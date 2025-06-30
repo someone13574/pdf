@@ -148,7 +148,7 @@ void logger_init(void) {
         0,
         "",
         LOG_LEVEL_INFO,
-        LOGGING_FILENAME,
+        RELATIVE_FILE_PATH,
         __LINE__,
         "Logging rules: `%s`",
         env
