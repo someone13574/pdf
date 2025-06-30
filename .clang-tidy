@@ -4,5 +4,6 @@ Checks: >
   modernize-*,
   readiblity-*,
   -bugprone-reserved-identifier,
-  -clang-analyzer-valist.Uninitialized
+  -clang-analyzer-valist.Uninitialized,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 HeaderFilterRegex: '.*'

@@ -21,7 +21,7 @@ static char const* level_names[] = {"TRACE", "DEBUG", "INFO", "WARN", "ERROR"};
 struct LevelRule {
     bool prefix_matching;
     char* pattern;
-    log_level_t level;
+    LogLevel level;
 };
 
 bool rule_matches(struct LevelRule* rule, char const* group) {
@@ -32,7 +32,7 @@ bool rule_matches(struct LevelRule* rule, char const* group) {
     }
 }
 
-int parse_level(char* level, log_level_t* out) {
+int parse_level(char* level, LogLevel* out) {
     if (strcasecmp(level, "trace") == 0) {
         *out = LOG_LEVEL_TRACE;
     } else if (strcasecmp(level, "debug") == 0) {
@@ -64,13 +64,7 @@ int parse_rules(char const* text, struct LevelRule* rules, int num_rules) {
             char level_str[6];
             char pattern_str[64];
 
-            int x =
-                sscanf( // NOLINT(clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling)
-                    rule,
-                    "%63[^=]=%5s",
-                    pattern_str,
-                    level_str
-                );
+            int x = sscanf(rule, "%63[^=]=%5s", pattern_str, level_str);
 
             if (x != 2) {
                 free(copy);
@@ -158,7 +152,7 @@ void logger_init(void) {
 void logger_log(
     int check_level,
     char const* group,
-    log_level_t level,
+    LogLevel level,
     char const* file,
     unsigned long line,
     char const* fmt,
@@ -167,7 +161,7 @@ void logger_log(
     logger_init();
 
     if (check_level) {
-        log_level_t filter_level = LOG_LEVEL_WARN;
+        LogLevel filter_level = LOG_LEVEL_WARN;
         for (int rule_idx = num_logger_rules - 1; rule_idx >= 0; rule_idx--) {
             if (rule_matches(&logger_rules[rule_idx], group)) {
                 filter_level = logger_rules[rule_idx].level;

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,69 +12,34 @@
 #endif
 
 typedef struct {
-    struct TestResult (*function)(void);
-    char const* name;
-} TestFunctionEntry;
-
-struct TestResult {
-    char* error_message;
     char const* error_file;
     uint32_t error_line;
-};
+} TestResult;
 
-static const struct TestResult TEST_RESULT_SUCCESS =
-    {.error_message = NULL, .error_file = NULL, .error_line = 0};
+typedef struct {
+    TestResult (*function)(void);
+    char const* name;
+} __TestFunctionEntry;
 
-// Return an malloc-allocated string, or NULL on OOM. Caller is responsible for
-// free().
-static inline char* format_alloc(char const* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    int needed =
-        vsnprintf( // NOLINT(clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling)
-            NULL,
-            0,
-            fmt,
-            args
-        );
-    va_end(args);
+static TestResult const TEST_SUCCESS = {.error_file = NULL, .error_line = 0};
 
-    if (needed < 0) {
-        abort();
-    }
-    char* buf = malloc((size_t)needed + 1);
-    if (!buf) {
-        abort();
-    }
-
-    va_start(args, fmt);
-    vsnprintf( // NOLINT(clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling)
-        buf,
-        (size_t)needed + 1,
-        fmt,
-        args
-    );
-    va_end(args);
-
-    return buf;
-}
-
-#define TEST_ERROR(...)                                                        \
+#define TEST_PANIC(...)                                                        \
     do {                                                                       \
-        return (struct TestResult                                              \
-        ) {.error_message = format_alloc(__VA_ARGS__),                         \
-           .error_file = RELATIVE_FILE_PATH,                                   \
-           .error_line = __LINE__};                                            \
+        LOG_ERROR_G("test", __VA_ARGS__);                                      \
+        return (TestResult) {                                                  \
+            .error_file = RELATIVE_FILE_PATH,                                  \
+            .error_line = __LINE__,                                            \
+        };                                                                     \
     } while (0)
 
 #define TEST_ASSERT(condition, ...)                                            \
     do {                                                                       \
         if (!(condition)) {                                                    \
-            return (struct TestResult                                          \
-            ) {.error_message =                                                \
-                   format_alloc("Assertion failed: " __VA_ARGS__),             \
-               .error_file = RELATIVE_FILE_PATH,                               \
-               .error_line = __LINE__};                                        \
+            LOG_ERROR_G("test", "Assertion failed: " __VA_ARGS__);             \
+            return (TestResult) {                                              \
+                .error_file = RELATIVE_FILE_PATH,                              \
+                .error_line = __LINE__,                                        \
+            };                                                                 \
         }                                                                      \
     } while (0)
 
@@ -98,8 +62,13 @@ void* __test_undefined(void);
     __TEST_COERCE(a, type) - __TEST_COERCE(b, type) < (type)(eps)              \
         && __TEST_COERCE(b, type) - __TEST_COERCE(a, type) < (type)(eps)
 
-#define TEST_ASSERT_CMP(a, b, target_eq, float_eps, msg_op)                    \
+#define TEST_ASSERT_CMP(a, b, target_eq, eps, msg_op)                          \
     do {                                                                       \
+        __typeof__(eps) _eps = eps;                                            \
+        _Static_assert(                                                        \
+            __builtin_types_compatible_p(long double, __typeof__(_eps)),       \
+            "Epsilon must be a long double"                                    \
+        );                                                                     \
         __typeof__(a) _a = (a);                                                \
         __typeof__(b) _b = (b);                                                \
         _Static_assert(                                                        \
@@ -110,9 +79,9 @@ void* __test_undefined(void);
         );                                                                     \
         _Bool equal = _Generic(                                                \
             _a,                                                                \
-            float: __TEST_CMP_FLOAT(_a, _b, float, (float_eps)),               \
-            double: __TEST_CMP_FLOAT(_a, _b, double, (float_eps)),             \
-            long double: __TEST_CMP_FLOAT(_a, _b, long double, (float_eps)),   \
+            float: __TEST_CMP_FLOAT(_a, _b, float, _eps),                      \
+            double: __TEST_CMP_FLOAT(_a, _b, double, _eps),                    \
+            long double: __TEST_CMP_FLOAT(_a, _b, long double, _eps),          \
             char*: strcmp(                                                     \
                 __TEST_COERCE(_a, const char*),                                \
                 __TEST_COERCE(_b, const char*)                                 \
@@ -124,7 +93,8 @@ void* __test_undefined(void);
             default: _a == _b                                                  \
         );                                                                     \
         if (((target_eq) && !equal) || (!(target_eq) && equal)) {              \
-            char* message = format_alloc(                                      \
+            LOG_ERROR_G(                                                       \
+                "test",                                                        \
                 _Generic(                                                      \
                     _a,                                                        \
                     char: __TEST_CMP_MESSAGE("'%c'", a, b, msg_op),            \
@@ -168,39 +138,23 @@ void* __test_undefined(void);
                 ),                                                             \
                 _a,                                                            \
                 _b,                                                            \
-                float_eps                                                      \
+                _eps                                                           \
             );                                                                 \
-            return (struct TestResult                                          \
-            ) {.error_message = message,                                       \
-               .error_file = RELATIVE_FILE_PATH,                               \
-               .error_line = __LINE__};                                        \
+            return (TestResult) {                                              \
+                .error_file = RELATIVE_FILE_PATH,                              \
+                .error_line = __LINE__,                                        \
+            };                                                                 \
         }                                                                      \
     } while (0)
 
 #define TEST_ASSERT_EQ(a, b) TEST_ASSERT_CMP(a, b, 1, 1e-6L, "==")
 #define TEST_ASSERT_NE(a, b) TEST_ASSERT_CMP(a, b, 0, 1e-6L, "!=")
-#define TEST_ASSERT_EQ_EPS(a, b, eps)                                          \
-    do {                                                                       \
-        __typeof__(eps) _eps = eps;                                            \
-        _Static_assert(                                                        \
-            __builtin_types_compatible_p(long double, __typeof__(_eps)),       \
-            "Epsilon must be a long double"                                    \
-        );                                                                     \
-        TEST_ASSERT_CMP(a, b, 1, _eps, "==");                                  \
-    } while (0)
-#define TEST_ASSERT_NE_EPS(a, b, eps)                                          \
-    do {                                                                       \
-        __typeof__(eps) _eps = eps;                                            \
-        _Static_assert(                                                        \
-            __builtin_types_compatible_p(long double, __typeof__(_eps)),       \
-            "Epsilon must be a long double"                                    \
-        );                                                                     \
-        TEST_ASSERT_CMP(a, b, 0, _eps, "!=");                                  \
-    } while (0)
+#define TEST_ASSERT_EQ_EPS(a, b, eps) TEST_ASSERT_CMP(a, b, 1, eps, "==")
+#define TEST_ASSERT_NE_EPS(a, b, eps) TEST_ASSERT_CMP(a, b, 0, eps, "!=")
 
 #define TEST_FUNC(test_name)                                                   \
-    struct TestResult test_name(void);                                         \
-    static const TestFunctionEntry _reg_##test_name                            \
+    static TestResult test_name(void);                                         \
+    static const __TestFunctionEntry _test_reg_##test_name                     \
         __attribute__((used, section("test_registry"))                         \
         ) = {.function = (test_name), .name = #test_name};                     \
-    struct TestResult test_name(void)
+    TestResult test_name(void)

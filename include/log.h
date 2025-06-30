@@ -6,12 +6,12 @@ typedef enum {
     LOG_LEVEL_INFO = 2,
     LOG_LEVEL_WARN = 3,
     LOG_LEVEL_ERROR = 4
-} log_level_t;
+} LogLevel;
 
 void logger_log(
     int check_level,
     char const* group,
-    log_level_t level,
+    LogLevel level,
     char const* file,
     unsigned long line,
     char const* fmt,
