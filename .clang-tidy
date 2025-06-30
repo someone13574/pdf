@@ -1,0 +1,6 @@
+---
+Checks: >
+  bugprone-*,
+  modernize-*,
+  readiblity-*
+HeaderFilterRegex: '.*'

@@ -69,7 +69,7 @@ NamespaceIndentation: Inner
 PointerAlignment: Left
 QualifierAlignment: Right
 ReferenceAlignment: Left
-ReflowComments: false
+ReflowComments: true
 RemoveSemicolon: true
 SeparateDefinitionBlocks: Always
 SortIncludes: true

@@ -1,9 +1,7 @@
-#include <stdio.h>
-
-#include "pdf.h"
+#include "log.h"
 
 int main(int argc, char** argv) {
-    printf("Hello world: %d\n", add(40, 2));
+    LOG_DEBUG("Hello world");
 
     return 0;
 }
