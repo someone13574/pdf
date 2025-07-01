@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdlib.h>
+
 typedef enum {
     LOG_LEVEL_TRACE = 0,
     LOG_LEVEL_DEBUG = 1,
@@ -10,13 +12,13 @@ typedef enum {
 
 void logger_log(
     int check_level,
-    char const* group,
+    const char* group,
     LogLevel level,
-    char const* file,
+    const char* file,
     unsigned long line,
-    char const* fmt,
+    const char* fmt,
     ...
-);
+) __attribute__((format(printf, 6, 7)));
 
 #if defined(SOURCE_PATH_SIZE)
     #define RELATIVE_FILE_PATH (&__FILE__[SOURCE_PATH_SIZE])
@@ -101,3 +103,29 @@ void logger_log(
         __LINE__,                                                              \
         __VA_ARGS__                                                            \
     )
+
+#define LOG_ASSERT(cond, ...)                                                  \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            LOG_ERROR("Assertion failed: " __VA_ARGS__);                       \
+            exit(EXIT_FAILURE);                                                \
+        }                                                                      \
+    } while (0)
+
+#ifdef DEBUG
+
+    #define DBG_ASSERT(cond)                                                   \
+        do {                                                                   \
+            if (!(cond)) {                                                     \
+                LOG_ERROR("Assertion failed: DBG_ASSERT(" #cond ")");          \
+                exit(EXIT_FAILURE);                                            \
+            }                                                                  \
+        } while (0)
+
+#else
+
+    #define DBG_ASSERT(cond)                                                   \
+        do {                                                                   \
+        } while (0)
+
+#endif

@@ -8,7 +8,7 @@
 #include <string.h>
 #include <strings.h>
 
-static char const* level_colors[] = {
+static const char* level_colors[] = {
     "\x1b[2m", // TRACE
     "\x1b[34m", // DEBUG
     "\x1b[32m", // INFO
@@ -16,7 +16,7 @@ static char const* level_colors[] = {
     "\x1b[31m", // ERROR
 };
 
-static char const* level_names[] = {"TRACE", "DEBUG", "INFO", "WARN", "ERROR"};
+static const char* level_names[] = {"TRACE", "DEBUG", "INFO", "WARN", "ERROR"};
 
 struct LevelRule {
     bool prefix_matching;
@@ -24,7 +24,7 @@ struct LevelRule {
     LogLevel level;
 };
 
-bool rule_matches(struct LevelRule* rule, char const* group) {
+bool rule_matches(struct LevelRule* rule, const char* group) {
     if (rule->prefix_matching) {
         return strncmp(rule->pattern, group, strlen(rule->pattern)) == 0;
     } else {
@@ -50,7 +50,7 @@ int parse_level(char* level, LogLevel* out) {
     return 0;
 }
 
-int parse_rules(char const* text, struct LevelRule* rules, int num_rules) {
+int parse_rules(const char* text, struct LevelRule* rules, int num_rules) {
     int parsed_rules = 0;
 
     char* copy = strdup(text);
@@ -116,7 +116,7 @@ void logger_init(void) {
         return;
     }
 
-    char const* env = getenv("PDF_LOG_LEVEL");
+    const char* env = getenv("PDF_LOG_LEVEL");
 
     if (!env) {
         env = "*=debug";
@@ -151,11 +151,11 @@ void logger_init(void) {
 
 void logger_log(
     int check_level,
-    char const* group,
+    const char* group,
     LogLevel level,
-    char const* file,
+    const char* file,
     unsigned long line,
-    char const* fmt,
+    const char* fmt,
     ...
 ) {
     logger_init();

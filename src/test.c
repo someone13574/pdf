@@ -89,7 +89,13 @@ int main(void) {
                 );
                 _exit(EXIT_FAILURE);
             } else {
-                LOG_DEBUG_G("test", "Test `%s` succeeded", entry->name);
+                LOG_DEBUG_G(
+                    "test",
+                    "Test `%s` (\x1b[4m%s:%d\x1b[0m) succeeded",
+                    entry->name,
+                    entry->file,
+                    entry->line
+                );
                 _exit(EXIT_SUCCESS);
             }
         } else {
@@ -142,8 +148,9 @@ int main(void) {
     print_line();
     LOG_INFO_G(
         "test",
-        "Test results: %d succeeded, %d failed, %d total",
+        "Test results: %d/%d succeeded, %d/%d failed",
         successful,
+        successful + failed,
         failed,
         successful + failed
     );
