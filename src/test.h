@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef TEST
+
 #include <log.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -7,9 +9,9 @@
 #include <string.h>
 
 #if defined(SOURCE_PATH_SIZE)
-    #define RELATIVE_FILE_PATH (&__FILE__[SOURCE_PATH_SIZE])
+#define RELATIVE_FILE_PATH (&__FILE__[SOURCE_PATH_SIZE])
 #else
-    #define RELATIVE_FILE_PATH __FILE__
+#define RELATIVE_FILE_PATH __FILE__
 #endif
 
 typedef struct {
@@ -325,12 +327,14 @@ void* __test_undefined(void);
     TEST_ASSERT_CMP(a, b, 0, eps, "!=", "not ")
 
 #define TEST_FUNC(test_name)                                                   \
-    static TestResult test_name(void);                                         \
+    static TestResult _test_func_##test_name(void);                            \
     static const __TestFunctionEntry _test_reg_##test_name                     \
         __attribute__((used, section("test_registry"))) = {                    \
-            .function = (test_name),                                           \
+            .function = (_test_func_##test_name),                              \
             .name = #test_name,                                                \
             .file = RELATIVE_FILE_PATH,                                        \
             .line = __LINE__                                                   \
     };                                                                         \
-    TestResult test_name(void)
+    TestResult _test_func_##test_name(void)
+
+#endif // TEST

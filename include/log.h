@@ -107,9 +107,14 @@ void logger_log(
 #define LOG_ASSERT(cond, ...)                                                  \
     do {                                                                       \
         if (!(cond)) {                                                         \
-            LOG_ERROR("Assertion failed: " __VA_ARGS__);                       \
-            exit(EXIT_FAILURE);                                                \
+            LOG_PANIC("Assertion failed: " __VA_ARGS__);                       \
         }                                                                      \
+    } while (0)
+
+#define LOG_PANIC(...)                                                         \
+    do {                                                                       \
+        LOG_ERROR(__VA_ARGS__);                                                \
+        exit(EXIT_FAILURE);                                                    \
     } while (0)
 
 #ifdef DEBUG

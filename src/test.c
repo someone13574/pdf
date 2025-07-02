@@ -1,5 +1,7 @@
 #include "test.h"
 
+#ifdef TEST
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,11 +39,13 @@ int main(void) {
     int failed = 0;
 
     for (__TestFunctionEntry* entry = start; entry < stop; entry++) {
+#ifndef TEST_NO_CAPTURE
         int pipefd[2];
         if (pipe(pipefd) < 0) {
             perror("pipe");
             exit(EXIT_FAILURE);
         }
+#endif // TEST_NO_CAPTURE
 
         pid_t pid = fork();
         if (pid < 0) {
@@ -50,6 +54,7 @@ int main(void) {
         }
 
         if (pid == 0) {
+#ifndef TEST_NO_CAPTURE
             close(pipefd[0]); // we only write
 
             // Save stdout for restore
@@ -65,9 +70,12 @@ int main(void) {
                 _exit(EXIT_FAILURE);
             }
             close(pipefd[1]);
+#endif // TEST_NO_CAPTURE
 
             // Run test and capture output
             TestResult result = entry->function();
+
+#ifndef TEST_NO_CAPTURE
             fflush(stdout);
 
             // Restore stdout
@@ -76,6 +84,7 @@ int main(void) {
                 _exit(EXIT_FAILURE);
             }
             close(saved_stdout);
+#endif // TEST_NO_CAPTURE
 
             // Print success/failure
             if (result.error_file) {
@@ -99,6 +108,7 @@ int main(void) {
                 _exit(EXIT_SUCCESS);
             }
         } else {
+#ifndef TEST_NO_CAPTURE
             close(pipefd[1]); // we only read
 
             // Save stdout into buffer
@@ -124,6 +134,7 @@ int main(void) {
                 buffer[buffer_size] = '\0';
             }
             close(pipefd[0]);
+#endif // TEST_NO_CAPTURE
 
             int status;
             waitpid(pid, &status, 0);
@@ -132,6 +143,7 @@ int main(void) {
                 successful++;
             } else {
                 failed++;
+#ifndef TEST_NO_CAPTURE
                 if (buffer_size > 0) {
                     if (fwrite(buffer, 1, buffer_size, stdout) != buffer_size) {
                         perror("fwrite");
@@ -139,9 +151,12 @@ int main(void) {
                     }
                     print_line();
                 }
+#endif // TEST_NO_CAPTURE
             }
 
+#ifndef TEST_NO_CAPTURE
             free(buffer);
+#endif // TEST_NO_CAPTURE
         }
     }
 
@@ -157,3 +172,9 @@ int main(void) {
 
     return (failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
+
+#else // TEST
+
+void translation_unit_not_empty(void) {}
+
+#endif

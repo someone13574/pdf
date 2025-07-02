@@ -1,8 +1,9 @@
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-uint8_t* load_file_to_buffer(const char* path, size_t* out_size) {
+#include "pdf.h"
+
+char* load_file_to_buffer(const char* path, size_t* out_size) {
     FILE* file = fopen(path, "rb");
     *out_size = 0;
     if (!file) {
@@ -25,7 +26,7 @@ uint8_t* load_file_to_buffer(const char* path, size_t* out_size) {
         return NULL;
     }
 
-    uint8_t* buffer = malloc((size_t)len);
+    char* buffer = malloc((size_t)len);
     if (!buffer) {
         fclose(file);
         return NULL;
@@ -46,11 +47,16 @@ int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
 
-    size_t file_size;
-    uint8_t* buffer = load_file_to_buffer("test-files/test.pdf", &file_size);
+    size_t buffer_size;
+    char* buffer = load_file_to_buffer("test-files/test.pdf", &buffer_size);
 
-    printf("File size: %lu\n", file_size);
-    printf("%s\n", buffer);
+    PdfDocument* doc = pdf_document_new(buffer, buffer_size);
+
+    pdf_document_free(doc);
+    doc = NULL;
+
+    free(buffer);
+    buffer = NULL;
 
     return 0;
 }
