@@ -1,6 +1,5 @@
 #include "parse.h"
 
-#include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -50,30 +49,16 @@ PdfResult pdf_parse_startxref(PdfCtx* ctx, size_t* startxref) {
     PDF_TRY(pdf_ctx_seek_line_start(ctx));
     size_t startxref_offset = pdf_ctx_offset(ctx);
 
-    char* xref_offset_str;
-    PDF_TRY(pdf_ctx_borrow_substr(
+    unsigned long long xref_offset;
+    PDF_TRY(pdf_ctx_parse_int(
         ctx,
         startxref_offset,
         eof_marker_offset - startxref_offset,
-        &xref_offset_str
+        &xref_offset,
+        NULL
     ));
 
-    if (xref_offset_str[0] == '+') { // stroll will parse signs
-        return PDF_ERR_INVALID_TRAILER;
-    }
-
-    char* strol_end;
-    long long xref_offset = strtoll(xref_offset_str, &strol_end, 10);
-    if (xref_offset_str == strol_end || xref_offset < 0) {
-        return PDF_ERR_INVALID_TRAILER;
-    }
-
-    if (errno == ERANGE) {
-        return PDF_ERR_INVALID_TRAILER;
-    }
-
     *startxref = (size_t)xref_offset;
-    PDF_TRY(pdf_ctx_release_substr(ctx));
 
     // Check for startxref line
     PDF_TRY(pdf_ctx_shift(ctx, -1));
@@ -153,7 +138,7 @@ TEST_FUNC(test_parse_startxref_invalid) {
 
     size_t startxref;
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_ERR_INVALID_TRAILER,
+        (PdfResult)PDF_CTX_ERR_INVALID_NUMBER,
         pdf_parse_startxref(ctx, &startxref)
     );
 
@@ -169,7 +154,7 @@ TEST_FUNC(test_parse_startxref_invalid2) {
 
     size_t startxref;
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_ERR_INVALID_TRAILER,
+        (PdfResult)PDF_CTX_ERR_INVALID_NUMBER,
         pdf_parse_startxref(ctx, &startxref)
     );
 

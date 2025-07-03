@@ -21,7 +21,16 @@ PdfResult pdf_ctx_peek(PdfCtx* ctx, char* out);
 PdfResult pdf_ctx_expect(PdfCtx* ctx, const char* text);
 PdfResult pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit);
 PdfResult pdf_ctx_seek_line_start(PdfCtx* ctx);
+PdfResult pdf_ctx_seek_next_line(PdfCtx* ctx);
 
 PdfResult
 pdf_ctx_borrow_substr(PdfCtx* ctx, size_t offset, size_t length, char** substr);
 PdfResult pdf_ctx_release_substr(PdfCtx* ctx);
+
+PdfResult pdf_ctx_parse_int(
+    PdfCtx* ctx,
+    size_t offset,
+    size_t length,
+    unsigned long long* out,
+    long* read_length
+);

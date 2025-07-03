@@ -7,9 +7,11 @@
 #include "log.h"
 #include "parse.h"
 #include "result.h"
+#include "xref.h"
 
 struct PdfDocument {
     PdfCtx* ctx;
+    XRefTable* xref;
     uint8_t version;
     size_t startxref;
 };
@@ -35,11 +37,19 @@ PdfDocument* pdf_document_new(char* buffer, size_t buffer_size) {
     );
     LOG_DEBUG_G("doc-info", "Startxref: %lu", doc->startxref);
 
+    // Parse xref
+    PdfResult result;
+    XRefTable* xref = pdf_xref_create(doc->ctx, doc->startxref, &result);
+    LOG_ASSERT(xref, "Invalid xref");
+    LOG_ASSERT(result == PDF_OK, "Failed to parse xref with code %d", result);
+    doc->xref = xref;
+
     return doc;
 }
 
 void pdf_document_free(PdfDocument* doc) {
     if (doc) {
+        pdf_xref_free(&doc->xref);
         pdf_ctx_free(doc->ctx);
         doc->ctx = NULL;
 

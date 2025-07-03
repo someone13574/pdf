@@ -132,7 +132,7 @@ void logger_init(void) {
     }
 
     logger_rules =
-        malloc((unsigned long)num_logger_rules * sizeof(struct LevelRule));
+        calloc((unsigned long)num_logger_rules, sizeof(struct LevelRule));
     if (parse_rules(env, logger_rules, num_logger_rules) < 0) {
         printf("Invalid logging rule set.\n");
         exit(EXIT_FAILURE);
