@@ -207,7 +207,6 @@ XRefTable* pdf_xref_create(PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
         subsection.objects = NULL; // allocated when used
 
         if (++xref->num_subsections > xref->subsections_capacity) {
-            size_t old_capacity = xref->subsections_capacity;
             xref->subsections_capacity *= 2;
 
             XRefSubsection* realloced = realloc(
@@ -215,13 +214,6 @@ XRefTable* pdf_xref_create(PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
                 sizeof(XRefSubsection) * xref->subsections_capacity
             );
             LOG_ASSERT(realloced, "Re-allocation failed");
-
-            memset(
-                realloced + sizeof(XRefSubsection) * old_capacity,
-                0,
-                sizeof(XRefSubsection)
-                    * (old_capacity - xref->subsections_capacity)
-            );
             xref->subsections = realloced;
         }
 
@@ -262,15 +254,15 @@ TEST_FUNC(test_xref_create) {
     char buffer[] =
         "xref\n0 2\n0000000000 65536 f \n0000000042 00000 n \n2 1\n0000000542 00002 n ";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
 
     PdfResult result;
     XRefTable* xref = pdf_xref_create(ctx, 0, &result);
     TEST_ASSERT_EQ((PdfResult)PDF_OK, result);
-    TEST_ASSERT(xref, "Creation failed");
+    TEST_ASSERT(xref);
 
     TEST_ASSERT_EQ((size_t)2, xref->num_subsections);
-    TEST_ASSERT(xref->subsections, "Subsections not allocated");
+    TEST_ASSERT(xref->subsections);
 
     TEST_ASSERT_EQ((size_t)9, xref->subsections[0].start_offset);
     TEST_ASSERT_EQ((uint32_t)0, xref->subsections[0].first_object);
@@ -280,7 +272,10 @@ TEST_FUNC(test_xref_create) {
     TEST_ASSERT_EQ((uint32_t)2, xref->subsections[1].first_object);
     TEST_ASSERT_EQ((uint32_t)1, xref->subsections[1].num_objects);
 
-    return TEST_SUCCESS;
+    pdf_xref_free(&xref);
+    pdf_ctx_free(ctx);
+
+    return TEST_RESULT_PASS;
 }
 
 #endif // TEST

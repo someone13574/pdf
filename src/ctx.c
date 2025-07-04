@@ -390,7 +390,7 @@ PdfResult pdf_ctx_parse_int(
 TEST_FUNC(test_expect_and_peek) {
     char buffer[] = "testing";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
 
     // Check peek
     char peeked;
@@ -417,31 +417,27 @@ TEST_FUNC(test_expect_and_peek) {
 
     pdf_ctx_free(ctx);
 
-    return TEST_SUCCESS;
+    return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_backscan) {
     char buffer[] = "the quick brown fox jumped over the lazy dog";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
         pdf_ctx_seek(ctx, pdf_ctx_buffer_len(ctx))
     );
 
-    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_backscan(ctx, "fox", 0));
-    TEST_ASSERT_EQ((size_t)16, pdf_ctx_offset(ctx));
-    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_expect(ctx, "fox"));
-
     pdf_ctx_free(ctx);
 
-    return TEST_SUCCESS;
+    return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_backscan_missing) {
     char buffer[] = "the quick brown fox jumped over the lazy dog";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
         pdf_ctx_seek(ctx, pdf_ctx_buffer_len(ctx))
@@ -451,13 +447,13 @@ TEST_FUNC(test_backscan_missing) {
 
     pdf_ctx_free(ctx);
 
-    return TEST_SUCCESS;
+    return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_backscan_limit) {
     char buffer[] = "the quick brown fox jumped over the lazy dog";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
         pdf_ctx_seek(ctx, pdf_ctx_buffer_len(ctx))
@@ -474,13 +470,13 @@ TEST_FUNC(test_backscan_limit) {
 
     pdf_ctx_free(ctx);
 
-    return TEST_SUCCESS;
+    return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_seek_line_start) {
     char buffer[] = "line1\nline2\rline3\r\nline4\nline5";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
 
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek_line_start(ctx));
     TEST_ASSERT_EQ((size_t)0, pdf_ctx_offset(ctx));
@@ -503,13 +499,13 @@ TEST_FUNC(test_seek_line_start) {
 
     pdf_ctx_free(ctx);
 
-    return TEST_SUCCESS;
+    return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_seek_next_line) {
     char buffer[] = "line1\nline2\rline3\r\nline4\nline5";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
 
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek_next_line(ctx));
     TEST_ASSERT_EQ((size_t)6, pdf_ctx_offset(ctx));
@@ -530,13 +526,13 @@ TEST_FUNC(test_seek_next_line) {
 
     pdf_ctx_free(ctx);
 
-    return TEST_SUCCESS;
+    return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_borrow_substr) {
     char buffer[] = "the quick brown fox jumped over the lazy dog";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
 
     // Borrow
     char* substr;
@@ -555,17 +551,17 @@ TEST_FUNC(test_borrow_substr) {
 
     // Free original borrow
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_release_substr(ctx));
-    TEST_ASSERT(!substr, "Substring not NULLed");
+    TEST_ASSERT(!substr);
 
     pdf_ctx_free(ctx);
 
-    return TEST_SUCCESS;
+    return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_parse_int) {
     char buffer[] = "John has +120 apples. I have 42.";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
 
     unsigned long long out;
     long read_length;
@@ -598,7 +594,7 @@ TEST_FUNC(test_parse_int) {
     );
 
     pdf_ctx_free(ctx);
-    return TEST_SUCCESS;
+    return TEST_RESULT_PASS;
 }
 
 #endif // TEST

@@ -69,12 +69,14 @@ PdfResult pdf_parse_startxref(PdfCtx* ctx, size_t* startxref) {
 }
 
 #ifdef TEST
+#include <string.h>
+
 #include "test.h"
 
 TEST_FUNC(test_valid_header) {
     char buffer[] = "%PDF-1.5";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
 
     uint8_t version;
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_parse_header(ctx, &version));
@@ -82,13 +84,13 @@ TEST_FUNC(test_valid_header) {
 
     pdf_ctx_free(ctx);
 
-    return TEST_SUCCESS;
+    return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_invalid_header) {
     char buffer[] = "hello";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
 
     uint8_t version;
     TEST_ASSERT_EQ(
@@ -98,13 +100,13 @@ TEST_FUNC(test_invalid_header) {
 
     pdf_ctx_free(ctx);
 
-    return TEST_SUCCESS;
+    return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_invalid_version) {
     char buffer[] = "%PDF-1.f";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
 
     uint8_t version;
     TEST_ASSERT_EQ(
@@ -114,13 +116,13 @@ TEST_FUNC(test_invalid_version) {
 
     pdf_ctx_free(ctx);
 
-    return TEST_SUCCESS;
+    return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_parse_startxref) {
     char buffer[] = "startxref\n4325\n%%EOF";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
 
     size_t startxref;
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_parse_startxref(ctx, &startxref));
@@ -128,13 +130,13 @@ TEST_FUNC(test_parse_startxref) {
 
     pdf_ctx_free(ctx);
 
-    return TEST_SUCCESS;
+    return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_parse_startxref_invalid) {
     char buffer[] = "startxref\n\n%%EOF";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
 
     size_t startxref;
     TEST_ASSERT_EQ(
@@ -144,13 +146,13 @@ TEST_FUNC(test_parse_startxref_invalid) {
 
     pdf_ctx_free(ctx);
 
-    return TEST_SUCCESS;
+    return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_parse_startxref_invalid2) {
     char buffer[] = "startxref\n+435\n%%EOF";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
 
     size_t startxref;
     TEST_ASSERT_EQ(
@@ -160,13 +162,13 @@ TEST_FUNC(test_parse_startxref_invalid2) {
 
     pdf_ctx_free(ctx);
 
-    return TEST_SUCCESS;
+    return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_parse_startxref_invalid3) {
     char buffer[] = "notstartxref\n4325\n%%EOF";
     PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
-    TEST_ASSERT(ctx, "Creation failed");
+    TEST_ASSERT(ctx);
 
     size_t startxref;
     TEST_ASSERT_EQ(
@@ -176,7 +178,7 @@ TEST_FUNC(test_parse_startxref_invalid3) {
 
     pdf_ctx_free(ctx);
 
-    return TEST_SUCCESS;
+    return TEST_RESULT_PASS;
 }
 
 #endif // TEST
