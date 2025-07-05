@@ -2,13 +2,13 @@
 
 #include <stdio.h>
 
+#include "arena.h"
 #include "result.h"
 
 typedef struct PdfCtx PdfCtx;
 
 // Creates a new context from a buffer. The buffer *must* be writable.
-PdfCtx* pdf_ctx_new(char* buffer, size_t buffer_size);
-void pdf_ctx_free(PdfCtx* ctx);
+PdfCtx* pdf_ctx_new(Arena* arena, char* buffer, size_t buffer_size);
 
 size_t pdf_ctx_buffer_len(PdfCtx* ctx);
 size_t pdf_ctx_offset(PdfCtx* ctx);

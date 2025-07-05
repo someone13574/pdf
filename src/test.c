@@ -90,6 +90,7 @@ TEST_ASSERT_INT_CMP_DEF(long, long, eq, ==, "%ld")
 TEST_ASSERT_INT_CMP_DEF(unsigned long, unsigned_long, eq, ==, "%lu")
 TEST_ASSERT_INT_CMP_DEF(long long, long_long, eq, ==, "%lld")
 TEST_ASSERT_INT_CMP_DEF(unsigned long long, unsigned_long_long, eq, ==, "%llu")
+TEST_ASSERT_INT_CMP_DEF(void*, void_ptr, eq, ==, "%p")
 TEST_ASSERT_FLOAT_CMP_DEF(float, float, eq, <, &&, ==, double, "%g")
 TEST_ASSERT_FLOAT_CMP_DEF(double, double, eq, <, &&, ==, double, "%g")
 TEST_ASSERT_FLOAT_CMP_DEF(long double, long_double, eq, <, &&, ==, long double, "%Lg")
@@ -105,6 +106,7 @@ TEST_ASSERT_INT_CMP_DEF(long, long, ne, !=, "%ld")
 TEST_ASSERT_INT_CMP_DEF(unsigned long, unsigned_long, ne, !=, "%lu")
 TEST_ASSERT_INT_CMP_DEF(long long, long_long, ne, !=, "%lld")
 TEST_ASSERT_INT_CMP_DEF(unsigned long long, unsigned_long_long, ne, !=, "%llu")
+TEST_ASSERT_INT_CMP_DEF(void*, void_ptr, ne, !=, "%p")
 TEST_ASSERT_FLOAT_CMP_DEF(float, float, ne, >, ||, !=, double, "%g")
 TEST_ASSERT_FLOAT_CMP_DEF(double, double, ne, >, ||, !=, double, "%g")
 TEST_ASSERT_FLOAT_CMP_DEF(
@@ -308,6 +310,10 @@ int test_entry(void) {
                     entry->file,
                     entry->line
                 );
+
+#ifdef TEST_NO_CAPTURE
+                print_line();
+#endif // TEST_NO_CAPTURE
 
                 passed++;
             } else {

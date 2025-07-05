@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arena.h"
 #include "log.h"
 #include "result.h"
 
@@ -20,11 +21,11 @@ struct PdfCtx {
     char** borrowed_substr;
 };
 
-PdfCtx* pdf_ctx_new(char* buffer, size_t buffer_size) {
+PdfCtx* pdf_ctx_new(Arena* arena, char* buffer, size_t buffer_size) {
     LOG_ASSERT(buffer, "Invalid buffer");
     LOG_ASSERT(buffer_size > 0, "Empty buffer");
 
-    PdfCtx* ctx = malloc(sizeof(PdfCtx));
+    PdfCtx* ctx = arena_alloc(arena, sizeof(PdfCtx));
     LOG_ASSERT(ctx, "Allocation failed");
 
     ctx->buffer = buffer;
@@ -35,12 +36,6 @@ PdfCtx* pdf_ctx_new(char* buffer, size_t buffer_size) {
     ctx->borrowed_substr = NULL;
 
     return ctx;
-}
-
-void pdf_ctx_free(PdfCtx* ctx) {
-    if (ctx) {
-        free(ctx);
-    }
 }
 
 size_t pdf_ctx_buffer_len(PdfCtx* ctx) {
@@ -387,9 +382,11 @@ PdfResult pdf_ctx_parse_int(
 #ifdef TEST
 #include "test.h"
 
-TEST_FUNC(test_expect_and_peek) {
+TEST_FUNC(test_ctx_expect_and_peek) {
     char buffer[] = "testing";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
 
     // Check peek
@@ -415,28 +412,30 @@ TEST_FUNC(test_expect_and_peek) {
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 0));
     TEST_ASSERT_EQ((PdfResult)PDF_CTX_ERR_EOF, pdf_ctx_expect(ctx, "testing!"));
 
-    pdf_ctx_free(ctx);
-
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_backscan) {
+TEST_FUNC(test_ctx_backscan) {
     char buffer[] = "the quick brown fox jumped over the lazy dog";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
         pdf_ctx_seek(ctx, pdf_ctx_buffer_len(ctx))
     );
 
-    pdf_ctx_free(ctx);
-
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_backscan_missing) {
+TEST_FUNC(test_ctx_backscan_missing) {
     char buffer[] = "the quick brown fox jumped over the lazy dog";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
@@ -445,14 +444,15 @@ TEST_FUNC(test_backscan_missing) {
 
     TEST_ASSERT_EQ((PdfResult)PDF_CTX_ERR_EOF, pdf_ctx_backscan(ctx, "cat", 0));
 
-    pdf_ctx_free(ctx);
-
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_backscan_limit) {
+TEST_FUNC(test_ctx_backscan_limit) {
     char buffer[] = "the quick brown fox jumped over the lazy dog";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
@@ -468,14 +468,15 @@ TEST_FUNC(test_backscan_limit) {
     );
     TEST_ASSERT_EQ((size_t)32, pdf_ctx_offset(ctx));
 
-    pdf_ctx_free(ctx);
-
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_seek_line_start) {
+TEST_FUNC(test_ctx_seek_line_start) {
     char buffer[] = "line1\nline2\rline3\r\nline4\nline5";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
 
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek_line_start(ctx));
@@ -497,14 +498,15 @@ TEST_FUNC(test_seek_line_start) {
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek_line_start(ctx));
     TEST_ASSERT_EQ((size_t)12, pdf_ctx_offset(ctx));
 
-    pdf_ctx_free(ctx);
-
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_seek_next_line) {
+TEST_FUNC(test_ctx_seek_next_line) {
     char buffer[] = "line1\nline2\rline3\r\nline4\nline5";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
 
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek_next_line(ctx));
@@ -524,14 +526,15 @@ TEST_FUNC(test_seek_next_line) {
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 27));
     TEST_ASSERT_EQ((PdfResult)PDF_CTX_ERR_EOF, pdf_ctx_seek_next_line(ctx));
 
-    pdf_ctx_free(ctx);
-
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_borrow_substr) {
+TEST_FUNC(test_ctx_borrow_substr) {
     char buffer[] = "the quick brown fox jumped over the lazy dog";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
 
     // Borrow
@@ -553,14 +556,15 @@ TEST_FUNC(test_borrow_substr) {
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_release_substr(ctx));
     TEST_ASSERT(!substr);
 
-    pdf_ctx_free(ctx);
-
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_parse_int) {
+TEST_FUNC(test_ctx_parse_int) {
     char buffer[] = "John has +120 apples. I have 42.";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
 
     unsigned long long out;
@@ -593,7 +597,7 @@ TEST_FUNC(test_parse_int) {
         pdf_ctx_parse_int(ctx, 28, 3, &out, NULL)
     );
 
-    pdf_ctx_free(ctx);
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 

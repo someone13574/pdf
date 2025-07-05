@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "arena.h"
 #include "ctx.h"
 #include "log.h"
 #include "result.h"
@@ -73,23 +74,26 @@ PdfResult pdf_parse_startxref(PdfCtx* ctx, size_t* startxref) {
 
 #include "test.h"
 
-TEST_FUNC(test_valid_header) {
+TEST_FUNC(test_header_valid) {
     char buffer[] = "%PDF-1.5";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
 
     uint8_t version;
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_parse_header(ctx, &version));
     TEST_ASSERT_EQ((uint8_t)5, version);
 
-    pdf_ctx_free(ctx);
-
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_invalid_header) {
+TEST_FUNC(test_header_invalid) {
     char buffer[] = "hello";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
 
     uint8_t version;
@@ -98,14 +102,15 @@ TEST_FUNC(test_invalid_header) {
         pdf_parse_header(ctx, &version)
     );
 
-    pdf_ctx_free(ctx);
-
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_invalid_version) {
+TEST_FUNC(test_header_invalid_version) {
     char buffer[] = "%PDF-1.f";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
 
     uint8_t version;
@@ -114,28 +119,30 @@ TEST_FUNC(test_invalid_version) {
         pdf_parse_header(ctx, &version)
     );
 
-    pdf_ctx_free(ctx);
-
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_parse_startxref) {
+TEST_FUNC(test_startxref) {
     char buffer[] = "startxref\n4325\n%%EOF";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
 
     size_t startxref;
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_parse_startxref(ctx, &startxref));
     TEST_ASSERT_EQ((size_t)4325, startxref);
 
-    pdf_ctx_free(ctx);
-
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_parse_startxref_invalid) {
+TEST_FUNC(test_startxref_invalid) {
     char buffer[] = "startxref\n\n%%EOF";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
 
     size_t startxref;
@@ -144,14 +151,15 @@ TEST_FUNC(test_parse_startxref_invalid) {
         pdf_parse_startxref(ctx, &startxref)
     );
 
-    pdf_ctx_free(ctx);
-
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_parse_startxref_invalid2) {
+TEST_FUNC(test_startxref_invalid2) {
     char buffer[] = "startxref\n+435\n%%EOF";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
 
     size_t startxref;
@@ -160,14 +168,15 @@ TEST_FUNC(test_parse_startxref_invalid2) {
         pdf_parse_startxref(ctx, &startxref)
     );
 
-    pdf_ctx_free(ctx);
-
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_parse_startxref_invalid3) {
+TEST_FUNC(test_startxref_invalid3) {
     char buffer[] = "notstartxref\n4325\n%%EOF";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
 
     size_t startxref;
@@ -176,8 +185,7 @@ TEST_FUNC(test_parse_startxref_invalid3) {
         pdf_parse_startxref(ctx, &startxref)
     );
 
-    pdf_ctx_free(ctx);
-
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 

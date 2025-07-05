@@ -21,9 +21,9 @@ void logger_log(
 ) __attribute__((format(printf, 6, 7)));
 
 #if defined(SOURCE_PATH_SIZE)
-    #define RELATIVE_FILE_PATH (&__FILE__[SOURCE_PATH_SIZE])
+#define RELATIVE_FILE_PATH (&__FILE__[SOURCE_PATH_SIZE])
 #else
-    #define RELATIVE_FILE_PATH __FILE__
+#define RELATIVE_FILE_PATH __FILE__
 #endif
 
 #define LOG_TRACE(...)                                                         \
@@ -119,18 +119,18 @@ void logger_log(
 
 #ifdef DEBUG
 
-    #define DBG_ASSERT(cond)                                                   \
-        do {                                                                   \
-            if (!(cond)) {                                                     \
-                LOG_ERROR("Assertion failed: DBG_ASSERT(" #cond ")");          \
-                exit(EXIT_FAILURE);                                            \
-            }                                                                  \
-        } while (0)
+#define DBG_ASSERT(cond)                                                       \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            LOG_ERROR("Assertion failed: DBG_ASSERT(" #cond ")");              \
+            exit(EXIT_FAILURE);                                                \
+        }                                                                      \
+    } while (0)
 
 #else
 
-    #define DBG_ASSERT(cond)                                                   \
-        do {                                                                   \
-        } while (0)
+#define DBG_ASSERT(cond)                                                       \
+    do {                                                                       \
+    } while (0)
 
 #endif

@@ -6,9 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "arena.h"
 #include "ctx.h"
 #include "log.h"
 #include "result.h"
+#include "vec.h"
 
 typedef struct {
     size_t offset;
@@ -25,10 +27,7 @@ typedef struct {
 
 struct XRefTable {
     PdfCtx* ctx;
-
-    size_t num_subsections;
-    size_t subsections_capacity;
-    XRefSubsection* subsections;
+    Vec* subsections;
 };
 
 // Each cross-reference subsection shall contain entries for a contiguous range
@@ -75,34 +74,16 @@ PdfResult pdf_xref_parse_subsection_header(
     return PDF_OK;
 }
 
-void pdf_xref_free(XRefTable** xref_ref) {
-    DBG_ASSERT(xref_ref);
-    XRefTable* xref = *xref_ref;
-
-    if (xref) {
-        if (xref->subsections) {
-            for (size_t subsection_idx = 0;
-                 subsection_idx < xref->num_subsections;
-                 subsection_idx++) {
-                free(xref->subsections[subsection_idx].objects);
-            }
-            free(xref->subsections);
-            xref->subsections = NULL;
-        }
-
-        free(xref);
-    }
-
-    *xref_ref = NULL;
-}
-
-XRefTable* pdf_xref_create(PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
+XRefTable*
+pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
     DBG_ASSERT(ctx);
+    DBG_ASSERT(arena);
+
     if (result) {
         *result = PDF_OK;
     }
 
-    XRefTable* xref = malloc(sizeof(XRefTable));
+    XRefTable* xref = arena_alloc(arena, sizeof(XRefTable));
     LOG_ASSERT(xref, "XRefTable allocation failed");
 
     // Validate xrefstart
@@ -111,8 +92,6 @@ XRefTable* pdf_xref_create(PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
         if (result) {
             *result = seek_result;
         }
-
-        free(xref);
         return NULL;
     }
 
@@ -126,8 +105,6 @@ XRefTable* pdf_xref_create(PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
         if (result) {
             *result = seek_result;
         }
-
-        free(xref);
         return NULL;
     }
 
@@ -137,7 +114,6 @@ XRefTable* pdf_xref_create(PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
             *result = expect_result;
         }
 
-        free(xref);
         return NULL;
     }
 
@@ -148,21 +124,20 @@ XRefTable* pdf_xref_create(PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
         if (result) {
             *result = next_line_result;
         }
-
-        free(xref);
         return NULL;
     }
 
     xref->ctx = ctx;
-    xref->num_subsections = 0;
-    xref->subsections_capacity = 1;
-    xref->subsections =
-        calloc(sizeof(XRefSubsection), xref->subsections_capacity);
+    xref->subsections = vec_new(arena);
     LOG_ASSERT(xref->subsections, "Allocation failed");
 
     // Parse subsections
     do {
-        LOG_TRACE_G("xref", "Parsing subsection %lu", xref->num_subsections);
+        LOG_TRACE_G(
+            "xref",
+            "Parsing subsection %zu",
+            vec_len(xref->subsections)
+        );
 
         // Parse
         unsigned long long first_object;
@@ -178,12 +153,11 @@ XRefTable* pdf_xref_create(PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
         if (parse_result != PDF_OK) {
             LOG_TRACE_G("xref", "Bad subsection header");
 
-            if (xref->num_subsections == 0) {
+            if (vec_len(xref->subsections) == 0) {
                 if (result) {
                     *result = parse_result;
                 }
 
-                pdf_xref_free(&xref);
                 return NULL;
             }
 
@@ -192,32 +166,21 @@ XRefTable* pdf_xref_create(PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
 
         LOG_DEBUG_G(
             "xref",
-            "subsection=%lu, subsection_start=%lu, first_object=%llu, num_objects=%llu",
-            xref->num_subsections,
+            "subsection=%zu, subsection_start=%lu, first_object=%llu, num_objects=%llu",
+            vec_len(xref->subsections),
             subsection_start,
             first_object,
             num_objects
         );
 
         // Allocate
-        XRefSubsection subsection;
-        subsection.start_offset = subsection_start;
-        subsection.first_object = (uint32_t)first_object;
-        subsection.num_objects = (uint32_t)num_objects;
-        subsection.objects = NULL; // allocated when used
+        XRefSubsection* subsection = arena_alloc(arena, sizeof(XRefSubsection));
+        subsection->start_offset = subsection_start;
+        subsection->first_object = (uint32_t)first_object;
+        subsection->num_objects = (uint32_t)num_objects;
+        subsection->objects = NULL; // allocated when used
 
-        if (++xref->num_subsections > xref->subsections_capacity) {
-            xref->subsections_capacity *= 2;
-
-            XRefSubsection* realloced = realloc(
-                xref->subsections,
-                sizeof(XRefSubsection) * xref->subsections_capacity
-            );
-            LOG_ASSERT(realloced, "Re-allocation failed");
-            xref->subsections = realloced;
-        }
-
-        xref->subsections[xref->num_subsections - 1] = subsection;
+        vec_push(xref->subsections, subsection);
 
         // Seek next subsection
         PdfResult seek_end_result =
@@ -234,7 +197,6 @@ XRefTable* pdf_xref_create(PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
                 *result = seek_end_result;
             }
 
-            pdf_xref_free(&xref);
             return NULL;
         }
 
@@ -243,6 +205,8 @@ XRefTable* pdf_xref_create(PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
             break;
         }
     } while (1);
+
+    LOG_TRACE_G("xref", "Finished parsing subsection headers");
 
     return xref;
 }
@@ -253,28 +217,29 @@ XRefTable* pdf_xref_create(PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
 TEST_FUNC(test_xref_create) {
     char buffer[] =
         "xref\n0 2\n0000000000 65536 f \n0000000042 00000 n \n2 1\n0000000542 00002 n ";
-    PdfCtx* ctx = pdf_ctx_new(buffer, strlen(buffer));
+    Arena* arena = arena_new(128);
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
 
     PdfResult result;
-    XRefTable* xref = pdf_xref_create(ctx, 0, &result);
+    XRefTable* xref = pdf_xref_new(arena, ctx, 0, &result);
     TEST_ASSERT_EQ((PdfResult)PDF_OK, result);
     TEST_ASSERT(xref);
 
-    TEST_ASSERT_EQ((size_t)2, xref->num_subsections);
+    TEST_ASSERT_EQ((size_t)2, vec_len(xref->subsections));
     TEST_ASSERT(xref->subsections);
 
-    TEST_ASSERT_EQ((size_t)9, xref->subsections[0].start_offset);
-    TEST_ASSERT_EQ((uint32_t)0, xref->subsections[0].first_object);
-    TEST_ASSERT_EQ((uint32_t)2, xref->subsections[0].num_objects);
+    XRefSubsection* subsection_0 = vec_get(xref->subsections, 0);
+    TEST_ASSERT_EQ((size_t)9, subsection_0->start_offset);
+    TEST_ASSERT_EQ((uint32_t)0, subsection_0->first_object);
+    TEST_ASSERT_EQ((uint32_t)2, subsection_0->num_objects);
 
-    TEST_ASSERT_EQ((size_t)53, xref->subsections[1].start_offset);
-    TEST_ASSERT_EQ((uint32_t)2, xref->subsections[1].first_object);
-    TEST_ASSERT_EQ((uint32_t)1, xref->subsections[1].num_objects);
+    XRefSubsection* subsection_1 = vec_get(xref->subsections, 1);
+    TEST_ASSERT_EQ((size_t)53, subsection_1->start_offset);
+    TEST_ASSERT_EQ((uint32_t)2, subsection_1->first_object);
+    TEST_ASSERT_EQ((uint32_t)1, subsection_1->num_objects);
 
-    pdf_xref_free(&xref);
-    pdf_ctx_free(ctx);
-
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 

@@ -5,5 +5,5 @@
 
 typedef struct XRefTable XRefTable;
 
-XRefTable* pdf_xref_create(PdfCtx* ctx, size_t xrefstart, PdfResult* result);
-void pdf_xref_free(XRefTable** xref);
+XRefTable*
+pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, PdfResult* result);

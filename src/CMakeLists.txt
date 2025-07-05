@@ -4,14 +4,12 @@ set(HEADER_LIST
 set(SOURCE_FILE_LIST
     pdf.c
     log.c
-    test.c
-    test.h
-    ctx.c
-    ctx.h
-    parse.c
-    parse.h
-    xref.c
-    xref.h
+    test.c test.h
+    arena.c arena.h
+    vec.c vec.h
+    ctx.c ctx.h
+    parse.c parse.h
+    xref.c xref.h
     ${HEADER_LIST})
 
 add_library(pdf ${SOURCE_FILE_LIST})

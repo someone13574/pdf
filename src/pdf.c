@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "arena.h"
 #include "ctx.h"
 #include "log.h"
 #include "parse.h"
@@ -14,13 +15,18 @@ struct PdfDocument {
     XRefTable* xref;
     uint8_t version;
     size_t startxref;
+
+    Arena* arena;
 };
 
 PdfDocument* pdf_document_new(char* buffer, size_t buffer_size) {
     // Allocate
-    PdfDocument* doc = malloc(sizeof(PdfDocument));
+    Arena* arena = arena_new(1024);
+
+    PdfDocument* doc = arena_alloc(arena, sizeof(PdfDocument));
     LOG_ASSERT(doc, "Failed to allocate document");
-    doc->ctx = pdf_ctx_new(buffer, buffer_size);
+    doc->ctx = pdf_ctx_new(arena, buffer, buffer_size);
+    doc->arena = arena;
 
     // Parse header
     LOG_ASSERT(
@@ -39,7 +45,7 @@ PdfDocument* pdf_document_new(char* buffer, size_t buffer_size) {
 
     // Parse xref
     PdfResult result;
-    XRefTable* xref = pdf_xref_create(doc->ctx, doc->startxref, &result);
+    XRefTable* xref = pdf_xref_new(arena, doc->ctx, doc->startxref, &result);
     LOG_ASSERT(xref, "Invalid xref");
     LOG_ASSERT(result == PDF_OK, "Failed to parse xref with code %d", result);
     doc->xref = xref;
@@ -49,10 +55,6 @@ PdfDocument* pdf_document_new(char* buffer, size_t buffer_size) {
 
 void pdf_document_free(PdfDocument* doc) {
     if (doc) {
-        pdf_xref_free(&doc->xref);
-        pdf_ctx_free(doc->ctx);
-        doc->ctx = NULL;
-
-        free(doc);
+        arena_free(doc->arena);
     }
 }
