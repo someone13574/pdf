@@ -42,6 +42,7 @@ __TEST_ASSERT_INT_CMP_DECL(unsigned long, unsigned_long, eq)
 __TEST_ASSERT_INT_CMP_DECL(long long, long_long, eq)
 __TEST_ASSERT_INT_CMP_DECL(unsigned long long, unsigned_long_long, eq)
 __TEST_ASSERT_INT_CMP_DECL(void*, void_ptr, eq)
+__TEST_ASSERT_INT_CMP_DECL(bool, bool, eq)
 __TEST_ASSERT_FLOAT_CMP_DECL(float, float, eq)
 __TEST_ASSERT_FLOAT_CMP_DECL(double, double, eq)
 __TEST_ASSERT_FLOAT_CMP_DECL(long double, long_double, eq)
@@ -58,6 +59,7 @@ __TEST_ASSERT_INT_CMP_DECL(unsigned long, unsigned_long, ne)
 __TEST_ASSERT_INT_CMP_DECL(long long, long_long, ne)
 __TEST_ASSERT_INT_CMP_DECL(unsigned long long, unsigned_long_long, ne)
 __TEST_ASSERT_INT_CMP_DECL(void*, void_ptr, ne)
+__TEST_ASSERT_INT_CMP_DECL(bool, bool, ne)
 __TEST_ASSERT_FLOAT_CMP_DECL(float, float, ne)
 __TEST_ASSERT_FLOAT_CMP_DECL(double, double, ne)
 __TEST_ASSERT_FLOAT_CMP_DECL(long double, long_double, ne)
@@ -93,6 +95,7 @@ TestResult __test_assert_ne_str(
         long long: __test_assert_##cmp##_long_long,                            \
         unsigned long long: __test_assert_##cmp##_unsigned_long_long,          \
         void*: __test_assert_##cmp##_void_ptr,                                 \
+        bool: __test_assert_##cmp##_bool,                                      \
         float: __test_assert_##cmp##_float,                                    \
         double: __test_assert_##cmp##_double,                                  \
         long double: __test_assert_##cmp##_long_double,                        \

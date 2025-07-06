@@ -18,6 +18,7 @@ PdfResult pdf_ctx_shift(PdfCtx* ctx, ssize_t relative_offset);
 PdfResult pdf_ctx_peek_and_advance(PdfCtx* ctx, char* out);
 
 PdfResult pdf_ctx_peek(PdfCtx* ctx, char* out);
+PdfResult pdf_ctx_peek_next(PdfCtx* ctx, char* out);
 PdfResult pdf_ctx_expect(PdfCtx* ctx, const char* text);
 PdfResult pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit);
 PdfResult pdf_ctx_seek_line_start(PdfCtx* ctx);

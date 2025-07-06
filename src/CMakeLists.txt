@@ -8,6 +8,7 @@ set(SOURCE_FILE_LIST
     arena.c arena.h
     vec.c vec.h
     ctx.c ctx.h
+    object.c object.h
     parse.c parse.h
     xref.c xref.h
     ${HEADER_LIST})

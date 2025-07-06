@@ -128,6 +128,22 @@ PdfResult pdf_ctx_peek(PdfCtx* ctx, char* peeked) {
     return PDF_OK;
 }
 
+PdfResult pdf_ctx_peek_next(PdfCtx* ctx, char* peeked) {
+    DBG_ASSERT(ctx);
+
+    size_t offset = ctx->offset;
+    PDF_TRY(pdf_ctx_peek_and_advance(ctx, NULL));
+
+    PdfResult peek_result = (pdf_ctx_peek(ctx, peeked));
+    PDF_TRY(pdf_ctx_seek(ctx, offset));
+
+    if (peek_result != PDF_OK) {
+        return peek_result;
+    }
+
+    return PDF_OK;
+}
+
 PdfResult pdf_ctx_expect(PdfCtx* ctx, const char* text) {
     DBG_ASSERT(ctx);
     LOG_DEBUG_G("ctx", "Expecting text \"%s\"", text);

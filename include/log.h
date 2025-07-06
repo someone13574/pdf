@@ -111,6 +111,8 @@ void logger_log(
         }                                                                      \
     } while (0)
 
+#define LOG_TODO(...) LOG_PANIC("TODO" __VA_OPT__(": ") __VA_ARGS__)
+
 #define LOG_PANIC(...)                                                         \
     do {                                                                       \
         LOG_ERROR(__VA_ARGS__);                                                \

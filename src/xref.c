@@ -149,45 +149,22 @@ pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
     LOG_ASSERT(xref, "XRefTable allocation failed");
 
     // Validate xrefstart
-    PdfResult seek_result = pdf_ctx_seek(ctx, xrefstart);
-    if (seek_result != PDF_OK) {
-        if (result) {
-            *result = seek_result;
-        }
-        return NULL;
-    }
+    PDF_TRY_RET_NULL(pdf_ctx_seek(ctx, xrefstart));
 
     PdfResult line_seek_result = pdf_ctx_seek_line_start(ctx);
     if (line_seek_result == PDF_OK && pdf_ctx_offset(ctx) != xrefstart) {
         LOG_WARN_G("parse", "xrefstart not pointing to start of line");
-        seek_result = PDF_ERR_INVALID_XREF;
-    }
-
-    if (seek_result != PDF_OK) {
         if (result) {
-            *result = seek_result;
+            *result = PDF_ERR_INVALID_XREF;
         }
         return NULL;
     }
 
-    PdfResult expect_result = pdf_ctx_expect(ctx, "xref");
-    if (expect_result != PDF_OK) {
-        if (result) {
-            *result = expect_result;
-        }
-
-        return NULL;
-    }
+    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "xref"));
 
     // Seek first subsection
-    pdf_ctx_seek(ctx, xrefstart);
-    PdfResult next_line_result = pdf_ctx_seek_next_line(ctx);
-    if (next_line_result != PDF_OK) {
-        if (result) {
-            *result = next_line_result;
-        }
-        return NULL;
-    }
+    PDF_TRY_RET_NULL(pdf_ctx_seek(ctx, xrefstart));
+    PDF_TRY_RET_NULL(pdf_ctx_seek_next_line(ctx));
 
     xref->ctx = ctx;
     xref->arena = arena;

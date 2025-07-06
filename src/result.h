@@ -7,6 +7,9 @@ typedef enum {
     PDF_ERR_INVALID_XREF,
     PDF_ERR_INVALID_XREF_REFERENCE,
     PDF_ERR_XREF_GENERATION_MISMATCH,
+    PDF_ERR_INVALID_OBJECT,
+    PDF_ERR_INVALID_NUMBER,
+    PDF_ERR_NUMBER_LIMIT,
     PDF_CTX_ERR_EOF,
     PDF_CTX_ERR_EXPECT,
     PDF_CTX_ERR_SCAN_LIMIT,
@@ -20,5 +23,16 @@ typedef enum {
         PdfResult try_result = (op);                                           \
         if (try_result != PDF_OK) {                                            \
             return try_result;                                                 \
+        }                                                                      \
+    } while (0)
+
+#define PDF_TRY_RET_NULL(op)                                                   \
+    do {                                                                       \
+        PdfResult try_result = (op);                                           \
+        if (try_result != PDF_OK) {                                            \
+            if (result) {                                                      \
+                *result = try_result;                                          \
+            }                                                                  \
+            return NULL;                                                       \
         }                                                                      \
     } while (0)
