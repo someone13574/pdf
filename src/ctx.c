@@ -309,7 +309,6 @@ PdfResult pdf_ctx_borrow_substr(
 ) {
     DBG_ASSERT(ctx);
     DBG_ASSERT(substr);
-    LOG_ASSERT(length > 0, "Cannot borrow zero length substr");
     LOG_DEBUG_G(
         "ctx",
         "Borrowing substring starting at %lu with length %lu",

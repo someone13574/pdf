@@ -10,7 +10,10 @@
 
 PdfObject* pdf_parse_true(Arena* arena, PdfCtx* ctx, PdfResult* result);
 PdfObject* pdf_parse_false(Arena* arena, PdfCtx* ctx, PdfResult* result);
+PdfObject* pdf_parse_null(Arena* arena, PdfCtx* ctx, PdfResult* result);
 PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result);
+PdfObject*
+pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfResult* result);
 
 PdfObject* pdf_parse_object(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     DBG_ASSERT(arena);
@@ -40,26 +43,19 @@ PdfObject* pdf_parse_object(Arena* arena, PdfCtx* ctx, PdfResult* result) {
         LOG_WARN("could be indirect object/ref");
         return pdf_parse_number(arena, ctx, result);
     } else if (peeked == '(') {
-        // literal string
-        LOG_TODO();
+        return pdf_parse_string_literal(arena, ctx, result);
     } else if (peeked == '<' && peeked_next != '<') {
-        // hex string
-        LOG_TODO();
+        LOG_TODO("Hexadecimal strings");
     } else if (peeked == '/') {
-        // name
-        LOG_TODO();
+        LOG_TODO("Names");
     } else if (peeked == '[') {
-        // array
-        LOG_TODO();
+        LOG_TODO("Arrays");
     } else if (peeked == '<' && peeked_next == '<') {
-        // dict
-        LOG_TODO();
+        LOG_TODO("Dictionaries");
     } else if (peeked == 's') {
-        // stream
-        LOG_TODO();
+        LOG_TODO("Streams");
     } else if (peeked == 'n') {
-        // null
-        LOG_TODO();
+        return pdf_parse_null(arena, ctx, result);
     }
 
     *result = PDF_ERR_INVALID_OBJECT;
@@ -86,6 +82,15 @@ PdfObject* pdf_parse_false(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     return object;
 }
 
+PdfObject* pdf_parse_null(Arena* arena, PdfCtx* ctx, PdfResult* result) {
+    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "null"));
+
+    PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
+    object->kind = PDF_OBJECT_KIND_NULL;
+
+    return object;
+}
+
 PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     LOG_TRACE_G("object", "Parsing number at offset %zu", pdf_ctx_offset(ctx));
 
@@ -103,8 +108,8 @@ PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result) {
 
     // Parse leading digits
     char digit_char;
-    bool has_leading = false;
     int64_t leading_acc = 0;
+    bool has_leading = false;
 
     while (pdf_ctx_peek(ctx, &digit_char) == PDF_OK && isdigit(digit_char)) {
         has_leading = true;
@@ -156,8 +161,11 @@ PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     // Parse trailing digits
     double trailing_acc = 0.0;
     double trailing_weight = 0.1;
+    bool has_trailing = false;
 
     while (pdf_ctx_peek(ctx, &digit_char) == PDF_OK && isdigit(digit_char)) {
+        has_trailing = true;
+
         trailing_acc += (double)(digit_char - '0') * trailing_weight;
         trailing_weight *= 0.1;
 
@@ -172,9 +180,137 @@ PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result) {
         return NULL;
     }
 
+    if (!has_leading && !has_trailing) {
+        *result = PDF_ERR_INVALID_NUMBER;
+        return NULL;
+    }
+
     PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
     object->kind = PDF_OBJECT_KIND_REAL;
     object->data.real_data = value;
+
+    return object;
+}
+
+PdfObject*
+pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfResult* result) {
+    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "("));
+
+    // Find length upper bound
+    char peeked_char;
+    int escape = 0;
+    int open_parenthesis = 1;
+    size_t start_offset = pdf_ctx_offset(ctx);
+
+    while (open_parenthesis > 0
+           && pdf_ctx_peek_and_advance(ctx, &peeked_char) == PDF_OK) {
+        if (peeked_char == '(' && escape == 0) {
+            open_parenthesis++;
+        } else if (peeked_char == ')' && escape == 0) {
+            open_parenthesis--;
+        }
+
+        if (peeked_char == '\\' && escape == 0) {
+            escape = 1;
+        } else {
+            escape = 0;
+        }
+    }
+
+    if (open_parenthesis != 0) {
+        *result = PDF_ERR_UNBALANCED_STR;
+        return NULL;
+    }
+
+    // Parse
+    char* raw;
+    PDF_TRY_RET_NULL(pdf_ctx_borrow_substr(
+        ctx,
+        start_offset,
+        pdf_ctx_offset(ctx) - start_offset - 1,
+        &raw
+    ));
+
+    char* parsed =
+        arena_alloc(arena, sizeof(char) * (pdf_ctx_offset(ctx) - start_offset));
+
+    escape = 0;
+    size_t write_offset = 0;
+
+    for (size_t read_offset = 0;
+         read_offset < pdf_ctx_offset(ctx) - start_offset - 1;
+         read_offset++) {
+        char read_char = raw[read_offset];
+
+        switch (escape) {
+            case 0: {
+                if (read_char == '\\') {
+                    escape = 1;
+                    break;
+                }
+
+                parsed[write_offset++] = read_char;
+                break;
+            }
+            case 1: {
+                switch (read_char) {
+                    case 'n': {
+                        parsed[write_offset++] = '\n';
+                        escape = 0;
+                        break;
+                    }
+                    case 'r': {
+                        parsed[write_offset++] = '\r';
+                        escape = 0;
+                        break;
+                    }
+                    case 't': {
+                        parsed[write_offset++] = '\t';
+                        escape = 0;
+                        break;
+                    }
+                    case 'b': {
+                        parsed[write_offset++] = '\b';
+                        escape = 0;
+                        break;
+                    }
+                    case 'f': {
+                        parsed[write_offset++] = '\f';
+                        escape = 0;
+                        break;
+                    }
+                    case '(': {
+                        parsed[write_offset++] = '(';
+                        escape = 0;
+                        break;
+                    }
+                    case ')': {
+                        parsed[write_offset++] = ')';
+                        escape = 0;
+                        break;
+                    }
+                    case '\\': {
+                        parsed[write_offset++] = '\\';
+                        escape = 0;
+                        break;
+                    }
+                    default: {
+                        LOG_TODO("Octal escape codes and split lines");
+                    }
+                }
+                break;
+            }
+            default: {
+                LOG_PANIC("Unreachable");
+            }
+        }
+    }
+
+    parsed[write_offset] = '\0';
+
+    PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
+    object->kind = PDF_OBJECT_KIND_STRING;
+    object->data.string_data = parsed;
 
     return object;
 }
@@ -190,8 +326,8 @@ PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));                  \
     PdfResult result;                                                          \
     PdfObject* object = pdf_parse_object(arena, ctx, &result);                 \
-    TEST_ASSERT(object);                                                       \
     TEST_ASSERT_EQ((PdfResult)PDF_OK, result);                                 \
+    TEST_ASSERT(object);                                                       \
     TEST_ASSERT_EQ((PdfObjectKind)(type), object->kind);
 
 #define SETUP_INVALID_PARSE_OBJECT(buf, err)                                   \
@@ -200,8 +336,8 @@ PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));                  \
     PdfResult result;                                                          \
     PdfObject* object = pdf_parse_object(arena, ctx, &result);                 \
-    TEST_ASSERT(!object);                                                      \
-    TEST_ASSERT_EQ((PdfResult)(err), result);
+    TEST_ASSERT_EQ((PdfResult)(err), result);                                  \
+    TEST_ASSERT(!object);
 
 TEST_FUNC(test_object_bool_true) {
     SETUP_VALID_PARSE_OBJECT("true", PDF_OBJECT_KIND_BOOLEAN);
@@ -212,6 +348,11 @@ TEST_FUNC(test_object_bool_true) {
 TEST_FUNC(test_object_bool_false) {
     SETUP_VALID_PARSE_OBJECT("false", PDF_OBJECT_KIND_BOOLEAN);
     TEST_ASSERT(!object->data.bool_data);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_null) {
+    SETUP_VALID_PARSE_OBJECT("null", PDF_OBJECT_KIND_NULL);
     return TEST_RESULT_PASS;
 }
 
@@ -261,6 +402,16 @@ TEST_FUNC(test_object_int_neg_overflow) {
     return TEST_RESULT_PASS;
 }
 
+TEST_FUNC(test_object_int_plus_no_digits) {
+    SETUP_INVALID_PARSE_OBJECT("+", PDF_ERR_INVALID_NUMBER);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_int_minus_no_digits) {
+    SETUP_INVALID_PARSE_OBJECT("-", PDF_ERR_INVALID_NUMBER);
+    return TEST_RESULT_PASS;
+}
+
 TEST_FUNC(test_object_real_34_5) {
     SETUP_VALID_PARSE_OBJECT("34.5", PDF_OBJECT_KIND_REAL);
     TEST_ASSERT_EQ_EPS((double)34.5, object->data.real_data, 1e-5L);
@@ -294,6 +445,64 @@ TEST_FUNC(test_object_real_minus_dot_002) {
 TEST_FUNC(test_object_real_0_0) {
     SETUP_VALID_PARSE_OBJECT("0.0", PDF_OBJECT_KIND_REAL);
     TEST_ASSERT_EQ_EPS((double)0.0, object->data.real_data, 1e-5L);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_real_no_digits) {
+    SETUP_INVALID_PARSE_OBJECT(".", PDF_ERR_INVALID_NUMBER);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_literal_str) {
+    SETUP_VALID_PARSE_OBJECT("(This is a string)", PDF_OBJECT_KIND_STRING);
+    TEST_ASSERT_EQ("This is a string", object->data.string_data);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_literal_str_newline) {
+    SETUP_VALID_PARSE_OBJECT(
+        "(Strings may contain newlines\nand such.)",
+        PDF_OBJECT_KIND_STRING
+    );
+    TEST_ASSERT_EQ(
+        "Strings may contain newlines\nand such.",
+        object->data.string_data
+    );
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_literal_str_parenthesis) {
+    SETUP_VALID_PARSE_OBJECT(
+        "(Strings may contain balanced parentheses () and special characters (*!&^% and so on).)",
+        PDF_OBJECT_KIND_STRING
+    );
+    TEST_ASSERT_EQ(
+        "Strings may contain balanced parentheses () and special characters (*!&^% and so on).",
+        object->data.string_data
+    );
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_literal_str_empty) {
+    SETUP_VALID_PARSE_OBJECT("()", PDF_OBJECT_KIND_STRING);
+    TEST_ASSERT_EQ("", object->data.string_data);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_literal_str_escapes) {
+    SETUP_VALID_PARSE_OBJECT(
+        "(This is a line\\nThis is a newline\\r\\nThis is another line with tabs (\\t), backspaces(\\b), form feeds (\\f), unbalanced parenthesis \\(\\(\\(\\), and backslashes \\\\\\\\)",
+        PDF_OBJECT_KIND_STRING
+    );
+    TEST_ASSERT_EQ(
+        "This is a line\nThis is a newline\r\nThis is another line with tabs (\t), backspaces(\b), form feeds (\f), unbalanced parenthesis (((), and backslashes \\\\",
+        object->data.string_data
+    );
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_literal_str_unbalanced) {
+    SETUP_INVALID_PARSE_OBJECT("(", PDF_ERR_UNBALANCED_STR);
     return TEST_RESULT_PASS;
 }
 
