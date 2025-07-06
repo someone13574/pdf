@@ -37,40 +37,32 @@ struct XRefTable {
 // object in this subsection and the number of entries in the subsection.
 PdfResult pdf_xref_parse_subsection_header(
     PdfCtx* ctx,
-    unsigned long long* first_object,
-    unsigned long long* num_objects,
+    uint64_t* first_object,
+    uint64_t* num_objects,
     size_t* subsection_start
 ) {
     DBG_ASSERT(ctx);
     DBG_ASSERT(first_object);
     DBG_ASSERT(num_objects);
 
-    size_t start_of_header = pdf_ctx_offset(ctx);
-    PDF_TRY(pdf_ctx_seek_next_line(ctx));
-    size_t end_of_header = pdf_ctx_offset(ctx);
-    DBG_ASSERT(start_of_header < end_of_header);
+    // Parse object index
+    uint32_t int_length;
+    PDF_TRY(pdf_ctx_parse_int(ctx, NULL, first_object, &int_length));
+    if (int_length == 0) {
+        return PDF_ERR_INVALID_XREF;
+    }
 
-    long read_length;
-    PDF_TRY(pdf_ctx_parse_int(
-        ctx,
-        start_of_header,
-        end_of_header - start_of_header,
-        first_object,
-        &read_length
-    ));
-
-    PDF_TRY(pdf_ctx_seek(ctx, start_of_header + (size_t)read_length));
     PDF_TRY(pdf_ctx_expect(ctx, " "));
 
-    PDF_TRY(pdf_ctx_parse_int(
-        ctx,
-        pdf_ctx_offset(ctx),
-        end_of_header - pdf_ctx_offset(ctx),
-        num_objects,
-        NULL
-    ));
+    // Parse length
+    PDF_TRY(pdf_ctx_parse_int(ctx, NULL, num_objects, &int_length));
+    if (int_length == 0) {
+        return PDF_ERR_INVALID_XREF;
+    }
 
-    *subsection_start = end_of_header; // end_of_header = start of next line
+    // Find start of subsection
+    PDF_TRY(pdf_ctx_seek_next_line(ctx));
+    *subsection_start = pdf_ctx_offset(ctx);
 
     return PDF_OK;
 }
@@ -111,23 +103,15 @@ PdfResult pdf_xref_parse_entry(
     }
 
     // Parse offset
-    unsigned long long offset;
-    long read_length;
-    PDF_TRY(pdf_ctx_parse_int(ctx, entry_offset, 10, &offset, &read_length));
-    if (read_length != 10) {
-        LOG_ERROR_G("xref", "XRef entry offset field not 10 characters");
-        return PDF_ERR_INVALID_XREF;
-    }
+    uint64_t offset;
+    uint32_t expected_length = 10;
+    PDF_TRY(pdf_ctx_parse_int(ctx, &expected_length, &offset, NULL));
+    PDF_TRY(pdf_ctx_expect(ctx, " "));
 
     // Parse generation
-    unsigned long long generation;
-    PDF_TRY(
-        pdf_ctx_parse_int(ctx, entry_offset + 11, 5, &generation, &read_length)
-    );
-    if (read_length != 5) {
-        LOG_ERROR_G("xref", "XRef entry generation field not 5 characters");
-        return PDF_ERR_INVALID_XREF;
-    }
+    uint64_t generation;
+    expected_length = 5;
+    PDF_TRY(pdf_ctx_parse_int(ctx, &expected_length, &generation, NULL));
 
     subsection->entries[entry].offset = (size_t)offset;
     subsection->entries[entry].generation = (size_t)generation;
@@ -180,8 +164,8 @@ pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
         );
 
         // Parse
-        unsigned long long first_object;
-        unsigned long long num_objects;
+        uint64_t first_object;
+        uint64_t num_objects;
         size_t subsection_start;
 
         PdfResult parse_result = pdf_xref_parse_subsection_header(
@@ -206,7 +190,7 @@ pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
 
         LOG_DEBUG_G(
             "xref",
-            "subsection=%zu, subsection_start=%lu, first_object=%llu, num_objects=%llu",
+            "subsection=%zu, subsection_start=%lu, first_object=%lu, num_objects=%lu",
             vec_len(xref->subsections),
             subsection_start,
             first_object,
@@ -228,7 +212,7 @@ pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, PdfResult* result) {
         if (seek_end_result != PDF_OK) {
             LOG_TRACE_G(
                 "xref",
-                "Failed to seek end of section. Start offset %lu, %llu objects",
+                "Failed to seek end of section. Start offset %zu, %lu objects",
                 subsection_start,
                 num_objects
             );

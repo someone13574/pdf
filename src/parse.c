@@ -1,7 +1,6 @@
 #include "parse.h"
 
 #include <stdint.h>
-#include <stdlib.h>
 
 #include "arena.h"
 #include "ctx.h"
@@ -45,23 +44,21 @@ PdfResult pdf_parse_startxref(PdfCtx* ctx, size_t* startxref) {
         return PDF_ERR_INVALID_TRAILER;
     }
 
-    // Get byte offset
+    // Parse byte offset
     PDF_TRY(pdf_ctx_shift(ctx, -1));
     PDF_TRY(pdf_ctx_seek_line_start(ctx));
-    size_t startxref_offset = pdf_ctx_offset(ctx);
 
-    unsigned long long xref_offset;
-    PDF_TRY(pdf_ctx_parse_int(
-        ctx,
-        startxref_offset,
-        eof_marker_offset - startxref_offset,
-        &xref_offset,
-        NULL
-    ));
+    uint64_t xref_offset;
+    uint32_t int_length;
+    PDF_TRY(pdf_ctx_parse_int(ctx, NULL, &xref_offset, &int_length));
+    if (int_length == 0) {
+        return PDF_ERR_INVALID_STARTXREF;
+    }
 
     *startxref = (size_t)xref_offset;
 
     // Check for startxref line
+    PDF_TRY(pdf_ctx_seek_line_start(ctx));
     PDF_TRY(pdf_ctx_shift(ctx, -1));
     PDF_TRY(pdf_ctx_seek_line_start(ctx));
     PDF_TRY(pdf_ctx_expect(ctx, "startxref"));
@@ -147,7 +144,7 @@ TEST_FUNC(test_startxref_invalid) {
 
     size_t startxref;
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_CTX_ERR_INVALID_NUMBER,
+        (PdfResult)PDF_ERR_INVALID_STARTXREF,
         pdf_parse_startxref(ctx, &startxref)
     );
 
@@ -164,7 +161,7 @@ TEST_FUNC(test_startxref_invalid2) {
 
     size_t startxref;
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_CTX_ERR_INVALID_NUMBER,
+        (PdfResult)PDF_ERR_INVALID_STARTXREF,
         pdf_parse_startxref(ctx, &startxref)
     );
 

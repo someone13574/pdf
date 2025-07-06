@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 #include <stdio.h>
 
 #include "arena.h"
@@ -23,6 +24,7 @@ PdfResult pdf_ctx_expect(PdfCtx* ctx, const char* text);
 PdfResult pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit);
 PdfResult pdf_ctx_seek_line_start(PdfCtx* ctx);
 PdfResult pdf_ctx_seek_next_line(PdfCtx* ctx);
+PdfResult pdf_ctx_consume_whitespace(PdfCtx* ctx);
 
 PdfResult
 pdf_ctx_borrow_substr(PdfCtx* ctx, size_t offset, size_t length, char** substr);
@@ -30,8 +32,11 @@ PdfResult pdf_ctx_release_substr(PdfCtx* ctx);
 
 PdfResult pdf_ctx_parse_int(
     PdfCtx* ctx,
-    size_t offset,
-    size_t length,
-    unsigned long long* out,
-    long* read_length
+    uint32_t* expected_length,
+    uint64_t* value,
+    uint32_t* actual_length
 );
+
+bool is_pdf_whitespace(char c);
+bool is_pdf_delimiter(char c);
+bool is_pdf_regular(char c);

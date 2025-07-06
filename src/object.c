@@ -15,6 +15,7 @@ PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result);
 PdfObject*
 pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfResult* result);
 PdfObject* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfResult* result);
+PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result);
 
 PdfObject* pdf_parse_object(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     DBG_ASSERT(arena);
@@ -41,7 +42,15 @@ PdfObject* pdf_parse_object(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     } else if (peeked == '.' || peeked == '+' || peeked == '-') {
         return pdf_parse_number(arena, ctx, result);
     } else if (isdigit((unsigned char)peeked)) {
-        LOG_WARN("could be indirect object/ref");
+        size_t restore_offset = pdf_ctx_offset(ctx);
+        PdfObject* indirect = pdf_parse_indirect(arena, ctx, result);
+        if (*result == PDF_OK) {
+            return indirect;
+        }
+
+        *result = PDF_OK;
+        PDF_TRY_RET_NULL(pdf_ctx_seek(ctx, restore_offset));
+
         return pdf_parse_number(arena, ctx, result);
     } else if (peeked == '(') {
         return pdf_parse_string_literal(arena, ctx, result);
@@ -317,20 +326,6 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     return object;
 }
 
-bool is_pdf_whitespace(char c) {
-    return c == '\0' || c == '\t' || c == '\n' || c == '\f' || c == '\r'
-        || c == ' ';
-}
-
-bool is_pdf_delimiter(char c) {
-    return c == '(' || c == ')' || c == '<' || c == '>' || c == '[' || c == ']'
-        || c == '{' || c == '}' || c == '/' || c == '%';
-}
-
-bool is_pdf_regular(char c) {
-    return !is_pdf_whitespace(c) && !is_pdf_delimiter(c);
-}
-
 bool char_to_hex(char c, int* out) {
     if (c >= '0' && c <= '9') {
         *out = c - '0';
@@ -428,6 +423,73 @@ PdfObject* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     object->data.name_data = name;
 
     return object;
+}
+
+PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result) {
+    LOG_DEBUG_G("object", "Parsing indirect object or reference");
+
+    // Parse object id
+    uint64_t object_id;
+    uint32_t int_length;
+    PDF_TRY_RET_NULL(pdf_ctx_parse_int(ctx, NULL, &object_id, &int_length));
+    if (int_length == 0) {
+        *result = PDF_CTX_ERR_EXPECT;
+        return NULL;
+    }
+
+    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, " "));
+
+    // Parse generation
+    uint64_t generation;
+    PDF_TRY_RET_NULL(pdf_ctx_parse_int(ctx, NULL, &generation, &int_length));
+    if (int_length == 0) {
+        *result = PDF_CTX_ERR_EXPECT;
+        return NULL;
+    }
+
+    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, " "));
+
+    // Determine if indirect object or reference
+    char peeked;
+    PDF_TRY_RET_NULL(pdf_ctx_peek(ctx, &peeked));
+
+    if (peeked == 'R') {
+        LOG_DEBUG_G("object", "Parsed indirect reference");
+        PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
+        object->kind = PDF_OBJECT_KIND_REF;
+        object->data.ref_data.object_id = object_id;
+        object->data.ref_data.generation = generation;
+
+        return object;
+    } else {
+        LOG_DEBUG_G("object", "Parsed indirect object");
+
+        PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "obj"));
+        PDF_TRY_RET_NULL(pdf_ctx_consume_whitespace(ctx));
+
+        PdfObject* inner = pdf_parse_object(arena, ctx, result);
+        if (*result != PDF_OK) {
+            LOG_DEBUG_G(
+                "object",
+                "Failed to parsing inner of indirect object with result %d",
+                *result
+            );
+            return NULL;
+        }
+
+        PDF_TRY_RET_NULL(pdf_ctx_consume_whitespace(ctx));
+        PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "endobj"));
+
+        PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
+        object->kind = PDF_OBJECT_KIND_INDIRECT;
+        object->data.indirect_data.object = inner;
+        object->data.indirect_data.object_id = object_id;
+        object->data.indirect_data.generation = generation;
+
+        return object;
+    }
+
+    return NULL;
 }
 
 #ifdef TEST
@@ -669,6 +731,67 @@ TEST_FUNC(test_object_name_invalid) {
         "/The_Key_of_F#_Minor",
         PDF_ERR_NAME_BAD_CHAR_CODE
     );
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_indirect) {
+    SETUP_VALID_PARSE_OBJECT(
+        "12 0 obj (Brillig) endobj",
+        PDF_OBJECT_KIND_INDIRECT
+    );
+    TEST_ASSERT_EQ((size_t)12, object->data.indirect_data.object_id);
+    TEST_ASSERT_EQ((size_t)0, object->data.indirect_data.generation);
+    TEST_ASSERT_EQ(
+        (PdfObjectKind)PDF_OBJECT_KIND_STRING,
+        object->data.indirect_data.object->kind
+    );
+    TEST_ASSERT_EQ(
+        "Brillig",
+        object->data.indirect_data.object->data.string_data
+    );
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_indirect_nested) {
+    SETUP_VALID_PARSE_OBJECT(
+        "12 0 obj 54 3 obj /Name endobj endobj",
+        PDF_OBJECT_KIND_INDIRECT
+    );
+    TEST_ASSERT_EQ((size_t)12, object->data.indirect_data.object_id);
+    TEST_ASSERT_EQ((size_t)0, object->data.indirect_data.generation);
+
+    TEST_ASSERT_EQ(
+        (PdfObjectKind)PDF_OBJECT_KIND_INDIRECT,
+        object->data.indirect_data.object->kind
+    );
+    TEST_ASSERT_EQ(
+        (size_t)54,
+        object->data.indirect_data.object->data.indirect_data.object_id
+    );
+    TEST_ASSERT_EQ(
+        (size_t)3,
+        object->data.indirect_data.object->data.indirect_data.generation
+    );
+
+    TEST_ASSERT_EQ(
+        (PdfObjectKind)PDF_OBJECT_KIND_NAME,
+        object->data.indirect_data.object->data.indirect_data.object->kind
+    );
+    TEST_ASSERT_EQ(
+        "Name",
+        object->data.indirect_data.object->data.indirect_data.object->data
+            .string_data
+    );
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_indirect_ref) {
+    SETUP_VALID_PARSE_OBJECT("12 0 R", PDF_OBJECT_KIND_REF);
+    TEST_ASSERT_EQ((size_t)12, object->data.indirect_data.object_id);
+    TEST_ASSERT_EQ((size_t)0, object->data.indirect_data.generation);
+
     return TEST_RESULT_PASS;
 }
 

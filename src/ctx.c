@@ -1,8 +1,8 @@
 #include "ctx.h"
 
 #include <ctype.h>
-#include <errno.h>
 #include <iso646.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,7 +50,7 @@ size_t pdf_ctx_offset(PdfCtx* ctx) {
 
 PdfResult pdf_ctx_seek(PdfCtx* ctx, size_t offset) {
     DBG_ASSERT(ctx);
-    LOG_TRACE_G("ctx", "Seeking offset %lu", offset);
+    LOG_TRACE_G("ctx", "Seeking offset %zu", offset);
 
     if (offset > ctx->buffer_len) {
         return PDF_CTX_ERR_EOF;
@@ -68,7 +68,7 @@ PdfResult pdf_ctx_shift(PdfCtx* ctx, ssize_t relative_offset) {
         if (ctx->offset < (size_t)(-relative_offset)) {
             LOG_TRACE_G(
                 "ctx",
-                "New offset is out of bounds. Restoring offset to %lu",
+                "New offset is out of bounds. Restoring offset to %zu",
                 ctx->offset
             );
             return PDF_CTX_ERR_EOF;
@@ -80,7 +80,7 @@ PdfResult pdf_ctx_shift(PdfCtx* ctx, ssize_t relative_offset) {
         if (new_offset > ctx->buffer_len) {
             LOG_TRACE_G(
                 "ctx",
-                "New offset is out of bounds. Restoring offset to %lu",
+                "New offset is out of bounds. Restoring offset to %zu",
                 ctx->offset
             );
             return PDF_CTX_ERR_EOF;
@@ -89,7 +89,7 @@ PdfResult pdf_ctx_shift(PdfCtx* ctx, ssize_t relative_offset) {
         ctx->offset = new_offset;
     }
 
-    LOG_TRACE_G("ctx", "New ctx offset is %lu", ctx->offset);
+    LOG_TRACE_G("ctx", "New ctx offset is %zu", ctx->offset);
     return PDF_OK;
 }
 
@@ -119,7 +119,7 @@ PdfResult pdf_ctx_peek(PdfCtx* ctx, char* peeked) {
         *peeked = ctx->buffer[ctx->offset];
         LOG_TRACE_G(
             "ctx",
-            "Ctx char at offset %lu: '%c'",
+            "Ctx char at offset %zu: '%c'",
             ctx->offset,
             *peeked
         );
@@ -182,7 +182,7 @@ PdfResult pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit) {
     DBG_ASSERT(ctx);
     LOG_DEBUG_G(
         "ctx",
-        "Backscanning for text \"%s\" with char limit %lu (0=none)",
+        "Backscanning for text \"%s\" with char limit %zu (0=none)",
         text,
         limit
     );
@@ -210,6 +210,7 @@ PdfResult pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit) {
         offset = ctx->offset;
     }
 
+    LOG_TRACE_G("ctx", "Backscanned to %zu", offset);
     pdf_ctx_seek(ctx, offset);
     return PDF_OK;
 }
@@ -301,6 +302,18 @@ PdfResult pdf_ctx_seek_next_line(PdfCtx* ctx) {
     return PDF_OK;
 }
 
+PdfResult pdf_ctx_consume_whitespace(PdfCtx* ctx) {
+    DBG_ASSERT(ctx);
+    LOG_DEBUG_G("ctx", "Consuming whitespace");
+
+    char peeked;
+    while (pdf_ctx_peek(ctx, &peeked) == PDF_OK && is_pdf_whitespace(peeked)) {
+        pdf_ctx_peek_and_advance(ctx, NULL);
+    }
+
+    return PDF_OK;
+}
+
 PdfResult pdf_ctx_borrow_substr(
     PdfCtx* ctx,
     size_t offset,
@@ -311,7 +324,7 @@ PdfResult pdf_ctx_borrow_substr(
     DBG_ASSERT(substr);
     LOG_DEBUG_G(
         "ctx",
-        "Borrowing substring starting at %lu with length %lu",
+        "Borrowing substring starting at %zu with length %zu",
         offset,
         length
     );
@@ -354,44 +367,67 @@ PdfResult pdf_ctx_release_substr(PdfCtx* ctx) {
 
 PdfResult pdf_ctx_parse_int(
     PdfCtx* ctx,
-    size_t offset,
-    size_t length,
-    unsigned long long* out,
-    long* read_length
+    uint32_t* expected_length,
+    uint64_t* value,
+    uint32_t* actual_length
 ) {
     DBG_ASSERT(ctx);
-    DBG_ASSERT(out);
-    LOG_DEBUG_G(
-        "ctx",
-        "Parsing int starting at %lu with length upto %lu",
-        offset,
-        length
-    );
+    DBG_ASSERT(value);
+    LOG_DEBUG_G("ctx", "Parsing int at %zu", ctx->offset);
 
-    char* substr;
-    PDF_TRY(pdf_ctx_borrow_substr(ctx, offset, length, &substr));
+    size_t start_offset = ctx->offset;
 
-    if (substr[0] == '+' || isspace(substr[0])) {
-        PDF_TRY(pdf_ctx_release_substr(ctx));
-        return PDF_CTX_ERR_INVALID_NUMBER;
+    char peeked;
+    PdfResult result;
+
+    uint64_t acc = 0;
+    uint32_t processed_length = 0;
+
+    while ((result = pdf_ctx_peek_and_advance(ctx, &peeked)) == PDF_OK
+           && isdigit(peeked)) {
+        uint64_t digit = (uint64_t)(peeked - '0');
+        processed_length++;
+
+        if (acc <= (UINT64_MAX - digit) / 10) {
+            acc *= 10;
+            acc += digit;
+        } else {
+            acc = UINT32_MAX;
+        }
     }
 
-    char* end;
-    errno = 0;
-    *out = strtoull(substr, &end, 10);
-
-    if (substr == end || errno == ERANGE) {
-        PDF_TRY(pdf_ctx_release_substr(ctx));
-        return PDF_CTX_ERR_INVALID_NUMBER;
+    if (expected_length && processed_length != *expected_length) {
+        pdf_ctx_seek(ctx, start_offset);
+        if (result == PDF_OK) {
+            return PDF_CTX_ERR_EXPECT;
+        } else {
+            return result;
+        }
     }
 
-    if (read_length) {
-        *read_length = end - substr;
+    if (actual_length) {
+        *actual_length = processed_length;
     }
 
-    PDF_TRY(pdf_ctx_release_substr(ctx));
-    LOG_DEBUG_G("ctx", "Parsed int %llu", *out);
+    pdf_ctx_seek(ctx, start_offset + processed_length);
+    *value = acc;
+
+    LOG_TRACE_G("ctx", "Parsed int %lu. Length is %u", acc, processed_length);
     return PDF_OK;
+}
+
+bool is_pdf_whitespace(char c) {
+    return c == '\0' || c == '\t' || c == '\n' || c == '\f' || c == '\r'
+        || c == ' ';
+}
+
+bool is_pdf_delimiter(char c) {
+    return c == '(' || c == ')' || c == '<' || c == '>' || c == '[' || c == ']'
+        || c == '{' || c == '}' || c == '/' || c == '%';
+}
+
+bool is_pdf_regular(char c) {
+    return !is_pdf_whitespace(c) && !is_pdf_delimiter(c);
 }
 
 #ifdef TEST
@@ -545,6 +581,25 @@ TEST_FUNC(test_ctx_seek_next_line) {
     return TEST_RESULT_PASS;
 }
 
+TEST_FUNC(test_ctx_consume_whitespace) {
+    char buffer[] = "there is a lot of whitespace             before this";
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    TEST_ASSERT(ctx);
+
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 28));
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_consume_whitespace(ctx));
+    TEST_ASSERT_EQ((size_t)41, pdf_ctx_offset(ctx));
+
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 12));
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_consume_whitespace(ctx));
+    TEST_ASSERT_EQ((size_t)12, pdf_ctx_offset(ctx));
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
 TEST_FUNC(test_ctx_borrow_substr) {
     char buffer[] = "the quick brown fox jumped over the lazy dog";
     Arena* arena = arena_new(128);
@@ -614,41 +669,59 @@ TEST_FUNC(test_ctx_borrow_eof) {
 }
 
 TEST_FUNC(test_ctx_parse_int) {
-    char buffer[] = "John has +120 apples. I have 42.";
+    char buffer[] = "John has +120 apples. I have 42";
     Arena* arena = arena_new(128);
 
     PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
 
-    unsigned long long out;
-    long read_length;
+    uint64_t value;
+    uint32_t expected_len = 3;
+    uint32_t actual_len = 3;
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 10));
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
-        pdf_ctx_parse_int(ctx, 10, 4, &out, &read_length)
+        pdf_ctx_parse_int(ctx, &expected_len, &value, &actual_len)
     );
-    TEST_ASSERT_EQ((unsigned long long)120, out);
-    TEST_ASSERT_EQ(3L, read_length);
+    TEST_ASSERT_EQ((uint64_t)120, value);
+    TEST_ASSERT_EQ((uint32_t)3, actual_len);
+    TEST_ASSERT_EQ((size_t)13, pdf_ctx_offset(ctx));
 
+    expected_len = 2;
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 10));
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_CTX_ERR_INVALID_NUMBER,
-        pdf_ctx_parse_int(ctx, 14, 2, &out, NULL)
+        (PdfResult)PDF_CTX_ERR_EXPECT,
+        pdf_ctx_parse_int(ctx, &expected_len, &value, NULL)
     );
 
+    expected_len = 2;
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 29));
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
-        pdf_ctx_parse_int(ctx, 29, 2, &out, NULL)
+        pdf_ctx_parse_int(ctx, &expected_len, &value, NULL)
     );
-    TEST_ASSERT_EQ((unsigned long long)42, out);
+    TEST_ASSERT_EQ((uint64_t)42, value);
 
+    expected_len = 3;
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 29));
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_CTX_ERR_INVALID_NUMBER,
-        pdf_ctx_parse_int(ctx, 9, 4, &out, NULL)
+        (PdfResult)PDF_CTX_ERR_EOF,
+        pdf_ctx_parse_int(ctx, &expected_len, &value, NULL)
     );
 
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 31));
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_CTX_ERR_INVALID_NUMBER,
-        pdf_ctx_parse_int(ctx, 28, 3, &out, NULL)
+        (PdfResult)PDF_OK,
+        pdf_ctx_parse_int(ctx, NULL, &value, &actual_len)
     );
+    TEST_ASSERT_EQ((uint32_t)0, actual_len);
+
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 5));
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_OK,
+        pdf_ctx_parse_int(ctx, NULL, &value, &actual_len)
+    );
+    TEST_ASSERT_EQ((uint32_t)0, actual_len);
 
     arena_free(arena);
     return TEST_RESULT_PASS;
