@@ -321,7 +321,7 @@ PdfResult pdf_ctx_borrow_substr(
     }
 
     ctx->borrow_term_offset = offset + length;
-    if (ctx->borrow_term_offset >= ctx->buffer_len) {
+    if (ctx->borrow_term_offset > ctx->buffer_len) {
         return PDF_CTX_ERR_EOF;
     }
 
@@ -570,6 +570,44 @@ TEST_FUNC(test_ctx_borrow_substr) {
     // Free original borrow
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_release_substr(ctx));
     TEST_ASSERT(!substr);
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_ctx_borrow_full) {
+    char buffer[] = "this is the whole string";
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    TEST_ASSERT(ctx);
+
+    char* substr;
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_OK,
+        pdf_ctx_borrow_substr(ctx, 0, strlen(buffer), &substr)
+    );
+    TEST_ASSERT_EQ("this is the whole string", substr);
+
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_release_substr(ctx));
+    TEST_ASSERT(!substr);
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_ctx_borrow_eof) {
+    char buffer[] = "this is the whole string";
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    TEST_ASSERT(ctx);
+
+    char* substr;
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_CTX_ERR_EOF,
+        pdf_ctx_borrow_substr(ctx, 0, strlen(buffer) + 1, &substr)
+    );
 
     arena_free(arena);
     return TEST_RESULT_PASS;

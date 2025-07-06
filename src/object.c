@@ -14,6 +14,7 @@ PdfObject* pdf_parse_null(Arena* arena, PdfCtx* ctx, PdfResult* result);
 PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result);
 PdfObject*
 pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfResult* result);
+PdfObject* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfResult* result);
 
 PdfObject* pdf_parse_object(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     DBG_ASSERT(arena);
@@ -47,7 +48,7 @@ PdfObject* pdf_parse_object(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     } else if (peeked == '<' && peeked_next != '<') {
         LOG_TODO("Hexadecimal strings");
     } else if (peeked == '/') {
-        LOG_TODO("Names");
+        return pdf_parse_name(arena, ctx, result);
     } else if (peeked == '[') {
         LOG_TODO("Arrays");
     } else if (peeked == '<' && peeked_next == '<') {
@@ -306,11 +307,125 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfResult* result) {
         }
     }
 
+    PDF_TRY_RET_NULL(pdf_ctx_release_substr(ctx));
     parsed[write_offset] = '\0';
 
     PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
     object->kind = PDF_OBJECT_KIND_STRING;
     object->data.string_data = parsed;
+
+    return object;
+}
+
+bool is_pdf_whitespace(char c) {
+    return c == '\0' || c == '\t' || c == '\n' || c == '\f' || c == '\r'
+        || c == ' ';
+}
+
+bool is_pdf_delimiter(char c) {
+    return c == '(' || c == ')' || c == '<' || c == '>' || c == '[' || c == ']'
+        || c == '{' || c == '}' || c == '/' || c == '%';
+}
+
+bool is_pdf_regular(char c) {
+    return !is_pdf_whitespace(c) && !is_pdf_delimiter(c);
+}
+
+bool char_to_hex(char c, int* out) {
+    if (c >= '0' && c <= '9') {
+        *out = c - '0';
+        return true;
+    } else if (c >= 'A' && c <= 'F') {
+        *out = c - 'A' + 10;
+        return true;
+    } else if (c >= 'a' && c <= 'f') {
+        *out = c - 'a' + 10;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+PdfObject* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfResult* result) {
+    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "/"));
+
+    // Find max length
+    size_t start_offset = pdf_ctx_offset(ctx);
+    size_t length = 0;
+    char peeked;
+
+    while (pdf_ctx_peek_and_advance(ctx, &peeked) == PDF_OK) {
+        if (!is_pdf_regular(peeked)) {
+            break;
+        }
+
+        if (peeked < '!' || peeked > '~') {
+            *result = PDF_ERR_NAME_UNESCAPED_CHAR;
+            return NULL;
+        }
+
+        length++;
+    }
+
+    LOG_DEBUG("Length %zu", length);
+
+    // Parse name
+    char* name = arena_alloc(arena, sizeof(char) * (length + 1));
+    char* raw;
+    PDF_TRY_RET_NULL(pdf_ctx_borrow_substr(ctx, start_offset, length, &raw));
+
+    size_t write_offset = 0;
+    int escape = 0;
+    int hex_code = 0;
+
+    for (size_t read_offset = 0; read_offset < length; read_offset++) {
+        char c = raw[read_offset];
+
+        switch (escape) {
+            case 0: {
+                if (c == '#') {
+                    escape = 1;
+                    continue;
+                }
+
+                name[write_offset++] = c;
+                break;
+            }
+            case 1: {
+                int value;
+                if (!char_to_hex(c, &value)) {
+                    *result = PDF_ERR_NAME_BAD_CHAR_CODE;
+                    return NULL;
+                }
+
+                hex_code = value << 4;
+                escape = 2;
+                break;
+            }
+            case 2: {
+                int value;
+                if (!char_to_hex(c, &value)) {
+                    *result = PDF_ERR_NAME_BAD_CHAR_CODE;
+                    return NULL;
+                }
+
+                hex_code |= value;
+                name[write_offset++] = (char)hex_code;
+                escape = 0;
+                break;
+            }
+            default: {
+                LOG_PANIC("Unreachable");
+            }
+        }
+    }
+
+    PDF_TRY_RET_NULL(pdf_ctx_release_substr(ctx));
+    name[write_offset] = '\0';
+
+    PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
+    object->kind = PDF_OBJECT_KIND_NAME;
+    object->data.name_data = name;
 
     return object;
 }
@@ -503,6 +618,57 @@ TEST_FUNC(test_object_literal_str_escapes) {
 
 TEST_FUNC(test_object_literal_str_unbalanced) {
     SETUP_INVALID_PARSE_OBJECT("(", PDF_ERR_UNBALANCED_STR);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_name) {
+    SETUP_VALID_PARSE_OBJECT("/Name1", PDF_OBJECT_KIND_NAME);
+    TEST_ASSERT_EQ("Name1", object->data.name_data);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_name_various_chars) {
+    SETUP_VALID_PARSE_OBJECT(
+        "/A;Name_With-Various***Characters?",
+        PDF_OBJECT_KIND_NAME
+    );
+    TEST_ASSERT_EQ("A;Name_With-Various***Characters?", object->data.name_data);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_name_dollars) {
+    SETUP_VALID_PARSE_OBJECT("/$$", PDF_OBJECT_KIND_NAME);
+    TEST_ASSERT_EQ("$$", object->data.name_data);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_name_escape) {
+    SETUP_VALID_PARSE_OBJECT(
+        "/lime#20Green",
+        PDF_OBJECT_KIND_NAME
+    ); // PDF 32000-1:2008 has a typo for this example
+    TEST_ASSERT_EQ("lime Green", object->data.name_data);
+    TEST_ASSERT_NE("Lime Green", object->data.name_data);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_name_terminated) {
+    SETUP_VALID_PARSE_OBJECT("/paired#28#29parentheses/", PDF_OBJECT_KIND_NAME);
+    TEST_ASSERT_EQ("paired()parentheses", object->data.name_data);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_name_whitespace_terminated) {
+    SETUP_VALID_PARSE_OBJECT("/A#42 ", PDF_OBJECT_KIND_NAME);
+    TEST_ASSERT_EQ("AB", object->data.name_data);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_name_invalid) {
+    SETUP_INVALID_PARSE_OBJECT(
+        "/The_Key_of_F#_Minor",
+        PDF_ERR_NAME_BAD_CHAR_CODE
+    );
     return TEST_RESULT_PASS;
 }
 
