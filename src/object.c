@@ -7,7 +7,7 @@
 #include "arena.h"
 #include "ctx.h"
 #include "log.h"
-#include "result.h"
+#include "pdf_result.h"
 #include "vec.h"
 
 PdfObject* pdf_parse_true(Arena* arena, PdfCtx* ctx, PdfResult* result);

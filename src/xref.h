@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ctx.h"
-#include "result.h"
+#include "pdf_result.h"
 
 typedef struct XRefTable XRefTable;
 

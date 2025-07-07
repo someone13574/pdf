@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #include "arena.h"
-#include "result.h"
+#include "pdf_result.h"
 
 typedef struct PdfCtx PdfCtx;
 

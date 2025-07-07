@@ -9,7 +9,7 @@
 #include "arena.h"
 #include "ctx.h"
 #include "log.h"
-#include "result.h"
+#include "pdf_result.h"
 #include "vec.h"
 
 typedef struct {

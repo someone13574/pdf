@@ -3,7 +3,6 @@
 #include <stdalign.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "log.h"
@@ -71,10 +70,7 @@ void arena_free(Arena* arena) {
         free((void*)arena->blocks[block].start);
     }
     free(arena->blocks);
-
-    arena->blocks = NULL;
-    arena->num_blocks = 0;
-    arena->next_block_size = 0;
+    free(arena);
 }
 
 void* arena_alloc(Arena* arena, size_t size) {
@@ -131,21 +127,18 @@ void* arena_alloc_align(Arena* arena, size_t size, size_t align) {
     arena->blocks = new_array;
     arena->num_blocks++;
 
-    while (arena->next_block_size
-           < size + (align == alignof(max_align_t) ? 0 : align)
+    size_t block_size = arena->next_block_size;
+    while (block_size < size + (align == alignof(max_align_t) ? 0 : align)
     ) { // Ensure there is enough space
         LOG_ASSERT(
-            arena->next_block_size < MAX_BLOCK_SIZE / 2,
+            block_size < MAX_BLOCK_SIZE / 2,
             "Arena allocations cannot be larger than 1 GiB"
         );
-        arena->next_block_size <<= 1;
+        block_size <<= 1;
     }
 
     ArenaBlock* block = &arena->blocks[arena->num_blocks - 1];
-    arena_block_init(
-        &arena->blocks[arena->num_blocks - 1],
-        arena->next_block_size
-    );
+    arena_block_init(&arena->blocks[arena->num_blocks - 1], block_size);
     if (arena->next_block_size <= MAX_BLOCK_SIZE / 2) {
         arena->next_block_size <<= 1;
     }

@@ -9,7 +9,7 @@
 
 #include "arena.h"
 #include "log.h"
-#include "result.h"
+#include "pdf_result.h"
 
 struct PdfCtx {
     char* buffer;
@@ -250,11 +250,14 @@ PdfResult pdf_ctx_seek_line_start(PdfCtx* ctx) {
         return PDF_CTX_ERR_BORROWED;
     }
 
+    size_t restore_offset = ctx->offset;
+    if (restore_offset == ctx->buffer_len) {
+        PDF_TRY(pdf_ctx_shift(ctx, -1));
+    }
+
     char peeked;
     char prev_char;
     PDF_TRY(pdf_ctx_peek(ctx, &peeked));
-
-    size_t restore_offset = ctx->offset;
 
     do {
         PdfResult seek_result = pdf_ctx_shift(ctx, -1);

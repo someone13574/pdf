@@ -1,9 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "log.h"
 #include "pdf.h"
+#include "pdf_object.h"
+#include "pdf_result.h"
 
-char* load_file_to_buffer(const char* path, size_t* out_size) {
+char* load_file_to_buffer(Arena* arena, const char* path, size_t* out_size) {
     FILE* file = fopen(path, "rb");
     *out_size = 0;
     if (!file) {
@@ -26,7 +29,7 @@ char* load_file_to_buffer(const char* path, size_t* out_size) {
         return NULL;
     }
 
-    char* buffer = malloc((size_t)len);
+    char* buffer = arena_alloc(arena, (size_t)len);
     if (!buffer) {
         fclose(file);
         return NULL;
@@ -47,16 +50,29 @@ int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
 
+    Arena* arena = arena_new(1024);
+
     size_t buffer_size;
-    char* buffer = load_file_to_buffer("test-files/test.pdf", &buffer_size);
+    char* buffer =
+        load_file_to_buffer(arena, "test-files/test.pdf", &buffer_size);
 
-    PdfDocument* doc = pdf_document_new(buffer, buffer_size);
+    PdfResult result = PDF_OK;
+    PdfDocument* doc = pdf_document_new(arena, buffer, buffer_size, &result);
+    if (result != PDF_OK || !doc) {
+        LOG_ERROR("Failed to load document");
+        arena_free(arena);
+        return EXIT_FAILURE;
+    }
 
-    pdf_document_free(doc);
-    doc = NULL;
+    PdfObject* trailer = pdf_get_trailer(doc, &result);
+    if (result != PDF_OK || !trailer) {
+        LOG_ERROR("Failed to parse trailer");
+        arena_free(arena);
+        return EXIT_FAILURE;
+    }
 
-    free(buffer);
-    buffer = NULL;
+    LOG_INFO("Finished");
 
+    arena_free(arena);
     return 0;
 }

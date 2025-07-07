@@ -1,15 +1,19 @@
 set(HEADER_LIST
     "${pdf_SOURCE_DIR}/include/pdf.h"
-    "${pdf_SOURCE_DIR}/include/log.h")
+    "${pdf_SOURCE_DIR}/include/pdf_object.h"
+    "${pdf_SOURCE_DIR}/include/pdf_result.h"
+    "${pdf_SOURCE_DIR}/include/log.h"
+    "${pdf_SOURCE_DIR}/include/test.h"
+    "${pdf_SOURCE_DIR}/include/vec.h"
+    "${pdf_SOURCE_DIR}/include/arena.h")
 set(SOURCE_FILE_LIST
     pdf.c
     log.c
-    test.c test.h
-    arena.c arena.h
-    vec.c vec.h
+    test.c
+    arena.c
+    vec.c
     ctx.c ctx.h
     object.c object.h
-    parse.c parse.h
     xref.c xref.h
     ${HEADER_LIST})
 
