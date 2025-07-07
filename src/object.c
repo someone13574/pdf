@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "arena.h"
 #include "ctx.h"
@@ -17,10 +18,26 @@ PdfObject*
 pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfResult* result);
 PdfObject* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfResult* result);
 PdfObject* pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfResult* result);
-PdfObject* pdf_parse_dict(Arena* arena, PdfCtx* ctx, PdfResult* result);
+PdfObject* pdf_parse_dict(
+    Arena* arena,
+    PdfCtx* ctx,
+    PdfResult* result,
+    bool in_direct_obj
+);
 PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result);
+char* pdf_parse_stream(
+    Arena* arena,
+    PdfCtx* ctx,
+    PdfResult* result,
+    Vec* stream_dict
+);
 
-PdfObject* pdf_parse_object(Arena* arena, PdfCtx* ctx, PdfResult* result) {
+PdfObject* pdf_parse_object(
+    Arena* arena,
+    PdfCtx* ctx,
+    PdfResult* result,
+    bool in_direct_obj
+) {
     DBG_ASSERT(arena);
     DBG_ASSERT(ctx);
     DBG_ASSERT(result);
@@ -51,6 +68,8 @@ PdfObject* pdf_parse_object(Arena* arena, PdfCtx* ctx, PdfResult* result) {
             return indirect;
         }
 
+        LOG_DEBUG_G("object", "Failed to parse indirect object/reference");
+
         *result = PDF_OK;
         PDF_TRY_RET_NULL(pdf_ctx_seek(ctx, restore_offset));
 
@@ -64,9 +83,7 @@ PdfObject* pdf_parse_object(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     } else if (peeked == '[') {
         return pdf_parse_array(arena, ctx, result);
     } else if (peeked == '<' && peeked_next == '<') {
-        return pdf_parse_dict(arena, ctx, result);
-    } else if (peeked == 's') {
-        LOG_TODO("Streams");
+        return pdf_parse_dict(arena, ctx, result, in_direct_obj);
     } else if (peeked == 'n') {
         return pdf_parse_null(arena, ctx, result);
     }
@@ -453,7 +470,7 @@ PdfObject* pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfResult* result) {
 
     char peeked;
     while (pdf_ctx_peek(ctx, &peeked) == PDF_OK && peeked != ']') {
-        PdfObject* element = pdf_parse_object(arena, ctx, result);
+        PdfObject* element = pdf_parse_object(arena, ctx, result, false);
         if (*result != PDF_OK) {
             return NULL;
         }
@@ -476,7 +493,12 @@ PdfObject* pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     return object;
 }
 
-PdfObject* pdf_parse_dict(Arena* arena, PdfCtx* ctx, PdfResult* result) {
+PdfObject* pdf_parse_dict(
+    Arena* arena,
+    PdfCtx* ctx,
+    PdfResult* result,
+    bool in_direct_obj
+) {
     PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "<<"));
     PDF_TRY_RET_NULL(pdf_ctx_consume_whitespace(ctx));
 
@@ -494,7 +516,7 @@ PdfObject* pdf_parse_dict(Arena* arena, PdfCtx* ctx, PdfResult* result) {
         );
         PDF_TRY_RET_NULL(pdf_ctx_consume_whitespace(ctx));
 
-        PdfObject* value = pdf_parse_object(arena, ctx, result);
+        PdfObject* value = pdf_parse_object(arena, ctx, result, false);
         if (*result != PDF_OK) {
             return NULL;
         }
@@ -515,11 +537,109 @@ PdfObject* pdf_parse_dict(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, ">>"));
     PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, is_pdf_non_regular));
 
+    // Attempt to parse stream
+    if (in_direct_obj) {
+        size_t restore_offset = pdf_ctx_offset(ctx);
+
+        PdfResult consume_result = pdf_ctx_consume_whitespace(ctx);
+        if (consume_result != PDF_OK) {
+            pdf_ctx_seek(ctx, restore_offset);
+            goto not_stream;
+        }
+
+        PdfResult stream_result = PDF_OK;
+        char* stream_bytes =
+            pdf_parse_stream(arena, ctx, &stream_result, entries);
+        if (stream_result != PDF_OK || !stream_bytes) {
+            pdf_ctx_seek(ctx, restore_offset);
+            goto not_stream;
+        }
+
+        PDF_TRY_RET_NULL(
+            pdf_ctx_require_char_type(ctx, true, is_pdf_non_regular)
+        );
+
+        PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
+        object->kind = PDF_OBJECT_KIND_STREAM;
+        object->data.stream_data.stream_dict = entries;
+        object->data.stream_data.stream_bytes = stream_bytes;
+
+        return object;
+    }
+
+    // Not a stream-object
+not_stream: {
     PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
     object->kind = PDF_OBJECT_KIND_DICT;
     object->data.dict_data = entries;
 
     return object;
+}
+}
+
+char* pdf_parse_stream(
+    Arena* arena,
+    PdfCtx* ctx,
+    PdfResult* result,
+    Vec* stream_dict
+) {
+    // Parse start
+    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "stream"));
+
+    char peeked_newline;
+    PDF_TRY_RET_NULL(pdf_ctx_peek(ctx, &peeked_newline));
+    if (peeked_newline == '\n') {
+        PDF_TRY_RET_NULL(pdf_ctx_shift(ctx, 1));
+    } else if (peeked_newline == '\r') {
+        PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "\r\n"));
+    } else {
+        *result = PDF_CTX_ERR_EXPECT;
+        return NULL;
+    }
+
+    // Get length
+    int32_t length = -1;
+    for (size_t entry_idx = 0; entry_idx < vec_len(stream_dict); entry_idx++) {
+        PdfObjectDictEntry* entry = vec_get(stream_dict, entry_idx);
+        if (!entry || !entry->key || !entry->value
+            || entry->value->kind != PDF_OBJECT_KIND_INTEGER
+            || strcmp("Length", entry->key->data.name_data) != 0) {
+            continue;
+        }
+
+        length = entry->value->data.integer_data;
+    }
+
+    if (length < 0) {
+        *result = PDF_ERR_STREAM_INVALID_LENGTH;
+        return NULL;
+    }
+
+    // Copy stream body
+    char* borrowed;
+    PDF_TRY_RET_NULL(pdf_ctx_borrow_substr(
+        ctx,
+        pdf_ctx_offset(ctx),
+        (size_t)length,
+        &borrowed
+    ));
+
+    char* body = arena_alloc(arena, sizeof(char) * (size_t)(length + 1));
+    strncpy(body, borrowed, (size_t)length);
+    body[length] = '\0';
+
+    PDF_TRY_RET_NULL(pdf_ctx_release_substr(ctx));
+
+    // Parse end
+    PDF_TRY_RET_NULL(pdf_ctx_shift(ctx, length));
+    if (pdf_ctx_expect(ctx, "\nendstream") != PDF_OK
+        && pdf_ctx_expect(ctx, "\r\nendstream") != PDF_OK
+        && pdf_ctx_expect(ctx, "\rendstream") != PDF_OK) {
+        *result = PDF_CTX_ERR_EXPECT;
+        return NULL;
+    }
+
+    return body;
 }
 
 PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result) {
@@ -569,7 +689,7 @@ PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result) {
         );
         PDF_TRY_RET_NULL(pdf_ctx_consume_whitespace(ctx));
 
-        PdfObject* inner = pdf_parse_object(arena, ctx, result);
+        PdfObject* inner = pdf_parse_object(arena, ctx, result, true);
         if (*result != PDF_OK) {
             LOG_DEBUG_G(
                 "object",
@@ -610,7 +730,7 @@ PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     char buffer[] = buf;                                                       \
     PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));                  \
     PdfResult result;                                                          \
-    PdfObject* object = pdf_parse_object(arena, ctx, &result);                 \
+    PdfObject* object = pdf_parse_object(arena, ctx, &result, false);          \
     TEST_ASSERT_EQ((PdfResult)PDF_OK, result, "Result was not ok");            \
     TEST_ASSERT(object, "PdfObject pointer is NULL");                          \
     TEST_ASSERT_EQ(                                                            \
@@ -632,7 +752,7 @@ PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     char buffer[] = buf;                                                       \
     PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));                  \
     PdfResult result;                                                          \
-    PdfObject* object = pdf_parse_object(arena, ctx, &result);                 \
+    PdfObject* object = pdf_parse_object(arena, ctx, &result, false);          \
     TEST_ASSERT_EQ((PdfResult)(err), result, "Incorrect error type");          \
     TEST_ASSERT(!object, "PdfObject pointer isn't NULL");
 
@@ -1220,6 +1340,80 @@ TEST_FUNC(test_object_indirect_ref) {
     SETUP_VALID_PARSE_OBJECT("12 0 R", PDF_OBJECT_KIND_REF);
     TEST_ASSERT_EQ((size_t)12, object->data.ref_data.object_id);
     TEST_ASSERT_EQ((size_t)0, object->data.ref_data.generation);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_stream) {
+    SETUP_VALID_PARSE_OBJECT(
+        "0 0 obj << /Length 8 >> stream\n01234567\nendstream\n endobj",
+        PDF_OBJECT_KIND_INDIRECT
+    );
+
+    PdfObject* stream_object = object->data.indirect_data.object;
+    TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_STREAM, stream_object->kind);
+    PdfObjectStream stream = stream_object->data.stream_data;
+    TEST_ASSERT(stream.stream_dict);
+    TEST_ASSERT_EQ("01234567", stream.stream_bytes);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_stream_crlf) {
+    SETUP_VALID_PARSE_OBJECT(
+        "0 0 obj << /Length 8 >> stream\r\n01234567\r\nendstream\r\n endobj",
+        PDF_OBJECT_KIND_INDIRECT
+    );
+
+    PdfObject* stream_object = object->data.indirect_data.object;
+    TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_STREAM, stream_object->kind);
+    PdfObjectStream stream = stream_object->data.stream_data;
+    TEST_ASSERT(stream.stream_dict);
+    TEST_ASSERT_EQ("01234567", stream.stream_bytes);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_stream_cr) {
+    // Stream parsing fails and it falls back to the integer
+    SETUP_VALID_PARSE_OBJECT_WITH_OFFSET(
+        "0 0 obj << /Length 8 >> stream\r01234567\nendstream\n endobj",
+        PDF_OBJECT_KIND_INTEGER,
+        1
+    );
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_stream_bad_length) {
+    // Stream parsing fails and it falls back to the integer
+    SETUP_VALID_PARSE_OBJECT_WITH_OFFSET(
+        "0 0 obj << /Length 7 >> stream\n01234567\nendstream\n endobj",
+        PDF_OBJECT_KIND_INTEGER,
+        1
+    );
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_stream_bad_length2) {
+    // Stream parsing fails and it falls back to the integer
+    SETUP_VALID_PARSE_OBJECT_WITH_OFFSET(
+        "0 0 obj << /Length 9 >> stream\n01234567\nendstream\n endobj",
+        PDF_OBJECT_KIND_INTEGER,
+        1
+    );
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_stream_no_line_end) {
+    // Stream parsing fails and it falls back to the integer
+    SETUP_VALID_PARSE_OBJECT_WITH_OFFSET(
+        "0 0 obj << /Length 9 >> stream\n01234567endstream\n endobj",
+        PDF_OBJECT_KIND_INTEGER,
+        1
+    );
 
     return TEST_RESULT_PASS;
 }

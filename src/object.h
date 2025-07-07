@@ -16,6 +16,11 @@ typedef struct {
 } PdfObjectDictEntry;
 
 typedef struct {
+    Vec* stream_dict;
+    char* stream_bytes;
+} PdfObjectStream;
+
+typedef struct {
     size_t object_id;
     size_t generation;
     PdfObject* object;
@@ -34,6 +39,7 @@ typedef enum {
     PDF_OBJECT_KIND_NAME,
     PDF_OBJECT_KIND_ARRAY,
     PDF_OBJECT_KIND_DICT,
+    PDF_OBJECT_KIND_STREAM,
     PDF_OBJECT_KIND_INDIRECT,
     PDF_OBJECT_KIND_REF,
     PDF_OBJECT_KIND_NULL
@@ -47,6 +53,7 @@ typedef union {
     char* name_data;
     Vec* array_data;
     Vec* dict_data;
+    PdfObjectStream stream_data;
     PdfObjectIndirect indirect_data;
     PdfObjectIndirectRef ref_data;
 
@@ -57,4 +64,9 @@ struct PdfObject {
     PdfObjectData data;
 };
 
-PdfObject* pdf_parse_object(Arena* arena, PdfCtx* ctx, PdfResult* result);
+PdfObject* pdf_parse_object(
+    Arena* arena,
+    PdfCtx* ctx,
+    PdfResult* result,
+    bool in_direct_obj
+);
