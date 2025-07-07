@@ -1,12 +1,16 @@
 #include "object.h"
 
 #include <ctype.h>
+#include <stdarg.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "arena.h"
 #include "ctx.h"
 #include "log.h"
+#include "pdf_object.h"
 #include "pdf_result.h"
 #include "vec.h"
 
@@ -537,6 +541,10 @@ PdfObject* pdf_parse_dict(
     PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, ">>"));
     PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, is_pdf_non_regular));
 
+    PdfObject* dict = arena_alloc(arena, sizeof(PdfObject));
+    dict->kind = PDF_OBJECT_KIND_DICT;
+    dict->data.dict_data = entries;
+
     // Attempt to parse stream
     if (in_direct_obj) {
         size_t restore_offset = pdf_ctx_offset(ctx);
@@ -561,20 +569,14 @@ PdfObject* pdf_parse_dict(
 
         PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
         object->kind = PDF_OBJECT_KIND_STREAM;
-        object->data.stream_data.stream_dict = entries;
+        object->data.stream_data.stream_dict = dict;
         object->data.stream_data.stream_bytes = stream_bytes;
 
         return object;
     }
 
     // Not a stream-object
-not_stream: {
-    PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
-    object->kind = PDF_OBJECT_KIND_DICT;
-    object->data.dict_data = entries;
-
-    return object;
-}
+not_stream: { return dict; }
 }
 
 char* pdf_parse_stream(
@@ -718,6 +720,233 @@ PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     }
 
     return NULL;
+}
+
+char* format_alloc(Arena* arena, const char* fmt, ...)
+    __attribute__((format(printf, 2, 3)));
+
+char* format_alloc(Arena* arena, const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    va_list args_copy;
+    va_copy(args_copy, args);
+    int needed = vsnprintf(NULL, 0, fmt, args_copy);
+    char* buffer = arena_alloc(arena, (size_t)needed + 1);
+    vsprintf(buffer, fmt, args);
+    va_end(args);
+
+    return buffer;
+}
+
+char* pdf_fmt_object_indented(
+    Arena* arena,
+    PdfObject* object,
+    int indent,
+    bool* contains_indirect
+) {
+    if (!object) {
+        return NULL;
+    }
+
+    switch (object->kind) {
+        case PDF_OBJECT_KIND_BOOLEAN: {
+            if (object->data.bool_data) {
+                return format_alloc(arena, "true");
+            } else {
+                return format_alloc(arena, "false");
+            }
+        }
+        case PDF_OBJECT_KIND_INTEGER: {
+            return format_alloc(arena, "%d", object->data.integer_data);
+        }
+        case PDF_OBJECT_KIND_REAL: {
+            return format_alloc(arena, "%g", object->data.real_data);
+        }
+        case PDF_OBJECT_KIND_STRING: {
+            return format_alloc(arena, "(%s)", object->data.string_data);
+        }
+        case PDF_OBJECT_KIND_NAME: {
+            return format_alloc(arena, "/%s", object->data.name_data);
+        }
+        case PDF_OBJECT_KIND_ARRAY: {
+            Vec* items = object->data.array_data;
+            size_t num_items = vec_len(items);
+            if (num_items == 0) {
+                return format_alloc(arena, "[]");
+            }
+
+            int length = indent;
+            char** item_strs = arena_alloc(arena, sizeof(char*) * num_items);
+            bool array_contains_indirect = false;
+            for (size_t idx = 0; idx < num_items; idx++) {
+                item_strs[idx] = pdf_fmt_object_indented(
+                    arena,
+                    vec_get(items, idx),
+                    indent + 2,
+                    &array_contains_indirect
+                );
+                length += (int)strlen(item_strs[idx]);
+            }
+
+            if (length > 80 || array_contains_indirect) {
+                char* buffer = format_alloc(arena, "[");
+                for (size_t idx = 0; idx < num_items; idx++) {
+                    char* new_buffer = format_alloc(
+                        arena,
+                        "%s\n  %*s%s",
+                        buffer,
+                        indent,
+                        "",
+                        item_strs[idx]
+                    );
+                    if (new_buffer) {
+                        buffer = new_buffer;
+                    } else {
+                        LOG_ERROR("Format failed");
+                        return NULL;
+                    }
+                }
+
+                return format_alloc(arena, "%s\n%*s]", buffer, indent, "");
+            } else {
+                char* buffer = format_alloc(arena, "[");
+                for (size_t idx = 0; idx < num_items; idx++) {
+                    buffer =
+                        format_alloc(arena, "%s %s", buffer, item_strs[idx]);
+                }
+
+                return format_alloc(arena, "%s ]", buffer);
+            }
+        }
+        case PDF_OBJECT_KIND_DICT: {
+            Vec* entries = object->data.dict_data;
+
+            switch (vec_len(entries)) {
+                case 0: {
+                    return format_alloc(arena, "<< >>");
+                }
+                case 1: {
+                    PdfObjectDictEntry* entry = vec_get(entries, 0);
+                    char* key_text = pdf_fmt_object_indented(
+                        arena,
+                        entry->key,
+                        indent + 2,
+                        NULL
+                    );
+                    char* value_text = pdf_fmt_object_indented(
+                        arena,
+                        entry->value,
+                        indent + (int)strlen(key_text) + 3,
+                        NULL
+                    );
+
+                    return format_alloc(
+                        arena,
+                        "<< %s %s >>",
+                        key_text,
+                        value_text
+                    );
+                }
+                default: {
+                    char* buffer = format_alloc(arena, "<<");
+                    for (size_t idx = 0; idx < vec_len(entries); idx++) {
+                        PdfObjectDictEntry* entry = vec_get(entries, idx);
+                        char* key_text = pdf_fmt_object_indented(
+                            arena,
+                            entry->key,
+                            indent + 2,
+                            NULL
+                        );
+                        char* value_text = pdf_fmt_object_indented(
+                            arena,
+                            entry->value,
+                            indent + (int)strlen(key_text) + 3,
+                            NULL
+                        );
+
+                        buffer = format_alloc(
+                            arena,
+                            "%s\n  %*s%s %s",
+                            buffer,
+                            indent,
+                            "",
+                            key_text,
+                            value_text
+                        );
+                    }
+
+                    return format_alloc(arena, "%s\n%*s>>", buffer, indent, "");
+                }
+            }
+        }
+        case PDF_OBJECT_KIND_STREAM: {
+            return format_alloc(
+                arena,
+                "%s\n%*sstream\n%*s...\n%*sendstream",
+                pdf_fmt_object_indented(
+                    arena,
+                    object->data.stream_data.stream_dict,
+                    indent,
+                    NULL
+                ),
+                indent,
+                "",
+                indent,
+                "",
+                indent,
+                ""
+            );
+        }
+        case PDF_OBJECT_KIND_INDIRECT: {
+            if (contains_indirect) {
+                *contains_indirect = true;
+            }
+
+            return format_alloc(
+                arena,
+                "%zu %zu obj\n%*s%s\n%*sendobj",
+                object->data.indirect_data.object_id,
+                object->data.indirect_data.generation,
+                indent + 2,
+                "",
+                pdf_fmt_object_indented(
+                    arena,
+                    object->data.indirect_data.object,
+                    indent + 2,
+                    NULL
+                ),
+                indent,
+                ""
+            );
+        }
+        case PDF_OBJECT_KIND_REF: {
+            if (contains_indirect) {
+                *contains_indirect = true;
+            }
+            return format_alloc(
+                arena,
+                "%zu %zu R",
+                object->data.ref_data.object_id,
+                object->data.ref_data.generation
+            );
+        }
+        case PDF_OBJECT_KIND_NULL: {
+            return format_alloc(arena, "null");
+        }
+    }
+}
+
+char* pdf_fmt_object(Arena* arena, PdfObject* object) {
+    if (!arena) {
+        arena = arena_new(64);
+        char* formatted = pdf_fmt_object_indented(arena, object, 0, NULL);
+        char* copy = strdup(formatted);
+        arena_free(arena);
+
+        return copy;
+    } else {
+        return pdf_fmt_object_indented(arena, object, 0, NULL);
+    }
 }
 
 #ifdef TEST

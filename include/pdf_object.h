@@ -12,7 +12,7 @@ typedef struct {
 } PdfObjectDictEntry;
 
 typedef struct {
-    Vec* stream_dict;
+    PdfObject* stream_dict;
     char* stream_bytes;
 } PdfObjectStream;
 
@@ -58,3 +58,7 @@ struct PdfObject {
     PdfObjectKind kind;
     PdfObjectData data;
 };
+
+// Generates a pretty-printed PdfObject string. If no arena is passed, you must
+// free the string manually.
+char* pdf_fmt_object(Arena* arena, PdfObject* object);

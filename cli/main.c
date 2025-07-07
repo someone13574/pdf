@@ -71,6 +71,9 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
+    char* formatted = pdf_fmt_object(arena, trailer);
+    printf("Trailer:\n%s\n", formatted);
+
     LOG_INFO("Finished");
 
     arena_free(arena);
