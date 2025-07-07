@@ -2,6 +2,7 @@
 
 #ifdef TEST
 
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,22 +26,49 @@
         type b,                                                                \
         long double eps,                                                       \
         const char* file,                                                      \
-        unsigned long line                                                     \
+        unsigned long line,                                                    \
+        const char* extra_message,                                             \
+        ...                                                                    \
     ) {                                                                        \
         (void)eps;                                                             \
         if (a cmp_op b) {                                                      \
             return TEST_RESULT_PASS;                                           \
         }                                                                      \
-        logger_log(                                                            \
-            1,                                                                 \
-            "test-assert",                                                     \
-            LOG_LEVEL_ERROR,                                                   \
-            file,                                                              \
-            line,                                                              \
-            "Assertion failed: " print_ecp " " #cmp_op " " print_ecp,          \
-            a,                                                                 \
-            b                                                                  \
-        );                                                                     \
+        if (extra_message && *extra_message) {                                 \
+            va_list args;                                                      \
+            va_start(args, extra_message);                                     \
+            char extra_message_buf[256];                                       \
+            vsnprintf(                                                         \
+                extra_message_buf,                                             \
+                sizeof(extra_message_buf),                                     \
+                extra_message,                                                 \
+                args                                                           \
+            );                                                                 \
+            va_end(args);                                                      \
+            logger_log(                                                        \
+                1,                                                             \
+                "test-assert",                                                 \
+                LOG_LEVEL_ERROR,                                               \
+                file,                                                          \
+                line,                                                          \
+                "Assertion failed: (" print_ecp " " #cmp_op " " print_ecp      \
+                "): %s",                                                       \
+                a,                                                             \
+                b,                                                             \
+                extra_message_buf                                              \
+            );                                                                 \
+        } else {                                                               \
+            logger_log(                                                        \
+                1,                                                             \
+                "test-assert",                                                 \
+                LOG_LEVEL_ERROR,                                               \
+                file,                                                          \
+                line,                                                          \
+                "Assertion failed: (" print_ecp " " #cmp_op " " print_ecp ")", \
+                a,                                                             \
+                b                                                              \
+            );                                                                 \
+        }                                                                      \
         return TEST_RESULT_FAIL;                                               \
     }
 
@@ -59,23 +87,51 @@
         type b,                                                                \
         long double eps,                                                       \
         const char* file,                                                      \
-        unsigned long line                                                     \
+        unsigned long line,                                                    \
+        const char* extra_message,                                             \
+        ...                                                                    \
     ) {                                                                        \
         if (a - b cmp_op(type) eps join_op b - a cmp_op(type) eps) {           \
             return TEST_RESULT_PASS;                                           \
         }                                                                      \
-        logger_log(                                                            \
-            1,                                                                 \
-            "test-assert",                                                     \
-            LOG_LEVEL_ERROR,                                                   \
-            file,                                                              \
-            line,                                                              \
-            "Assertion failed: " print_ecp " " #cmp_op_dsp " " print_ecp       \
-            " (eps=%Lg)",                                                      \
-            (printf_cast)a,                                                    \
-            (printf_cast)b,                                                    \
-            eps                                                                \
-        );                                                                     \
+        if (extra_message && *extra_message) {                                 \
+            va_list args;                                                      \
+            va_start(args, extra_message);                                     \
+            char extra_message_buf[256];                                       \
+            vsnprintf(                                                         \
+                extra_message_buf,                                             \
+                sizeof(extra_message_buf),                                     \
+                extra_message,                                                 \
+                args                                                           \
+            );                                                                 \
+            va_end(args);                                                      \
+            logger_log(                                                        \
+                1,                                                             \
+                "test-assert",                                                 \
+                LOG_LEVEL_ERROR,                                               \
+                file,                                                          \
+                line,                                                          \
+                "Assertion failed: (" print_ecp " " #cmp_op_dsp " " print_ecp  \
+                ") (eps=%Lg): %s",                                             \
+                (printf_cast)a,                                                \
+                (printf_cast)b,                                                \
+                eps,                                                           \
+                extra_message_buf                                              \
+            );                                                                 \
+        } else {                                                               \
+            logger_log(                                                        \
+                1,                                                             \
+                "test-assert",                                                 \
+                LOG_LEVEL_ERROR,                                               \
+                file,                                                          \
+                line,                                                          \
+                "Assertion failed: (" print_ecp " " #cmp_op_dsp " " print_ecp  \
+                ") (eps=%Lg)",                                                 \
+                (printf_cast)a,                                                \
+                (printf_cast)b,                                                \
+                eps                                                            \
+            );                                                                 \
+        }                                                                      \
         return TEST_RESULT_FAIL;                                               \
     }
 
@@ -127,7 +183,9 @@ TestResult __test_assert_eq_str(
     const char* b,
     long double eps,
     const char* file,
-    unsigned long line
+    unsigned long line,
+    const char* extra_message,
+    ...
 ) {
     (void)eps;
     if (!a || !b) {
@@ -144,16 +202,40 @@ TestResult __test_assert_eq_str(
     if (strcmp(a, b) == 0) {
         return TEST_RESULT_PASS;
     }
-    logger_log(
-        1,
-        "test-assert",
-        LOG_LEVEL_ERROR,
-        file,
-        line,
-        "Assertion failed: \"%s\" == \"%s\"",
-        a,
-        b
-    );
+    if (extra_message && *extra_message) {
+        va_list args;
+        va_start(args, extra_message);
+        char extra_message_buf[256];
+        vsnprintf(
+            extra_message_buf,
+            sizeof(extra_message_buf),
+            extra_message,
+            args
+        );
+        va_end(args);
+        logger_log(
+            1,
+            "test-assert",
+            LOG_LEVEL_ERROR,
+            file,
+            line,
+            "Assertion failed: (\"%s\" == \"%s\"): %s",
+            a,
+            b,
+            extra_message_buf
+        );
+    } else {
+        logger_log(
+            1,
+            "test-assert",
+            LOG_LEVEL_ERROR,
+            file,
+            line,
+            "Assertion failed: (\"%s\" == \"%s\")",
+            a,
+            b
+        );
+    }
     return TEST_RESULT_FAIL;
 }
 
@@ -162,7 +244,9 @@ TestResult __test_assert_ne_str(
     const char* b,
     long double eps,
     const char* file,
-    unsigned long line
+    unsigned long line,
+    const char* extra_message,
+    ...
 ) {
     (void)eps;
     if (!a || !b) {
@@ -179,16 +263,40 @@ TestResult __test_assert_ne_str(
     if (strcmp(a, b) != 0) {
         return TEST_RESULT_PASS;
     }
-    logger_log(
-        1,
-        "test-assert",
-        LOG_LEVEL_ERROR,
-        file,
-        line,
-        "Assertion failed: \"%s\" != \"%s\"",
-        a,
-        b
-    );
+    if (extra_message && *extra_message) {
+        va_list args;
+        va_start(args, extra_message);
+        char extra_message_buf[256];
+        vsnprintf(
+            extra_message_buf,
+            sizeof(extra_message_buf),
+            extra_message,
+            args
+        );
+        va_end(args);
+        logger_log(
+            1,
+            "test-assert",
+            LOG_LEVEL_ERROR,
+            file,
+            line,
+            "Assertion failed: \"%s\" != \"%s\": %s",
+            a,
+            b,
+            extra_message_buf
+        );
+    } else {
+        logger_log(
+            1,
+            "test-assert",
+            LOG_LEVEL_ERROR,
+            file,
+            line,
+            "Assertion failed: \"%s\" != \"%s\"",
+            a,
+            b
+        );
+    }
     return TEST_RESULT_FAIL;
 }
 
@@ -350,14 +458,26 @@ int test_entry(void) {
     }
 
     print_line();
-    LOG_INFO_G(
-        "test",
-        "Test results: %d/%d passed, %d/%d failed",
-        passed,
-        passed + failed,
-        failed,
-        passed + failed
-    );
+
+    if (failed == 0) {
+        LOG_INFO_G(
+            "test",
+            "Test results: %d/%d passed, %d/%d failed",
+            passed,
+            passed + failed,
+            failed,
+            passed + failed
+        );
+    } else {
+        LOG_ERROR_G(
+            "test",
+            "Test results: %d/%d passed, %d/%d failed",
+            passed,
+            passed + failed,
+            failed,
+            passed + failed
+        );
+    }
 
     return (failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

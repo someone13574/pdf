@@ -178,6 +178,29 @@ PdfResult pdf_ctx_expect(PdfCtx* ctx, const char* text) {
     return PDF_OK;
 }
 
+PdfResult
+pdf_ctx_require_char_type(PdfCtx* ctx, bool permit_eof, bool (*eval)(char)) {
+    DBG_ASSERT(ctx);
+    LOG_TRACE_G("ctx", "Expecting character type at offset %zu", ctx->offset);
+
+    char peeked;
+    PdfResult peek_result = (pdf_ctx_peek(ctx, &peeked));
+    if (peek_result != PDF_OK) {
+        if (permit_eof) {
+            return PDF_OK;
+        }
+
+        return peek_result;
+    }
+
+    if (!eval(peeked)) {
+        LOG_TRACE_G("ctx", "Character type didn't match");
+        return PDF_CTX_ERR_EXPECT;
+    }
+
+    return PDF_OK;
+}
+
 PdfResult pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit) {
     DBG_ASSERT(ctx);
     LOG_DEBUG_G(
@@ -430,6 +453,10 @@ bool is_pdf_regular(char c) {
     return !is_pdf_whitespace(c) && !is_pdf_delimiter(c);
 }
 
+bool is_pdf_non_regular(char c) {
+    return !is_pdf_regular(c);
+}
+
 #ifdef TEST
 #include "test.h"
 
@@ -467,12 +494,59 @@ TEST_FUNC(test_ctx_expect_and_peek) {
     return TEST_RESULT_PASS;
 }
 
+TEST_FUNC(text_ctx_require_char_type) {
+    char buffer[] = "the quick brown fox\t jumped( over the lazy dog";
+    Arena* arena = arena_new(128);
+
+    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    TEST_ASSERT(ctx);
+
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 19));
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_OK,
+        pdf_ctx_require_char_type(ctx, false, &is_pdf_whitespace)
+    );
+
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 27));
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_OK,
+        pdf_ctx_require_char_type(ctx, false, &is_pdf_delimiter)
+    );
+
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 6));
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_OK,
+        pdf_ctx_require_char_type(ctx, false, &is_pdf_regular)
+    );
+
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 6));
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_CTX_ERR_EXPECT,
+        pdf_ctx_require_char_type(ctx, false, &is_pdf_whitespace)
+    );
+
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 46));
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_CTX_ERR_EOF,
+        pdf_ctx_require_char_type(ctx, false, &is_pdf_whitespace)
+    );
+
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 46));
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_OK,
+        pdf_ctx_require_char_type(ctx, true, &is_pdf_whitespace)
+    );
+
+    return TEST_RESULT_PASS;
+}
+
 TEST_FUNC(test_ctx_backscan) {
     char buffer[] = "the quick brown fox jumped over the lazy dog";
     Arena* arena = arena_new(128);
 
     PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
     TEST_ASSERT(ctx);
+
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
         pdf_ctx_seek(ctx, pdf_ctx_buffer_len(ctx))

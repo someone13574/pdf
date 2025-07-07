@@ -18,7 +18,9 @@ typedef enum { TEST_RESULT_PASS, TEST_RESULT_FAIL } TestResult;
         type b,                                                                \
         long double eps,                                                       \
         const char* file,                                                      \
-        unsigned long line                                                     \
+        unsigned long line,                                                    \
+        const char* extra_message,                                             \
+        ...                                                                    \
     );
 
 #define __TEST_ASSERT_FLOAT_CMP_DECL(type, type_underscore, cmp_type)          \
@@ -27,7 +29,9 @@ typedef enum { TEST_RESULT_PASS, TEST_RESULT_FAIL } TestResult;
         type b,                                                                \
         long double eps,                                                       \
         const char* file,                                                      \
-        unsigned long line                                                     \
+        unsigned long line,                                                    \
+        const char* extra_message,                                             \
+        ...                                                                    \
     );
 
 __TEST_ASSERT_INT_CMP_DECL(char, char, eq)
@@ -69,7 +73,9 @@ TestResult __test_assert_eq_str(
     const char* b,
     long double eps,
     const char* file,
-    unsigned long line
+    unsigned long line,
+    const char* extra_message,
+    ...
 );
 
 TestResult __test_assert_ne_str(
@@ -77,7 +83,9 @@ TestResult __test_assert_ne_str(
     const char* b,
     long double eps,
     const char* file,
-    unsigned long line
+    unsigned long line,
+    const char* extra_message,
+    ...
 );
 
 #define __TEST_ASSERT_CMP_FN(x, cmp)                                           \
@@ -105,7 +113,12 @@ TestResult __test_assert_ne_str(
 
 #define __TEST_TYPE_IS_STR(x) _Generic(x, char*: 1, const char*: 1, default: 0)
 
-#define TEST_ASSERT_EQ_EPS(a, b, eps)                                          \
+#define __TEST_ASSERT_EXTRA_MESSAGE_HELPER(...) ""
+#define __TEST_ASSERT_EXTRA_MESSAGE_HELPER1(...) __VA_ARGS__
+#define __TEST_ASSERT_EXTRA_MESSAGE(cond, ...)                                 \
+    __TEST_ASSERT_EXTRA_MESSAGE_HELPER##cond(__VA_ARGS__)
+
+#define TEST_ASSERT_EQ_EPS(a, b, eps, ...)                                     \
     do {                                                                       \
         _Static_assert(                                                        \
             __builtin_types_compatible_p(long double, __typeof__(eps)),        \
@@ -123,14 +136,15 @@ TestResult __test_assert_ne_str(
                 _b,                                                            \
                 _eps,                                                          \
                 RELATIVE_FILE_PATH,                                            \
-                __LINE__                                                       \
+                __LINE__,                                                      \
+                __TEST_ASSERT_EXTRA_MESSAGE(__VA_OPT__(1), __VA_ARGS__)        \
             )                                                                  \
             == TEST_RESULT_FAIL) {                                             \
             return TEST_RESULT_FAIL;                                           \
         }                                                                      \
     } while (0)
 
-#define TEST_ASSERT_NE_EPS(a, b, eps)                                          \
+#define TEST_ASSERT_NE_EPS(a, b, eps, ...)                                     \
     do {                                                                       \
         _Static_assert(                                                        \
             __builtin_types_compatible_p(long double, __typeof__(eps)),        \
@@ -143,25 +157,31 @@ TestResult __test_assert_ne_str(
             __builtin_types_compatible_p(__typeof__(_a), __typeof__(_b))       \
             || (__TEST_TYPE_IS_STR(_a) && __TEST_TYPE_IS_STR(_b))              \
         );                                                                     \
-        if (__TEST_ASSERT_CMP_FN(_a, ne)(                                      \
+        if (__TEST_ASSERT_CMP_FN(_a, ne __VA_OPT__(, ) __VA_ARGS__)(           \
                 _a,                                                            \
                 _b,                                                            \
                 _eps,                                                          \
                 RELATIVE_FILE_PATH,                                            \
-                __LINE__                                                       \
+                __LINE__,                                                      \
+                __TEST_ASSERT_EXTRA_MESSAGE(__VA_OPT__(1), __VA_ARGS__)        \
             )                                                                  \
             == TEST_RESULT_FAIL) {                                             \
             return TEST_RESULT_FAIL;                                           \
         }                                                                      \
     } while (0)
 
-#define TEST_ASSERT_EQ(a, b) TEST_ASSERT_EQ_EPS(a, b, 1e-6L)
-#define TEST_ASSERT_NE(a, b) TEST_ASSERT_NE_EPS(a, b, 1e-6L)
+#define TEST_ASSERT_EQ(a, b, ...)                                              \
+    TEST_ASSERT_EQ_EPS(a, b, 1e-6L __VA_OPT__(, ) __VA_ARGS__)
+#define TEST_ASSERT_NE(a, b, ...)                                              \
+    TEST_ASSERT_NE_EPS(a, b, 1e-6L __VA_OPT__(, ) __VA_ARGS__)
 
-#define TEST_ASSERT(cond)                                                      \
+#define TEST_ASSERT(cond, ...)                                                 \
     do {                                                                       \
         if (!(cond)) {                                                         \
-            LOG_ERROR_G("test-assert", "Assertion failed: \"" #cond "\"");     \
+            LOG_ERROR_G(                                                       \
+                "test-assert",                                                 \
+                "Assertion failed: \"" #cond "\"" __VA_OPT__(": ") __VA_ARGS__ \
+            );                                                                 \
             return TEST_RESULT_FAIL;                                           \
         }                                                                      \
     } while (0)

@@ -21,6 +21,8 @@ PdfResult pdf_ctx_peek_and_advance(PdfCtx* ctx, char* out);
 PdfResult pdf_ctx_peek(PdfCtx* ctx, char* out);
 PdfResult pdf_ctx_peek_next(PdfCtx* ctx, char* out);
 PdfResult pdf_ctx_expect(PdfCtx* ctx, const char* text);
+PdfResult
+pdf_ctx_require_char_type(PdfCtx* ctx, bool permit_eof, bool (*eval)(char));
 PdfResult pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit);
 PdfResult pdf_ctx_seek_line_start(PdfCtx* ctx);
 PdfResult pdf_ctx_seek_next_line(PdfCtx* ctx);
@@ -40,3 +42,4 @@ PdfResult pdf_ctx_parse_int(
 bool is_pdf_whitespace(char c);
 bool is_pdf_delimiter(char c);
 bool is_pdf_regular(char c);
+bool is_pdf_non_regular(char c);

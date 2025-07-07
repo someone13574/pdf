@@ -74,6 +74,7 @@ PdfObject* pdf_parse_object(Arena* arena, PdfCtx* ctx, PdfResult* result) {
 
 PdfObject* pdf_parse_true(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "true"));
+    PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
 
     PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
     object->kind = PDF_OBJECT_KIND_BOOLEAN;
@@ -84,6 +85,7 @@ PdfObject* pdf_parse_true(Arena* arena, PdfCtx* ctx, PdfResult* result) {
 
 PdfObject* pdf_parse_false(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "false"));
+    PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
 
     PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
     object->kind = PDF_OBJECT_KIND_BOOLEAN;
@@ -94,6 +96,7 @@ PdfObject* pdf_parse_false(Arena* arena, PdfCtx* ctx, PdfResult* result) {
 
 PdfObject* pdf_parse_null(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "null"));
+    PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
 
     PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
     object->kind = PDF_OBJECT_KIND_NULL;
@@ -142,6 +145,9 @@ PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     if ((decimal_peek_result == PDF_OK && decimal_char != '.')
         || decimal_peek_result == PDF_CTX_ERR_EOF) {
         LOG_TRACE_G("object", "Number is integer");
+        PDF_TRY_RET_NULL(
+            pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular)
+        );
 
         if (!has_leading) {
             *result = PDF_ERR_INVALID_NUMBER;
@@ -182,6 +188,8 @@ PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result) {
         PDF_TRY_RET_NULL(pdf_ctx_peek_and_advance(ctx, NULL));
     }
 
+    PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+
     double value = ((double)leading_acc + trailing_acc) * (double)sign;
     const double PDF_FLOAT_MAX = 3.403e38;
 
@@ -210,10 +218,13 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     char peeked_char;
     int escape = 0;
     int open_parenthesis = 1;
+    unsigned long length = 0;
     size_t start_offset = pdf_ctx_offset(ctx);
 
     while (open_parenthesis > 0
            && pdf_ctx_peek_and_advance(ctx, &peeked_char) == PDF_OK) {
+        length++;
+
         if (peeked_char == '(' && escape == 0) {
             open_parenthesis++;
         } else if (peeked_char == ')' && escape == 0) {
@@ -232,6 +243,8 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfResult* result) {
         return NULL;
     }
 
+    PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+
     // Parse
     char* raw;
     PDF_TRY_RET_NULL(pdf_ctx_borrow_substr(
@@ -241,15 +254,12 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfResult* result) {
         &raw
     ));
 
-    char* parsed =
-        arena_alloc(arena, sizeof(char) * (pdf_ctx_offset(ctx) - start_offset));
+    char* parsed = arena_alloc(arena, sizeof(char) * (length + 1));
 
     escape = 0;
     size_t write_offset = 0;
 
-    for (size_t read_offset = 0;
-         read_offset < pdf_ctx_offset(ctx) - start_offset - 1;
-         read_offset++) {
+    for (size_t read_offset = 0; read_offset < length; read_offset++) {
         char read_char = raw[read_offset];
 
         switch (escape) {
@@ -363,6 +373,8 @@ PdfObject* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     }
 
     LOG_DEBUG("Length %zu", length);
+    PDF_TRY_RET_NULL(pdf_ctx_seek(ctx, start_offset + length));
+    PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
 
     // Parse name
     char* name = arena_alloc(arena, sizeof(char) * (length + 1));
@@ -415,6 +427,11 @@ PdfObject* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfResult* result) {
         }
     }
 
+    if (escape != 0) {
+        *result = PDF_ERR_NAME_BAD_CHAR_CODE;
+        return NULL;
+    }
+
     PDF_TRY_RET_NULL(pdf_ctx_release_substr(ctx));
     name[write_offset] = '\0';
 
@@ -454,6 +471,8 @@ PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     PDF_TRY_RET_NULL(pdf_ctx_peek(ctx, &peeked));
 
     if (peeked == 'R') {
+        PDF_TRY_RET_NULL(pdf_ctx_peek_and_advance(ctx, NULL));
+
         LOG_DEBUG_G("object", "Parsed indirect reference");
         PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
         object->kind = PDF_OBJECT_KIND_REF;
@@ -465,6 +484,9 @@ PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result) {
         LOG_DEBUG_G("object", "Parsed indirect object");
 
         PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "obj"));
+        PDF_TRY_RET_NULL(
+            pdf_ctx_require_char_type(ctx, false, &is_pdf_non_regular)
+        );
         PDF_TRY_RET_NULL(pdf_ctx_consume_whitespace(ctx));
 
         PdfObject* inner = pdf_parse_object(arena, ctx, result);
@@ -477,8 +499,14 @@ PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result) {
             return NULL;
         }
 
+        PDF_TRY_RET_NULL(
+            pdf_ctx_require_char_type(ctx, false, &is_pdf_non_regular)
+        );
         PDF_TRY_RET_NULL(pdf_ctx_consume_whitespace(ctx));
         PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "endobj"));
+        PDF_TRY_RET_NULL(
+            pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular)
+        );
 
         PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
         object->kind = PDF_OBJECT_KIND_INDIRECT;
@@ -497,15 +525,27 @@ PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result) {
 
 #include "test.h"
 
-#define SETUP_VALID_PARSE_OBJECT(buf, type)                                    \
+#define SETUP_VALID_PARSE_OBJECT_WITH_OFFSET(buf, type, expected_offset)       \
     Arena* arena = arena_new(128);                                             \
     char buffer[] = buf;                                                       \
     PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));                  \
     PdfResult result;                                                          \
     PdfObject* object = pdf_parse_object(arena, ctx, &result);                 \
-    TEST_ASSERT_EQ((PdfResult)PDF_OK, result);                                 \
-    TEST_ASSERT(object);                                                       \
-    TEST_ASSERT_EQ((PdfObjectKind)(type), object->kind);
+    TEST_ASSERT_EQ((PdfResult)PDF_OK, result, "Result was not ok");            \
+    TEST_ASSERT(object, "PdfObject pointer is NULL");                          \
+    TEST_ASSERT_EQ(                                                            \
+        (PdfObjectKind)(type),                                                 \
+        object->kind,                                                          \
+        "Parsed object has wrong kind"                                         \
+    );                                                                         \
+    TEST_ASSERT_EQ(                                                            \
+        (size_t)(expected_offset),                                             \
+        pdf_ctx_offset(ctx),                                                   \
+        "Incorrect offset after parsing"                                       \
+    );
+
+#define SETUP_VALID_PARSE_OBJECT(buf, type)                                    \
+    SETUP_VALID_PARSE_OBJECT_WITH_OFFSET(buf, type, strlen(buf))
 
 #define SETUP_INVALID_PARSE_OBJECT(buf, err)                                   \
     Arena* arena = arena_new(128);                                             \
@@ -554,6 +594,12 @@ TEST_FUNC(test_object_int_minus_98) {
 TEST_FUNC(test_object_int_0) {
     SETUP_VALID_PARSE_OBJECT("0", PDF_OBJECT_KIND_INTEGER);
     TEST_ASSERT_EQ((int32_t)0, object->data.integer_data);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_int_with_whitespace) {
+    SETUP_VALID_PARSE_OBJECT_WITH_OFFSET("-98 ", PDF_OBJECT_KIND_INTEGER, 3);
+    TEST_ASSERT_EQ((int32_t)-98, object->data.integer_data);
     return TEST_RESULT_PASS;
 }
 
@@ -627,6 +673,12 @@ TEST_FUNC(test_object_real_0_0) {
 
 TEST_FUNC(test_object_real_no_digits) {
     SETUP_INVALID_PARSE_OBJECT(".", PDF_ERR_INVALID_NUMBER);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_real_trailing_whitespace) {
+    SETUP_VALID_PARSE_OBJECT_WITH_OFFSET("123.6 ", PDF_OBJECT_KIND_REAL, 5);
+    TEST_ASSERT_EQ_EPS((double)123.6, object->data.real_data, 1e-5L);
     return TEST_RESULT_PASS;
 }
 
@@ -715,13 +767,17 @@ TEST_FUNC(test_object_name_escape) {
 }
 
 TEST_FUNC(test_object_name_terminated) {
-    SETUP_VALID_PARSE_OBJECT("/paired#28#29parentheses/", PDF_OBJECT_KIND_NAME);
+    SETUP_VALID_PARSE_OBJECT_WITH_OFFSET(
+        "/paired#28#29parentheses/",
+        PDF_OBJECT_KIND_NAME,
+        24
+    );
     TEST_ASSERT_EQ("paired()parentheses", object->data.name_data);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_name_whitespace_terminated) {
-    SETUP_VALID_PARSE_OBJECT("/A#42 ", PDF_OBJECT_KIND_NAME);
+    SETUP_VALID_PARSE_OBJECT_WITH_OFFSET("/A#42 ", PDF_OBJECT_KIND_NAME, 5);
     TEST_ASSERT_EQ("AB", object->data.name_data);
     return TEST_RESULT_PASS;
 }
@@ -749,6 +805,17 @@ TEST_FUNC(test_object_indirect) {
         "Brillig",
         object->data.indirect_data.object->data.string_data
     );
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_unterminated) {
+    SETUP_VALID_PARSE_OBJECT_WITH_OFFSET(
+        "12 0 obj123endobj",
+        PDF_OBJECT_KIND_INTEGER,
+        2
+    );
+    TEST_ASSERT_EQ((int32_t)12, object->data.integer_data);
 
     return TEST_RESULT_PASS;
 }
@@ -789,8 +856,8 @@ TEST_FUNC(test_object_indirect_nested) {
 
 TEST_FUNC(test_object_indirect_ref) {
     SETUP_VALID_PARSE_OBJECT("12 0 R", PDF_OBJECT_KIND_REF);
-    TEST_ASSERT_EQ((size_t)12, object->data.indirect_data.object_id);
-    TEST_ASSERT_EQ((size_t)0, object->data.indirect_data.generation);
+    TEST_ASSERT_EQ((size_t)12, object->data.ref_data.object_id);
+    TEST_ASSERT_EQ((size_t)0, object->data.ref_data.generation);
 
     return TEST_RESULT_PASS;
 }

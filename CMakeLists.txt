@@ -22,6 +22,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
         -Wconversion
         -Wmissing-field-initializers
         -Werror
+        -Wno-gnu-zero-variadic-macro-arguments
         -Wno-error=unused-function
         -Wno-error=unused-parameter
         -Wno-error=unused-variable
