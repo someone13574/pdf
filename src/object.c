@@ -7,6 +7,7 @@
 #include "ctx.h"
 #include "log.h"
 #include "result.h"
+#include "vec.h"
 
 PdfObject* pdf_parse_true(Arena* arena, PdfCtx* ctx, PdfResult* result);
 PdfObject* pdf_parse_false(Arena* arena, PdfCtx* ctx, PdfResult* result);
@@ -15,6 +16,7 @@ PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result);
 PdfObject*
 pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfResult* result);
 PdfObject* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfResult* result);
+PdfObject* pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfResult* result);
 PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result);
 
 PdfObject* pdf_parse_object(Arena* arena, PdfCtx* ctx, PdfResult* result) {
@@ -59,7 +61,7 @@ PdfObject* pdf_parse_object(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     } else if (peeked == '/') {
         return pdf_parse_name(arena, ctx, result);
     } else if (peeked == '[') {
-        LOG_TODO("Arrays");
+        return pdf_parse_array(arena, ctx, result);
     } else if (peeked == '<' && peeked_next == '<') {
         LOG_TODO("Dictionaries");
     } else if (peeked == 's') {
@@ -442,6 +444,36 @@ PdfObject* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     return object;
 }
 
+PdfObject* pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfResult* result) {
+    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "["));
+
+    Vec* elements = vec_new(arena);
+
+    char peeked;
+    while (pdf_ctx_peek(ctx, &peeked) == PDF_OK && peeked != ']') {
+        PdfObject* element = pdf_parse_object(arena, ctx, result);
+        if (*result != PDF_OK) {
+            return NULL;
+        }
+
+        PDF_TRY_RET_NULL(
+            pdf_ctx_require_char_type(ctx, false, is_pdf_non_regular)
+        );
+        PDF_TRY_RET_NULL(pdf_ctx_consume_whitespace(ctx));
+
+        vec_push(elements, element);
+    }
+
+    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "]"));
+    PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, is_pdf_non_regular));
+
+    PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
+    object->kind = PDF_OBJECT_KIND_ARRAY;
+    object->data.array_data = elements;
+
+    return object;
+}
+
 PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     LOG_DEBUG_G("object", "Parsing indirect object or reference");
 
@@ -786,6 +818,98 @@ TEST_FUNC(test_object_name_invalid) {
     SETUP_INVALID_PARSE_OBJECT(
         "/The_Key_of_F#_Minor",
         PDF_ERR_NAME_BAD_CHAR_CODE
+    );
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_array) {
+    SETUP_VALID_PARSE_OBJECT(
+        "[549 3.14 false (Ralph)/SomeName]",
+        PDF_OBJECT_KIND_ARRAY
+    );
+
+    PdfObject* element0 = vec_get(object->data.array_data, 0);
+    TEST_ASSERT(element0);
+    TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_INTEGER, element0->kind);
+    TEST_ASSERT_EQ((int32_t)549, element0->data.integer_data);
+
+    PdfObject* element1 = vec_get(object->data.array_data, 1);
+    TEST_ASSERT(element1);
+    TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_REAL, element1->kind);
+    TEST_ASSERT_EQ(3.14, element1->data.real_data);
+
+    PdfObject* element2 = vec_get(object->data.array_data, 2);
+    TEST_ASSERT(element2);
+    TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_BOOLEAN, element2->kind);
+    TEST_ASSERT_EQ(false, element2->data.bool_data);
+
+    PdfObject* element3 = vec_get(object->data.array_data, 3);
+    TEST_ASSERT(element3);
+    TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_STRING, element3->kind);
+    TEST_ASSERT_EQ("Ralph", element3->data.string_data);
+
+    PdfObject* element4 = vec_get(object->data.array_data, 4);
+    TEST_ASSERT(element4);
+    TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_NAME, element4->kind);
+    TEST_ASSERT_EQ("SomeName", element4->data.name_data);
+
+    TEST_ASSERT(!vec_get(object->data.array_data, 5));
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_array_nested) {
+    SETUP_VALID_PARSE_OBJECT("[[1 2][3 4]]", PDF_OBJECT_KIND_ARRAY);
+
+    PdfObject* element0 = vec_get(object->data.array_data, 0);
+    TEST_ASSERT(element0);
+    TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_ARRAY, element0->kind);
+
+    PdfObject* element00 = vec_get(element0->data.array_data, 0);
+    TEST_ASSERT(element00);
+    TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_INTEGER, element00->kind);
+    TEST_ASSERT_EQ((int32_t)1, element00->data.integer_data);
+
+    PdfObject* element01 = vec_get(element0->data.array_data, 1);
+    TEST_ASSERT(element01);
+    TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_INTEGER, element01->kind);
+    TEST_ASSERT_EQ((int32_t)2, element01->data.integer_data);
+
+    PdfObject* element1 = vec_get(object->data.array_data, 1);
+    TEST_ASSERT(element1);
+    TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_ARRAY, element1->kind);
+
+    PdfObject* element10 = vec_get(element1->data.array_data, 0);
+    TEST_ASSERT(element10);
+    TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_INTEGER, element10->kind);
+    TEST_ASSERT_EQ((int32_t)3, element10->data.integer_data);
+
+    PdfObject* element11 = vec_get(element1->data.array_data, 1);
+    TEST_ASSERT(element11);
+    TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_INTEGER, element11->kind);
+    TEST_ASSERT_EQ((int32_t)4, element11->data.integer_data);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_array_empty) {
+    SETUP_VALID_PARSE_OBJECT("[]", PDF_OBJECT_KIND_ARRAY);
+    TEST_ASSERT_EQ((size_t)0, vec_len(object->data.array_data));
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_array_offset) {
+    SETUP_VALID_PARSE_OBJECT_WITH_OFFSET("[]  ", PDF_OBJECT_KIND_ARRAY, 2);
+    TEST_ASSERT_EQ((size_t)0, vec_len(object->data.array_data));
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_array_unterminated) {
+    SETUP_INVALID_PARSE_OBJECT(
+        "[549 3.14 false (Ralph)/SomeName",
+        PDF_CTX_ERR_EOF
     );
     return TEST_RESULT_PASS;
 }

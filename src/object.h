@@ -11,10 +11,6 @@
 typedef struct PdfObject PdfObject;
 
 typedef struct {
-    Vec* elements;
-} PdfObjectArray;
-
-typedef struct {
     Vec** buckets;
 } PdfObjectDict;
 
@@ -48,7 +44,7 @@ typedef union {
     double real_data;
     char* string_data;
     char* name_data;
-    PdfObjectArray array_data;
+    Vec* array_data;
     PdfObjectDict dict_data;
     PdfObjectIndirect indirect_data;
     PdfObjectIndirectRef ref_data;
