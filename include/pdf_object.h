@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 
+#include "pdf_result.h"
 #include "vec.h"
 
 typedef struct PdfObject PdfObject;
@@ -25,7 +26,7 @@ typedef struct {
 typedef struct {
     size_t object_id;
     size_t generation;
-} PdfObjectIndirectRef;
+} PdfObjectRef;
 
 typedef enum {
     PDF_OBJECT_KIND_BOOLEAN,
@@ -51,13 +52,17 @@ typedef union {
     Vec* dict_data;
     PdfObjectStream stream_data;
     PdfObjectIndirect indirect_data;
-    PdfObjectIndirectRef ref_data;
+    PdfObjectRef ref_data;
 } PdfObjectData;
 
 struct PdfObject {
     PdfObjectKind kind;
     PdfObjectData data;
 };
+
+// Gets the value associated with a given key in a dictionary object
+PdfObject*
+pdf_object_dict_get(PdfObject* dict, const char* key, PdfResult* result);
 
 // Generates a pretty-printed PdfObject string. If no arena is passed, you must
 // free the string manually.

@@ -19,7 +19,9 @@ struct PdfDocument {
     uint8_t version;
     size_t startxref;
     XRefTable* xref;
+
     PdfObject* trailer;
+    PdfObject* root;
 };
 
 PdfResult pdf_parse_header(PdfCtx* ctx, uint8_t* version);
@@ -40,7 +42,7 @@ PdfDocument* pdf_document_new(
 
     uint8_t version;
     PDF_TRY_RET_NULL(pdf_parse_header(ctx, &version));
-    LOG_DEBUG_G("doc-info", "PDF Version 1.%hhu", version);
+    LOG_INFO_G("doc-info", "File Version 1.%hhu", version);
 
     size_t startxref;
     PDF_TRY_RET_NULL(pdf_parse_startxref(ctx, &startxref));
@@ -61,6 +63,7 @@ PdfDocument* pdf_document_new(
     doc->startxref = startxref;
     doc->xref = xref;
     doc->trailer = NULL;
+    doc->root = NULL;
 
     *result = PDF_OK;
     return doc;
@@ -91,6 +94,58 @@ PdfObject* pdf_get_trailer(PdfDocument* doc, PdfResult* result) {
 
     doc->trailer = pdf_parse_object(doc->arena, doc->ctx, result, false);
     return doc->trailer;
+}
+
+PdfObject* pdf_get_root(PdfDocument* doc, PdfResult* result) {
+    if (!result || !doc) {
+        LOG_ERROR("Invalid args to pdf_get_root");
+        return NULL;
+    }
+
+    *result = PDF_OK;
+
+    if (doc->root) {
+        return doc->root;
+    }
+
+    PdfObject* trailer = pdf_get_trailer(doc, result);
+    if (*result != PDF_OK || !trailer) {
+        return NULL;
+    }
+
+    PdfObject* root_ref = pdf_object_dict_get(trailer, "Root", result);
+    if (*result != PDF_OK || !root_ref) {
+        return NULL;
+    }
+
+    PdfObject* root = pdf_get_ref(doc, root_ref->data.ref_data, result);
+    if (*result != PDF_OK || !root) {
+        return NULL;
+    }
+
+    doc->root = root;
+    return root;
+}
+
+PdfObject* pdf_get_ref(PdfDocument* doc, PdfObjectRef ref, PdfResult* result) {
+    if (!doc || !result) {
+        LOG_ERROR("Invalid args to pdf_get_ref");
+        return NULL;
+    }
+
+    XRefEntry* entry =
+        pdf_xref_get_entry(doc->xref, ref.object_id, ref.generation, result);
+    if (*result != PDF_OK || !entry) {
+        return NULL;
+    }
+
+    PDF_TRY_RET_NULL(pdf_ctx_seek(doc->ctx, entry->offset));
+    entry->object = pdf_parse_object(doc->arena, doc->ctx, result, false);
+    if (*result != PDF_OK || !entry->object) {
+        return NULL;
+    }
+
+    return entry->object;
 }
 
 // The first line of a PDF file shall be a header consisting of the 5 characters

@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
 
-    Arena* arena = arena_new(1024);
+    Arena* arena = arena_new(4096);
 
     size_t buffer_size;
     char* buffer =
@@ -64,15 +64,13 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    PdfObject* trailer = pdf_get_trailer(doc, &result);
-    if (result != PDF_OK || !trailer) {
-        LOG_ERROR("Failed to parse trailer");
+    PdfObject* root = pdf_get_root(doc, &result);
+    if (result != PDF_OK || !root) {
+        LOG_ERROR("Failed to parse root with code %d", result);
         arena_free(arena);
         return EXIT_FAILURE;
     }
-
-    char* formatted = pdf_fmt_object(arena, trailer);
-    printf("Trailer:\n%s\n", formatted);
+    printf("Root:\n%s\n", pdf_fmt_object(arena, root));
 
     LOG_INFO("Finished");
 

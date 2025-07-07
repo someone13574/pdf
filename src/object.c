@@ -738,6 +738,31 @@ char* format_alloc(Arena* arena, const char* fmt, ...) {
     return buffer;
 }
 
+PdfObject*
+pdf_object_dict_get(PdfObject* dict, const char* key, PdfResult* result) {
+    if (!dict || !key || !result) {
+        return NULL;
+    }
+
+    *result = PDF_OK;
+
+    if (dict->kind != PDF_OBJECT_KIND_DICT) {
+        *result = PDF_ERR_WRONG_OBJECT_TYPE;
+        return NULL;
+    }
+
+    Vec* entries = dict->data.dict_data;
+    for (size_t idx = 0; idx < vec_len(entries); idx++) {
+        PdfObjectDictEntry* entry = vec_get(entries, idx);
+        if (strcmp(entry->key->data.name_data, key) == 0) {
+            return entry->value;
+        }
+    }
+
+    *result = PDF_ERR_MISSING_DICT_KEY;
+    return NULL;
+}
+
 char* pdf_fmt_object_indented(
     Arena* arena,
     PdfObject* object,
