@@ -8,7 +8,7 @@
 typedef struct PdfObject PdfObject;
 
 typedef bool PdfObjectBoolean;
-typedef uint32_t PdfObjectInteger;
+typedef int32_t PdfObjectInteger;
 typedef double PdfObjectReal;
 typedef char* PdfObjectString;
 typedef char* PdfObjectName;

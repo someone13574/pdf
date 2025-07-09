@@ -1,5 +1,6 @@
 set(HEADER_LIST
     "${pdf_SOURCE_DIR}/include/pdf.h"
+    "${pdf_SOURCE_DIR}/include/pdf_doc.h"
     "${pdf_SOURCE_DIR}/include/pdf_object.h"
     "${pdf_SOURCE_DIR}/include/pdf_schema.h"
     "${pdf_SOURCE_DIR}/include/pdf_result.h"

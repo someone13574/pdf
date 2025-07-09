@@ -5,6 +5,7 @@
 #include "pdf.h"
 #include "pdf_object.h"
 #include "pdf_result.h"
+#include "pdf_schema.h"
 
 char* load_file_to_buffer(Arena* arena, const char* path, size_t* out_size) {
     FILE* file = fopen(path, "rb");
@@ -64,13 +65,13 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    PdfObject* root = pdf_get_root(doc, &result);
-    if (result != PDF_OK || !root) {
-        LOG_ERROR("Failed to parse root with code %d", result);
+    PdfSchemaCatalog* catalog = pdf_get_catalog(doc, &result);
+    if (result != PDF_OK || !catalog) {
+        LOG_ERROR("Failed to get catalog with code %d", result);
         arena_free(arena);
         return EXIT_FAILURE;
     }
-    printf("Root:\n%s\n", pdf_fmt_object(arena, root));
+    printf("Root:\n%s\n", pdf_fmt_object(arena, catalog->dict));
 
     LOG_INFO("Finished");
 
