@@ -118,7 +118,7 @@ PdfObject* pdf_get_root(PdfDocument* doc, PdfResult* result) {
         return NULL;
     }
 
-    PdfObject* root = pdf_get_ref(doc, root_ref->data.ref_data, result);
+    PdfObject* root = pdf_get_ref(doc, root_ref->data.ref, result);
     if (*result != PDF_OK || !root) {
         return NULL;
     }
@@ -343,15 +343,15 @@ TEST_FUNC(test_trailer) {
     TEST_ASSERT(trailer);
     TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_DICT, trailer->kind);
 
-    Vec* trailer_entries = trailer->data.dict_data;
-    TEST_ASSERT_EQ((size_t)1, vec_len(trailer->data.dict_data));
+    Vec* trailer_entries = trailer->data.dict;
+    TEST_ASSERT_EQ((size_t)1, vec_len(trailer->data.dict));
 
     PdfObjectDictEntry* entry = vec_get(trailer_entries, 0);
     TEST_ASSERT(entry);
     TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_NAME, entry->key->kind);
-    TEST_ASSERT_EQ("Size", entry->key->data.string_data);
+    TEST_ASSERT_EQ("Size", entry->key->data.string);
     TEST_ASSERT_EQ((PdfObjectKind)PDF_OBJECT_KIND_INTEGER, entry->value->kind);
-    TEST_ASSERT_EQ((int32_t)1, entry->value->data.integer_data);
+    TEST_ASSERT_EQ((int32_t)1, entry->value->data.integer);
 
     return TEST_RESULT_PASS;
 }

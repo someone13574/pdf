@@ -7,6 +7,14 @@
 
 typedef struct PdfObject PdfObject;
 
+typedef bool PdfObjectBoolean;
+typedef uint32_t PdfObjectInteger;
+typedef double PdfObjectReal;
+typedef char* PdfObjectString;
+typedef char* PdfObjectName;
+typedef Vec* PdfObjectArray;
+typedef Vec* PdfObjectDict;
+
 typedef struct {
     PdfObject* key;
     PdfObject* value;
@@ -28,6 +36,56 @@ typedef struct {
     size_t generation;
 } PdfObjectRef;
 
+typedef struct {
+    bool has_value;
+    PdfObjectBoolean value;
+} PdfObjectBooleanOptional;
+
+typedef struct {
+    bool has_value;
+    PdfObjectInteger value;
+} PdfObjectIntegerOptional;
+
+typedef struct {
+    bool has_value;
+    PdfObjectReal value;
+} PdfObjectRealOptional;
+
+typedef struct {
+    bool has_value;
+    PdfObjectString value;
+} PdfObjectStringOptional;
+
+typedef struct {
+    bool has_value;
+    PdfObjectName value;
+} PdfObjectNameOptional;
+
+typedef struct {
+    bool has_value;
+    PdfObjectArray value;
+} PdfObjectArrayOptional;
+
+typedef struct {
+    bool has_value;
+    PdfObjectDict value;
+} PdfObjectDictOptional;
+
+typedef struct {
+    bool has_value;
+    PdfObjectStream value;
+} PdfObjectStreamOptional;
+
+typedef struct {
+    bool has_value;
+    PdfObjectIndirect value;
+} PdfObjectIndirectOptional;
+
+typedef struct {
+    bool has_value;
+    PdfObjectRef value;
+} PdfObjectRefOptional;
+
 typedef enum {
     PDF_OBJECT_KIND_BOOLEAN,
     PDF_OBJECT_KIND_INTEGER,
@@ -43,16 +101,16 @@ typedef enum {
 } PdfObjectKind;
 
 typedef union {
-    bool bool_data;
-    int32_t integer_data;
-    double real_data;
-    char* string_data;
-    char* name_data;
-    Vec* array_data;
-    Vec* dict_data;
-    PdfObjectStream stream_data;
-    PdfObjectIndirect indirect_data;
-    PdfObjectRef ref_data;
+    PdfObjectBoolean boolean;
+    PdfObjectInteger integer;
+    PdfObjectReal real;
+    PdfObjectString string;
+    PdfObjectName name;
+    PdfObjectArray array;
+    PdfObjectDict dict;
+    PdfObjectStream stream;
+    PdfObjectIndirect indirect;
+    PdfObjectRef ref;
 } PdfObjectData;
 
 struct PdfObject {
