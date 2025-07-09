@@ -107,7 +107,7 @@ void* arena_alloc_align(Arena* arena, size_t size, size_t align) {
 
         LOG_TRACE_G(
             "arena",
-            "Allocating on block %zu. Usage: %zu/%zu bytes remaining",
+            "Allocating on block %zu. %zu/%zu bytes remaining",
             block_idx,
             block->ptr - block->start,
             block->end - block->start
