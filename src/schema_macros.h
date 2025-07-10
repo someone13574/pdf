@@ -60,11 +60,9 @@
     },
 #define SCHEMA_FIELD_INIT_OPTIONAL_SCHEMA_REF(name, schema_name)               \
     .name = {                                                                  \
-        .has_value = false,                                                    \
-        .value =                                                               \
-            {.get = pdf_schema_##schema_name##_get_ref,                        \
-             .ref = SCHEMA_FIELD_INIT_REF,                                     \
-             .cached = NULL}                                                   \
+        .get = &pdf_schema_##schema_name##_get_optional_ref,                   \
+        .ref = {.has_value = false, .value = SCHEMA_FIELD_INIT_REF},           \
+        .cached = NULL                                                         \
     },
 #define SCHEMA_FIELD_INIT(required, field_type, field_name, key)               \
     SCHEMA_FIELD_INIT_##required(field_name, field_type)
@@ -144,8 +142,8 @@
             return NULL;                                                       \
         }                                                                      \
         name##_present = true;                                                 \
-        out.name.has_value = true;                                             \
-        out.name.value.ref = entry_value->data.OBJECT_UNION_FIELD_REF;         \
+        out.name.ref.has_value = true;                                         \
+        out.name.ref.value = entry_value->data.OBJECT_UNION_FIELD_REF;         \
     } else
 
 #define SCHEMA_FIELD_PARSE(required, type, field_name, key)                    \
@@ -207,6 +205,11 @@
             } else                                                             \
                 FOR_EACH_TUP(SCHEMA_FIELD_PARSE, __VA_ARGS__) {                \
                     *result = PDF_ERR_SCHEMA_UNKNOWN_KEY;                      \
+                    LOG_TRACE_G(                                               \
+                        "schema",                                              \
+                        "Unknown key in " #type_name " schema: \"%s\"",        \
+                        entry_key                                              \
+                    );                                                         \
                     return NULL;                                               \
                 }                                                              \
         }                                                                      \
@@ -235,6 +238,37 @@
             return ref->cached;                                                \
         }                                                                      \
         PdfObject* object = pdf_get_ref(doc, ref->ref, result);                \
+        if (*result != PDF_OK || !object) {                                    \
+            return NULL;                                                       \
+        }                                                                      \
+        ref->cached = pdf_schema_##schema_name##_new(                          \
+            pdf_doc_arena(doc),                                                \
+            object,                                                            \
+            result                                                             \
+        );                                                                     \
+        return ref->cached;                                                    \
+    }
+
+#define SCHEMA_IMPL_GET_OPTIONAL_REF(schema_type, schema_name)                 \
+    schema_type* pdf_schema_##schema_name##_get_optional_ref(                  \
+        schema_type##OptionalRef* ref,                                         \
+        PdfDocument* doc,                                                      \
+        PdfResult* result                                                      \
+    ) {                                                                        \
+        if (!ref || !doc || !result) {                                         \
+            return NULL;                                                       \
+        }                                                                      \
+        LOG_DEBUG_G("schema", "Resolving schema reference to " #schema_type);  \
+        *result = PDF_OK;                                                      \
+        if (!ref->ref.has_value) {                                             \
+            *result = PDF_OPTIONAL_REF_IS_NONE;                                \
+            return NULL;                                                       \
+        }                                                                      \
+        if (ref->cached) {                                                     \
+            LOG_TRACE_G("schema", "Using cached value");                       \
+            return ref->cached;                                                \
+        }                                                                      \
+        PdfObject* object = pdf_get_ref(doc, ref->ref.value, result);          \
         if (*result != PDF_OK || !object) {                                    \
             return NULL;                                                       \
         }                                                                      \

@@ -71,7 +71,15 @@ int main(int argc, char** argv) {
         arena_free(arena);
         return EXIT_FAILURE;
     }
-    printf("Root:\n%s\n", pdf_fmt_object(arena, catalog->dict));
+
+    PdfSchemaPageTreeNode* page_tree_node =
+        PDF_REF_GET(catalog->pages, doc, &result);
+    if (result != PDF_OK || !page_tree_node) {
+        LOG_ERROR("Failed to get root page tree node with code %d", result);
+        arena_free(arena);
+        return EXIT_FAILURE;
+    }
+    printf("Root:\n%s\n", pdf_fmt_object(arena, page_tree_node->dict));
 
     LOG_INFO("Finished");
 

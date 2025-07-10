@@ -1,5 +1,5 @@
+#include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "arena.h"
@@ -10,6 +10,21 @@
 #include "pdf_schema.h"
 #include "schema_macros.h"
 
+// Page tree node
+SCHEMA_IMPL(
+    PdfSchemaPageTreeNode,
+    page_tree_node,
+    schema_validation_none, // No easy way to validate that root doesn't have
+                            // Parent key
+    (REQUIRED, NAME, type, "Type"),
+    (OPTIONAL_SCHEMA_REF, page_tree_node, parent, "Parent"),
+    (REQUIRED, ARRAY, kids, "Kids"),
+    (REQUIRED, INTEGER, count, "Count")
+)
+SCHEMA_IMPL_GET_REF(PdfSchemaPageTreeNode, page_tree_node)
+SCHEMA_IMPL_GET_OPTIONAL_REF(PdfSchemaPageTreeNode, page_tree_node)
+
+// Catalog
 bool validate_catalog_schema(PdfSchemaCatalog* catalog, PdfResult* result) {
     if (strcmp(catalog->type, "Catalog") != 0) {
         *result = PDF_ERR_SCHEMA_INCORRECT_TYPE_NAME;
@@ -24,9 +39,11 @@ SCHEMA_IMPL(
     catalog,
     validate_catalog_schema,
     (REQUIRED, NAME, type, "Type"),
-    (REQUIRED, REF, pages, "Pages")
+    (REQUIRED_SCHEMA_REF, page_tree_node, pages, "Pages")
 )
+SCHEMA_IMPL_GET_REF(PdfSchemaCatalog, catalog)
 
+// Trailer
 SCHEMA_IMPL(
     PdfSchemaTrailer,
     trailer,
@@ -34,8 +51,6 @@ SCHEMA_IMPL(
     (REQUIRED, INTEGER, size, "Size"),
     (REQUIRED_SCHEMA_REF, catalog, root, "Root")
 )
-
-SCHEMA_IMPL_GET_REF(PdfSchemaCatalog, catalog)
 
 #ifdef TEST
 
