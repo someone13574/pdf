@@ -36,55 +36,22 @@ typedef struct {
     size_t generation;
 } PdfObjectRef;
 
-typedef struct {
-    bool has_value;
-    PdfObjectBoolean value;
-} PdfObjectBooleanOptional;
+#define DECL_OPTIONAL_TYPE(type)                                               \
+    typedef struct {                                                           \
+        bool has_value;                                                        \
+        type value;                                                            \
+    } type##Optional;
 
-typedef struct {
-    bool has_value;
-    PdfObjectInteger value;
-} PdfObjectIntegerOptional;
-
-typedef struct {
-    bool has_value;
-    PdfObjectReal value;
-} PdfObjectRealOptional;
-
-typedef struct {
-    bool has_value;
-    PdfObjectString value;
-} PdfObjectStringOptional;
-
-typedef struct {
-    bool has_value;
-    PdfObjectName value;
-} PdfObjectNameOptional;
-
-typedef struct {
-    bool has_value;
-    PdfObjectArray value;
-} PdfObjectArrayOptional;
-
-typedef struct {
-    bool has_value;
-    PdfObjectDict value;
-} PdfObjectDictOptional;
-
-typedef struct {
-    bool has_value;
-    PdfObjectStream value;
-} PdfObjectStreamOptional;
-
-typedef struct {
-    bool has_value;
-    PdfObjectIndirect value;
-} PdfObjectIndirectOptional;
-
-typedef struct {
-    bool has_value;
-    PdfObjectRef value;
-} PdfObjectRefOptional;
+DECL_OPTIONAL_TYPE(PdfObjectBoolean)
+DECL_OPTIONAL_TYPE(PdfObjectInteger)
+DECL_OPTIONAL_TYPE(PdfObjectReal)
+DECL_OPTIONAL_TYPE(PdfObjectString)
+DECL_OPTIONAL_TYPE(PdfObjectName)
+DECL_OPTIONAL_TYPE(PdfObjectArray)
+DECL_OPTIONAL_TYPE(PdfObjectDict)
+DECL_OPTIONAL_TYPE(PdfObjectStream)
+DECL_OPTIONAL_TYPE(PdfObjectIndirect)
+DECL_OPTIONAL_TYPE(PdfObjectRef)
 
 typedef enum {
     PDF_OBJECT_KIND_BOOLEAN,

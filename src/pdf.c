@@ -106,7 +106,7 @@ PdfSchemaTrailer* pdf_get_trailer(PdfDocument* doc, PdfResult* result) {
         return NULL;
     }
 
-    doc->trailer = pdf_schema_trailer_new(doc->arena, trailer_dict, result);
+    doc->trailer = pdf_schema_trailer_new(trailer_dict, doc->arena, result);
     return doc->trailer;
 }
 
@@ -127,7 +127,7 @@ PdfSchemaCatalog* pdf_get_catalog(PdfDocument* doc, PdfResult* result) {
         return NULL;
     }
 
-    doc->catalog = PDF_REF_GET(trailer->root, doc, result);
+    doc->catalog = PDF_RESOLVE(trailer->root, doc, result);
     return doc->catalog;
 }
 
