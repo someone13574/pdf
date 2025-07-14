@@ -3,9 +3,9 @@
 
 #include "log.h"
 #include "pdf.h"
+#include "pdf_catalog.h"
 #include "pdf_object.h"
 #include "pdf_result.h"
-#include "pdf_schema.h"
 
 char* load_file_to_buffer(Arena* arena, const char* path, size_t* out_size) {
     FILE* file = fopen(path, "rb");
@@ -65,21 +65,24 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    PdfSchemaCatalog* catalog = pdf_get_catalog(doc, &result);
+    PdfCatalog* catalog = pdf_get_catalog(doc, &result);
     if (result != PDF_OK || !catalog) {
         LOG_ERROR("Failed to get catalog with code %d", result);
         arena_free(arena);
         return EXIT_FAILURE;
     }
 
-    PdfSchemaPageTreeNode* page_tree_node =
-        PDF_RESOLVE(catalog->pages, doc, &result);
-    if (result != PDF_OK || !page_tree_node) {
-        LOG_ERROR("Failed to get root page tree node with code %d", result);
+    printf("%s\n", pdf_fmt_object(arena, catalog->raw_dict));
+
+    PdfPageTreeNode* page_tree_root =
+        pdf_resolve_page_tree_node(&catalog->pages, doc, &result);
+    if (result != PDF_OK || !page_tree_root) {
+        LOG_ERROR("Failed to resolve page tree root with code %d", result);
         arena_free(arena);
         return EXIT_FAILURE;
     }
-    printf("Root:\n%s\n", pdf_fmt_object(arena, page_tree_node->raw_dict));
+
+    printf("%s\n", pdf_fmt_object(arena, page_tree_root->raw_dict));
 
     LOG_INFO("Finished");
 

@@ -7,81 +7,89 @@
 
 typedef struct PdfObject PdfObject;
 
-typedef bool PdfObjectBoolean;
-typedef int32_t PdfObjectInteger;
-typedef double PdfObjectReal;
-typedef char* PdfObjectString;
-typedef char* PdfObjectName;
-typedef Vec* PdfObjectArray;
-typedef Vec* PdfObjectDict;
+typedef bool PdfBoolean;
+typedef int32_t PdfInteger;
+typedef double PdfReal;
+typedef char* PdfString;
+typedef char* PdfName;
+
+typedef struct {
+    Vec* elements;
+} PdfArray;
+
+typedef struct {
+    Vec* entries;
+} PdfDict;
 
 typedef struct {
     PdfObject* key;
     PdfObject* value;
-} PdfObjectDictEntry;
+} PdfDictEntry;
 
 typedef struct {
     PdfObject* stream_dict;
     char* stream_bytes;
-} PdfObjectStream;
+} PdfStream;
 
 typedef struct {
     size_t object_id;
     size_t generation;
     PdfObject* object;
-} PdfObjectIndirect;
+} PdfIndirectObject;
 
 typedef struct {
     size_t object_id;
     size_t generation;
-} PdfObjectRef;
+} PdfIndirectRef;
 
 #define DECL_OPTIONAL_TYPE(type)                                               \
     typedef struct {                                                           \
-        bool has_value;                                                        \
-        type value;                                                            \
-    } type##Optional;
+        bool discriminant;                                                     \
+        Pdf##type value;                                                       \
+    } PdfOp##type;
 
-DECL_OPTIONAL_TYPE(PdfObjectBoolean)
-DECL_OPTIONAL_TYPE(PdfObjectInteger)
-DECL_OPTIONAL_TYPE(PdfObjectReal)
-DECL_OPTIONAL_TYPE(PdfObjectString)
-DECL_OPTIONAL_TYPE(PdfObjectName)
-DECL_OPTIONAL_TYPE(PdfObjectArray)
-DECL_OPTIONAL_TYPE(PdfObjectDict)
-DECL_OPTIONAL_TYPE(PdfObjectStream)
-DECL_OPTIONAL_TYPE(PdfObjectIndirect)
-DECL_OPTIONAL_TYPE(PdfObjectRef)
+DECL_OPTIONAL_TYPE(Boolean)
+DECL_OPTIONAL_TYPE(Integer)
+DECL_OPTIONAL_TYPE(Real)
+DECL_OPTIONAL_TYPE(String)
+DECL_OPTIONAL_TYPE(Name)
+DECL_OPTIONAL_TYPE(Array)
+DECL_OPTIONAL_TYPE(Dict)
+DECL_OPTIONAL_TYPE(Stream)
+DECL_OPTIONAL_TYPE(IndirectObject)
+DECL_OPTIONAL_TYPE(IndirectRef)
+
+#undef DECL_OPTIONAL_TYPE
 
 typedef enum {
-    PDF_OBJECT_KIND_BOOLEAN,
-    PDF_OBJECT_KIND_INTEGER,
-    PDF_OBJECT_KIND_REAL,
-    PDF_OBJECT_KIND_STRING,
-    PDF_OBJECT_KIND_NAME,
-    PDF_OBJECT_KIND_ARRAY,
-    PDF_OBJECT_KIND_DICT,
-    PDF_OBJECT_KIND_STREAM,
-    PDF_OBJECT_KIND_INDIRECT,
-    PDF_OBJECT_KIND_REF,
-    PDF_OBJECT_KIND_NULL
-} PdfObjectKind;
+    PDF_OBJECT_TYPE_BOOLEAN,
+    PDF_OBJECT_TYPE_INTEGER,
+    PDF_OBJECT_TYPE_REAL,
+    PDF_OBJECT_TYPE_STRING,
+    PDF_OBJECT_TYPE_NAME,
+    PDF_OBJECT_TYPE_ARRAY,
+    PDF_OBJECT_TYPE_DICT,
+    PDF_OBJECT_TYPE_STREAM,
+    PDF_OBJECT_TYPE_INDIRECT_OBJECT,
+    PDF_OBJECT_TYPE_INDIRECT_REF,
+    PDF_OBJECT_TYPE_NULL
+} PdfObjectType;
 
 typedef union {
-    PdfObjectBoolean boolean;
-    PdfObjectInteger integer;
-    PdfObjectReal real;
-    PdfObjectString string;
-    PdfObjectName name;
-    PdfObjectArray array;
-    PdfObjectDict dict;
-    PdfObjectStream stream;
-    PdfObjectIndirect indirect;
-    PdfObjectRef ref;
+    PdfBoolean boolean;
+    PdfInteger integer;
+    PdfReal real;
+    PdfString string;
+    PdfName name;
+    PdfArray array;
+    PdfDict dict;
+    PdfStream stream;
+    PdfIndirectObject indirect_object;
+    PdfIndirectRef indirect_ref;
 } PdfObjectData;
 
 struct PdfObject {
-    PdfObjectKind kind;
+    PdfObjectType type;
     PdfObjectData data;
 };
 

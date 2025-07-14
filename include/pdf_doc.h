@@ -14,4 +14,4 @@ PdfDocument* pdf_document_new(
 );
 
 Arena* pdf_doc_arena(PdfDocument* doc);
-PdfObject* pdf_get_ref(PdfDocument* doc, PdfObjectRef ref, PdfResult* result);
+PdfObject* pdf_get_ref(PdfDocument* doc, PdfIndirectRef ref, PdfResult* result);

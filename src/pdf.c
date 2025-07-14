@@ -7,10 +7,11 @@
 #include "ctx.h"
 #include "log.h"
 #include "object.h"
+#include "pdf_catalog.h"
 #include "pdf_doc.h"
 #include "pdf_object.h"
 #include "pdf_result.h"
-#include "pdf_schema.h"
+#include "pdf_trailer.h"
 #include "xref.h"
 
 struct PdfDocument {
@@ -21,8 +22,8 @@ struct PdfDocument {
     size_t startxref;
     XRefTable* xref;
 
-    PdfSchemaTrailer* trailer;
-    PdfSchemaCatalog* catalog;
+    PdfTrailer* trailer;
+    PdfCatalog* catalog;
 };
 
 PdfResult pdf_parse_header(PdfCtx* ctx, uint8_t* version);
@@ -77,7 +78,7 @@ Arena* pdf_doc_arena(PdfDocument* doc) {
     return doc->arena;
 }
 
-PdfSchemaTrailer* pdf_get_trailer(PdfDocument* doc, PdfResult* result) {
+PdfTrailer* pdf_get_trailer(PdfDocument* doc, PdfResult* result) {
     if (!result || !doc) {
         LOG_ERROR("Invalid args to pdf_get_trailer");
         return NULL;
@@ -106,11 +107,11 @@ PdfSchemaTrailer* pdf_get_trailer(PdfDocument* doc, PdfResult* result) {
         return NULL;
     }
 
-    doc->trailer = pdf_schema_trailer_new(trailer_dict, doc->arena, result);
+    doc->trailer = pdf_deserialize_trailer(trailer_dict, doc->arena, result);
     return doc->trailer;
 }
 
-PdfSchemaCatalog* pdf_get_catalog(PdfDocument* doc, PdfResult* result) {
+PdfCatalog* pdf_get_catalog(PdfDocument* doc, PdfResult* result) {
     if (!result || !doc) {
         LOG_ERROR("Invalid args to pdf_get_root");
         return NULL;
@@ -122,16 +123,17 @@ PdfSchemaCatalog* pdf_get_catalog(PdfDocument* doc, PdfResult* result) {
         return doc->catalog;
     }
 
-    PdfSchemaTrailer* trailer = pdf_get_trailer(doc, result);
+    PdfTrailer* trailer = pdf_get_trailer(doc, result);
     if (*result != PDF_OK || !trailer) {
         return NULL;
     }
 
-    doc->catalog = PDF_RESOLVE(trailer->root, doc, result);
+    doc->catalog = pdf_resolve_catalog(&trailer->root, doc, result);
     return doc->catalog;
 }
 
-PdfObject* pdf_get_ref(PdfDocument* doc, PdfObjectRef ref, PdfResult* result) {
+PdfObject*
+pdf_get_ref(PdfDocument* doc, PdfIndirectRef ref, PdfResult* result) {
     if (!doc || !result) {
         LOG_ERROR("Invalid args to pdf_get_ref");
         return NULL;

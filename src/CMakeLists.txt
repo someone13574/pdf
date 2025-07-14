@@ -2,8 +2,9 @@ set(HEADER_LIST
     "${pdf_SOURCE_DIR}/include/pdf.h"
     "${pdf_SOURCE_DIR}/include/pdf_doc.h"
     "${pdf_SOURCE_DIR}/include/pdf_object.h"
-    "${pdf_SOURCE_DIR}/include/pdf_schema.h"
     "${pdf_SOURCE_DIR}/include/pdf_result.h"
+    "${pdf_SOURCE_DIR}/include/pdf_trailer.h"
+    "${pdf_SOURCE_DIR}/include/pdf_catalog.h"
     "${pdf_SOURCE_DIR}/include/log.h"
     "${pdf_SOURCE_DIR}/include/test.h"
     "${pdf_SOURCE_DIR}/include/vec.h"
@@ -16,7 +17,9 @@ set(SOURCE_FILE_LIST
     vec.c
     ctx.c ctx.h
     object.c object.h
-    schema.c
+    deserialize.c deserialize.h
+    trailer.c
+    catalog.c
     xref.c xref.h
     ${HEADER_LIST})
 
