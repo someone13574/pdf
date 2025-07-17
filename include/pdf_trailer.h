@@ -2,6 +2,7 @@
 
 #include "arena.h"
 #include "pdf_catalog.h"
+#include "pdf_doc.h"
 #include "pdf_object.h"
 #include "pdf_result.h"
 
@@ -12,4 +13,4 @@ typedef struct {
 } PdfTrailer;
 
 PdfTrailer*
-pdf_deserialize_trailer(PdfObject* object, Arena* arena, PdfResult* result);
+pdf_deserialize_trailer(PdfObject* object, PdfDocument* doc, PdfResult* result);

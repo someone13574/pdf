@@ -16,6 +16,8 @@ struct Vec {
 };
 
 Vec* vec_new(Arena* arena) {
+    LOG_INFO_G("vec", "Creating new vector");
+
     Vec* vec = arena_alloc(arena, sizeof(Vec));
     vec->len = 0;
     vec->allocated_blocks = 0;
@@ -26,7 +28,7 @@ Vec* vec_new(Arena* arena) {
 }
 
 void vec_push(Vec* vec, void* element) {
-    LOG_DEBUG_G("vec", "Pushing element");
+    LOG_DEBUG_G("vec", "Pushing element at addr %p", element);
 
     size_t block_idx =
         8 * sizeof(size_t) - 1 - (size_t)__builtin_clzll(vec->len + 1);

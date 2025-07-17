@@ -5,7 +5,9 @@
 #include "pdf.h"
 #include "pdf_catalog.h"
 #include "pdf_object.h"
+#include "pdf_page.h"
 #include "pdf_result.h"
+#include "vec.h"
 
 char* load_file_to_buffer(Arena* arena, const char* path, size_t* out_size) {
     FILE* file = fopen(path, "rb");
@@ -82,7 +84,27 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    printf("%s\n", pdf_fmt_object(arena, page_tree_root->raw_dict));
+    for (size_t idx = 0; idx < vec_len(page_tree_root->kids); idx++) {
+        PdfPageRef* page_ref = vec_get(page_tree_root->kids, idx);
+        PdfPage* page = pdf_resolve_page(page_ref, doc, &result);
+        if (result != PDF_OK || !page) {
+            LOG_ERROR("Failed to resolve page with code %d", result);
+            arena_free(arena);
+            return EXIT_FAILURE;
+        }
+
+        printf("%s\n", pdf_fmt_object(arena, page->raw_dict));
+
+        if (page->contents.discriminant) {
+            for (size_t contents_idx = 0;
+                 contents_idx < vec_len(page->contents.value.elements);
+                 contents_idx++) {
+                PdfStream* content =
+                    vec_get(page->contents.value.elements, contents_idx);
+                printf("%s\n", content->stream_bytes);
+            }
+        }
+    }
 
     LOG_INFO("Finished");
 

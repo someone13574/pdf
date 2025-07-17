@@ -766,7 +766,7 @@ char* pdf_fmt_object_indented(
     Arena* arena,
     PdfObject* object,
     int indent,
-    bool* contains_indirect
+    bool* force_indent_parent
 ) {
     if (!object) {
         return NULL;
@@ -845,12 +845,12 @@ char* pdf_fmt_object_indented(
         case PDF_OBJECT_TYPE_DICT: {
             Vec* entries = object->data.dict.entries;
 
-            switch (vec_len(entries)) {
-                case 0: {
-                    return format_alloc(arena, "<< >>");
-                }
-                case 1: {
-                    PdfDictEntry* entry = vec_get(entries, 0);
+            if (vec_len(entries) == 0) {
+                return format_alloc(arena, "<< >>");
+            } else {
+                char* buffer = format_alloc(arena, "<<");
+                for (size_t idx = 0; idx < vec_len(entries); idx++) {
+                    PdfDictEntry* entry = vec_get(entries, idx);
                     char* key_text = pdf_fmt_object_indented(
                         arena,
                         entry->key,
@@ -864,43 +864,18 @@ char* pdf_fmt_object_indented(
                         NULL
                     );
 
-                    return format_alloc(
+                    buffer = format_alloc(
                         arena,
-                        "<< %s %s >>",
+                        "%s\n  %*s%s %s",
+                        buffer,
+                        indent,
+                        "",
                         key_text,
                         value_text
                     );
                 }
-                default: {
-                    char* buffer = format_alloc(arena, "<<");
-                    for (size_t idx = 0; idx < vec_len(entries); idx++) {
-                        PdfDictEntry* entry = vec_get(entries, idx);
-                        char* key_text = pdf_fmt_object_indented(
-                            arena,
-                            entry->key,
-                            indent + 2,
-                            NULL
-                        );
-                        char* value_text = pdf_fmt_object_indented(
-                            arena,
-                            entry->value,
-                            indent + (int)strlen(key_text) + 3,
-                            NULL
-                        );
 
-                        buffer = format_alloc(
-                            arena,
-                            "%s\n  %*s%s %s",
-                            buffer,
-                            indent,
-                            "",
-                            key_text,
-                            value_text
-                        );
-                    }
-
-                    return format_alloc(arena, "%s\n%*s>>", buffer, indent, "");
-                }
+                return format_alloc(arena, "%s\n%*s>>", buffer, indent, "");
             }
         }
         case PDF_OBJECT_TYPE_STREAM: {
@@ -922,8 +897,8 @@ char* pdf_fmt_object_indented(
             );
         }
         case PDF_OBJECT_TYPE_INDIRECT_OBJECT: {
-            if (contains_indirect) {
-                *contains_indirect = true;
+            if (force_indent_parent) {
+                *force_indent_parent = true;
             }
 
             return format_alloc(
@@ -944,8 +919,8 @@ char* pdf_fmt_object_indented(
             );
         }
         case PDF_OBJECT_TYPE_INDIRECT_REF: {
-            if (contains_indirect) {
-                *contains_indirect = true;
+            if (force_indent_parent) {
+                *force_indent_parent = true;
             }
             return format_alloc(
                 arena,

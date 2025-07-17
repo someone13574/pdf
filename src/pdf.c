@@ -107,7 +107,7 @@ PdfTrailer* pdf_get_trailer(PdfDocument* doc, PdfResult* result) {
         return NULL;
     }
 
-    doc->trailer = pdf_deserialize_trailer(trailer_dict, doc->arena, result);
+    doc->trailer = pdf_deserialize_trailer(trailer_dict, doc, result);
     return doc->trailer;
 }
 
@@ -133,9 +133,9 @@ PdfCatalog* pdf_get_catalog(PdfDocument* doc, PdfResult* result) {
 }
 
 PdfObject*
-pdf_get_ref(PdfDocument* doc, PdfIndirectRef ref, PdfResult* result) {
+pdf_resolve(PdfDocument* doc, PdfIndirectRef ref, PdfResult* result) {
     if (!doc || !result) {
-        LOG_ERROR("Invalid args to pdf_get_ref");
+        LOG_ERROR("Invalid args to pdf_resolve");
         return NULL;
     }
 

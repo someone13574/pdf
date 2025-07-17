@@ -2,61 +2,127 @@
 
 #include <stddef.h>
 
+#include "log.h"
+#include "pdf_doc.h"
 #include "pdf_object.h"
 #include "pdf_result.h"
 
 typedef enum {
     PDF_FIELD_KIND_OBJECT,
-    PDF_FIELD_KIND_OP_OBJECT,
     PDF_FIELD_KIND_REF,
-    PDF_FIELD_KIND_OP_REF
+    PDF_FIELD_KIND_ARRAY,
+    PDF_FIELD_KIND_AS_ARRAY,
+    PDF_FIELD_KIND_OPTIONAL,
+    PDF_FIELD_KIND_IGNORED
 } PdfFieldKind;
 
-typedef struct {
-    PdfObjectType type;
-} PdfFieldDataObject;
+typedef struct PdfFieldInfo PdfFieldInfo;
 
 typedef struct {
     PdfObjectType type;
-    size_t discriminant_offset;
-    size_t value_offset;
-} PdfFieldDataOpObject;
+} PdfObjectFieldData;
 
 typedef struct {
-    size_t resolved_offset;
-    size_t ref_offset;
-} PdfFieldDataRef;
+    size_t object_ref_offset;
+} PdfRefFieldData;
 
 typedef struct {
-    PdfFieldDataRef ref_data;
+    size_t vec_offset;
+    size_t element_size;
+    PdfFieldInfo* element_info;
+} PdfArrayFieldData;
+
+typedef struct {
     size_t discriminant_offset;
     size_t data_offset;
-} PdfFieldDataOpRef;
+    PdfFieldInfo* inner_info;
+} PdfOptionalFieldData;
 
-typedef union {
-    PdfFieldDataObject object;
-    PdfFieldDataOpObject op_object;
-    PdfFieldDataRef ref;
-    PdfFieldDataOpRef op_ref;
-} PdfFieldData;
+struct PdfFieldInfo {
+    PdfFieldKind kind;
+
+    union {
+        PdfObjectFieldData object;
+        PdfRefFieldData ref;
+        PdfArrayFieldData array;
+        PdfOptionalFieldData optional;
+    } data;
+};
+
+typedef struct {
+    const char* file;
+    unsigned long line;
+} PdfFieldDebugInfo;
 
 typedef struct {
     const char* key;
     size_t offset;
-    PdfFieldKind kind;
-    PdfFieldData data;
+    PdfFieldInfo info;
+    PdfFieldDebugInfo debug;
 } PdfFieldDescriptor;
 
 PdfResult pdf_deserialize_object(
     void* target,
+    PdfObject* object,
     PdfFieldDescriptor* fields,
     size_t num_fields,
-    PdfObject* object
+    PdfDocument* doc
 );
 
-#define PDF_RESOLVE_IMPL(struct_type, resolve_function, deserialize_function)  \
-    struct_type* resolve_function(                                             \
-        struct_type##Ref* ref,                                                 \
+#define PDF_FIELD(struct_type, key_str, field_name, field_info)                \
+    {                                                                          \
+        .key = (key_str), .offset = offsetof(struct_type, field_name),         \
+        .info = (field_info), .debug = {                                       \
+            .file = RELATIVE_FILE_PATH,                                        \
+            .line = __LINE__                                                   \
+        }                                                                      \
+    }
+
+#define PDF_OBJECT_FIELD(object_type_enum)                                     \
+    (PdfFieldInfo) {                                                           \
+        .kind = PDF_FIELD_KIND_OBJECT, .data.object.type = (object_type_enum)  \
+    }
+
+#define PDF_REF_FIELD(ref_type)                                                \
+    (PdfFieldInfo) {                                                           \
+        .kind = PDF_FIELD_KIND_REF,                                            \
+        .data.ref.object_ref_offset = offsetof(ref_type, ref)                  \
+    }
+
+#define PDF_ARRAY_FIELD(array_type, element_type, field_info)                  \
+    (PdfFieldInfo) {                                                           \
+        .kind = PDF_FIELD_KIND_ARRAY, .data.array = {                          \
+            .vec_offset = offsetof(array_type, elements),                      \
+            .element_size = sizeof(element_type),                              \
+            .element_info = (PdfFieldInfo*)&(field_info)                       \
+        }                                                                      \
+    }
+
+#define PDF_AS_ARRAY_FIELD(array_type, element_type, field_info)               \
+    (PdfFieldInfo) {                                                           \
+        .kind = PDF_FIELD_KIND_AS_ARRAY, .data.array = {                       \
+            .vec_offset = offsetof(array_type, elements),                      \
+            .element_size = sizeof(element_type),                              \
+            .element_info = (PdfFieldInfo*)&(field_info)                       \
+        }                                                                      \
+    }
+
+#define PDF_OPTIONAL_FIELD(optional_type, field_info)                          \
+    (PdfFieldInfo) {                                                           \
+        .kind = PDF_FIELD_KIND_OPTIONAL, .data.optional = {                    \
+            .discriminant_offset = offsetof(optional_type, discriminant),      \
+            .data_offset = offsetof(optional_type, value),                     \
+            .inner_info = (PdfFieldInfo*)&(field_info)                         \
+        }                                                                      \
+    }
+
+#define PDF_DESERIALIZABLE_REF_IMPL(                                           \
+    base_struct,                                                               \
+    lowercase_name,                                                            \
+    deserialize_fn                                                             \
+)                                                                              \
+    base_struct* pdf_resolve_##lowercase_name(                                 \
+        base_struct##Ref* ref,                                                 \
         PdfDocument* doc,                                                      \
         PdfResult* result                                                      \
     ) {                                                                        \
@@ -65,47 +131,15 @@ PdfResult pdf_deserialize_object(
         }                                                                      \
         *result = PDF_OK;                                                      \
         if (ref->resolved) {                                                   \
-            return ref->resolved;                                              \
+            return (base_struct*)ref->resolved;                                \
         }                                                                      \
-        PdfObject* object = pdf_get_ref(doc, ref->ref, result);                \
+        PdfObject* object = pdf_resolve(doc, ref->ref, result);                \
         if (*result != PDF_OK || !object) {                                    \
             return NULL;                                                       \
         }                                                                      \
-        ref->resolved =                                                        \
-            deserialize_function(object, pdf_doc_arena(doc), result);          \
-        return ref->resolved;                                                  \
-    }
-
-#define PDF_OBJECT_FIELD(struct_type, key, field_name, object_type)            \
-    {                                                                          \
-        key, offsetof(struct_type, field_name), PDF_FIELD_KIND_OBJECT, {       \
-            .object = {.type = (object_type) }                                 \
+        ref->resolved = deserialize_fn(object, doc, result);                   \
+        if (*result != PDF_OK || !ref->resolved) {                             \
+            return NULL;                                                       \
         }                                                                      \
-    }
-
-#define PDF_OP_OBJECT_FIELD(                                                   \
-    struct_type,                                                               \
-    key,                                                                       \
-    field_name,                                                                \
-    object_type_enum,                                                          \
-    object_type                                                                \
-)                                                                              \
-    {                                                                          \
-        key, offsetof(struct_type, field_name), PDF_FIELD_KIND_OP_OBJECT, {    \
-            .op_object = {                                                     \
-                .type = (object_type_enum),                                    \
-                .discriminant_offset = offsetof(object_type, discriminant),    \
-                .value_offset = offsetof(object_type, value)                   \
-            }                                                                  \
-        }                                                                      \
-    }
-
-#define PDF_REF_FIELD(struct_type, key, field_name, ref_type)                  \
-    {                                                                          \
-        key, offsetof(struct_type, field_name), PDF_FIELD_KIND_REF, {          \
-            .ref = {                                                           \
-                .resolved_offset = offsetof(ref_type, resolved),               \
-                .ref_offset = offsetof(ref_type, ref)                          \
-            }                                                                  \
-        }                                                                      \
+        return (base_struct*)ref->resolved;                                    \
     }
