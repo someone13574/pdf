@@ -18,12 +18,17 @@ typedef struct {
 void arena_block_init(ArenaBlock* block, size_t size) {
     LOG_INFO_G("arena", "Allocating new arena block with size %zu", size);
 
-    LOG_ASSERT(
+    RELEASE_ASSERT(block);
+    RELEASE_ASSERT(
         (size != 0) && (size & (size - 1)) == 0,
         "Invalid arena block size %zu. Must be a power of two",
         size
     );
-    LOG_ASSERT(size <= MAX_BLOCK_SIZE, "Arena block size %zu too large", size);
+    RELEASE_ASSERT(
+        size <= MAX_BLOCK_SIZE,
+        "Arena block size %zu too large",
+        size
+    );
 
     void* alloc = malloc(size);
     if (!alloc) {
@@ -36,8 +41,11 @@ void arena_block_init(ArenaBlock* block, size_t size) {
     block->ptr = block->end;
 }
 
-size_t align_ptr_down(uintptr_t ptr, size_t align) {
-    return ptr & ~(align - 1);
+uintptr_t align_ptr_down(uintptr_t ptr, size_t align) {
+    uintptr_t aligned = ptr & ~(align - 1);
+    DEBUG_ASSERT(aligned <= ptr);
+
+    return aligned;
 }
 
 struct Arena {
@@ -49,11 +57,11 @@ struct Arena {
 
 Arena* arena_new(size_t block_size) {
     ArenaBlock* blocks = malloc(sizeof(ArenaBlock));
-    LOG_ASSERT(blocks, "Malloc failed");
+    RELEASE_ASSERT(blocks, "Malloc failed");
     arena_block_init(&blocks[0], block_size);
 
     Arena* arena = malloc(sizeof(Arena));
-    LOG_ASSERT(arena, "Malloc failed");
+    RELEASE_ASSERT(arena, "Malloc failed");
     arena->blocks = blocks;
     arena->num_blocks = 1;
     arena->next_block_size = block_size;
@@ -62,9 +70,7 @@ Arena* arena_new(size_t block_size) {
 }
 
 void arena_free(Arena* arena) {
-    if (!arena) {
-        return;
-    }
+    RELEASE_ASSERT(arena);
 
     for (size_t block = 0; block < arena->num_blocks; block++) {
         free((void*)arena->blocks[block].start);
@@ -78,11 +84,11 @@ void* arena_alloc(Arena* arena, size_t size) {
 }
 
 void* arena_alloc_align(Arena* arena, size_t size, size_t align) {
-    DBG_ASSERT(arena);
-    DBG_ASSERT(arena->blocks);
-    DBG_ASSERT(size > 0);
-    DBG_ASSERT(align > 0);
-    DBG_ASSERT((align & (align - 1)) == 0);
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(arena->blocks);
+    RELEASE_ASSERT(size > 0);
+    RELEASE_ASSERT(align > 0);
+    RELEASE_ASSERT((align & (align - 1)) == 0);
 
     LOG_DEBUG_G(
         "arena",
@@ -130,7 +136,7 @@ void* arena_alloc_align(Arena* arena, size_t size, size_t align) {
     size_t block_size = arena->next_block_size;
     while (block_size < size + (align == alignof(max_align_t) ? 0 : align)
     ) { // Ensure there is enough space
-        LOG_ASSERT(
+        RELEASE_ASSERT(
             block_size < MAX_BLOCK_SIZE / 2,
             "Arena allocations cannot be larger than 1 GiB"
         );
@@ -145,18 +151,15 @@ void* arena_alloc_align(Arena* arena, size_t size, size_t align) {
 
     // Allocate space in block
     uintptr_t aligned_ptr = align_ptr_down(block->ptr - size, align);
-    LOG_ASSERT(
-        aligned_ptr >= block->start,
-        "Unreachable: not enough space in newly allocated block"
-    );
+    DEBUG_ASSERT(aligned_ptr >= block->start);
     block->ptr = aligned_ptr;
 
     return (void*)aligned_ptr;
 }
 
 void arena_reset(Arena* arena) {
-    DBG_ASSERT(arena);
-    DBG_ASSERT(arena->blocks);
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(arena->blocks);
 
     LOG_DEBUG_G("arena", "Resetting arena");
 

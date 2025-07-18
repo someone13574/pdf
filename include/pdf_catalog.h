@@ -13,7 +13,10 @@ typedef struct {
     PdfObject* raw_dict;
 } PdfCatalog;
 
-PdfCatalog*
-pdf_deserialize_catalog(PdfObject* object, PdfDocument* doc, PdfResult* result);
+PdfResult pdf_deserialize_catalog(
+    PdfObject* object,
+    PdfDocument* doc,
+    PdfCatalog* deserialized
+);
 
 DESERIALIZABLE_STRUCT_REF(PdfCatalog, catalog)

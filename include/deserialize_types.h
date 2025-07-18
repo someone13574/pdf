@@ -5,10 +5,10 @@
         PdfIndirectRef ref;                                                    \
         void* resolved;                                                        \
     } base_struct##Ref;                                                        \
-    base_struct* pdf_resolve_##lowercase_name(                                 \
+    PdfResult pdf_resolve_##lowercase_name(                                    \
         base_struct##Ref* ref,                                                 \
         PdfDocument* doc,                                                      \
-        PdfResult* result                                                      \
+        base_struct* resolved                                                  \
     );
 
 #define DESERIALIZABLE_ARRAY_TYPE(struct_name)                                 \

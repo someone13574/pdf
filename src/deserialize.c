@@ -1,6 +1,5 @@
 #include "deserialize.h"
 
-#include <stdio.h>
 #include <string.h>
 
 #include "arena.h"
@@ -10,25 +9,34 @@
 #include "pdf_result.h"
 #include "vec.h"
 
-PdfObject*
-resolve_object(PdfDocument* doc, PdfObject* object, PdfResult* result) {
-    *result = PDF_OK;
+PdfResult
+resolve_object(PdfDocument* doc, PdfObject* object, PdfObject* resolved) {
+    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(resolved);
 
     if (object->type == PDF_OBJECT_TYPE_INDIRECT_OBJECT) {
         LOG_TRACE_G("deserde", "Unwrapping indirect object");
-        return resolve_object(doc, object->data.indirect_object.object, result);
+        return resolve_object(
+            doc,
+            object->data.indirect_object.object,
+            resolved
+        );
     }
 
     if (object->type == PDF_OBJECT_TYPE_INDIRECT_REF) {
         LOG_TRACE_G("deserde", "Resolving indirect reference");
-        return resolve_object(
-            doc,
-            pdf_resolve(doc, object->data.indirect_ref, result),
-            result
+
+        PdfObject indirect_object;
+        PDF_PROPAGATE(
+            pdf_resolve(doc, object->data.indirect_ref, &indirect_object)
         );
+
+        return resolve_object(doc, &indirect_object, resolved);
     }
 
-    return object;
+    *resolved = *object;
+    return PDF_OK;
 }
 
 PdfResult deserialize_object_field(
@@ -37,68 +45,69 @@ PdfResult deserialize_object_field(
     PdfObjectFieldData field_data,
     PdfDocument* doc
 ) {
-    PdfResult result = PDF_OK;
-    PdfObject* resolved_object = resolve_object(doc, object, &result);
-    if (result != PDF_OK || !resolved_object) {
-        return result;
-    }
+    RELEASE_ASSERT(field_ptr);
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(doc);
+
+    PdfObject resolved_object;
+    PDF_PROPAGATE(resolve_object(doc, object, &resolved_object));
 
     LOG_TRACE_G(
         "deserde",
         "Deserializing object field with type `%d`",
-        resolved_object->type
+        resolved_object.type
     );
 
-    if (resolved_object->type != field_data.type) {
+    if (resolved_object.type != field_data.type) {
         LOG_ERROR_G(
             "deserde",
             "Incorrect type for object field. Expected `%d`, got `%d`",
             field_data.type,
-            resolved_object->type
+            resolved_object.type
         );
-        return PDF_ERR_SCHEMA_INCORRECT_TYPE;
+        return PDF_ERR_INCORRECT_TYPE;
     }
 
-    switch (resolved_object->type) {
+    switch (resolved_object.type) {
         case PDF_OBJECT_TYPE_BOOLEAN: {
-            *(PdfBoolean*)field_ptr = resolved_object->data.boolean;
+            *(PdfBoolean*)field_ptr = resolved_object.data.boolean;
             break;
         }
         case PDF_OBJECT_TYPE_INTEGER: {
-            *(PdfInteger*)field_ptr = resolved_object->data.integer;
+            *(PdfInteger*)field_ptr = resolved_object.data.integer;
             break;
         }
         case PDF_OBJECT_TYPE_REAL: {
-            *(PdfReal*)field_ptr = resolved_object->data.real;
+            *(PdfReal*)field_ptr = resolved_object.data.real;
             break;
         }
         case PDF_OBJECT_TYPE_STRING: {
-            *(PdfString*)field_ptr = resolved_object->data.string;
+            *(PdfString*)field_ptr = resolved_object.data.string;
             break;
         }
         case PDF_OBJECT_TYPE_NAME: {
-            *(PdfName*)field_ptr = resolved_object->data.name;
+            *(PdfName*)field_ptr = resolved_object.data.name;
             break;
         }
         case PDF_OBJECT_TYPE_ARRAY: {
-            *(PdfArray*)field_ptr = resolved_object->data.array;
+            *(PdfArray*)field_ptr = resolved_object.data.array;
             break;
         }
         case PDF_OBJECT_TYPE_DICT: {
-            *(PdfDict*)field_ptr = resolved_object->data.dict;
+            *(PdfDict*)field_ptr = resolved_object.data.dict;
             break;
         }
         case PDF_OBJECT_TYPE_STREAM: {
-            *(PdfStream*)field_ptr = resolved_object->data.stream;
+            *(PdfStream*)field_ptr = resolved_object.data.stream;
             break;
         }
         case PDF_OBJECT_TYPE_INDIRECT_OBJECT: {
             *(PdfIndirectObject*)field_ptr =
-                resolved_object->data.indirect_object;
+                resolved_object.data.indirect_object;
             break;
         }
         case PDF_OBJECT_TYPE_INDIRECT_REF: {
-            *(PdfIndirectRef*)field_ptr = resolved_object->data.indirect_ref;
+            *(PdfIndirectRef*)field_ptr = resolved_object.data.indirect_ref;
             break;
         }
         case PDF_OBJECT_TYPE_NULL: {
@@ -114,13 +123,16 @@ PdfResult deserialize_ref_field(
     PdfObject* object,
     PdfRefFieldData field_data
 ) {
+    RELEASE_ASSERT(field_ptr);
+    RELEASE_ASSERT(object);
+
     if (object->type != PDF_OBJECT_TYPE_INDIRECT_REF) {
         LOG_ERROR_G(
             "deserde",
             "Incorrect type for ref field. Expected indirect ref, found %d",
             object->type
         );
-        return PDF_ERR_SCHEMA_INCORRECT_TYPE;
+        return PDF_ERR_INCORRECT_TYPE;
     }
 
     LOG_TRACE_G("deserde", "Deserializing ref field");
@@ -131,36 +143,35 @@ PdfResult deserialize_ref_field(
     return PDF_OK;
 }
 
-void* deserialize_array_element(
+PdfResult deserialize_array_element(
     PdfObject* element,
     PdfArrayFieldData field_data,
     PdfDocument* doc,
-    PdfResult* result
+    void** deserialized
 ) {
-    *result = PDF_OK;
+    RELEASE_ASSERT(element);
+    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(deserialized);
 
-    void* deserialized_element =
-        arena_alloc(pdf_doc_arena(doc), field_data.element_size);
-    memset(deserialized_element, 0, field_data.element_size);
+    *deserialized = arena_alloc(pdf_doc_arena(doc), field_data.element_size);
+    memset(*deserialized, 0, field_data.element_size);
 
     switch (field_data.element_info->kind) {
         case PDF_FIELD_KIND_OBJECT: {
-            *result = deserialize_object_field(
-                deserialized_element,
+            PDF_PROPAGATE(deserialize_object_field(
+                *deserialized,
                 element,
                 field_data.element_info->data.object,
                 doc
-            );
-
+            ));
             break;
         }
         case PDF_FIELD_KIND_REF: {
-            *result = deserialize_ref_field(
-                deserialized_element,
+            PDF_PROPAGATE(deserialize_ref_field(
+                *deserialized,
                 element,
                 field_data.element_info->data.ref
-            );
-
+            ));
             break;
         }
         default: {
@@ -168,11 +179,7 @@ void* deserialize_array_element(
         }
     }
 
-    if (*result != PDF_OK) {
-        return NULL;
-    }
-
-    return deserialized_element;
+    return PDF_OK;
 }
 
 PdfResult deserialize_array_field(
@@ -181,11 +188,12 @@ PdfResult deserialize_array_field(
     PdfArrayFieldData field_data,
     PdfDocument* doc
 ) {
-    PdfResult result = PDF_OK;
-    PdfObject* resolved_object = resolve_object(doc, object, &result);
-    if (result != PDF_OK || !resolved_object) {
-        return result;
-    }
+    RELEASE_ASSERT(field_ptr);
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(doc);
+
+    PdfObject resolved_object;
+    PDF_PROPAGATE(resolve_object(doc, object, &resolved_object));
 
     if (object->type != PDF_OBJECT_TYPE_ARRAY) {
         LOG_ERROR_G(
@@ -193,7 +201,7 @@ PdfResult deserialize_array_field(
             "Array field has incorrect type %d",
             object->type
         );
-        return PDF_ERR_SCHEMA_INCORRECT_TYPE;
+        return PDF_ERR_INCORRECT_TYPE;
     }
 
     LOG_TRACE_G(
@@ -208,11 +216,10 @@ PdfResult deserialize_array_field(
 
         PdfObject* element = vec_get(object->data.array.elements, idx);
 
-        void* deserialized =
-            deserialize_array_element(element, field_data, doc, &result);
-        if (result != PDF_OK || !deserialized) {
-            return result;
-        }
+        void* deserialized;
+        PDF_PROPAGATE(
+            deserialize_array_element(element, field_data, doc, &deserialized)
+        );
 
         vec_push(deserialized_elements, deserialized);
     }
@@ -229,11 +236,12 @@ PdfResult deserialize_as_array_field(
     PdfArrayFieldData field_data,
     PdfDocument* doc
 ) {
-    PdfResult result = PDF_OK;
-    PdfObject* resolved_object = resolve_object(doc, object, &result);
-    if (result != PDF_OK || !resolved_object) {
-        return result;
-    }
+    RELEASE_ASSERT(field_ptr);
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(doc);
+
+    PdfObject resolved_object;
+    PDF_PROPAGATE(resolve_object(doc, object, &resolved_object));
 
     if (object->type == PDF_OBJECT_TYPE_ARRAY) {
         return deserialize_array_field(field_ptr, object, field_data, doc);
@@ -241,11 +249,10 @@ PdfResult deserialize_as_array_field(
 
     LOG_TRACE_G("deserde", "Deserializing single element as array field");
 
-    void* deserialized =
-        deserialize_array_element(object, field_data, doc, &result);
-    if (result != PDF_OK) {
-        return result;
-    }
+    void* deserialized;
+    PDF_PROPAGATE(
+        deserialize_array_element(object, field_data, doc, &deserialized)
+    );
 
     Vec* deserialized_elements = vec_new(pdf_doc_arena(doc));
     vec_push(deserialized_elements, deserialized);
@@ -267,6 +274,10 @@ PdfResult deserialize_optional_field(
     PdfOptionalFieldData field_data,
     PdfDocument* doc
 ) {
+    RELEASE_ASSERT(field_ptr);
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(doc);
+
     void* discriminant_ptr = (char*)field_ptr + field_data.discriminant_offset;
     *(bool*)discriminant_ptr = true;
 
@@ -351,15 +362,15 @@ PdfResult pdf_deserialize_object(
     size_t num_fields,
     PdfDocument* doc
 ) {
-    if (!target || !fields || !object) {
-        return PDF_ERR_NULL_ARGS;
-    }
+    RELEASE_ASSERT(target);
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(fields);
+    RELEASE_ASSERT(doc);
 
     // Check object type
-    PdfResult result = PDF_OK;
-    object = resolve_object(doc, object, &result);
+    PDF_PROPAGATE(resolve_object(doc, object, object));
 
-    if (result != PDF_OK || !object || object->type != PDF_OBJECT_TYPE_DICT) {
+    if (object->type != PDF_OBJECT_TYPE_DICT) {
         return PDF_ERR_OBJECT_NOT_DICT;
     }
 
@@ -373,8 +384,16 @@ PdfResult pdf_deserialize_object(
 
         for (size_t field_idx = 0; field_idx < num_fields; field_idx++) {
             if (strcmp(entry->key->data.name, fields[field_idx].key) == 0) {
+                if (found) {
+                    LOG_ERROR_G(
+                        "deserde",
+                        "Duplicate dict key `%s`",
+                        entry->key->data.name
+                    );
+                    return PDF_ERR_DUPLICATE_KEY;
+                }
+
                 found = true;
-                break;
             }
         }
 
@@ -384,7 +403,7 @@ PdfResult pdf_deserialize_object(
                 "Dict key `%s` is not a known field",
                 entry->key->data.name
             );
-            return PDF_ERR_SCHEMA_UNKNOWN_KEY;
+            return PDF_ERR_UNKNOWN_KEY;
         }
     }
 
@@ -410,72 +429,47 @@ PdfResult pdf_deserialize_object(
 
             switch (field->info.kind) {
                 case PDF_FIELD_KIND_OBJECT: {
-                    result = deserialize_object_field(
+                    PDF_PROPAGATE(deserialize_object_field(
                         (char*)target + field->offset,
                         entry->value,
                         field->info.data.object,
                         doc
-                    );
-
-                    if (result != PDF_OK) {
-                        return result;
-                    }
-
+                    ));
                     break;
                 }
                 case PDF_FIELD_KIND_REF: {
-                    result = deserialize_ref_field(
+                    PDF_PROPAGATE(deserialize_ref_field(
                         (char*)target + field->offset,
                         entry->value,
                         field->info.data.ref
-                    );
-
-                    if (result != PDF_OK) {
-                        return result;
-                    }
-
+                    ));
                     break;
                 }
                 case PDF_FIELD_KIND_ARRAY: {
-                    result = deserialize_array_field(
+                    PDF_PROPAGATE(deserialize_array_field(
                         (char*)target + field->offset,
                         entry->value,
                         field->info.data.array,
                         doc
-                    );
-
-                    if (result != PDF_OK) {
-                        return result;
-                    }
-
+                    ));
                     break;
                 }
                 case PDF_FIELD_KIND_AS_ARRAY: {
-                    result = deserialize_as_array_field(
+                    PDF_PROPAGATE(deserialize_as_array_field(
                         (char*)target + field->offset,
                         entry->value,
                         field->info.data.array,
                         doc
-                    );
-
-                    if (result != PDF_OK) {
-                        return result;
-                    }
-
+                    ));
                     break;
                 }
                 case PDF_FIELD_KIND_OPTIONAL: {
-                    result = deserialize_optional_field(
+                    PDF_PROPAGATE(deserialize_optional_field(
                         (char*)target + field->offset,
                         entry->value,
                         field->info.data.optional,
                         doc
-                    );
-
-                    if (result != PDF_OK) {
-                        return result;
-                    }
-
+                    ));
                     break;
                 }
                 case PDF_FIELD_KIND_IGNORED: {

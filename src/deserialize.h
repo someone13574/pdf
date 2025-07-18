@@ -121,25 +121,23 @@ PdfResult pdf_deserialize_object(
     lowercase_name,                                                            \
     deserialize_fn                                                             \
 )                                                                              \
-    base_struct* pdf_resolve_##lowercase_name(                                 \
+    PdfResult pdf_resolve_##lowercase_name(                                    \
         base_struct##Ref* ref,                                                 \
         PdfDocument* doc,                                                      \
-        PdfResult* result                                                      \
+        base_struct* resolved                                                  \
     ) {                                                                        \
-        if (!ref || !doc || !result) {                                         \
-            return NULL;                                                       \
-        }                                                                      \
-        *result = PDF_OK;                                                      \
+        RELEASE_ASSERT(ref);                                                   \
+        RELEASE_ASSERT(doc);                                                   \
+        RELEASE_ASSERT(resolved);                                              \
         if (ref->resolved) {                                                   \
-            return (base_struct*)ref->resolved;                                \
+            *resolved = *(base_struct*)ref->resolved;                          \
+            return PDF_OK;                                                     \
         }                                                                      \
-        PdfObject* object = pdf_resolve(doc, ref->ref, result);                \
-        if (*result != PDF_OK || !object) {                                    \
-            return NULL;                                                       \
-        }                                                                      \
-        ref->resolved = deserialize_fn(object, doc, result);                   \
-        if (*result != PDF_OK || !ref->resolved) {                             \
-            return NULL;                                                       \
-        }                                                                      \
-        return (base_struct*)ref->resolved;                                    \
+        PdfObject* object =                                                    \
+            arena_alloc(pdf_doc_arena(doc), sizeof(PdfObject));                \
+        PDF_PROPAGATE(pdf_resolve(doc, ref->ref, object));                     \
+        PDF_PROPAGATE(deserialize_fn(object, doc, resolved));                  \
+        ref->resolved = arena_alloc(pdf_doc_arena(doc), sizeof(base_struct));  \
+        *(base_struct*)ref->resolved = *resolved;                              \
+        return PDF_OK;                                                         \
     }

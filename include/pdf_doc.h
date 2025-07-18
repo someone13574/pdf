@@ -6,12 +6,13 @@
 
 typedef struct PdfDocument PdfDocument;
 
-PdfDocument* pdf_document_new(
+PdfResult pdf_document_new(
     Arena* arena,
     char* buffer,
     size_t buffer_size,
-    PdfResult* result
+    PdfDocument** doc
 );
 
 Arena* pdf_doc_arena(PdfDocument* doc);
-PdfObject* pdf_resolve(PdfDocument* doc, PdfIndirectRef ref, PdfResult* result);
+PdfResult
+pdf_resolve(PdfDocument* doc, PdfIndirectRef ref, PdfObject* resolved);

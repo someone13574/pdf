@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "arena.h"
 #include "log.h"
 #include "pdf.h"
 #include "pdf_catalog.h"
+#include "pdf_doc.h"
 #include "pdf_object.h"
 #include "pdf_page.h"
 #include "pdf_result.h"
@@ -39,7 +41,6 @@ char* load_file_to_buffer(Arena* arena, const char* path, size_t* out_size) {
     }
 
     if (fread(buffer, 1, (size_t)len, file) != (size_t)len) {
-        free(buffer);
         fclose(file);
         return NULL;
     }
@@ -59,48 +60,31 @@ int main(int argc, char** argv) {
     char* buffer =
         load_file_to_buffer(arena, "test-files/test.pdf", &buffer_size);
 
-    PdfResult result = PDF_OK;
-    PdfDocument* doc = pdf_document_new(arena, buffer, buffer_size, &result);
-    if (result != PDF_OK || !doc) {
-        LOG_ERROR("Failed to load document");
-        arena_free(arena);
-        return EXIT_FAILURE;
-    }
+    PdfDocument* doc;
+    PDF_REQUIRE(pdf_document_new(arena, buffer, buffer_size, &doc));
 
-    PdfCatalog* catalog = pdf_get_catalog(doc, &result);
-    if (result != PDF_OK || !catalog) {
-        LOG_ERROR("Failed to get catalog with code %d", result);
-        arena_free(arena);
-        return EXIT_FAILURE;
-    }
+    PdfCatalog catalog;
+    PDF_REQUIRE(pdf_get_catalog(doc, &catalog));
 
-    printf("%s\n", pdf_fmt_object(arena, catalog->raw_dict));
+    printf("%s\n", pdf_fmt_object(arena, catalog.raw_dict));
 
-    PdfPageTreeNode* page_tree_root =
-        pdf_resolve_page_tree_node(&catalog->pages, doc, &result);
-    if (result != PDF_OK || !page_tree_root) {
-        LOG_ERROR("Failed to resolve page tree root with code %d", result);
-        arena_free(arena);
-        return EXIT_FAILURE;
-    }
+    PdfPageTreeNode page_tree_root;
+    PDF_REQUIRE(pdf_resolve_page_tree_node(&catalog.pages, doc, &page_tree_root)
+    );
 
-    for (size_t idx = 0; idx < vec_len(page_tree_root->kids); idx++) {
-        PdfPageRef* page_ref = vec_get(page_tree_root->kids, idx);
-        PdfPage* page = pdf_resolve_page(page_ref, doc, &result);
-        if (result != PDF_OK || !page) {
-            LOG_ERROR("Failed to resolve page with code %d", result);
-            arena_free(arena);
-            return EXIT_FAILURE;
-        }
+    for (size_t idx = 0; idx < vec_len(page_tree_root.kids); idx++) {
+        PdfPageRef* page_ref = vec_get(page_tree_root.kids, idx);
+        PdfPage page;
+        PDF_REQUIRE(pdf_resolve_page(page_ref, doc, &page));
 
-        printf("%s\n", pdf_fmt_object(arena, page->raw_dict));
+        printf("%s\n", pdf_fmt_object(arena, page.raw_dict));
 
-        if (page->contents.discriminant) {
+        if (page.contents.discriminant) {
             for (size_t contents_idx = 0;
-                 contents_idx < vec_len(page->contents.value.elements);
+                 contents_idx < vec_len(page.contents.value.elements);
                  contents_idx++) {
                 PdfStream* content =
-                    vec_get(page->contents.value.elements, contents_idx);
+                    vec_get(page.contents.value.elements, contents_idx);
                 printf("%s\n", content->stream_bytes);
             }
         }

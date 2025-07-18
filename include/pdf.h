@@ -5,5 +5,5 @@
 #include "pdf_result.h"
 #include "pdf_trailer.h"
 
-PdfTrailer* pdf_get_trailer(PdfDocument* doc, PdfResult* result);
-PdfCatalog* pdf_get_catalog(PdfDocument* doc, PdfResult* result);
+PdfResult pdf_get_trailer(PdfDocument* doc, PdfTrailer* trailer);
+PdfResult pdf_get_catalog(PdfDocument* doc, PdfCatalog* catalog);

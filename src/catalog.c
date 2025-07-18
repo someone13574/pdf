@@ -1,20 +1,19 @@
-#include <stddef.h>
-
 #include "deserialize.h"
+#include "log.h"
 #include "pdf_catalog.h"
 #include "pdf_doc.h"
 #include "pdf_object.h"
 #include "pdf_page.h"
 #include "pdf_result.h"
 
-PdfCatalog* pdf_deserialize_catalog(
+PdfResult pdf_deserialize_catalog(
     PdfObject* object,
     PdfDocument* doc,
-    PdfResult* result
+    PdfCatalog* deserialized
 ) {
-    if (!object || !doc || !result) {
-        return NULL;
-    }
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(deserialized);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
@@ -26,23 +25,16 @@ PdfCatalog* pdf_deserialize_catalog(
         PDF_FIELD(PdfCatalog, "Pages", pages, PDF_REF_FIELD(PdfPageTreeNodeRef))
     };
 
-    PdfCatalog catalog = {.raw_dict = object};
-    *result = pdf_deserialize_object(
-        &catalog,
+    deserialized->raw_dict = object;
+    PDF_PROPAGATE(pdf_deserialize_object(
+        deserialized,
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         doc
-    );
+    ));
 
-    if (*result != PDF_OK) {
-        return NULL;
-    }
-
-    PdfCatalog* allocated = arena_alloc(pdf_doc_arena(doc), sizeof(PdfCatalog));
-    *allocated = catalog;
-
-    return allocated;
+    return PDF_OK;
 }
 
 PDF_DESERIALIZABLE_REF_IMPL(PdfCatalog, catalog, pdf_deserialize_catalog)

@@ -104,10 +104,11 @@ void logger_log(
         __VA_ARGS__                                                            \
     )
 
-#define LOG_ASSERT(cond, ...)                                                  \
+#define RELEASE_ASSERT(cond, ...)                                              \
     do {                                                                       \
         if (!(cond)) {                                                         \
-            LOG_PANIC("Assertion failed: " __VA_ARGS__);                       \
+            LOG_PANIC("Assertion failed: RELEASE_ASSERT(" #cond                \
+                      ")" __VA_ARGS__);                                        \
         }                                                                      \
     } while (0)
 
@@ -121,17 +122,17 @@ void logger_log(
 
 #ifdef DEBUG
 
-#define DBG_ASSERT(cond)                                                       \
+#define DEBUG_ASSERT(cond)                                                     \
     do {                                                                       \
         if (!(cond)) {                                                         \
-            LOG_ERROR("Assertion failed: DBG_ASSERT(" #cond ")");              \
+            LOG_ERROR("Assertion failed: DEBUG_ASSERT(" #cond ")");            \
             exit(EXIT_FAILURE);                                                \
         }                                                                      \
     } while (0)
 
 #else
 
-#define DBG_ASSERT(cond)                                                       \
+#define DEBUG_ASSERT(cond)                                                     \
     do {                                                                       \
     } while (0)
 

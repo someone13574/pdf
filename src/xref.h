@@ -4,7 +4,11 @@
 #include "pdf_object.h"
 #include "pdf_result.h"
 
-typedef struct XRefTable XRefTable;
+typedef struct {
+    Arena* arena;
+    PdfCtx* ctx;
+    Vec* subsections;
+} XRefTable;
 
 typedef struct {
     size_t offset;
@@ -13,12 +17,12 @@ typedef struct {
     PdfObject* object;
 } XRefEntry;
 
-XRefTable*
-pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, PdfResult* result);
+PdfResult
+pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, XRefTable* xref);
 
-XRefEntry* pdf_xref_get_entry(
+PdfResult pdf_xref_get_entry(
     XRefTable* xref,
     size_t object_id,
     size_t generation,
-    PdfResult* result
+    XRefEntry** entry
 );

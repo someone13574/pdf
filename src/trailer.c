@@ -1,19 +1,19 @@
-#include <stddef.h>
-
 #include "deserialize.h"
+#include "log.h"
 #include "pdf_catalog.h"
 #include "pdf_doc.h"
 #include "pdf_object.h"
+#include "pdf_result.h"
 #include "pdf_trailer.h"
 
-PdfTrailer* pdf_deserialize_trailer(
+PdfResult pdf_deserialize_trailer(
     PdfObject* object,
     PdfDocument* doc,
-    PdfResult* result
+    PdfTrailer* deserialized
 ) {
-    if (!object || !result) {
-        return NULL;
-    }
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(deserialized);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
@@ -25,21 +25,14 @@ PdfTrailer* pdf_deserialize_trailer(
         PDF_FIELD(PdfTrailer, "Root", root, PDF_REF_FIELD(PdfCatalogRef))
     };
 
-    PdfTrailer trailer = {.raw_dict = object};
-    *result = pdf_deserialize_object(
-        &trailer,
+    deserialized->raw_dict = object;
+    PDF_PROPAGATE(pdf_deserialize_object(
+        deserialized,
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         doc
-    );
+    ));
 
-    if (*result != PDF_OK) {
-        return NULL;
-    }
-
-    PdfTrailer* allocated = arena_alloc(pdf_doc_arena(doc), sizeof(PdfTrailer));
-    *allocated = trailer;
-
-    return allocated;
+    return PDF_OK;
 }

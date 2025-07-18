@@ -29,140 +29,132 @@ struct PdfDocument {
 PdfResult pdf_parse_header(PdfCtx* ctx, uint8_t* version);
 PdfResult pdf_parse_startxref(PdfCtx* ctx, size_t* startxref);
 
-PdfDocument* pdf_document_new(
+PdfResult pdf_document_new(
     Arena* arena,
     char* buffer,
     size_t buffer_size,
-    PdfResult* result
+    PdfDocument** doc
 ) {
-    if (!result || !arena || !buffer) {
-        LOG_WARN("Invalid args to pdf_document new");
-        return NULL;
-    }
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(buffer);
+    RELEASE_ASSERT(buffer_size != 0);
+    RELEASE_ASSERT(doc);
 
     PdfCtx* ctx = pdf_ctx_new(arena, buffer, buffer_size);
 
     uint8_t version;
-    PDF_TRY_RET_NULL(pdf_parse_header(ctx, &version));
+    PDF_PROPAGATE(pdf_parse_header(ctx, &version));
     LOG_INFO_G("doc-info", "File Version 1.%hhu", version);
 
     size_t startxref;
-    PDF_TRY_RET_NULL(pdf_parse_startxref(ctx, &startxref));
+    PDF_PROPAGATE(pdf_parse_startxref(ctx, &startxref));
     LOG_DEBUG_G("doc-info", "Startxref: %zu", startxref);
 
     PdfResult xref_result = PDF_OK;
-    XRefTable* xref = pdf_xref_new(arena, ctx, startxref, &xref_result);
+    XRefTable* xref = arena_alloc(arena, sizeof(XRefTable));
+    PDF_PROPAGATE(pdf_xref_new(arena, ctx, startxref, xref));
     if (xref_result != PDF_OK) {
         LOG_ERROR("Failed to create xref table");
-        *result = xref_result;
-        return NULL;
+        return xref_result;
     }
 
-    PdfDocument* doc = arena_alloc(arena, sizeof(PdfDocument));
-    doc->arena = arena;
-    doc->ctx = ctx;
-    doc->version = version;
-    doc->startxref = startxref;
-    doc->xref = xref;
-    doc->trailer = NULL;
-    doc->catalog = NULL;
+    *doc = arena_alloc(arena, sizeof(PdfDocument));
+    (*doc)->arena = arena;
+    (*doc)->ctx = ctx;
+    (*doc)->version = version;
+    (*doc)->startxref = startxref;
+    (*doc)->xref = xref;
+    (*doc)->trailer = NULL;
+    (*doc)->catalog = NULL;
 
-    *result = PDF_OK;
-    return doc;
+    return PDF_OK;
 }
 
 Arena* pdf_doc_arena(PdfDocument* doc) {
-    if (!doc) {
-        return NULL;
-    }
+    RELEASE_ASSERT(doc);
+
     return doc->arena;
 }
 
-PdfTrailer* pdf_get_trailer(PdfDocument* doc, PdfResult* result) {
-    if (!result || !doc) {
-        LOG_ERROR("Invalid args to pdf_get_trailer");
-        return NULL;
-    }
-
-    *result = PDF_OK;
+PdfResult pdf_get_trailer(PdfDocument* doc, PdfTrailer* trailer) {
+    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(trailer);
 
     if (doc->trailer) {
-        return doc->trailer;
+        *trailer = *doc->trailer;
+        return PDF_OK;
     }
 
-    PDF_TRY_RET_NULL(pdf_ctx_seek(doc->ctx, pdf_ctx_buffer_len(doc->ctx)));
-    PDF_TRY_RET_NULL(pdf_ctx_seek_line_start(doc->ctx));
+    PDF_PROPAGATE(pdf_ctx_seek(doc->ctx, pdf_ctx_buffer_len(doc->ctx)));
+    PDF_PROPAGATE(pdf_ctx_seek_line_start(doc->ctx));
 
     while (pdf_ctx_expect(doc->ctx, "trailer") != PDF_OK
            && pdf_ctx_offset(doc->ctx) != 0) {
-        PDF_TRY_RET_NULL(pdf_ctx_shift(doc->ctx, -1));
-        PDF_TRY_RET_NULL(pdf_ctx_seek_line_start(doc->ctx));
+        PDF_PROPAGATE(pdf_ctx_shift(doc->ctx, -1));
+        PDF_PROPAGATE(pdf_ctx_seek_line_start(doc->ctx));
     }
 
-    PDF_TRY_RET_NULL(pdf_ctx_seek_next_line(doc->ctx));
+    PDF_PROPAGATE(pdf_ctx_seek_next_line(doc->ctx));
 
-    PdfObject* trailer_dict =
-        pdf_parse_object(doc->arena, doc->ctx, result, false);
-    if (*result != PDF_OK || !trailer_dict) {
-        return NULL;
-    }
+    PdfObject* trailer_dict = arena_alloc(doc->arena, sizeof(PdfObject));
+    PDF_PROPAGATE(pdf_parse_object(doc->arena, doc->ctx, trailer_dict, false));
 
-    doc->trailer = pdf_deserialize_trailer(trailer_dict, doc, result);
-    return doc->trailer;
+    PDF_PROPAGATE(pdf_deserialize_trailer(trailer_dict, doc, trailer));
+
+    doc->trailer = arena_alloc(doc->arena, sizeof(PdfTrailer));
+    *doc->trailer = *trailer;
+
+    return PDF_OK;
 }
 
-PdfCatalog* pdf_get_catalog(PdfDocument* doc, PdfResult* result) {
-    if (!result || !doc) {
-        LOG_ERROR("Invalid args to pdf_get_root");
-        return NULL;
-    }
-
-    *result = PDF_OK;
+PdfResult pdf_get_catalog(PdfDocument* doc, PdfCatalog* catalog) {
+    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(catalog);
 
     if (doc->catalog) {
-        return doc->catalog;
+        *catalog = *doc->catalog;
+        return PDF_OK;
     }
 
-    PdfTrailer* trailer = pdf_get_trailer(doc, result);
-    if (*result != PDF_OK || !trailer) {
-        return NULL;
-    }
+    PdfTrailer trailer;
+    PDF_PROPAGATE(pdf_get_trailer(doc, &trailer));
+    PDF_PROPAGATE(pdf_resolve_catalog(&trailer.root, doc, catalog));
 
-    doc->catalog = pdf_resolve_catalog(&trailer->root, doc, result);
-    return doc->catalog;
+    doc->catalog = arena_alloc(doc->arena, sizeof(PdfCatalog));
+    *doc->catalog = *catalog;
+
+    return PDF_OK;
 }
 
-PdfObject*
-pdf_resolve(PdfDocument* doc, PdfIndirectRef ref, PdfResult* result) {
-    if (!doc || !result) {
-        LOG_ERROR("Invalid args to pdf_resolve");
-        return NULL;
-    }
+PdfResult
+pdf_resolve(PdfDocument* doc, PdfIndirectRef ref, PdfObject* resolved) {
+    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(resolved);
 
-    XRefEntry* entry =
-        pdf_xref_get_entry(doc->xref, ref.object_id, ref.generation, result);
-    if (*result != PDF_OK || !entry) {
-        return NULL;
-    }
+    XRefEntry* entry;
+    PDF_PROPAGATE(
+        pdf_xref_get_entry(doc->xref, ref.object_id, ref.generation, &entry)
+    );
 
-    PDF_TRY_RET_NULL(pdf_ctx_seek(doc->ctx, entry->offset));
-    entry->object = pdf_parse_object(doc->arena, doc->ctx, result, false);
-    if (*result != PDF_OK || !entry->object) {
-        return NULL;
-    }
+    PDF_PROPAGATE(pdf_ctx_seek(doc->ctx, entry->offset));
 
-    return entry->object;
+    entry->object = arena_alloc(doc->arena, sizeof(PdfObject));
+    PDF_PROPAGATE(pdf_parse_object(doc->arena, doc->ctx, entry->object, false));
+    *resolved = *entry->object;
+
+    return PDF_OK;
 }
 
 // The first line of a PDF file shall be a header consisting of the 5 characters
 // %PDF– followed by a version number of the form 1.N, where N is a digit
 // between 0 and 7.
 PdfResult pdf_parse_header(PdfCtx* ctx, uint8_t* version) {
-    DBG_ASSERT(version);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(version);
 
     char version_char;
-    PDF_TRY(pdf_ctx_expect(ctx, "%PDF-1."));
-    PDF_TRY(pdf_ctx_peek_and_advance(ctx, &version_char));
+    PDF_PROPAGATE(pdf_ctx_expect(ctx, "%PDF-1."));
+    PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &version_char));
 
     if (version_char < '0' || version_char > '7') {
         *version = 0;
@@ -180,25 +172,26 @@ PdfResult pdf_parse_header(PdfCtx* ctx, uint8_t* version) {
 // file to the beginning of the xref keyword in the last cross-reference
 // section.
 PdfResult pdf_parse_startxref(PdfCtx* ctx, size_t* startxref) {
-    DBG_ASSERT(startxref);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(startxref);
 
     // Find EOF marker
-    PDF_TRY(pdf_ctx_seek(ctx, pdf_ctx_buffer_len(ctx)));
-    PDF_TRY(pdf_ctx_backscan(ctx, "%%EOF", 32));
+    PDF_PROPAGATE(pdf_ctx_seek(ctx, pdf_ctx_buffer_len(ctx)));
+    PDF_PROPAGATE(pdf_ctx_backscan(ctx, "%%EOF", 32));
 
     size_t eof_marker_offset = pdf_ctx_offset(ctx);
-    PDF_TRY(pdf_ctx_seek_line_start(ctx));
+    PDF_PROPAGATE(pdf_ctx_seek_line_start(ctx));
     if (eof_marker_offset != pdf_ctx_offset(ctx)) {
         return PDF_ERR_INVALID_TRAILER;
     }
 
     // Parse byte offset
-    PDF_TRY(pdf_ctx_shift(ctx, -1));
-    PDF_TRY(pdf_ctx_seek_line_start(ctx));
+    PDF_PROPAGATE(pdf_ctx_shift(ctx, -1));
+    PDF_PROPAGATE(pdf_ctx_seek_line_start(ctx));
 
     uint64_t xref_offset;
     uint32_t int_length;
-    PDF_TRY(pdf_ctx_parse_int(ctx, NULL, &xref_offset, &int_length));
+    PDF_PROPAGATE(pdf_ctx_parse_int(ctx, NULL, &xref_offset, &int_length));
     if (int_length == 0) {
         return PDF_ERR_INVALID_STARTXREF;
     }
@@ -206,10 +199,10 @@ PdfResult pdf_parse_startxref(PdfCtx* ctx, size_t* startxref) {
     *startxref = (size_t)xref_offset;
 
     // Check for startxref line
-    PDF_TRY(pdf_ctx_seek_line_start(ctx));
-    PDF_TRY(pdf_ctx_shift(ctx, -1));
-    PDF_TRY(pdf_ctx_seek_line_start(ctx));
-    PDF_TRY(pdf_ctx_expect(ctx, "startxref"));
+    PDF_PROPAGATE(pdf_ctx_seek_line_start(ctx));
+    PDF_PROPAGATE(pdf_ctx_shift(ctx, -1));
+    PDF_PROPAGATE(pdf_ctx_seek_line_start(ctx));
+    PDF_PROPAGATE(pdf_ctx_expect(ctx, "startxref"));
 
     return PDF_OK;
 }
@@ -243,7 +236,7 @@ TEST_FUNC(test_header_invalid) {
 
     uint8_t version;
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_CTX_ERR_EXPECT,
+        (PdfResult)PDF_ERR_CTX_EXPECT,
         pdf_parse_header(ctx, &version)
     );
 
@@ -326,7 +319,7 @@ TEST_FUNC(test_startxref_invalid3) {
 
     size_t startxref;
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_CTX_ERR_EXPECT,
+        (PdfResult)PDF_ERR_CTX_EXPECT,
         pdf_parse_startxref(ctx, &startxref)
     );
 

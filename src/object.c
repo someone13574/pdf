@@ -14,129 +14,131 @@
 #include "pdf_result.h"
 #include "vec.h"
 
-PdfObject* pdf_parse_true(Arena* arena, PdfCtx* ctx, PdfResult* result);
-PdfObject* pdf_parse_false(Arena* arena, PdfCtx* ctx, PdfResult* result);
-PdfObject* pdf_parse_null(Arena* arena, PdfCtx* ctx, PdfResult* result);
-PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result);
-PdfObject*
-pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfResult* result);
-PdfObject* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfResult* result);
-PdfObject* pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfResult* result);
-PdfObject* pdf_parse_dict(
+PdfResult pdf_parse_true(PdfCtx* ctx, PdfObject* object);
+PdfResult pdf_parse_false(PdfCtx* ctx, PdfObject* object);
+PdfResult pdf_parse_null(PdfCtx* ctx, PdfObject* object);
+PdfResult pdf_parse_number(PdfCtx* ctx, PdfObject* object);
+PdfResult
+pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object);
+PdfResult pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object);
+PdfResult pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfObject* object);
+PdfResult pdf_parse_dict(
     Arena* arena,
     PdfCtx* ctx,
-    PdfResult* result,
-    bool in_direct_obj
+    PdfObject* object,
+    bool in_indirect_obj
 );
-PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result);
-char* pdf_parse_stream(
+PdfResult pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfObject* object);
+PdfResult pdf_parse_stream(
     Arena* arena,
     PdfCtx* ctx,
-    PdfResult* result,
+    char** stream_bytes,
     Vec* stream_dict
 );
 
-PdfObject* pdf_parse_object(
+PdfResult pdf_parse_object(
     Arena* arena,
     PdfCtx* ctx,
-    PdfResult* result,
-    bool in_direct_obj
+    PdfObject* object,
+    bool in_indirect_obj
 ) {
-    DBG_ASSERT(arena);
-    DBG_ASSERT(ctx);
-    DBG_ASSERT(result);
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(object);
 
     LOG_DEBUG_G("object", "Parsing object at offset %zu", pdf_ctx_offset(ctx));
 
-    *result = PDF_OK;
-
     char peeked, peeked_next;
-    PDF_TRY_RET_NULL(pdf_ctx_peek(ctx, &peeked));
+    PDF_PROPAGATE(pdf_ctx_peek(ctx, &peeked));
 
     PdfResult peeked_next_result = pdf_ctx_peek_next(ctx, &peeked_next);
     if (peeked == '<' && peeked_next_result != PDF_OK) {
-        *result = peeked_next_result;
-        return NULL;
+        return peeked_next_result;
     }
 
     if (peeked == 't') {
-        return pdf_parse_true(arena, ctx, result);
+        return pdf_parse_true(ctx, object);
     } else if (peeked == 'f') {
-        return pdf_parse_false(arena, ctx, result);
+        return pdf_parse_false(ctx, object);
     } else if (peeked == '.' || peeked == '+' || peeked == '-') {
-        return pdf_parse_number(arena, ctx, result);
+        return pdf_parse_number(ctx, object);
     } else if (isdigit((unsigned char)peeked)) {
         size_t restore_offset = pdf_ctx_offset(ctx);
-        PdfObject* indirect = pdf_parse_indirect(arena, ctx, result);
-        if (*result == PDF_OK) {
-            return indirect;
+        if (pdf_parse_indirect(arena, ctx, object) == PDF_OK) {
+            return PDF_OK;
         }
 
         LOG_DEBUG_G("object", "Failed to parse indirect object/reference");
+        PDF_PROPAGATE(pdf_ctx_seek(ctx, restore_offset));
 
-        *result = PDF_OK;
-        PDF_TRY_RET_NULL(pdf_ctx_seek(ctx, restore_offset));
-
-        return pdf_parse_number(arena, ctx, result);
+        return pdf_parse_number(ctx, object);
     } else if (peeked == '(') {
-        return pdf_parse_string_literal(arena, ctx, result);
+        return pdf_parse_string_literal(arena, ctx, object);
     } else if (peeked == '<' && peeked_next != '<') {
         LOG_TODO("Hexadecimal strings");
     } else if (peeked == '/') {
-        return pdf_parse_name(arena, ctx, result);
+        return pdf_parse_name(arena, ctx, object);
     } else if (peeked == '[') {
-        return pdf_parse_array(arena, ctx, result);
+        return pdf_parse_array(arena, ctx, object);
     } else if (peeked == '<' && peeked_next == '<') {
-        return pdf_parse_dict(arena, ctx, result, in_direct_obj);
+        return pdf_parse_dict(arena, ctx, object, in_indirect_obj);
     } else if (peeked == 'n') {
-        return pdf_parse_null(arena, ctx, result);
+        return pdf_parse_null(ctx, object);
     }
 
-    *result = PDF_ERR_INVALID_OBJECT;
-    return NULL;
+    return PDF_ERR_INVALID_OBJECT;
 }
 
-PdfObject* pdf_parse_true(Arena* arena, PdfCtx* ctx, PdfResult* result) {
-    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "true"));
-    PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+PdfResult pdf_parse_true(PdfCtx* ctx, PdfObject* object) {
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(object);
 
-    PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
+    PDF_PROPAGATE(pdf_ctx_expect(ctx, "true"));
+    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+
     object->type = PDF_OBJECT_TYPE_BOOLEAN;
     object->data.boolean = true;
 
-    return object;
+    return PDF_OK;
 }
 
-PdfObject* pdf_parse_false(Arena* arena, PdfCtx* ctx, PdfResult* result) {
-    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "false"));
-    PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+PdfResult pdf_parse_false(PdfCtx* ctx, PdfObject* object) {
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(object);
 
-    PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
+    PDF_PROPAGATE(pdf_ctx_expect(ctx, "false"));
+    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+
     object->type = PDF_OBJECT_TYPE_BOOLEAN;
     object->data.boolean = false;
 
-    return object;
+    return PDF_OK;
 }
 
-PdfObject* pdf_parse_null(Arena* arena, PdfCtx* ctx, PdfResult* result) {
-    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "null"));
-    PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+PdfResult pdf_parse_null(PdfCtx* ctx, PdfObject* object) {
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(object);
 
-    PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
+    PDF_PROPAGATE(pdf_ctx_expect(ctx, "null"));
+    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+
     object->type = PDF_OBJECT_TYPE_NULL;
 
-    return object;
+    return PDF_OK;
 }
 
-PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result) {
+PdfResult pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(object);
+
     LOG_TRACE_G("object", "Parsing number at offset %zu", pdf_ctx_offset(ctx));
 
     // Parse sign
     char sign_char;
     int32_t sign = 1;
-    PDF_TRY_RET_NULL(pdf_ctx_peek(ctx, &sign_char));
+    PDF_PROPAGATE(pdf_ctx_peek(ctx, &sign_char));
     if (sign_char == '+' || sign_char == '-') {
-        PDF_TRY_RET_NULL(pdf_ctx_peek_and_advance(ctx, NULL));
+        PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, NULL));
 
         if (sign_char == '-') {
             sign = -1;
@@ -159,7 +161,7 @@ PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result) {
             leading_acc = INT64_MAX;
         }
 
-        PDF_TRY_RET_NULL(pdf_ctx_peek_and_advance(ctx, NULL));
+        PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, NULL));
     }
 
     // Parse decimal point
@@ -167,33 +169,29 @@ PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     PdfResult decimal_peek_result = pdf_ctx_peek(ctx, &decimal_char);
 
     if ((decimal_peek_result == PDF_OK && decimal_char != '.')
-        || decimal_peek_result == PDF_CTX_ERR_EOF) {
+        || decimal_peek_result == PDF_ERR_CTX_EOF) {
         LOG_TRACE_G("object", "Number is integer");
-        PDF_TRY_RET_NULL(
-            pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular)
+        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular)
         );
 
         if (!has_leading) {
-            *result = PDF_ERR_INVALID_NUMBER;
-            return NULL;
+            return PDF_ERR_INVALID_NUMBER;
         }
 
         leading_acc *= sign;
         if (leading_acc < (int64_t)INT32_MIN
             || leading_acc > (int64_t)INT32_MAX) {
-            *result = PDF_ERR_NUMBER_LIMIT;
-            return NULL;
+            return PDF_ERR_NUMBER_LIMIT;
         }
 
-        PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
         object->type = PDF_OBJECT_TYPE_INTEGER;
         object->data.integer = (int32_t)leading_acc;
-        return object;
+
+        return PDF_OK;
     } else if (decimal_peek_result != PDF_OK) {
-        *result = decimal_peek_result;
-        return NULL;
+        return decimal_peek_result;
     } else {
-        PDF_TRY_RET_NULL(pdf_ctx_peek_and_advance(ctx, NULL));
+        PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, NULL));
     }
 
     LOG_TRACE_G("object", "Number is real");
@@ -209,34 +207,35 @@ PdfObject* pdf_parse_number(Arena* arena, PdfCtx* ctx, PdfResult* result) {
         trailing_acc += (double)(digit_char - '0') * trailing_weight;
         trailing_weight *= 0.1;
 
-        PDF_TRY_RET_NULL(pdf_ctx_peek_and_advance(ctx, NULL));
+        PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, NULL));
     }
 
-    PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
 
     double value = ((double)leading_acc + trailing_acc) * (double)sign;
     const double PDF_FLOAT_MAX = 3.403e38;
 
     if (value > PDF_FLOAT_MAX || value < -PDF_FLOAT_MAX) {
-        *result = PDF_ERR_NUMBER_LIMIT;
-        return NULL;
+        return PDF_ERR_NUMBER_LIMIT;
     }
 
     if (!has_leading && !has_trailing) {
-        *result = PDF_ERR_INVALID_NUMBER;
-        return NULL;
+        return PDF_ERR_INVALID_NUMBER;
     }
 
-    PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
     object->type = PDF_OBJECT_TYPE_REAL;
     object->data.real = value;
 
-    return object;
+    return PDF_OK;
 }
 
-PdfObject*
-pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfResult* result) {
-    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "("));
+PdfResult
+pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(object);
+
+    PDF_PROPAGATE(pdf_ctx_expect(ctx, "("));
 
     // Find length upper bound
     char peeked_char;
@@ -263,15 +262,14 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     }
 
     if (open_parenthesis != 0) {
-        *result = PDF_ERR_UNBALANCED_STR;
-        return NULL;
+        return PDF_ERR_UNBALANCED_STR;
     }
 
-    PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
 
     // Parse
     char* raw;
-    PDF_TRY_RET_NULL(pdf_ctx_borrow_substr(
+    PDF_PROPAGATE(pdf_ctx_borrow_substr(
         ctx,
         start_offset,
         pdf_ctx_offset(ctx) - start_offset - 1,
@@ -350,14 +348,13 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfResult* result) {
         }
     }
 
-    PDF_TRY_RET_NULL(pdf_ctx_release_substr(ctx));
+    PDF_PROPAGATE(pdf_ctx_release_substr(ctx));
     parsed[write_offset] = '\0';
 
-    PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
     object->type = PDF_OBJECT_TYPE_STRING;
     object->data.string = parsed;
 
-    return object;
+    return PDF_OK;
 }
 
 bool char_to_hex(char c, int* out) {
@@ -375,8 +372,12 @@ bool char_to_hex(char c, int* out) {
     }
 }
 
-PdfObject* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfResult* result) {
-    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "/"));
+PdfResult pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(object);
+
+    PDF_PROPAGATE(pdf_ctx_expect(ctx, "/"));
 
     // Find max length
     size_t start_offset = pdf_ctx_offset(ctx);
@@ -389,21 +390,20 @@ PdfObject* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfResult* result) {
         }
 
         if (peeked < '!' || peeked > '~') {
-            *result = PDF_ERR_NAME_UNESCAPED_CHAR;
-            return NULL;
+            return PDF_ERR_NAME_UNESCAPED_CHAR;
         }
 
         length++;
     }
 
     LOG_DEBUG("Length %zu", length);
-    PDF_TRY_RET_NULL(pdf_ctx_seek(ctx, start_offset + length));
-    PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+    PDF_PROPAGATE(pdf_ctx_seek(ctx, start_offset + length));
+    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
 
     // Parse name
     char* name = arena_alloc(arena, sizeof(char) * (length + 1));
     char* raw;
-    PDF_TRY_RET_NULL(pdf_ctx_borrow_substr(ctx, start_offset, length, &raw));
+    PDF_PROPAGATE(pdf_ctx_borrow_substr(ctx, start_offset, length, &raw));
 
     size_t write_offset = 0;
     int escape = 0;
@@ -425,8 +425,7 @@ PdfObject* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfResult* result) {
             case 1: {
                 int value;
                 if (!char_to_hex(c, &value)) {
-                    *result = PDF_ERR_NAME_BAD_CHAR_CODE;
-                    return NULL;
+                    return PDF_ERR_NAME_BAD_CHAR_CODE;
                 }
 
                 hex_code = value << 4;
@@ -436,8 +435,7 @@ PdfObject* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfResult* result) {
             case 2: {
                 int value;
                 if (!char_to_hex(c, &value)) {
-                    *result = PDF_ERR_NAME_BAD_CHAR_CODE;
-                    return NULL;
+                    return PDF_ERR_NAME_BAD_CHAR_CODE;
                 }
 
                 hex_code |= value;
@@ -452,83 +450,78 @@ PdfObject* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfResult* result) {
     }
 
     if (escape != 0) {
-        *result = PDF_ERR_NAME_BAD_CHAR_CODE;
-        return NULL;
+        return PDF_ERR_NAME_BAD_CHAR_CODE;
     }
 
-    PDF_TRY_RET_NULL(pdf_ctx_release_substr(ctx));
+    PDF_PROPAGATE(pdf_ctx_release_substr(ctx));
     name[write_offset] = '\0';
 
-    PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
     object->type = PDF_OBJECT_TYPE_NAME;
     object->data.name = name;
 
-    return object;
+    return PDF_OK;
 }
 
-PdfObject* pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfResult* result) {
-    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "["));
-    PDF_TRY_RET_NULL(pdf_ctx_consume_whitespace(ctx));
+PdfResult pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfObject* object) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(object);
+
+    PDF_PROPAGATE(pdf_ctx_expect(ctx, "["));
+    PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
     Vec* elements = vec_new(arena);
 
     char peeked;
     while (pdf_ctx_peek(ctx, &peeked) == PDF_OK && peeked != ']') {
-        PdfObject* element = pdf_parse_object(arena, ctx, result, false);
-        if (*result != PDF_OK) {
-            return NULL;
-        }
-
-        PDF_TRY_RET_NULL(
-            pdf_ctx_require_char_type(ctx, false, is_pdf_non_regular)
+        PdfObject element;
+        PDF_PROPAGATE(pdf_parse_object(arena, ctx, &element, false));
+        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, false, is_pdf_non_regular)
         );
-        PDF_TRY_RET_NULL(pdf_ctx_consume_whitespace(ctx));
+        PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
-        vec_push(elements, element);
+        PdfObject* allocated = arena_alloc(arena, sizeof(PdfObject));
+        *allocated = element;
+        vec_push(elements, allocated);
     }
 
-    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "]"));
-    PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, is_pdf_non_regular));
+    PDF_PROPAGATE(pdf_ctx_expect(ctx, "]"));
+    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, is_pdf_non_regular));
 
-    PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
     object->type = PDF_OBJECT_TYPE_ARRAY;
     object->data.array.elements = elements;
 
-    return object;
+    return PDF_OK;
 }
 
-PdfObject* pdf_parse_dict(
+PdfResult pdf_parse_dict(
     Arena* arena,
     PdfCtx* ctx,
-    PdfResult* result,
-    bool in_direct_obj
+    PdfObject* object,
+    bool in_indirect_obj
 ) {
-    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "<<"));
-    PDF_TRY_RET_NULL(pdf_ctx_consume_whitespace(ctx));
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(object);
+
+    PDF_PROPAGATE(pdf_ctx_expect(ctx, "<<"));
+    PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
     Vec* entries = vec_new(arena);
 
     char peeked;
     while (pdf_ctx_peek(ctx, &peeked) == PDF_OK && peeked != '>') {
-        PdfObject* key = pdf_parse_name(arena, ctx, result);
-        if (*result != PDF_OK) {
-            return NULL;
-        }
-
-        PDF_TRY_RET_NULL(
-            pdf_ctx_require_char_type(ctx, false, is_pdf_non_regular)
+        PdfObject* key = arena_alloc(arena, sizeof(PdfObject));
+        PDF_PROPAGATE(pdf_parse_name(arena, ctx, key));
+        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, false, is_pdf_non_regular)
         );
-        PDF_TRY_RET_NULL(pdf_ctx_consume_whitespace(ctx));
+        PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
-        PdfObject* value = pdf_parse_object(arena, ctx, result, false);
-        if (*result != PDF_OK) {
-            return NULL;
-        }
-
-        PDF_TRY_RET_NULL(
-            pdf_ctx_require_char_type(ctx, false, is_pdf_non_regular)
+        PdfObject* value = arena_alloc(arena, sizeof(PdfObject));
+        PDF_PROPAGATE(pdf_parse_object(arena, ctx, value, false));
+        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, false, is_pdf_non_regular)
         );
-        PDF_TRY_RET_NULL(pdf_ctx_consume_whitespace(ctx));
+        PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
         PdfDictEntry* entry = arena_alloc(arena, sizeof(PdfDictEntry));
         entry->key = key;
@@ -537,65 +530,69 @@ PdfObject* pdf_parse_dict(
         vec_push(entries, entry);
     }
 
-    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, ">>"));
-    PDF_TRY_RET_NULL(pdf_ctx_require_char_type(ctx, true, is_pdf_non_regular));
+    PDF_PROPAGATE(pdf_ctx_expect(ctx, ">>"));
+    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, is_pdf_non_regular));
 
-    PdfObject* dict = arena_alloc(arena, sizeof(PdfObject));
-    dict->type = PDF_OBJECT_TYPE_DICT;
-    dict->data.dict.entries = entries;
+    object->type = PDF_OBJECT_TYPE_DICT;
+    object->data.dict.entries = entries;
 
     // Attempt to parse stream
-    if (in_direct_obj) {
+    if (in_indirect_obj) {
         size_t restore_offset = pdf_ctx_offset(ctx);
 
         PdfResult consume_result = pdf_ctx_consume_whitespace(ctx);
         if (consume_result != PDF_OK) {
+            // Not a stream
             pdf_ctx_seek(ctx, restore_offset);
-            goto not_stream;
+            return PDF_OK;
         }
 
-        PdfResult stream_result = PDF_OK;
-        char* stream_bytes =
-            pdf_parse_stream(arena, ctx, &stream_result, entries);
-        if (stream_result != PDF_OK || !stream_bytes) {
+        char* stream_bytes;
+        if (pdf_parse_stream(arena, ctx, &stream_bytes, entries) != PDF_OK
+            || !stream_bytes) {
+            // Not a stream
             pdf_ctx_seek(ctx, restore_offset);
-            goto not_stream;
+            return PDF_OK;
         }
 
-        PDF_TRY_RET_NULL(
-            pdf_ctx_require_char_type(ctx, true, is_pdf_non_regular)
-        );
+        // Type is a stream
+        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, is_pdf_non_regular));
 
-        PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
+        PdfObject* stream_dict = arena_alloc(arena, sizeof(PdfObject));
+        *stream_dict = *object;
+
         object->type = PDF_OBJECT_TYPE_STREAM;
-        object->data.stream.stream_dict = dict;
+        object->data.stream.stream_dict = stream_dict;
         object->data.stream.stream_bytes = stream_bytes;
 
-        return object;
+        return PDF_OK;
     }
 
-    // Not a stream-object
-not_stream: { return dict; }
+    return PDF_OK;
 }
 
-char* pdf_parse_stream(
+PdfResult pdf_parse_stream(
     Arena* arena,
     PdfCtx* ctx,
-    PdfResult* result,
+    char** stream_body,
     Vec* stream_dict
 ) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(stream_body);
+    RELEASE_ASSERT(stream_dict);
+
     // Parse start
-    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "stream"));
+    PDF_PROPAGATE(pdf_ctx_expect(ctx, "stream"));
 
     char peeked_newline;
-    PDF_TRY_RET_NULL(pdf_ctx_peek(ctx, &peeked_newline));
+    PDF_PROPAGATE(pdf_ctx_peek(ctx, &peeked_newline));
     if (peeked_newline == '\n') {
-        PDF_TRY_RET_NULL(pdf_ctx_shift(ctx, 1));
+        PDF_PROPAGATE(pdf_ctx_shift(ctx, 1));
     } else if (peeked_newline == '\r') {
-        PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "\r\n"));
+        PDF_PROPAGATE(pdf_ctx_expect(ctx, "\r\n"));
     } else {
-        *result = PDF_CTX_ERR_EXPECT;
-        return NULL;
+        return PDF_ERR_CTX_EXPECT;
     }
 
     // Get length
@@ -612,113 +609,100 @@ char* pdf_parse_stream(
     }
 
     if (length < 0) {
-        *result = PDF_ERR_STREAM_INVALID_LENGTH;
-        return NULL;
+        return PDF_ERR_STREAM_INVALID_LENGTH;
     }
 
     // Copy stream body
     char* borrowed;
-    PDF_TRY_RET_NULL(pdf_ctx_borrow_substr(
+    PDF_PROPAGATE(pdf_ctx_borrow_substr(
         ctx,
         pdf_ctx_offset(ctx),
         (size_t)length,
         &borrowed
     ));
 
-    char* body = arena_alloc(arena, sizeof(char) * (size_t)(length + 1));
-    strncpy(body, borrowed, (size_t)length);
-    body[length] = '\0';
+    *stream_body = arena_alloc(arena, sizeof(char) * (size_t)(length + 1));
+    strncpy(*stream_body, borrowed, (size_t)length);
+    (*stream_body)[length] = '\0';
 
-    PDF_TRY_RET_NULL(pdf_ctx_release_substr(ctx));
+    PDF_PROPAGATE(pdf_ctx_release_substr(ctx));
 
     // Parse end
-    PDF_TRY_RET_NULL(pdf_ctx_shift(ctx, length));
+    PDF_PROPAGATE(pdf_ctx_shift(ctx, length));
     if (pdf_ctx_expect(ctx, "\nendstream") != PDF_OK
         && pdf_ctx_expect(ctx, "\r\nendstream") != PDF_OK
         && pdf_ctx_expect(ctx, "\rendstream") != PDF_OK) {
-        *result = PDF_CTX_ERR_EXPECT;
-        return NULL;
+        return PDF_ERR_CTX_EXPECT;
     }
 
-    return body;
+    return PDF_OK;
 }
 
-PdfObject* pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfResult* result) {
+PdfResult pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfObject* object) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(object);
+
     LOG_DEBUG_G("object", "Parsing indirect object or reference");
 
     // Parse object id
     uint64_t object_id;
     uint32_t int_length;
-    PDF_TRY_RET_NULL(pdf_ctx_parse_int(ctx, NULL, &object_id, &int_length));
+    PDF_PROPAGATE(pdf_ctx_parse_int(ctx, NULL, &object_id, &int_length));
     if (int_length == 0) {
-        *result = PDF_CTX_ERR_EXPECT;
-        return NULL;
+        return PDF_ERR_CTX_EXPECT;
     }
 
-    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, " "));
+    PDF_PROPAGATE(pdf_ctx_expect(ctx, " "));
 
     // Parse generation
     uint64_t generation;
-    PDF_TRY_RET_NULL(pdf_ctx_parse_int(ctx, NULL, &generation, &int_length));
+    PDF_PROPAGATE(pdf_ctx_parse_int(ctx, NULL, &generation, &int_length));
     if (int_length == 0) {
-        *result = PDF_CTX_ERR_EXPECT;
-        return NULL;
+        return PDF_ERR_CTX_EXPECT;
     }
 
-    PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, " "));
+    PDF_PROPAGATE(pdf_ctx_expect(ctx, " "));
 
     // Determine if indirect object or reference
     char peeked;
-    PDF_TRY_RET_NULL(pdf_ctx_peek(ctx, &peeked));
+    PDF_PROPAGATE(pdf_ctx_peek(ctx, &peeked));
 
     if (peeked == 'R') {
-        PDF_TRY_RET_NULL(pdf_ctx_peek_and_advance(ctx, NULL));
+        PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, NULL));
 
         LOG_DEBUG_G("object", "Parsed indirect reference");
-        PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
+
         object->type = PDF_OBJECT_TYPE_INDIRECT_REF;
         object->data.indirect_ref.object_id = object_id;
         object->data.indirect_ref.generation = generation;
 
-        return object;
+        return PDF_OK;
     } else {
         LOG_DEBUG_G("object", "Parsed indirect object");
 
-        PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "obj"));
-        PDF_TRY_RET_NULL(
-            pdf_ctx_require_char_type(ctx, false, &is_pdf_non_regular)
+        PDF_PROPAGATE(pdf_ctx_expect(ctx, "obj"));
+        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, false, &is_pdf_non_regular)
         );
-        PDF_TRY_RET_NULL(pdf_ctx_consume_whitespace(ctx));
+        PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
-        PdfObject* inner = pdf_parse_object(arena, ctx, result, true);
-        if (*result != PDF_OK) {
-            LOG_DEBUG_G(
-                "object",
-                "Failed to parsing inner of indirect object with result %d",
-                *result
-            );
-            return NULL;
-        }
+        PdfObject* inner = arena_alloc(arena, sizeof(PdfObject));
+        PDF_PROPAGATE(pdf_parse_object(arena, ctx, inner, true));
 
-        PDF_TRY_RET_NULL(
-            pdf_ctx_require_char_type(ctx, false, &is_pdf_non_regular)
+        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, false, &is_pdf_non_regular)
         );
-        PDF_TRY_RET_NULL(pdf_ctx_consume_whitespace(ctx));
-        PDF_TRY_RET_NULL(pdf_ctx_expect(ctx, "endobj"));
-        PDF_TRY_RET_NULL(
-            pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular)
+        PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
+        PDF_PROPAGATE(pdf_ctx_expect(ctx, "endobj"));
+        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular)
         );
 
-        PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
         object->type = PDF_OBJECT_TYPE_INDIRECT_OBJECT;
         object->data.indirect_object.object = inner;
         object->data.indirect_object.object_id = object_id;
         object->data.indirect_object.generation = generation;
 
-        return object;
+        return PDF_OK;
     }
-
-    return NULL;
 }
 
 char* format_alloc(Arena* arena, const char* fmt, ...)
@@ -737,40 +721,14 @@ char* format_alloc(Arena* arena, const char* fmt, ...) {
     return buffer;
 }
 
-PdfObject*
-pdf_object_dict_get(PdfObject* dict, const char* key, PdfResult* result) {
-    if (!dict || !key || !result) {
-        return NULL;
-    }
-
-    *result = PDF_OK;
-
-    if (dict->type != PDF_OBJECT_TYPE_DICT) {
-        *result = PDF_ERR_OBJECT_NOT_DICT;
-        return NULL;
-    }
-
-    Vec* entries = dict->data.dict.entries;
-    for (size_t idx = 0; idx < vec_len(entries); idx++) {
-        PdfDictEntry* entry = vec_get(entries, idx);
-        if (strcmp(entry->key->data.name, key) == 0) {
-            return entry->value;
-        }
-    }
-
-    *result = PDF_ERR_MISSING_DICT_KEY;
-    return NULL;
-}
-
 char* pdf_fmt_object_indented(
     Arena* arena,
     PdfObject* object,
     int indent,
     bool* force_indent_parent
 ) {
-    if (!object) {
-        return NULL;
-    }
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(object);
 
     switch (object->type) {
         case PDF_OBJECT_TYPE_BOOLEAN: {
@@ -961,13 +919,12 @@ char* pdf_fmt_object(Arena* arena, PdfObject* object) {
     Arena* arena = arena_new(128);                                             \
     char buffer[] = buf;                                                       \
     PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));                  \
-    PdfResult result;                                                          \
-    PdfObject* object = pdf_parse_object(arena, ctx, &result, false);          \
+    PdfObject object;                                                          \
+    PdfResult result = pdf_parse_object(arena, ctx, &object, false);           \
     TEST_ASSERT_EQ((PdfResult)PDF_OK, result, "Result was not ok");            \
-    TEST_ASSERT(object, "PdfObject pointer is NULL");                          \
     TEST_ASSERT_EQ(                                                            \
         (PdfObjectType)(object_type),                                          \
-        object->type,                                                          \
+        object.type,                                                           \
         "Parsed object has wrong type"                                         \
     );                                                                         \
     TEST_ASSERT_EQ(                                                            \
@@ -983,20 +940,20 @@ char* pdf_fmt_object(Arena* arena, PdfObject* object) {
     Arena* arena = arena_new(128);                                             \
     char buffer[] = buf;                                                       \
     PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));                  \
-    PdfResult result;                                                          \
-    PdfObject* object = pdf_parse_object(arena, ctx, &result, false);          \
-    TEST_ASSERT_EQ((PdfResult)(err), result, "Incorrect error type");          \
-    TEST_ASSERT(!object, "PdfObject pointer isn't NULL");
+                                                                               \
+    PdfObject object;                                                          \
+    PdfResult result = pdf_parse_object(arena, ctx, &object, false);           \
+    TEST_ASSERT_EQ((PdfResult)(err), result, "Incorrect error type");
 
 TEST_FUNC(test_object_bool_true) {
     SETUP_VALID_PARSE_OBJECT("true", PDF_OBJECT_TYPE_BOOLEAN);
-    TEST_ASSERT(object->data.boolean);
+    TEST_ASSERT(object.data.boolean);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_bool_false) {
     SETUP_VALID_PARSE_OBJECT("false", PDF_OBJECT_TYPE_BOOLEAN);
-    TEST_ASSERT(!object->data.boolean);
+    TEST_ASSERT(!object.data.boolean);
     return TEST_RESULT_PASS;
 }
 
@@ -1007,43 +964,43 @@ TEST_FUNC(test_object_null) {
 
 TEST_FUNC(test_object_int_123) {
     SETUP_VALID_PARSE_OBJECT("123", PDF_OBJECT_TYPE_INTEGER);
-    TEST_ASSERT_EQ((int32_t)123, object->data.integer);
+    TEST_ASSERT_EQ((int32_t)123, object.data.integer);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_int_plus_17) {
     SETUP_VALID_PARSE_OBJECT("+17", PDF_OBJECT_TYPE_INTEGER);
-    TEST_ASSERT_EQ((int32_t)17, object->data.integer);
+    TEST_ASSERT_EQ((int32_t)17, object.data.integer);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_int_minus_98) {
     SETUP_VALID_PARSE_OBJECT("-98", PDF_OBJECT_TYPE_INTEGER);
-    TEST_ASSERT_EQ((int32_t)-98, object->data.integer);
+    TEST_ASSERT_EQ((int32_t)-98, object.data.integer);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_int_0) {
     SETUP_VALID_PARSE_OBJECT("0", PDF_OBJECT_TYPE_INTEGER);
-    TEST_ASSERT_EQ((int32_t)0, object->data.integer);
+    TEST_ASSERT_EQ((int32_t)0, object.data.integer);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_int_with_whitespace) {
     SETUP_VALID_PARSE_OBJECT_WITH_OFFSET("-98 ", PDF_OBJECT_TYPE_INTEGER, 3);
-    TEST_ASSERT_EQ((int32_t)-98, object->data.integer);
+    TEST_ASSERT_EQ((int32_t)-98, object.data.integer);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_int_large) {
     SETUP_VALID_PARSE_OBJECT("2147483647", PDF_OBJECT_TYPE_INTEGER);
-    TEST_ASSERT_EQ((int32_t)2147483647, object->data.integer);
+    TEST_ASSERT_EQ((int32_t)2147483647, object.data.integer);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_int_neg_large) {
     SETUP_VALID_PARSE_OBJECT("-2147483648", PDF_OBJECT_TYPE_INTEGER);
-    TEST_ASSERT_EQ((int32_t)-2147483648, object->data.integer);
+    TEST_ASSERT_EQ((int32_t)-2147483648, object.data.integer);
     return TEST_RESULT_PASS;
 }
 
@@ -1069,37 +1026,37 @@ TEST_FUNC(test_object_int_minus_no_digits) {
 
 TEST_FUNC(test_object_real_34_5) {
     SETUP_VALID_PARSE_OBJECT("34.5", PDF_OBJECT_TYPE_REAL);
-    TEST_ASSERT_EQ_EPS((double)34.5, object->data.real, 1e-5L);
+    TEST_ASSERT_EQ_EPS((double)34.5, object.data.real, 1e-5L);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_real_minus_3_62) {
     SETUP_VALID_PARSE_OBJECT("-3.62", PDF_OBJECT_TYPE_REAL);
-    TEST_ASSERT_EQ_EPS((double)-3.62, object->data.real, 1e-5L);
+    TEST_ASSERT_EQ_EPS((double)-3.62, object.data.real, 1e-5L);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_real_plus_123_6) {
     SETUP_VALID_PARSE_OBJECT("123.6", PDF_OBJECT_TYPE_REAL);
-    TEST_ASSERT_EQ_EPS((double)123.6, object->data.real, 1e-5L);
+    TEST_ASSERT_EQ_EPS((double)123.6, object.data.real, 1e-5L);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_real_4_) {
     SETUP_VALID_PARSE_OBJECT("4.", PDF_OBJECT_TYPE_REAL);
-    TEST_ASSERT_EQ_EPS((double)4.0, object->data.real, 1e-5L);
+    TEST_ASSERT_EQ_EPS((double)4.0, object.data.real, 1e-5L);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_real_minus_dot_002) {
     SETUP_VALID_PARSE_OBJECT("-.002", PDF_OBJECT_TYPE_REAL);
-    TEST_ASSERT_EQ_EPS((double)-0.002, object->data.real, 1e-5L);
+    TEST_ASSERT_EQ_EPS((double)-0.002, object.data.real, 1e-5L);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_real_0_0) {
     SETUP_VALID_PARSE_OBJECT("0.0", PDF_OBJECT_TYPE_REAL);
-    TEST_ASSERT_EQ_EPS((double)0.0, object->data.real, 1e-5L);
+    TEST_ASSERT_EQ_EPS((double)0.0, object.data.real, 1e-5L);
     return TEST_RESULT_PASS;
 }
 
@@ -1110,13 +1067,13 @@ TEST_FUNC(test_object_real_no_digits) {
 
 TEST_FUNC(test_object_real_trailing_whitespace) {
     SETUP_VALID_PARSE_OBJECT_WITH_OFFSET("123.6 ", PDF_OBJECT_TYPE_REAL, 5);
-    TEST_ASSERT_EQ_EPS((double)123.6, object->data.real, 1e-5L);
+    TEST_ASSERT_EQ_EPS((double)123.6, object.data.real, 1e-5L);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_literal_str) {
     SETUP_VALID_PARSE_OBJECT("(This is a string)", PDF_OBJECT_TYPE_STRING);
-    TEST_ASSERT_EQ("This is a string", object->data.string);
+    TEST_ASSERT_EQ("This is a string", object.data.string);
     return TEST_RESULT_PASS;
 }
 
@@ -1127,7 +1084,7 @@ TEST_FUNC(test_object_literal_str_newline) {
     );
     TEST_ASSERT_EQ(
         "Strings may contain newlines\nand such.",
-        object->data.string
+        object.data.string
     );
     return TEST_RESULT_PASS;
 }
@@ -1139,14 +1096,14 @@ TEST_FUNC(test_object_literal_str_parenthesis) {
     );
     TEST_ASSERT_EQ(
         "Strings may contain balanced parentheses () and special characters (*!&^% and so on).",
-        object->data.string
+        object.data.string
     );
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_literal_str_empty) {
     SETUP_VALID_PARSE_OBJECT("()", PDF_OBJECT_TYPE_STRING);
-    TEST_ASSERT_EQ("", object->data.string);
+    TEST_ASSERT_EQ("", object.data.string);
     return TEST_RESULT_PASS;
 }
 
@@ -1157,7 +1114,7 @@ TEST_FUNC(test_object_literal_str_escapes) {
     );
     TEST_ASSERT_EQ(
         "This is a line\nThis is a newline\r\nThis is another line with tabs (\t), backspaces(\b), form feeds (\f), unbalanced parenthesis (((), and backslashes \\\\",
-        object->data.string
+        object.data.string
     );
     return TEST_RESULT_PASS;
 }
@@ -1169,7 +1126,7 @@ TEST_FUNC(test_object_literal_str_unbalanced) {
 
 TEST_FUNC(test_object_name) {
     SETUP_VALID_PARSE_OBJECT("/Name1", PDF_OBJECT_TYPE_NAME);
-    TEST_ASSERT_EQ("Name1", object->data.name);
+    TEST_ASSERT_EQ("Name1", object.data.name);
     return TEST_RESULT_PASS;
 }
 
@@ -1178,13 +1135,13 @@ TEST_FUNC(test_object_name_various_chars) {
         "/A;Name_With-Various***Characters?",
         PDF_OBJECT_TYPE_NAME
     );
-    TEST_ASSERT_EQ("A;Name_With-Various***Characters?", object->data.name);
+    TEST_ASSERT_EQ("A;Name_With-Various***Characters?", object.data.name);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_name_dollars) {
     SETUP_VALID_PARSE_OBJECT("/$$", PDF_OBJECT_TYPE_NAME);
-    TEST_ASSERT_EQ("$$", object->data.name);
+    TEST_ASSERT_EQ("$$", object.data.name);
     return TEST_RESULT_PASS;
 }
 
@@ -1193,8 +1150,8 @@ TEST_FUNC(test_object_name_escape) {
         "/lime#20Green",
         PDF_OBJECT_TYPE_NAME
     ); // PDF 32000-1:2008 has a typo for this example
-    TEST_ASSERT_EQ("lime Green", object->data.name);
-    TEST_ASSERT_NE("Lime Green", object->data.name);
+    TEST_ASSERT_EQ("lime Green", object.data.name);
+    TEST_ASSERT_NE("Lime Green", object.data.name);
     return TEST_RESULT_PASS;
 }
 
@@ -1204,13 +1161,13 @@ TEST_FUNC(test_object_name_terminated) {
         PDF_OBJECT_TYPE_NAME,
         24
     );
-    TEST_ASSERT_EQ("paired()parentheses", object->data.name);
+    TEST_ASSERT_EQ("paired()parentheses", object.data.name);
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_name_whitespace_terminated) {
     SETUP_VALID_PARSE_OBJECT_WITH_OFFSET("/A#42 ", PDF_OBJECT_TYPE_NAME, 5);
-    TEST_ASSERT_EQ("AB", object->data.name);
+    TEST_ASSERT_EQ("AB", object.data.name);
     return TEST_RESULT_PASS;
 }
 
@@ -1228,32 +1185,32 @@ TEST_FUNC(test_object_array) {
         PDF_OBJECT_TYPE_ARRAY
     );
 
-    PdfObject* element0 = vec_get(object->data.array.elements, 0);
+    PdfObject* element0 = vec_get(object.data.array.elements, 0);
     TEST_ASSERT(element0);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element0->type);
     TEST_ASSERT_EQ((int32_t)549, element0->data.integer);
 
-    PdfObject* element1 = vec_get(object->data.array.elements, 1);
+    PdfObject* element1 = vec_get(object.data.array.elements, 1);
     TEST_ASSERT(element1);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_REAL, element1->type);
     TEST_ASSERT_EQ(3.14, element1->data.real);
 
-    PdfObject* element2 = vec_get(object->data.array.elements, 2);
+    PdfObject* element2 = vec_get(object.data.array.elements, 2);
     TEST_ASSERT(element2);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_BOOLEAN, element2->type);
     TEST_ASSERT_EQ(false, element2->data.boolean);
 
-    PdfObject* element3 = vec_get(object->data.array.elements, 3);
+    PdfObject* element3 = vec_get(object.data.array.elements, 3);
     TEST_ASSERT(element3);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, element3->type);
     TEST_ASSERT_EQ("Ralph", element3->data.string);
 
-    PdfObject* element4 = vec_get(object->data.array.elements, 4);
+    PdfObject* element4 = vec_get(object.data.array.elements, 4);
     TEST_ASSERT(element4);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, element4->type);
     TEST_ASSERT_EQ("SomeName", element4->data.name);
 
-    TEST_ASSERT(!vec_get(object->data.array.elements, 5));
+    TEST_ASSERT(!vec_get(object.data.array.elements, 5));
 
     return TEST_RESULT_PASS;
 }
@@ -1264,32 +1221,32 @@ TEST_FUNC(test_object_array_whitespace) {
         PDF_OBJECT_TYPE_ARRAY
     );
 
-    PdfObject* element0 = vec_get(object->data.array.elements, 0);
+    PdfObject* element0 = vec_get(object.data.array.elements, 0);
     TEST_ASSERT(element0);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element0->type);
     TEST_ASSERT_EQ((int32_t)549, element0->data.integer);
 
-    PdfObject* element1 = vec_get(object->data.array.elements, 1);
+    PdfObject* element1 = vec_get(object.data.array.elements, 1);
     TEST_ASSERT(element1);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_REAL, element1->type);
     TEST_ASSERT_EQ(3.14, element1->data.real);
 
-    PdfObject* element2 = vec_get(object->data.array.elements, 2);
+    PdfObject* element2 = vec_get(object.data.array.elements, 2);
     TEST_ASSERT(element2);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_BOOLEAN, element2->type);
     TEST_ASSERT_EQ(false, element2->data.boolean);
 
-    PdfObject* element3 = vec_get(object->data.array.elements, 3);
+    PdfObject* element3 = vec_get(object.data.array.elements, 3);
     TEST_ASSERT(element3);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, element3->type);
     TEST_ASSERT_EQ("Ralph", element3->data.string);
 
-    PdfObject* element4 = vec_get(object->data.array.elements, 4);
+    PdfObject* element4 = vec_get(object.data.array.elements, 4);
     TEST_ASSERT(element4);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, element4->type);
     TEST_ASSERT_EQ("SomeName", element4->data.name);
 
-    TEST_ASSERT(!vec_get(object->data.array.elements, 5));
+    TEST_ASSERT(!vec_get(object.data.array.elements, 5));
 
     return TEST_RESULT_PASS;
 }
@@ -1297,7 +1254,7 @@ TEST_FUNC(test_object_array_whitespace) {
 TEST_FUNC(test_object_array_nested) {
     SETUP_VALID_PARSE_OBJECT("[[1 2][3 4]]", PDF_OBJECT_TYPE_ARRAY);
 
-    PdfObject* element0 = vec_get(object->data.array.elements, 0);
+    PdfObject* element0 = vec_get(object.data.array.elements, 0);
     TEST_ASSERT(element0);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_ARRAY, element0->type);
 
@@ -1311,7 +1268,7 @@ TEST_FUNC(test_object_array_nested) {
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element01->type);
     TEST_ASSERT_EQ((int32_t)2, element01->data.integer);
 
-    PdfObject* element1 = vec_get(object->data.array.elements, 1);
+    PdfObject* element1 = vec_get(object.data.array.elements, 1);
     TEST_ASSERT(element1);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_ARRAY, element1->type);
 
@@ -1330,14 +1287,14 @@ TEST_FUNC(test_object_array_nested) {
 
 TEST_FUNC(test_object_array_empty) {
     SETUP_VALID_PARSE_OBJECT("[]", PDF_OBJECT_TYPE_ARRAY);
-    TEST_ASSERT_EQ((size_t)0, vec_len(object->data.array.elements));
+    TEST_ASSERT_EQ((size_t)0, vec_len(object.data.array.elements));
 
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_array_offset) {
     SETUP_VALID_PARSE_OBJECT_WITH_OFFSET("[]  ", PDF_OBJECT_TYPE_ARRAY, 2);
-    TEST_ASSERT_EQ((size_t)0, vec_len(object->data.array.elements));
+    TEST_ASSERT_EQ((size_t)0, vec_len(object.data.array.elements));
 
     return TEST_RESULT_PASS;
 }
@@ -1345,7 +1302,7 @@ TEST_FUNC(test_object_array_offset) {
 TEST_FUNC(test_object_array_unterminated) {
     SETUP_INVALID_PARSE_OBJECT(
         "[549 3.14 false (Ralph)/SomeName",
-        PDF_CTX_ERR_EOF
+        PDF_ERR_CTX_EOF
     );
     return TEST_RESULT_PASS;
 }
@@ -1365,7 +1322,7 @@ TEST_FUNC(test_object_dict) {
         PDF_OBJECT_TYPE_DICT
     );
 
-    PdfDictEntry* entry0 = vec_get(object->data.dict.entries, 0);
+    PdfDictEntry* entry0 = vec_get(object.data.dict.entries, 0);
     TEST_ASSERT(entry0);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry0->key->type);
     TEST_ASSERT_EQ("Type", entry0->key->data.name);
@@ -1373,7 +1330,7 @@ TEST_FUNC(test_object_dict) {
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry0->value->type);
     TEST_ASSERT_EQ("Example", entry0->value->data.name);
 
-    PdfDictEntry* entry1 = vec_get(object->data.dict.entries, 1);
+    PdfDictEntry* entry1 = vec_get(object.data.dict.entries, 1);
     TEST_ASSERT(entry1);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry1->key->type);
     TEST_ASSERT_EQ("Subtype", entry1->key->data.name);
@@ -1381,7 +1338,7 @@ TEST_FUNC(test_object_dict) {
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry1->value->type);
     TEST_ASSERT_EQ("DictionaryExample", entry1->value->data.name);
 
-    PdfDictEntry* entry2 = vec_get(object->data.dict.entries, 2);
+    PdfDictEntry* entry2 = vec_get(object.data.dict.entries, 2);
     TEST_ASSERT(entry2);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry2->key->type);
     TEST_ASSERT_EQ("Version", entry2->key->data.name);
@@ -1389,7 +1346,7 @@ TEST_FUNC(test_object_dict) {
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_REAL, entry2->value->type);
     TEST_ASSERT_EQ(0.01, entry2->value->data.real);
 
-    PdfDictEntry* entry3 = vec_get(object->data.dict.entries, 3);
+    PdfDictEntry* entry3 = vec_get(object.data.dict.entries, 3);
     TEST_ASSERT(entry3);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry3->key->type);
     TEST_ASSERT_EQ("IntegerItem", entry3->key->data.name);
@@ -1397,7 +1354,7 @@ TEST_FUNC(test_object_dict) {
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, entry3->value->type);
     TEST_ASSERT_EQ((int32_t)12, entry3->value->data.integer);
 
-    PdfDictEntry* entry4 = vec_get(object->data.dict.entries, 4);
+    PdfDictEntry* entry4 = vec_get(object.data.dict.entries, 4);
     TEST_ASSERT(entry4);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry4->key->type);
     TEST_ASSERT_EQ("StringItem", entry4->key->data.name);
@@ -1405,7 +1362,7 @@ TEST_FUNC(test_object_dict) {
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, entry4->value->type);
     TEST_ASSERT_EQ("a string", entry4->value->data.string);
 
-    PdfDictEntry* entry5 = vec_get(object->data.dict.entries, 5);
+    PdfDictEntry* entry5 = vec_get(object.data.dict.entries, 5);
     TEST_ASSERT(entry5);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry5->key->type);
     TEST_ASSERT_EQ("Subdictionary", entry5->key->data.name);
@@ -1447,14 +1404,14 @@ TEST_FUNC(test_object_dict) {
     TEST_ASSERT_EQ("OK", sub3->value->data.string);
 
     TEST_ASSERT_EQ((size_t)4, vec_len(subdict));
-    TEST_ASSERT_EQ((size_t)6, vec_len(object->data.dict.entries));
+    TEST_ASSERT_EQ((size_t)6, vec_len(object.data.dict.entries));
 
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_dict_empty) {
     SETUP_VALID_PARSE_OBJECT("<<>>", PDF_OBJECT_TYPE_DICT);
-    TEST_ASSERT_EQ((size_t)0, vec_len(object->data.dict.entries));
+    TEST_ASSERT_EQ((size_t)0, vec_len(object.data.dict.entries));
 
     return TEST_RESULT_PASS;
 }
@@ -1462,21 +1419,21 @@ TEST_FUNC(test_object_dict_empty) {
 TEST_FUNC(test_object_dict_unpadded) {
     SETUP_VALID_PARSE_OBJECT("<</A 1/B 2>>", PDF_OBJECT_TYPE_DICT);
 
-    PdfDictEntry* entry0 = vec_get(object->data.dict.entries, 0);
+    PdfDictEntry* entry0 = vec_get(object.data.dict.entries, 0);
     TEST_ASSERT(entry0);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry0->key->type);
     TEST_ASSERT_EQ("A", entry0->key->data.name);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, entry0->value->type);
     TEST_ASSERT_EQ((int32_t)1, entry0->value->data.integer);
 
-    PdfDictEntry* entry1 = vec_get(object->data.dict.entries, 1);
+    PdfDictEntry* entry1 = vec_get(object.data.dict.entries, 1);
     TEST_ASSERT(entry1);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry1->key->type);
     TEST_ASSERT_EQ("B", entry1->key->data.name);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, entry1->value->type);
     TEST_ASSERT_EQ((int32_t)2, entry1->value->data.integer);
 
-    TEST_ASSERT_EQ((size_t)2, vec_len(object->data.dict.entries));
+    TEST_ASSERT_EQ((size_t)2, vec_len(object.data.dict.entries));
     return TEST_RESULT_PASS;
 }
 
@@ -1490,7 +1447,7 @@ TEST_FUNC(test_object_dict_offset) {
 }
 
 TEST_FUNC(test_object_dict_unclosed) {
-    SETUP_INVALID_PARSE_OBJECT("<< /Key (value)", PDF_CTX_ERR_EOF);
+    SETUP_INVALID_PARSE_OBJECT("<< /Key (value)", PDF_ERR_CTX_EOF);
     return TEST_RESULT_PASS;
 }
 
@@ -1500,7 +1457,7 @@ TEST_FUNC(test_object_dict_missing_value) {
 }
 
 TEST_FUNC(test_object_dict_non_name_key) {
-    SETUP_INVALID_PARSE_OBJECT("<< 123 (value) >>", PDF_CTX_ERR_EXPECT);
+    SETUP_INVALID_PARSE_OBJECT("<< 123 (value) >>", PDF_ERR_CTX_EXPECT);
     return TEST_RESULT_PASS;
 }
 
@@ -1509,13 +1466,13 @@ TEST_FUNC(test_object_indirect) {
         "12 0 obj (Brillig) endobj",
         PDF_OBJECT_TYPE_INDIRECT_OBJECT
     );
-    TEST_ASSERT_EQ((size_t)12, object->data.indirect_object.object_id);
-    TEST_ASSERT_EQ((size_t)0, object->data.indirect_object.generation);
+    TEST_ASSERT_EQ((size_t)12, object.data.indirect_object.object_id);
+    TEST_ASSERT_EQ((size_t)0, object.data.indirect_object.generation);
     TEST_ASSERT_EQ(
         (PdfObjectType)PDF_OBJECT_TYPE_STRING,
-        object->data.indirect_object.object->type
+        object.data.indirect_object.object->type
     );
-    TEST_ASSERT_EQ("Brillig", object->data.indirect_object.object->data.string);
+    TEST_ASSERT_EQ("Brillig", object.data.indirect_object.object->data.string);
 
     return TEST_RESULT_PASS;
 }
@@ -1526,7 +1483,7 @@ TEST_FUNC(test_object_unterminated) {
         PDF_OBJECT_TYPE_INTEGER,
         2
     );
-    TEST_ASSERT_EQ((int32_t)12, object->data.integer);
+    TEST_ASSERT_EQ((int32_t)12, object.data.integer);
 
     return TEST_RESULT_PASS;
 }
@@ -1536,29 +1493,29 @@ TEST_FUNC(test_object_indirect_nested) {
         "12 0 obj 54 3 obj /Name endobj endobj",
         PDF_OBJECT_TYPE_INDIRECT_OBJECT
     );
-    TEST_ASSERT_EQ((size_t)12, object->data.indirect_object.object_id);
-    TEST_ASSERT_EQ((size_t)0, object->data.indirect_object.generation);
+    TEST_ASSERT_EQ((size_t)12, object.data.indirect_object.object_id);
+    TEST_ASSERT_EQ((size_t)0, object.data.indirect_object.generation);
 
     TEST_ASSERT_EQ(
         (PdfObjectType)PDF_OBJECT_TYPE_INDIRECT_OBJECT,
-        object->data.indirect_object.object->type
+        object.data.indirect_object.object->type
     );
     TEST_ASSERT_EQ(
         (size_t)54,
-        object->data.indirect_object.object->data.indirect_object.object_id
+        object.data.indirect_object.object->data.indirect_object.object_id
     );
     TEST_ASSERT_EQ(
         (size_t)3,
-        object->data.indirect_object.object->data.indirect_object.generation
+        object.data.indirect_object.object->data.indirect_object.generation
     );
 
     TEST_ASSERT_EQ(
         (PdfObjectType)PDF_OBJECT_TYPE_NAME,
-        object->data.indirect_object.object->data.indirect_object.object->type
+        object.data.indirect_object.object->data.indirect_object.object->type
     );
     TEST_ASSERT_EQ(
         "Name",
-        object->data.indirect_object.object->data.indirect_object.object->data
+        object.data.indirect_object.object->data.indirect_object.object->data
             .string
     );
 
@@ -1567,8 +1524,8 @@ TEST_FUNC(test_object_indirect_nested) {
 
 TEST_FUNC(test_object_indirect_ref) {
     SETUP_VALID_PARSE_OBJECT("12 0 R", PDF_OBJECT_TYPE_INDIRECT_REF);
-    TEST_ASSERT_EQ((size_t)12, object->data.indirect_ref.object_id);
-    TEST_ASSERT_EQ((size_t)0, object->data.indirect_ref.generation);
+    TEST_ASSERT_EQ((size_t)12, object.data.indirect_ref.object_id);
+    TEST_ASSERT_EQ((size_t)0, object.data.indirect_ref.generation);
 
     return TEST_RESULT_PASS;
 }
@@ -1579,7 +1536,7 @@ TEST_FUNC(test_object_stream) {
         PDF_OBJECT_TYPE_INDIRECT_OBJECT
     );
 
-    PdfObject* stream_object = object->data.indirect_object.object;
+    PdfObject* stream_object = object.data.indirect_object.object;
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STREAM, stream_object->type);
     PdfStream stream = stream_object->data.stream;
     TEST_ASSERT(stream.stream_dict);
@@ -1594,7 +1551,7 @@ TEST_FUNC(test_object_stream_crlf) {
         PDF_OBJECT_TYPE_INDIRECT_OBJECT
     );
 
-    PdfObject* stream_object = object->data.indirect_object.object;
+    PdfObject* stream_object = object.data.indirect_object.object;
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STREAM, stream_object->type);
     PdfStream stream = stream_object->data.stream;
     TEST_ASSERT(stream.stream_dict);

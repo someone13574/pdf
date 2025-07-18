@@ -16,6 +16,8 @@ struct Vec {
 };
 
 Vec* vec_new(Arena* arena) {
+    RELEASE_ASSERT(arena);
+
     LOG_INFO_G("vec", "Creating new vector");
 
     Vec* vec = arena_alloc(arena, sizeof(Vec));
@@ -28,11 +30,14 @@ Vec* vec_new(Arena* arena) {
 }
 
 void vec_push(Vec* vec, void* element) {
+    RELEASE_ASSERT(vec);
+    RELEASE_ASSERT(element);
+
     LOG_DEBUG_G("vec", "Pushing element at addr %p", element);
 
     size_t block_idx =
         8 * sizeof(size_t) - 1 - (size_t)__builtin_clzll(vec->len + 1);
-    LOG_ASSERT(block_idx < MAX_BLOCKS, "Vector max length reached");
+    RELEASE_ASSERT(block_idx < MAX_BLOCKS, "Vector max length reached");
 
     if (block_idx >= vec->allocated_blocks) {
         LOG_TRACE_G("vec", "Allocating new vec block at idx %zu", block_idx);
@@ -58,6 +63,8 @@ void vec_push(Vec* vec, void* element) {
 }
 
 void* vec_pop(Vec* vec) {
+    RELEASE_ASSERT(vec);
+
     LOG_DEBUG_G("vec", "Popping element");
 
     if (vec->len == 0) {
@@ -71,6 +78,8 @@ void* vec_pop(Vec* vec) {
 }
 
 void* vec_get(Vec* vec, size_t idx) {
+    RELEASE_ASSERT(vec);
+
     LOG_DEBUG_G("vec", "Getting element at index %zu", idx);
 
     if (idx >= vec->len) {
@@ -92,6 +101,8 @@ void* vec_get(Vec* vec, size_t idx) {
 }
 
 size_t vec_len(Vec* vec) {
+    RELEASE_ASSERT(vec);
+
     return vec->len;
 }
 

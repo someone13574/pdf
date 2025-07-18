@@ -2,7 +2,6 @@
 
 typedef enum {
     PDF_OK,
-    PDF_ERR_NULL_ARGS,
     PDF_ERR_INVALID_VERSION,
     PDF_ERR_INVALID_TRAILER,
     PDF_ERR_INVALID_STARTXREF,
@@ -19,18 +18,17 @@ typedef enum {
     PDF_ERR_OBJECT_NOT_DICT,
     PDF_ERR_MISSING_DICT_KEY,
     PDF_OPTIONAL_REF_IS_NONE,
-    PDF_ERR_SCHEMA_UNKNOWN_KEY,
-    PDF_ERR_SCHEMA_DUPLICATE_KEY,
-    PDF_ERR_SCHEMA_INCORRECT_TYPE,
-    PDF_ERR_SCHEMA_INCORRECT_TYPE_NAME,
-    PDF_CTX_ERR_EOF,
-    PDF_CTX_ERR_EXPECT,
-    PDF_CTX_ERR_SCAN_LIMIT,
-    PDF_CTX_ERR_BORROWED,
-    PDF_CTX_ERR_NOT_BORROWED,
+    PDF_ERR_UNKNOWN_KEY,
+    PDF_ERR_DUPLICATE_KEY,
+    PDF_ERR_INCORRECT_TYPE,
+    PDF_ERR_CTX_EOF,
+    PDF_ERR_CTX_EXPECT,
+    PDF_ERR_CTX_SCAN_LIMIT,
+    PDF_ERR_CTX_BORROWED,
+    PDF_ERR_CTX_NOT_BORROWED,
 } PdfResult;
 
-#define PDF_TRY(op)                                                            \
+#define PDF_PROPAGATE(op)                                                      \
     do {                                                                       \
         PdfResult try_result = (op);                                           \
         if (try_result != PDF_OK) {                                            \
@@ -38,13 +36,10 @@ typedef enum {
         }                                                                      \
     } while (0)
 
-#define PDF_TRY_RET_NULL(op)                                                   \
+#define PDF_REQUIRE(op)                                                        \
     do {                                                                       \
-        PdfResult try_result = (op);                                           \
-        if (try_result != PDF_OK) {                                            \
-            if (result) {                                                      \
-                *result = try_result;                                          \
-            }                                                                  \
-            return NULL;                                                       \
+        PdfResult result = (op);                                               \
+        if (result != PDF_OK) {                                                \
+            LOG_PANIC("Error code %d occurred", result);                       \
         }                                                                      \
     } while (0)

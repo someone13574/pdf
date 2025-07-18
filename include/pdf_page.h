@@ -13,10 +13,10 @@ typedef struct {
     PdfObject* raw_dict;
 } PdfPageTreeNode;
 
-PdfPageTreeNode* pdf_deserialize_page_tree_node(
+PdfResult pdf_deserialize_page_tree_node(
     PdfObject* object,
     PdfDocument* doc,
-    PdfResult* result
+    PdfPageTreeNode* deserialized
 );
 
 DESERIALIZABLE_STRUCT_REF(PdfPageTreeNode, page_tree_node)
@@ -33,8 +33,11 @@ typedef struct {
     PdfObject* raw_dict;
 } PdfPage;
 
-PdfPage*
-pdf_deserialize_page(PdfObject* object, PdfDocument* doc, PdfResult* result);
+PdfResult pdf_deserialize_page(
+    PdfObject* object,
+    PdfDocument* doc,
+    PdfPage* deserialized
+);
 
 DESERIALIZABLE_STRUCT_REF(PdfPage, page)
 DESERIALIZABLE_ARRAY_TYPE(PdfPageArray)

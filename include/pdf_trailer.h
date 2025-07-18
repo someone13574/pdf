@@ -1,6 +1,5 @@
 #pragma once
 
-#include "arena.h"
 #include "pdf_catalog.h"
 #include "pdf_doc.h"
 #include "pdf_object.h"
@@ -12,5 +11,8 @@ typedef struct {
     PdfObject* raw_dict;
 } PdfTrailer;
 
-PdfTrailer*
-pdf_deserialize_trailer(PdfObject* object, PdfDocument* doc, PdfResult* result);
+PdfResult pdf_deserialize_trailer(
+    PdfObject* object,
+    PdfDocument* doc,
+    PdfTrailer* deserialized
+);

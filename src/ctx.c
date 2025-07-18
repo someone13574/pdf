@@ -22,11 +22,12 @@ struct PdfCtx {
 };
 
 PdfCtx* pdf_ctx_new(Arena* arena, char* buffer, size_t buffer_size) {
-    LOG_ASSERT(buffer, "Invalid buffer");
-    LOG_ASSERT(buffer_size > 0, "Empty buffer");
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(buffer, "Invalid buffer");
+    RELEASE_ASSERT(buffer_size > 0, "Empty buffer");
 
     PdfCtx* ctx = arena_alloc(arena, sizeof(PdfCtx));
-    LOG_ASSERT(ctx, "Allocation failed");
+    RELEASE_ASSERT(ctx, "Allocation failed");
 
     ctx->buffer = buffer;
     ctx->buffer_len = buffer_size;
@@ -39,21 +40,21 @@ PdfCtx* pdf_ctx_new(Arena* arena, char* buffer, size_t buffer_size) {
 }
 
 size_t pdf_ctx_buffer_len(PdfCtx* ctx) {
-    DBG_ASSERT(ctx);
+    RELEASE_ASSERT(ctx);
     return ctx->buffer_len;
 }
 
 size_t pdf_ctx_offset(PdfCtx* ctx) {
-    DBG_ASSERT(ctx);
+    RELEASE_ASSERT(ctx);
     return ctx->offset;
 }
 
 PdfResult pdf_ctx_seek(PdfCtx* ctx, size_t offset) {
-    DBG_ASSERT(ctx);
+    RELEASE_ASSERT(ctx);
     LOG_TRACE_G("ctx", "Seeking offset %zu", offset);
 
     if (offset > ctx->buffer_len) {
-        return PDF_CTX_ERR_EOF;
+        return PDF_ERR_CTX_EOF;
     }
 
     ctx->offset = offset;
@@ -61,7 +62,7 @@ PdfResult pdf_ctx_seek(PdfCtx* ctx, size_t offset) {
 }
 
 PdfResult pdf_ctx_shift(PdfCtx* ctx, ssize_t relative_offset) {
-    DBG_ASSERT(ctx);
+    RELEASE_ASSERT(ctx);
     LOG_TRACE_G("ctx", "Shifting offset by %ld", relative_offset);
 
     if (relative_offset < 0) {
@@ -71,7 +72,7 @@ PdfResult pdf_ctx_shift(PdfCtx* ctx, ssize_t relative_offset) {
                 "New offset is out of bounds. Restoring offset to %zu",
                 ctx->offset
             );
-            return PDF_CTX_ERR_EOF;
+            return PDF_ERR_CTX_EOF;
         }
 
         ctx->offset -= (size_t)(-relative_offset);
@@ -83,7 +84,7 @@ PdfResult pdf_ctx_shift(PdfCtx* ctx, ssize_t relative_offset) {
                 "New offset is out of bounds. Restoring offset to %zu",
                 ctx->offset
             );
-            return PDF_CTX_ERR_EOF;
+            return PDF_ERR_CTX_EOF;
         }
 
         ctx->offset = new_offset;
@@ -94,48 +95,46 @@ PdfResult pdf_ctx_shift(PdfCtx* ctx, ssize_t relative_offset) {
 }
 
 PdfResult pdf_ctx_peek_and_advance(PdfCtx* ctx, char* peeked) {
+    RELEASE_ASSERT(ctx);
+
     if (ctx->borrowed_substr) {
-        return PDF_CTX_ERR_BORROWED;
+        return PDF_ERR_CTX_BORROWED;
     }
 
     if (peeked) {
-        PDF_TRY(pdf_ctx_peek(ctx, peeked));
+        PDF_PROPAGATE(pdf_ctx_peek(ctx, peeked));
     }
 
     return pdf_ctx_seek(ctx, ctx->offset + 1);
 }
 
 PdfResult pdf_ctx_peek(PdfCtx* ctx, char* peeked) {
-    DBG_ASSERT(ctx);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(peeked);
+
     if (ctx->borrowed_substr) {
-        return PDF_CTX_ERR_BORROWED;
+        return PDF_ERR_CTX_BORROWED;
     }
 
     if (ctx->offset >= ctx->buffer_len) {
-        return PDF_CTX_ERR_EOF;
+        return PDF_ERR_CTX_EOF;
     }
 
-    if (peeked) {
-        *peeked = ctx->buffer[ctx->offset];
-        LOG_TRACE_G(
-            "ctx",
-            "Ctx char at offset %zu: '%c'",
-            ctx->offset,
-            *peeked
-        );
-    }
+    *peeked = ctx->buffer[ctx->offset];
+    LOG_TRACE_G("ctx", "Ctx char at offset %zu: '%c'", ctx->offset, *peeked);
 
     return PDF_OK;
 }
 
 PdfResult pdf_ctx_peek_next(PdfCtx* ctx, char* peeked) {
-    DBG_ASSERT(ctx);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(peeked);
 
     size_t offset = ctx->offset;
-    PDF_TRY(pdf_ctx_peek_and_advance(ctx, NULL));
+    PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, NULL));
 
     PdfResult peek_result = (pdf_ctx_peek(ctx, peeked));
-    PDF_TRY(pdf_ctx_seek(ctx, offset));
+    PDF_PROPAGATE(pdf_ctx_seek(ctx, offset));
 
     if (peek_result != PDF_OK) {
         return peek_result;
@@ -145,11 +144,13 @@ PdfResult pdf_ctx_peek_next(PdfCtx* ctx, char* peeked) {
 }
 
 PdfResult pdf_ctx_expect(PdfCtx* ctx, const char* text) {
-    DBG_ASSERT(ctx);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(text);
+
     LOG_DEBUG_G("ctx", "Expecting text \"%s\"", text);
 
     if (ctx->borrowed_substr) {
-        return PDF_CTX_ERR_BORROWED;
+        return PDF_ERR_CTX_BORROWED;
     }
 
     size_t restore_offset = ctx->offset;
@@ -163,7 +164,7 @@ PdfResult pdf_ctx_expect(PdfCtx* ctx, const char* text) {
 
         if (*text != peeked) {
             pdf_ctx_seek(ctx, restore_offset);
-            return PDF_CTX_ERR_EXPECT;
+            return PDF_ERR_CTX_EXPECT;
         }
 
         PdfResult next_ret = pdf_ctx_peek_and_advance(ctx, NULL);
@@ -180,7 +181,9 @@ PdfResult pdf_ctx_expect(PdfCtx* ctx, const char* text) {
 
 PdfResult
 pdf_ctx_require_char_type(PdfCtx* ctx, bool permit_eof, bool (*eval)(char)) {
-    DBG_ASSERT(ctx);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(eval);
+
     LOG_TRACE_G("ctx", "Expecting character type at offset %zu", ctx->offset);
 
     char peeked;
@@ -195,14 +198,16 @@ pdf_ctx_require_char_type(PdfCtx* ctx, bool permit_eof, bool (*eval)(char)) {
 
     if (!eval(peeked)) {
         LOG_TRACE_G("ctx", "Character type didn't match");
-        return PDF_CTX_ERR_EXPECT;
+        return PDF_ERR_CTX_EXPECT;
     }
 
     return PDF_OK;
 }
 
 PdfResult pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit) {
-    DBG_ASSERT(ctx);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(text);
+
     LOG_DEBUG_G(
         "ctx",
         "Backscanning for text \"%s\" with char limit %zu (0=none)",
@@ -211,7 +216,7 @@ PdfResult pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit) {
     );
 
     if (ctx->borrowed_substr) {
-        return PDF_CTX_ERR_BORROWED;
+        return PDF_ERR_CTX_BORROWED;
     }
 
     size_t offset = ctx->offset;
@@ -227,7 +232,7 @@ PdfResult pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit) {
 
         if (limit != 0 && ++count > limit) {
             pdf_ctx_seek(ctx, restore_offset);
-            return PDF_CTX_ERR_SCAN_LIMIT;
+            return PDF_ERR_CTX_SCAN_LIMIT;
         }
 
         offset = ctx->offset;
@@ -243,21 +248,22 @@ PdfResult pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit) {
 // a CARRIAGE RETURN followed immediately by a LINE FEED shall be treated as one
 // EOL marker.
 PdfResult pdf_ctx_seek_line_start(PdfCtx* ctx) {
-    DBG_ASSERT(ctx);
+    RELEASE_ASSERT(ctx);
+
     LOG_DEBUG_G("ctx", "Finding line start");
 
     if (ctx->borrowed_substr) {
-        return PDF_CTX_ERR_BORROWED;
+        return PDF_ERR_CTX_BORROWED;
     }
 
     size_t restore_offset = ctx->offset;
     if (restore_offset == ctx->buffer_len) {
-        PDF_TRY(pdf_ctx_shift(ctx, -1));
+        PDF_PROPAGATE(pdf_ctx_shift(ctx, -1));
     }
 
     char peeked;
     char prev_char;
-    PDF_TRY(pdf_ctx_peek(ctx, &peeked));
+    PDF_PROPAGATE(pdf_ctx_peek(ctx, &peeked));
 
     do {
         PdfResult seek_result = pdf_ctx_shift(ctx, -1);
@@ -265,7 +271,7 @@ PdfResult pdf_ctx_seek_line_start(PdfCtx* ctx) {
             case PDF_OK: {
                 break;
             }
-            case PDF_CTX_ERR_EOF: {
+            case PDF_ERR_CTX_EOF: {
                 ctx->offset = 0;
                 return PDF_OK;
             }
@@ -294,11 +300,12 @@ PdfResult pdf_ctx_seek_line_start(PdfCtx* ctx) {
 }
 
 PdfResult pdf_ctx_seek_next_line(PdfCtx* ctx) {
-    DBG_ASSERT(ctx);
+    RELEASE_ASSERT(ctx);
+
     LOG_DEBUG_G("ctx", "Finding next line");
 
     if (ctx->borrowed_substr) {
-        return PDF_CTX_ERR_BORROWED;
+        return PDF_ERR_CTX_BORROWED;
     }
 
     size_t restore_offset = ctx->offset;
@@ -329,7 +336,8 @@ PdfResult pdf_ctx_seek_next_line(PdfCtx* ctx) {
 }
 
 PdfResult pdf_ctx_consume_whitespace(PdfCtx* ctx) {
-    DBG_ASSERT(ctx);
+    RELEASE_ASSERT(ctx);
+
     LOG_DEBUG_G("ctx", "Consuming whitespace");
 
     char peeked;
@@ -346,8 +354,9 @@ PdfResult pdf_ctx_borrow_substr(
     size_t length,
     char** substr
 ) {
-    DBG_ASSERT(ctx);
-    DBG_ASSERT(substr);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(substr);
+
     LOG_DEBUG_G(
         "ctx",
         "Borrowing substring starting at %zu with length %zu",
@@ -356,12 +365,12 @@ PdfResult pdf_ctx_borrow_substr(
     );
 
     if (ctx->borrowed_substr) {
-        return PDF_CTX_ERR_BORROWED;
+        return PDF_ERR_CTX_BORROWED;
     }
 
     ctx->borrow_term_offset = offset + length;
     if (ctx->borrow_term_offset > ctx->buffer_len) {
-        return PDF_CTX_ERR_EOF;
+        return PDF_ERR_CTX_EOF;
     }
 
     ctx->borrowed_substr = substr;
@@ -375,11 +384,12 @@ PdfResult pdf_ctx_borrow_substr(
 }
 
 PdfResult pdf_ctx_release_substr(PdfCtx* ctx) {
-    DBG_ASSERT(ctx);
+    RELEASE_ASSERT(ctx);
+
     LOG_DEBUG_G("ctx", "Releasing substr");
 
     if (!ctx->borrowed_substr) {
-        return PDF_CTX_ERR_NOT_BORROWED;
+        return PDF_ERR_CTX_NOT_BORROWED;
     }
 
     ctx->buffer[ctx->borrow_term_offset] = ctx->borrow_term_replaced;
@@ -397,8 +407,9 @@ PdfResult pdf_ctx_parse_int(
     uint64_t* value,
     uint32_t* actual_length
 ) {
-    DBG_ASSERT(ctx);
-    DBG_ASSERT(value);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(value);
+
     LOG_DEBUG_G("ctx", "Parsing int at %zu", ctx->offset);
 
     size_t start_offset = ctx->offset;
@@ -425,7 +436,7 @@ PdfResult pdf_ctx_parse_int(
     if (expected_length && processed_length != *expected_length) {
         pdf_ctx_seek(ctx, start_offset);
         if (result == PDF_OK) {
-            return PDF_CTX_ERR_EXPECT;
+            return PDF_ERR_CTX_EXPECT;
         } else {
             return result;
         }
@@ -482,16 +493,16 @@ TEST_FUNC(test_ctx_expect_and_peek) {
     // Check offset after partial match and invalid peek
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_expect(ctx, "est"));
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_expect(ctx, "ing"));
-    TEST_ASSERT_EQ((PdfResult)PDF_CTX_ERR_EOF, pdf_ctx_peek(ctx, &peeked));
+    TEST_ASSERT_EQ((PdfResult)PDF_ERR_CTX_EOF, pdf_ctx_peek(ctx, &peeked));
 
     // Check offset restore on failure
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 0));
-    TEST_ASSERT_EQ((PdfResult)PDF_CTX_ERR_EXPECT, pdf_ctx_expect(ctx, "hi"));
+    TEST_ASSERT_EQ((PdfResult)PDF_ERR_CTX_EXPECT, pdf_ctx_expect(ctx, "hi"));
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_expect(ctx, "testing"));
 
     // Check EOF
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 0));
-    TEST_ASSERT_EQ((PdfResult)PDF_CTX_ERR_EOF, pdf_ctx_expect(ctx, "testing!"));
+    TEST_ASSERT_EQ((PdfResult)PDF_ERR_CTX_EOF, pdf_ctx_expect(ctx, "testing!"));
 
     arena_free(arena);
     return TEST_RESULT_PASS;
@@ -524,13 +535,13 @@ TEST_FUNC(text_ctx_require_char_type) {
 
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 6));
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_CTX_ERR_EXPECT,
+        (PdfResult)PDF_ERR_CTX_EXPECT,
         pdf_ctx_require_char_type(ctx, false, &is_pdf_whitespace)
     );
 
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 46));
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_CTX_ERR_EOF,
+        (PdfResult)PDF_ERR_CTX_EOF,
         pdf_ctx_require_char_type(ctx, false, &is_pdf_whitespace)
     );
 
@@ -570,7 +581,7 @@ TEST_FUNC(test_ctx_backscan_missing) {
         pdf_ctx_seek(ctx, pdf_ctx_buffer_len(ctx))
     );
 
-    TEST_ASSERT_EQ((PdfResult)PDF_CTX_ERR_EOF, pdf_ctx_backscan(ctx, "cat", 0));
+    TEST_ASSERT_EQ((PdfResult)PDF_ERR_CTX_EOF, pdf_ctx_backscan(ctx, "cat", 0));
 
     arena_free(arena);
     return TEST_RESULT_PASS;
@@ -591,7 +602,7 @@ TEST_FUNC(test_ctx_backscan_limit) {
     TEST_ASSERT_EQ((size_t)32, pdf_ctx_offset(ctx));
 
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_CTX_ERR_SCAN_LIMIT,
+        (PdfResult)PDF_ERR_CTX_SCAN_LIMIT,
         pdf_ctx_backscan(ctx, "fox", 15)
     );
     TEST_ASSERT_EQ((size_t)32, pdf_ctx_offset(ctx));
@@ -652,7 +663,7 @@ TEST_FUNC(test_ctx_seek_next_line) {
     TEST_ASSERT_EQ((size_t)19, pdf_ctx_offset(ctx));
 
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 27));
-    TEST_ASSERT_EQ((PdfResult)PDF_CTX_ERR_EOF, pdf_ctx_seek_next_line(ctx));
+    TEST_ASSERT_EQ((PdfResult)PDF_ERR_CTX_EOF, pdf_ctx_seek_next_line(ctx));
 
     arena_free(arena);
     return TEST_RESULT_PASS;
@@ -695,7 +706,7 @@ TEST_FUNC(test_ctx_borrow_substr) {
     // Try double borrow
     char* substr2;
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_CTX_ERR_BORROWED,
+        (PdfResult)PDF_ERR_CTX_BORROWED,
         pdf_ctx_borrow_substr(ctx, 4, 5, &substr2)
     );
 
@@ -737,7 +748,7 @@ TEST_FUNC(test_ctx_borrow_eof) {
 
     char* substr;
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_CTX_ERR_EOF,
+        (PdfResult)PDF_ERR_CTX_EOF,
         pdf_ctx_borrow_substr(ctx, 0, strlen(buffer) + 1, &substr)
     );
 
@@ -767,7 +778,7 @@ TEST_FUNC(test_ctx_parse_int) {
     expected_len = 2;
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 10));
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_CTX_ERR_EXPECT,
+        (PdfResult)PDF_ERR_CTX_EXPECT,
         pdf_ctx_parse_int(ctx, &expected_len, &value, NULL)
     );
 
@@ -782,7 +793,7 @@ TEST_FUNC(test_ctx_parse_int) {
     expected_len = 3;
     TEST_ASSERT_EQ((PdfResult)PDF_OK, pdf_ctx_seek(ctx, 29));
     TEST_ASSERT_EQ(
-        (PdfResult)PDF_CTX_ERR_EOF,
+        (PdfResult)PDF_ERR_CTX_EOF,
         pdf_ctx_parse_int(ctx, &expected_len, &value, NULL)
     );
 

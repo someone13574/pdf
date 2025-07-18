@@ -1,7 +1,9 @@
 #include "deserialize.h"
+#include "log.h"
 #include "pdf_doc.h"
 #include "pdf_object.h"
 #include "pdf_page.h"
+#include "pdf_result.h"
 
 PDF_DESERIALIZABLE_REF_IMPL(
     PdfPageTreeNode,
@@ -9,14 +11,14 @@ PDF_DESERIALIZABLE_REF_IMPL(
     pdf_deserialize_page_tree_node
 )
 
-PdfPageTreeNode* pdf_deserialize_page_tree_node(
+PdfResult pdf_deserialize_page_tree_node(
     PdfObject* object,
     PdfDocument* doc,
-    PdfResult* result
+    PdfPageTreeNode* deserialized
 ) {
-    if (!object || !doc || !result) {
-        return NULL;
-    }
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(deserialized);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
@@ -48,31 +50,26 @@ PdfPageTreeNode* pdf_deserialize_page_tree_node(
         )
     };
 
-    PdfPageTreeNode page_tree_node = {.raw_dict = object};
-    *result = pdf_deserialize_object(
-        &page_tree_node,
+    deserialized->raw_dict = object;
+    PDF_PROPAGATE(pdf_deserialize_object(
+        deserialized,
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         doc
-    );
+    ));
 
-    if (*result != PDF_OK) {
-        return NULL;
-    }
-
-    PdfPageTreeNode* allocated =
-        arena_alloc(pdf_doc_arena(doc), sizeof(PdfPageTreeNode));
-    *allocated = page_tree_node;
-
-    return allocated;
+    return PDF_OK;
 }
 
-PdfPage*
-pdf_deserialize_page(PdfObject* object, PdfDocument* doc, PdfResult* result) {
-    if (!object || !doc || !result) {
-        return NULL;
-    }
+PdfResult pdf_deserialize_page(
+    PdfObject* object,
+    PdfDocument* doc,
+    PdfPage* deserialized
+) {
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(deserialized);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
@@ -112,23 +109,16 @@ pdf_deserialize_page(PdfObject* object, PdfDocument* doc, PdfResult* result) {
         )
     };
 
-    PdfPage page = {.raw_dict = object};
-    *result = pdf_deserialize_object(
-        &page,
+    deserialized->raw_dict = object;
+    PDF_PROPAGATE(pdf_deserialize_object(
+        deserialized,
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         doc
-    );
+    ));
 
-    if (*result != PDF_OK) {
-        return NULL;
-    }
-
-    PdfPage* allocated = arena_alloc(pdf_doc_arena(doc), sizeof(PdfPage));
-    *allocated = page;
-
-    return allocated;
+    return PDF_OK;
 }
 
 PDF_DESERIALIZABLE_REF_IMPL(PdfPage, page, pdf_deserialize_page)

@@ -94,8 +94,8 @@ struct PdfObject {
 };
 
 // Gets the value associated with a given key in a dictionary object
-PdfObject*
-pdf_object_dict_get(PdfObject* dict, const char* key, PdfResult* result);
+PdfResult
+pdf_object_dict_get(PdfObject* dict, const char* key, PdfObject* object);
 
 // Generates a pretty-printed PdfObject string. If no arena is passed, you must
 // free the string manually.
