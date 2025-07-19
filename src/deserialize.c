@@ -44,18 +44,126 @@ PdfResult deserialize_object_field(
     PdfObject* object,
     PdfObjectFieldData field_data,
     PdfDocument* doc
+);
+PdfResult deserialize_ref_field(
+    void* field_ptr,
+    PdfObject* object,
+    PdfRefFieldData field_data
+);
+PdfResult deserialize_custom_field(
+    void* field_ptr,
+    PdfObject* object,
+    PdfDeserializerFn deserializer,
+    PdfDocument* doc
+);
+PdfResult deserialize_array_field(
+    void* field_ptr,
+    PdfObject* object,
+    PdfArrayFieldData field_data,
+    PdfDocument* doc
+);
+PdfResult deserialize_as_array_field(
+    void* field_ptr,
+    PdfObject* object,
+    PdfArrayFieldData field_data,
+    PdfDocument* doc
+);
+PdfResult deserialize_optional_field(
+    void* field_ptr,
+    PdfObject* object,
+    PdfOptionalFieldData field_data,
+    PdfDocument* doc
+);
+
+PdfResult deserialize_field(
+    void* field_ptr,
+    PdfObject* object,
+    PdfFieldInfo field_info,
+    PdfDocument* doc
+) {
+    switch (field_info.kind) {
+        case PDF_FIELD_KIND_OBJECT: {
+            PDF_PROPAGATE(deserialize_object_field(
+                field_ptr,
+                object,
+                field_info.data.object,
+                doc
+            ));
+            break;
+        }
+        case PDF_FIELD_KIND_REF: {
+            PDF_PROPAGATE(
+                deserialize_ref_field(field_ptr, object, field_info.data.ref)
+            );
+            break;
+        }
+        case PDF_FIELD_KIND_CUSTOM: {
+            PDF_PROPAGATE(deserialize_custom_field(
+                field_ptr,
+                object,
+                field_info.data.custom,
+                doc
+            ));
+            break;
+        }
+        case PDF_FIELD_KIND_ARRAY: {
+            PDF_PROPAGATE(deserialize_array_field(
+                field_ptr,
+                object,
+                field_info.data.array,
+                doc
+            ));
+            break;
+        }
+        case PDF_FIELD_KIND_AS_ARRAY: {
+            PDF_PROPAGATE(deserialize_as_array_field(
+                field_ptr,
+                object,
+                field_info.data.array,
+                doc
+            ));
+            break;
+        }
+        case PDF_FIELD_KIND_OPTIONAL: {
+            PDF_PROPAGATE(deserialize_optional_field(
+                field_ptr,
+                object,
+                field_info.data.optional,
+                doc
+            ));
+            break;
+        }
+        case PDF_FIELD_KIND_IGNORED: {
+            break;
+        }
+    }
+
+    return PDF_OK;
+}
+
+PdfResult deserialize_object_field(
+    void* field_ptr,
+    PdfObject* object,
+    PdfObjectFieldData field_data,
+    PdfDocument* doc
 ) {
     RELEASE_ASSERT(field_ptr);
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(doc);
 
     PdfObject resolved_object;
-    PDF_PROPAGATE(resolve_object(doc, object, &resolved_object));
+    if (field_data.type == PDF_OBJECT_TYPE_INDIRECT_OBJECT
+        || field_data.type == PDF_OBJECT_TYPE_INDIRECT_REF) {
+        resolved_object = *object;
+    } else {
+        PDF_PROPAGATE(resolve_object(doc, object, &resolved_object));
+    }
 
     LOG_TRACE_G(
         "deserde",
-        "Deserializing object field with type `%d`",
-        resolved_object.type
+        "Deserializing object field with type `%d` and expected type `%d`",
+        resolved_object.type,
+        field_data.type
     );
 
     if (resolved_object.type != field_data.type) {
@@ -143,6 +251,20 @@ PdfResult deserialize_ref_field(
     return PDF_OK;
 }
 
+PdfResult deserialize_custom_field(
+    void* field_ptr,
+    PdfObject* object,
+    PdfDeserializerFn deserializer,
+    PdfDocument* doc
+) {
+    RELEASE_ASSERT(field_ptr);
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(deserializer);
+    RELEASE_ASSERT(doc);
+
+    return deserializer(object, doc, field_ptr);
+}
+
 PdfResult deserialize_array_element(
     PdfObject* element,
     PdfArrayFieldData field_data,
@@ -156,30 +278,12 @@ PdfResult deserialize_array_element(
     *deserialized = arena_alloc(pdf_doc_arena(doc), field_data.element_size);
     memset(*deserialized, 0, field_data.element_size);
 
-    switch (field_data.element_info->kind) {
-        case PDF_FIELD_KIND_OBJECT: {
-            PDF_PROPAGATE(deserialize_object_field(
-                *deserialized,
-                element,
-                field_data.element_info->data.object,
-                doc
-            ));
-            break;
-        }
-        case PDF_FIELD_KIND_REF: {
-            PDF_PROPAGATE(deserialize_ref_field(
-                *deserialized,
-                element,
-                field_data.element_info->data.ref
-            ));
-            break;
-        }
-        default: {
-            LOG_PANIC("Unreachable");
-        }
-    }
-
-    return PDF_OK;
+    return deserialize_field(
+        *deserialized,
+        element,
+        *field_data.element_info,
+        doc
+    );
 }
 
 PdfResult deserialize_array_field(
@@ -283,76 +387,12 @@ PdfResult deserialize_optional_field(
 
     LOG_TRACE_G("deserde", "Deserializing optional field");
 
-    void* data_ptr = (char*)field_ptr + field_data.data_offset;
-    LOG_INFO(
-        "Data offset: %zu (%p), Discriminant offset: %zu (%p)",
-        field_data.data_offset,
-        data_ptr,
-        field_data.discriminant_offset,
-        discriminant_ptr
+    return deserialize_field(
+        (char*)field_ptr + field_data.data_offset,
+        object,
+        *field_data.inner_info,
+        doc
     );
-    switch (field_data.inner_info->kind) {
-        case PDF_FIELD_KIND_OBJECT: {
-            PdfResult result = deserialize_object_field(
-                data_ptr,
-                object,
-                field_data.inner_info->data.object,
-                doc
-            );
-
-            if (result != PDF_OK) {
-                return result;
-            }
-
-            break;
-        }
-        case PDF_FIELD_KIND_REF: {
-            PdfResult result = deserialize_ref_field(
-                data_ptr,
-                object,
-                field_data.inner_info->data.ref
-            );
-
-            if (result != PDF_OK) {
-                return result;
-            }
-
-            break;
-        }
-        case PDF_FIELD_KIND_ARRAY: {
-            PdfResult result = deserialize_array_field(
-                data_ptr,
-                object,
-                field_data.inner_info->data.array,
-                doc
-            );
-
-            if (result != PDF_OK) {
-                return result;
-            }
-
-            break;
-        }
-        case PDF_FIELD_KIND_AS_ARRAY: {
-            PdfResult result = deserialize_as_array_field(
-                data_ptr,
-                object,
-                field_data.inner_info->data.array,
-                doc
-            );
-
-            if (result != PDF_OK) {
-                return result;
-            }
-
-            break;
-        }
-        default: {
-            LOG_PANIC("Unreachable");
-        }
-    }
-
-    return PDF_OK;
 }
 
 PdfResult pdf_deserialize_object(
@@ -427,55 +467,12 @@ PdfResult pdf_deserialize_object(
                 continue;
             }
 
-            switch (field->info.kind) {
-                case PDF_FIELD_KIND_OBJECT: {
-                    PDF_PROPAGATE(deserialize_object_field(
-                        (char*)target + field->offset,
-                        entry->value,
-                        field->info.data.object,
-                        doc
-                    ));
-                    break;
-                }
-                case PDF_FIELD_KIND_REF: {
-                    PDF_PROPAGATE(deserialize_ref_field(
-                        (char*)target + field->offset,
-                        entry->value,
-                        field->info.data.ref
-                    ));
-                    break;
-                }
-                case PDF_FIELD_KIND_ARRAY: {
-                    PDF_PROPAGATE(deserialize_array_field(
-                        (char*)target + field->offset,
-                        entry->value,
-                        field->info.data.array,
-                        doc
-                    ));
-                    break;
-                }
-                case PDF_FIELD_KIND_AS_ARRAY: {
-                    PDF_PROPAGATE(deserialize_as_array_field(
-                        (char*)target + field->offset,
-                        entry->value,
-                        field->info.data.array,
-                        doc
-                    ));
-                    break;
-                }
-                case PDF_FIELD_KIND_OPTIONAL: {
-                    PDF_PROPAGATE(deserialize_optional_field(
-                        (char*)target + field->offset,
-                        entry->value,
-                        field->info.data.optional,
-                        doc
-                    ));
-                    break;
-                }
-                case PDF_FIELD_KIND_IGNORED: {
-                    break;
-                }
-            }
+            PDF_PROPAGATE(deserialize_field(
+                (char*)target + field->offset,
+                entry->value,
+                field->info,
+                doc
+            ));
 
             found = true;
             break;
@@ -491,3 +488,542 @@ PdfResult pdf_deserialize_object(
 
     return PDF_OK;
 }
+
+#ifdef TEST
+
+#include "deserialize_types.h"
+#include "test.h"
+#include "test_helpers.h"
+
+#define DESERIALIZER_IMPL_HELPER()                                             \
+    do {                                                                       \
+        deserialized->raw_dict = object;                                       \
+        PDF_PROPAGATE(pdf_deserialize_object(                                  \
+            deserialized,                                                      \
+            object,                                                            \
+            fields,                                                            \
+            sizeof(fields) / sizeof(PdfFieldDescriptor),                       \
+            doc                                                                \
+        ));                                                                    \
+        return PDF_OK;                                                         \
+    } while (0)
+
+#define DESERIALIZER_TEST_HELPER()                                             \
+    PdfDocument* doc;                                                          \
+    TEST_ASSERT_EQ(                                                            \
+        (PdfResult)PDF_OK,                                                     \
+        pdf_document_new(arena, buffer, strlen(buffer), &doc)                  \
+    );                                                                         \
+    PdfObject object;                                                          \
+    TEST_ASSERT_EQ(                                                            \
+        (PdfResult)PDF_OK,                                                     \
+        pdf_resolve(                                                           \
+            doc,                                                               \
+            (PdfIndirectRef) {.object_id = 1, .generation = 0},                \
+            &object                                                            \
+        )                                                                      \
+    );
+
+typedef struct {
+    PdfBoolean boolean;
+    PdfInteger integer;
+    PdfReal real;
+    PdfString string;
+    PdfName name;
+    PdfArray array;
+    PdfDict dict;
+    PdfStream stream;
+    PdfIndirectRef indirect_ref;
+    PdfObject* raw_dict;
+} TestDeserializeObjectsStruct;
+
+PdfResult deserialize_test_objects_struct(
+    PdfObject* object,
+    PdfDocument* doc,
+    TestDeserializeObjectsStruct* deserialized
+) {
+    PdfFieldDescriptor fields[] = {
+        PDF_FIELD(
+            TestDeserializeObjectsStruct,
+            "Boolean",
+            boolean,
+            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_BOOLEAN)
+        ),
+        PDF_FIELD(
+            TestDeserializeObjectsStruct,
+            "Integer",
+            integer,
+            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+        ),
+        PDF_FIELD(
+            TestDeserializeObjectsStruct,
+            "Real",
+            real,
+            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_REAL)
+        ),
+        PDF_FIELD(
+            TestDeserializeObjectsStruct,
+            "String",
+            string,
+            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STRING)
+        ),
+        PDF_FIELD(
+            TestDeserializeObjectsStruct,
+            "Name",
+            name,
+            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+        ),
+        PDF_FIELD(
+            TestDeserializeObjectsStruct,
+            "Array",
+            array,
+            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_ARRAY)
+        ),
+        PDF_FIELD(
+            TestDeserializeObjectsStruct,
+            "Dict",
+            dict,
+            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+        ),
+        PDF_FIELD(
+            TestDeserializeObjectsStruct,
+            "Stream",
+            stream,
+            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STREAM)
+        ),
+        PDF_FIELD(
+            TestDeserializeObjectsStruct,
+            "IndirectRef",
+            indirect_ref,
+            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INDIRECT_REF)
+        )
+    };
+
+    DESERIALIZER_IMPL_HELPER();
+}
+
+TEST_FUNC(test_deserialize_objects) {
+    Arena* arena = arena_new(1024);
+    const char* objects[] = {
+        "<< /Boolean true /Integer 42 /Real 42.5 /String (test) /Name /Hello /Array [1 2 3] /Dict << /A 1 /B 2 >> /Stream 2 0 R /IndirectRef 1 0 R >>",
+        "<< /Length 8 >> stream\n01234567\nendstream\n"
+    };
+
+    char* buffer =
+        pdf_construct_deserde_test_doc(objects, 2, "<< /Size 3 >>", arena);
+    LOG_DEBUG("Buffer:\n%s", buffer);
+
+    DESERIALIZER_TEST_HELPER();
+
+    TestDeserializeObjectsStruct deserialized;
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_OK,
+        deserialize_test_objects_struct(&object, doc, &deserialized)
+    );
+
+    TEST_ASSERT_EQ(true, deserialized.boolean);
+    TEST_ASSERT_EQ(42, deserialized.integer);
+    TEST_ASSERT_EQ(42.5, deserialized.real);
+    TEST_ASSERT_EQ("test", deserialized.string);
+    TEST_ASSERT_EQ("Hello", deserialized.name);
+
+    TEST_ASSERT(deserialized.array.elements);
+    TEST_ASSERT_EQ((size_t)3, vec_len(deserialized.array.elements));
+    for (size_t idx = 0; idx < 3; idx++) {
+        PdfObject* element = vec_get(deserialized.array.elements, idx);
+        TEST_ASSERT(element);
+        TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element->type);
+        TEST_ASSERT_EQ((PdfInteger)idx + 1, element->data.integer);
+    }
+
+    TEST_ASSERT(deserialized.dict.entries);
+    TEST_ASSERT_EQ((size_t)2, vec_len(deserialized.dict.entries));
+    for (size_t idx = 0; idx < 2; idx++) {
+        PdfDictEntry* entry = vec_get(deserialized.dict.entries, idx);
+        TEST_ASSERT(entry);
+
+        TEST_ASSERT(entry->key);
+        TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry->key->type);
+        TEST_ASSERT_EQ(idx == 0 ? "A" : "B", entry->key->data.name);
+
+        TEST_ASSERT(entry->value);
+        TEST_ASSERT_EQ(
+            (PdfObjectType)PDF_OBJECT_TYPE_INTEGER,
+            entry->value->type
+        );
+        TEST_ASSERT_EQ((PdfInteger)idx + 1, entry->value->data.integer);
+    }
+
+    TEST_ASSERT(deserialized.stream.stream_dict);
+    TEST_ASSERT(deserialized.stream.stream_bytes);
+    TEST_ASSERT_EQ("01234567", deserialized.stream.stream_bytes);
+
+    TEST_ASSERT_EQ((size_t)1, deserialized.indirect_ref.object_id);
+    TEST_ASSERT_EQ((size_t)0, deserialized.indirect_ref.generation);
+
+    return TEST_RESULT_PASS;
+}
+
+typedef struct {
+    PdfName hello;
+    PdfInteger world;
+    PdfObject* raw_dict;
+} TestDeserializeInnerStruct;
+
+PdfResult deserialize_test_inner_struct(
+    PdfObject* object,
+    PdfDocument* doc,
+    TestDeserializeInnerStruct* deserialized
+) {
+    PdfFieldDescriptor fields[] = {
+        PDF_FIELD(
+            TestDeserializeInnerStruct,
+            "Hello",
+            hello,
+            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+        ),
+        PDF_FIELD(
+            TestDeserializeInnerStruct,
+            "World",
+            world,
+            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+        )
+    };
+
+    DESERIALIZER_IMPL_HELPER();
+}
+
+PDF_UNTYPED_DESERIALIZER_WRAPPER(
+    deserialize_test_inner_struct,
+    deserialize_test_inner_struct_untyped
+)
+
+DESERIALIZABLE_STRUCT_REF(
+    TestDeserializeInnerStruct,
+    test_deserialize_inner_struct
+)
+
+PDF_DESERIALIZABLE_REF_IMPL(
+    TestDeserializeInnerStruct,
+    test_deserialize_inner_struct,
+    deserialize_test_inner_struct
+)
+
+typedef struct {
+    TestDeserializeInnerStructRef reference;
+    PdfObject* raw_dict;
+} TestDeserializeRefStruct;
+
+PdfResult deserialize_test_ref_struct(
+    PdfObject* object,
+    PdfDocument* doc,
+    TestDeserializeRefStruct* deserialized
+) {
+    PdfFieldDescriptor fields[] = {PDF_FIELD(
+        TestDeserializeRefStruct,
+        "Reference",
+        reference,
+        PDF_REF_FIELD(TestDeserializeInnerStructRef)
+    )};
+
+    DESERIALIZER_IMPL_HELPER();
+}
+
+TEST_FUNC(test_deserialize_ref) {
+    Arena* arena = arena_new(1024);
+    const char* objects[] = {
+        "<< /Reference 2 0 R >>",
+        "<< /Hello /There /World 42 >>"
+    };
+
+    char* buffer =
+        pdf_construct_deserde_test_doc(objects, 2, "<< /Size 3 >>", arena);
+    LOG_DEBUG("Buffer:\n%s", buffer);
+
+    DESERIALIZER_TEST_HELPER();
+
+    TestDeserializeRefStruct deserialized;
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_OK,
+        deserialize_test_ref_struct(&object, doc, &deserialized)
+    );
+
+    TestDeserializeInnerStruct resolved;
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_OK,
+        pdf_resolve_test_deserialize_inner_struct(
+            &deserialized.reference,
+            doc,
+            &resolved
+        )
+    );
+
+    TEST_ASSERT_EQ("There", resolved.hello);
+    TEST_ASSERT_EQ(42, resolved.world);
+
+    return TEST_RESULT_PASS;
+}
+
+typedef struct {
+    TestDeserializeInnerStruct inner;
+    PdfObject* raw_dict;
+} TestDeserializeInlineStruct;
+
+PdfResult deserialize_test_inline_struct(
+    PdfObject* object,
+    PdfDocument* doc,
+    TestDeserializeInlineStruct* deserialized
+) {
+    PdfFieldDescriptor fields[] = {PDF_FIELD(
+        TestDeserializeInlineStruct,
+        "Inner",
+        inner,
+        PDF_CUSTOM_FIELD(deserialize_test_inner_struct_untyped)
+    )};
+
+    DESERIALIZER_IMPL_HELPER();
+}
+
+TEST_FUNC(test_deserialize_inline_struct) {
+    Arena* arena = arena_new(1024);
+    const char* objects[] = {
+        "<< /Inner 2 0 R >>",
+        "<< /Hello /There /World 42 >>"
+    };
+
+    char* buffer =
+        pdf_construct_deserde_test_doc(objects, 2, "<< /Size 3 >>", arena);
+    LOG_DEBUG("Buffer:\n%s", buffer);
+
+    PdfDocument* doc;
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_OK,
+        pdf_document_new(arena, buffer, strlen(buffer), &doc)
+    );
+
+    PdfObject object;
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_OK,
+        pdf_resolve(
+            doc,
+            (PdfIndirectRef) {.object_id = 1, .generation = 0},
+            &object
+        )
+    );
+
+    TestDeserializeInlineStruct deserialized;
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_OK,
+        deserialize_test_inline_struct(&object, doc, &deserialized)
+    );
+
+    TEST_ASSERT_EQ("There", deserialized.inner.hello);
+    TEST_ASSERT_EQ(42, deserialized.inner.world);
+
+    return TEST_RESULT_PASS;
+}
+
+DESERIALIZABLE_OPTIONAL_TYPE(
+    TestDeserializeInnerOptional,
+    TestDeserializeInnerStruct
+)
+
+typedef struct {
+    TestDeserializeInnerOptional inner;
+    PdfObject* raw_dict;
+} TestDeserializeInlineOptional;
+
+PdfResult deserialize_test_inline_optional(
+    PdfObject* object,
+    PdfDocument* doc,
+    TestDeserializeInlineOptional* deserialized
+) {
+    PdfFieldDescriptor fields[] = {PDF_FIELD(
+        TestDeserializeInlineOptional,
+        "Inner",
+        inner,
+        PDF_OPTIONAL_FIELD(
+            TestDeserializeInnerOptional,
+            PDF_CUSTOM_FIELD(deserialize_test_inner_struct_untyped)
+        )
+    )};
+
+    DESERIALIZER_IMPL_HELPER();
+}
+
+TEST_FUNC(test_deserialize_inline_optional) {
+    Arena* arena = arena_new(1024);
+    const char* objects[] = {
+        "<< /Inner 2 0 R >>",
+        "<< /Hello /There /World 42 >>"
+    };
+
+    char* buffer =
+        pdf_construct_deserde_test_doc(objects, 2, "<< /Size 3 >>", arena);
+    LOG_DEBUG("Buffer:\n%s", buffer);
+
+    DESERIALIZER_TEST_HELPER();
+
+    TestDeserializeInlineOptional deserialized;
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_OK,
+        deserialize_test_inline_optional(&object, doc, &deserialized)
+    );
+
+    TEST_ASSERT(deserialized.inner.discriminant);
+    TEST_ASSERT_EQ("There", deserialized.inner.value.hello);
+    TEST_ASSERT_EQ(42, deserialized.inner.value.world);
+
+    return TEST_RESULT_PASS;
+}
+
+DESERIALIZABLE_ARRAY_TYPE(DeserializeTestStringArray)
+DESERIALIZABLE_ARRAY_TYPE(DeserializeTestIntegerArray)
+
+typedef struct {
+    DeserializeTestStringArray strings;
+    DeserializeTestIntegerArray integers;
+    PdfObject* raw_dict;
+} TestDeserializePrimitiveArrays;
+
+PdfResult deserialize_test_primitive_arrays(
+    PdfObject* object,
+    PdfDocument* doc,
+    TestDeserializePrimitiveArrays* deserialized
+) {
+    PdfFieldDescriptor fields[] = {
+        PDF_FIELD(
+            TestDeserializePrimitiveArrays,
+            "Strings",
+            strings,
+            PDF_ARRAY_FIELD(
+                DeserializeTestStringArray,
+                PdfString,
+                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STRING)
+            )
+        ),
+        PDF_FIELD(
+            TestDeserializePrimitiveArrays,
+            "Integers",
+            integers,
+            PDF_ARRAY_FIELD(
+                DeserializeTestIntegerArray,
+                PdfInteger,
+                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+            )
+        )
+    };
+
+    DESERIALIZER_IMPL_HELPER();
+}
+
+TEST_FUNC(test_deserialize_primitive_arrays) {
+    Arena* arena = arena_new(1024);
+    const char* objects[] = {
+        "<< /Strings [(Hello) (World)] /Integers [4 5 6] >>"
+    };
+
+    char* buffer =
+        pdf_construct_deserde_test_doc(objects, 1, "<< /Size 2 >>", arena);
+    LOG_DEBUG("Buffer:\n%s", buffer);
+
+    DESERIALIZER_TEST_HELPER();
+
+    TestDeserializePrimitiveArrays deserialized;
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_OK,
+        deserialize_test_primitive_arrays(&object, doc, &deserialized)
+    );
+
+    TEST_ASSERT(deserialized.strings.elements);
+    TEST_ASSERT_EQ((size_t)2, vec_len(deserialized.strings.elements));
+    TEST_ASSERT_EQ(
+        "Hello",
+        *(PdfString*)vec_get(deserialized.strings.elements, 0)
+    );
+    TEST_ASSERT_EQ(
+        "World",
+        *(PdfString*)vec_get(deserialized.strings.elements, 1)
+    );
+
+    TEST_ASSERT(deserialized.integers.elements);
+    TEST_ASSERT_EQ((size_t)3, vec_len(deserialized.integers.elements));
+    TEST_ASSERT_EQ(
+        (PdfInteger)4,
+        *(PdfInteger*)vec_get(deserialized.integers.elements, 0)
+    );
+    TEST_ASSERT_EQ(
+        (PdfInteger)5,
+        *(PdfInteger*)vec_get(deserialized.integers.elements, 1)
+    );
+    TEST_ASSERT_EQ(
+        (PdfInteger)6,
+        *(PdfInteger*)vec_get(deserialized.integers.elements, 2)
+    );
+
+    return TEST_RESULT_PASS;
+}
+
+DESERIALIZABLE_ARRAY_TYPE(DeserializeTestStructArray)
+
+typedef struct {
+    DeserializeTestStructArray inners;
+    PdfObject* raw_dict;
+} TestDeserializeTestComplexArray;
+
+PdfResult deserialize_test_complex_array(
+    PdfObject* object,
+    PdfDocument* doc,
+    TestDeserializeTestComplexArray* deserialized
+) {
+    PdfFieldDescriptor fields[] = {PDF_FIELD(
+        TestDeserializeTestComplexArray,
+        "Inners",
+        inners,
+        PDF_ARRAY_FIELD(
+            DeserializeTestStructArray,
+            TestDeserializeInnerStruct,
+            PDF_CUSTOM_FIELD(deserialize_test_inner_struct_untyped)
+        )
+    )};
+
+    DESERIALIZER_IMPL_HELPER();
+}
+
+TEST_FUNC(test_deserialize_custom_array) {
+    Arena* arena = arena_new(1024);
+    const char* objects[] = {
+        "<< /Inners [<< /Hello /There /World 42 >> << /Hello /Example /World 5 >>] >>"
+    };
+
+    char* buffer =
+        pdf_construct_deserde_test_doc(objects, 1, "<< /Size 2 >>", arena);
+    LOG_DEBUG("Buffer:\n%s", buffer);
+
+    DESERIALIZER_TEST_HELPER();
+
+    TestDeserializeTestComplexArray deserialized;
+    TEST_ASSERT_EQ(
+        (PdfResult)PDF_OK,
+        deserialize_test_complex_array(&object, doc, &deserialized)
+    );
+
+    TEST_ASSERT(deserialized.inners.elements);
+    TEST_ASSERT_EQ((size_t)2, vec_len(deserialized.inners.elements));
+
+    TestDeserializeInnerStruct* element0 =
+        vec_get(deserialized.inners.elements, 0);
+    TEST_ASSERT(element0);
+    TEST_ASSERT_EQ("There", element0->hello);
+    TEST_ASSERT_EQ(42, element0->world);
+
+    TestDeserializeInnerStruct* element1 =
+        vec_get(deserialized.inners.elements, 1);
+    TEST_ASSERT(element1);
+    TEST_ASSERT_EQ("Example", element1->hello);
+    TEST_ASSERT_EQ(5, element1->world);
+
+    return TEST_RESULT_PASS;
+}
+
+#endif // TEST

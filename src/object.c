@@ -28,7 +28,12 @@ PdfResult pdf_parse_dict(
     PdfObject* object,
     bool in_indirect_obj
 );
-PdfResult pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfObject* object);
+PdfResult pdf_parse_indirect(
+    Arena* arena,
+    PdfCtx* ctx,
+    PdfObject* object,
+    bool* number_fallback
+);
 PdfResult pdf_parse_stream(
     Arena* arena,
     PdfCtx* ctx,
@@ -46,7 +51,7 @@ PdfResult pdf_parse_object(
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(object);
 
-    LOG_DEBUG_G("object", "Parsing object at offset %zu", pdf_ctx_offset(ctx));
+    LOG_INFO_G("object", "Parsing object at offset %zu", pdf_ctx_offset(ctx));
 
     char peeked, peeked_next;
     PDF_PROPAGATE(pdf_ctx_peek(ctx, &peeked));
@@ -64,11 +69,18 @@ PdfResult pdf_parse_object(
         return pdf_parse_number(ctx, object);
     } else if (isdigit((unsigned char)peeked)) {
         size_t restore_offset = pdf_ctx_offset(ctx);
-        if (pdf_parse_indirect(arena, ctx, object) == PDF_OK) {
-            return PDF_OK;
+        bool number_fallback = true;
+        PdfResult result =
+            pdf_parse_indirect(arena, ctx, object, &number_fallback);
+
+        if (result == PDF_OK || !number_fallback) {
+            return result;
         }
 
-        LOG_DEBUG_G("object", "Failed to parse indirect object/reference");
+        LOG_DEBUG_G(
+            "object",
+            "Failed to parse indirect object/reference. Attempting to parse number."
+        );
         PDF_PROPAGATE(pdf_ctx_seek(ctx, restore_offset));
 
         return pdf_parse_number(ctx, object);
@@ -638,10 +650,16 @@ PdfResult pdf_parse_stream(
     return PDF_OK;
 }
 
-PdfResult pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfObject* object) {
+PdfResult pdf_parse_indirect(
+    Arena* arena,
+    PdfCtx* ctx,
+    PdfObject* object,
+    bool* number_fallback
+) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(object);
+    RELEASE_ASSERT(number_fallback);
 
     LOG_DEBUG_G("object", "Parsing indirect object or reference");
 
@@ -685,6 +703,7 @@ PdfResult pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfObject* object) {
         PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, false, &is_pdf_non_regular)
         );
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
+        *number_fallback = false;
 
         PdfObject* inner = arena_alloc(arena, sizeof(PdfObject));
         PDF_PROPAGATE(pdf_parse_object(arena, ctx, inner, true));
@@ -705,10 +724,10 @@ PdfResult pdf_parse_indirect(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     }
 }
 
-char* format_alloc(Arena* arena, const char* fmt, ...)
+static char* format_alloc(Arena* arena, const char* fmt, ...)
     __attribute__((format(printf, 2, 3)));
 
-char* format_alloc(Arena* arena, const char* fmt, ...) {
+static char* format_alloc(Arena* arena, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
     va_list args_copy;
@@ -1561,44 +1580,36 @@ TEST_FUNC(test_object_stream_crlf) {
 }
 
 TEST_FUNC(test_object_stream_cr) {
-    // Stream parsing fails and it falls back to the integer
-    SETUP_VALID_PARSE_OBJECT_WITH_OFFSET(
+    SETUP_INVALID_PARSE_OBJECT(
         "0 0 obj << /Length 8 >> stream\r01234567\nendstream\n endobj",
-        PDF_OBJECT_TYPE_INTEGER,
-        1
+        PDF_ERR_CTX_EXPECT
     );
 
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_stream_bad_length) {
-    // Stream parsing fails and it falls back to the integer
-    SETUP_VALID_PARSE_OBJECT_WITH_OFFSET(
+    SETUP_INVALID_PARSE_OBJECT(
         "0 0 obj << /Length 7 >> stream\n01234567\nendstream\n endobj",
-        PDF_OBJECT_TYPE_INTEGER,
-        1
+        PDF_ERR_CTX_EXPECT
     );
 
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_stream_bad_length2) {
-    // Stream parsing fails and it falls back to the integer
-    SETUP_VALID_PARSE_OBJECT_WITH_OFFSET(
+    SETUP_INVALID_PARSE_OBJECT(
         "0 0 obj << /Length 9 >> stream\n01234567\nendstream\n endobj",
-        PDF_OBJECT_TYPE_INTEGER,
-        1
+        PDF_ERR_CTX_EXPECT
     );
 
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_stream_no_line_end) {
-    // Stream parsing fails and it falls back to the integer
-    SETUP_VALID_PARSE_OBJECT_WITH_OFFSET(
+    SETUP_INVALID_PARSE_OBJECT(
         "0 0 obj << /Length 9 >> stream\n01234567endstream\n endobj",
-        PDF_OBJECT_TYPE_INTEGER,
-        1
+        PDF_ERR_CTX_EXPECT
     );
 
     return TEST_RESULT_PASS;

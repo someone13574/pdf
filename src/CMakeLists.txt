@@ -14,6 +14,7 @@ set(SOURCE_FILE_LIST
     pdf.c
     log.c
     test.c
+    test_helpers.c test_helpers.h
     arena.c
     vec.c
     ctx.c ctx.h

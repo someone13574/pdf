@@ -10,6 +10,7 @@
 typedef enum {
     PDF_FIELD_KIND_OBJECT,
     PDF_FIELD_KIND_REF,
+    PDF_FIELD_KIND_CUSTOM,
     PDF_FIELD_KIND_ARRAY,
     PDF_FIELD_KIND_AS_ARRAY,
     PDF_FIELD_KIND_OPTIONAL,
@@ -25,6 +26,12 @@ typedef struct {
 typedef struct {
     size_t object_ref_offset;
 } PdfRefFieldData;
+
+typedef PdfResult (*PdfDeserializerFn)(
+    PdfObject* object,
+    PdfDocument* doc,
+    void* deserialized
+);
 
 typedef struct {
     size_t vec_offset;
@@ -44,6 +51,7 @@ struct PdfFieldInfo {
     union {
         PdfObjectFieldData object;
         PdfRefFieldData ref;
+        PdfDeserializerFn custom;
         PdfArrayFieldData array;
         PdfOptionalFieldData optional;
     } data;
@@ -87,6 +95,11 @@ PdfResult pdf_deserialize_object(
     (PdfFieldInfo) {                                                           \
         .kind = PDF_FIELD_KIND_REF,                                            \
         .data.ref.object_ref_offset = offsetof(ref_type, ref)                  \
+    }
+
+#define PDF_CUSTOM_FIELD(deserializer_fn)                                      \
+    (PdfFieldInfo) {                                                           \
+        .kind = PDF_FIELD_KIND_CUSTOM, .data.custom = deserializer_fn          \
     }
 
 #define PDF_ARRAY_FIELD(array_type, element_type, field_info)                  \
@@ -140,4 +153,13 @@ PdfResult pdf_deserialize_object(
         ref->resolved = arena_alloc(pdf_doc_arena(doc), sizeof(base_struct));  \
         *(base_struct*)ref->resolved = *resolved;                              \
         return PDF_OK;                                                         \
+    }
+
+#define PDF_UNTYPED_DESERIALIZER_WRAPPER(deserialize_fn, wrapper_name)         \
+    PdfResult wrapper_name(                                                    \
+        PdfObject* object,                                                     \
+        PdfDocument* doc,                                                      \
+        void* deserialized                                                     \
+    ) {                                                                        \
+        return deserialize_fn(object, doc, deserialized);                      \
     }
