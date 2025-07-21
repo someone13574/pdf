@@ -1,11 +1,14 @@
 set(HEADER_LIST
     "${pdf_SOURCE_DIR}/include/pdf.h"
-    "${pdf_SOURCE_DIR}/include/pdf_doc.h"
+    "${pdf_SOURCE_DIR}/include/pdf_resolver.h"
     "${pdf_SOURCE_DIR}/include/pdf_object.h"
+    "${pdf_SOURCE_DIR}/include/pdf_types.h"
     "${pdf_SOURCE_DIR}/include/pdf_result.h"
     "${pdf_SOURCE_DIR}/include/pdf_trailer.h"
     "${pdf_SOURCE_DIR}/include/pdf_catalog.h"
     "${pdf_SOURCE_DIR}/include/pdf_page.h"
+    "${pdf_SOURCE_DIR}/include/pdf_content_stream.h"
+    "${pdf_SOURCE_DIR}/include/pdf_content_op.h"
     "${pdf_SOURCE_DIR}/include/log.h"
     "${pdf_SOURCE_DIR}/include/test.h"
     "${pdf_SOURCE_DIR}/include/vec.h"
@@ -19,10 +22,14 @@ set(SOURCE_FILE_LIST
     vec.c
     ctx.c ctx.h
     object.c object.h
+    types.c
     deserialize.c deserialize.h
     trailer.c
     catalog.c
     page.c
+    content_stream/stream.c
+    content_stream/op.c content_stream/op.h
+    content_stream/operator.c content_stream/operator.h
     xref.c xref.h
     ${HEADER_LIST})
 

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "deserialize_types.h"
-#include "pdf_doc.h"
 #include "pdf_object.h"
+#include "pdf_resolver.h"
 
 // Page tree node
 typedef struct {
@@ -15,7 +15,8 @@ typedef struct {
 
 PdfResult pdf_deserialize_page_tree_node(
     PdfObject* object,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     PdfPageTreeNode* deserialized
 );
 
@@ -35,7 +36,8 @@ typedef struct {
 
 PdfResult pdf_deserialize_page(
     PdfObject* object,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     PdfPage* deserialized
 );
 

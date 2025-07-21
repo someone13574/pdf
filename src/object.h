@@ -11,3 +11,6 @@ PdfResult pdf_parse_object(
     PdfObject* object,
     bool in_indirect_obj
 );
+
+PdfResult
+pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object);

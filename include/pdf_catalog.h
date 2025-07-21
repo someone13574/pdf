@@ -1,9 +1,9 @@
 #pragma once
 
 #include "deserialize_types.h"
-#include "pdf_doc.h"
 #include "pdf_object.h"
 #include "pdf_page.h"
+#include "pdf_resolver.h"
 #include "pdf_result.h"
 
 // Catalog
@@ -15,7 +15,8 @@ typedef struct {
 
 PdfResult pdf_deserialize_catalog(
     PdfObject* object,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     PdfCatalog* deserialized
 );
 

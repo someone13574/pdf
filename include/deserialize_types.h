@@ -7,7 +7,7 @@
     } base_struct##Ref;                                                        \
     PdfResult pdf_resolve_##lowercase_name(                                    \
         base_struct##Ref* ref,                                                 \
-        PdfDocument* doc,                                                      \
+        PdfResolver* resolver,                                                 \
         base_struct* resolved                                                  \
     );
 

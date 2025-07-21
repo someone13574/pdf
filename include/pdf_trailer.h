@@ -1,8 +1,8 @@
 #pragma once
 
 #include "pdf_catalog.h"
-#include "pdf_doc.h"
 #include "pdf_object.h"
+#include "pdf_resolver.h"
 #include "pdf_result.h"
 
 typedef struct {
@@ -13,6 +13,7 @@ typedef struct {
 
 PdfResult pdf_deserialize_trailer(
     PdfObject* object,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     PdfTrailer* deserialized
 );

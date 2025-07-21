@@ -5,9 +5,10 @@
 #include "log.h"
 #include "pdf.h"
 #include "pdf_catalog.h"
-#include "pdf_doc.h"
+#include "pdf_content_stream.h"
 #include "pdf_object.h"
 #include "pdf_page.h"
+#include "pdf_resolver.h"
 #include "pdf_result.h"
 #include "vec.h"
 
@@ -60,22 +61,23 @@ int main(int argc, char** argv) {
     char* buffer =
         load_file_to_buffer(arena, "test-files/test.pdf", &buffer_size);
 
-    PdfDocument* doc;
-    PDF_REQUIRE(pdf_document_new(arena, buffer, buffer_size, &doc));
+    PdfResolver* resolver;
+    PDF_REQUIRE(pdf_resolver_new(arena, buffer, buffer_size, &resolver));
 
     PdfCatalog catalog;
-    PDF_REQUIRE(pdf_get_catalog(doc, &catalog));
+    PDF_REQUIRE(pdf_get_catalog(resolver, &catalog));
 
     printf("%s\n", pdf_fmt_object(arena, catalog.raw_dict));
 
     PdfPageTreeNode page_tree_root;
-    PDF_REQUIRE(pdf_resolve_page_tree_node(&catalog.pages, doc, &page_tree_root)
+    PDF_REQUIRE(
+        pdf_resolve_page_tree_node(&catalog.pages, resolver, &page_tree_root)
     );
 
     for (size_t idx = 0; idx < vec_len(page_tree_root.kids); idx++) {
         PdfPageRef* page_ref = vec_get(page_tree_root.kids, idx);
         PdfPage page;
-        PDF_REQUIRE(pdf_resolve_page(page_ref, doc, &page));
+        PDF_REQUIRE(pdf_resolve_page(page_ref, resolver, &page));
 
         printf("%s\n", pdf_fmt_object(arena, page.raw_dict));
 
@@ -86,6 +88,11 @@ int main(int argc, char** argv) {
                 PdfStream* content =
                     vec_get(page.contents.value.elements, contents_idx);
                 printf("%s\n", content->stream_bytes);
+
+                PdfContentStream stream;
+                PDF_REQUIRE(
+                    pdf_deserialize_content_stream(content, arena, &stream)
+                );
             }
         }
     }

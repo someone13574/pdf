@@ -8,6 +8,7 @@ Vec* vec_new(Arena* arena);
 
 void vec_push(Vec* vec, void* element);
 void* vec_pop(Vec* vec);
+void vec_clear(Vec* vec);
 
 void* vec_get(Vec* vec, size_t idx);
 size_t vec_len(Vec* vec);

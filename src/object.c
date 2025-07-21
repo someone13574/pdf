@@ -101,6 +101,48 @@ PdfResult pdf_parse_object(
     return PDF_ERR_INVALID_OBJECT;
 }
 
+PdfResult
+pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object) {
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(object);
+
+    LOG_DEBUG_G(
+        "object",
+        "Parsing operand object at offset %zu in stream ctx",
+        pdf_ctx_offset(ctx)
+    );
+
+    char peeked, peeked_next;
+    PDF_PROPAGATE(pdf_ctx_peek(ctx, &peeked));
+
+    PdfResult peeked_next_result = pdf_ctx_peek_next(ctx, &peeked_next);
+    if (peeked == '<' && peeked_next_result != PDF_OK) {
+        return peeked_next_result;
+    }
+
+    if (peeked == 't') {
+        return pdf_parse_true(ctx, object);
+    } else if (peeked == 'f') {
+        return pdf_parse_false(ctx, object);
+    } else if (peeked == '.' || peeked == '+' || peeked == '-' || isdigit((unsigned char)peeked)) {
+        return pdf_parse_number(ctx, object);
+    } else if (peeked == '(') {
+        return pdf_parse_string_literal(arena, ctx, object);
+    } else if (peeked == '<' && peeked_next != '<') {
+        LOG_TODO("Hexadecimal strings");
+    } else if (peeked == '/') {
+        return pdf_parse_name(arena, ctx, object);
+    } else if (peeked == '[') {
+        return pdf_parse_array(arena, ctx, object);
+    } else if (peeked == '<' && peeked_next == '<') {
+        return pdf_parse_dict(arena, ctx, object, false);
+    } else if (peeked == 'n') {
+        return pdf_parse_null(ctx, object);
+    }
+
+    return PDF_ERR_INVALID_OBJECT;
+}
+
 PdfResult pdf_parse_true(PdfCtx* ctx, PdfObject* object) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(object);
@@ -728,6 +770,9 @@ static char* format_alloc(Arena* arena, const char* fmt, ...)
     __attribute__((format(printf, 2, 3)));
 
 static char* format_alloc(Arena* arena, const char* fmt, ...) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(fmt);
+
     va_list args;
     va_start(args, fmt);
     va_list args_copy;
@@ -913,16 +958,18 @@ char* pdf_fmt_object_indented(
 }
 
 char* pdf_fmt_object(Arena* arena, PdfObject* object) {
-    if (!arena) {
-        arena = arena_new(64);
-        char* formatted = pdf_fmt_object_indented(arena, object, 0, NULL);
-        char* copy = strdup(formatted);
-        arena_free(arena);
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(object);
 
-        return copy;
-    } else {
-        return pdf_fmt_object_indented(arena, object, 0, NULL);
-    }
+    Arena* temp_arena = arena_new(512);
+    char* formatted = pdf_fmt_object_indented(temp_arena, object, 0, NULL);
+
+    unsigned long len = strlen(formatted);
+    char* allocated = arena_alloc(arena, sizeof(char) * (len + 1));
+    strncpy(allocated, formatted, (size_t)len);
+    arena_free(temp_arena);
+
+    return allocated;
 }
 
 #ifdef TEST

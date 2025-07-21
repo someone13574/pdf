@@ -77,6 +77,11 @@ void* vec_pop(Vec* vec) {
     return element;
 }
 
+void vec_clear(Vec* vec) {
+    RELEASE_ASSERT(vec);
+    vec->len = 0;
+}
+
 void* vec_get(Vec* vec, size_t idx) {
     RELEASE_ASSERT(vec);
 

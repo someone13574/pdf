@@ -72,6 +72,8 @@ Arena* arena_new(size_t block_size) {
 void arena_free(Arena* arena) {
     RELEASE_ASSERT(arena);
 
+    LOG_INFO_G("arena", "Freeing arena");
+
     for (size_t block = 0; block < arena->num_blocks; block++) {
         free((void*)arena->blocks[block].start);
     }

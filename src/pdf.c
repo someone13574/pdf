@@ -8,13 +8,13 @@
 #include "log.h"
 #include "object.h"
 #include "pdf_catalog.h"
-#include "pdf_doc.h"
 #include "pdf_object.h"
+#include "pdf_resolver.h"
 #include "pdf_result.h"
 #include "pdf_trailer.h"
 #include "xref.h"
 
-struct PdfDocument {
+struct PdfResolver {
     Arena* arena;
     PdfCtx* ctx;
 
@@ -29,16 +29,16 @@ struct PdfDocument {
 PdfResult pdf_parse_header(PdfCtx* ctx, uint8_t* version);
 PdfResult pdf_parse_startxref(PdfCtx* ctx, size_t* startxref);
 
-PdfResult pdf_document_new(
+PdfResult pdf_resolver_new(
     Arena* arena,
     char* buffer,
     size_t buffer_size,
-    PdfDocument** doc
+    PdfResolver** resolver
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(buffer);
     RELEASE_ASSERT(buffer_size != 0);
-    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(resolver);
 
     PdfCtx* ctx = pdf_ctx_new(arena, buffer, buffer_size);
 
@@ -58,88 +58,122 @@ PdfResult pdf_document_new(
         return xref_result;
     }
 
-    *doc = arena_alloc(arena, sizeof(PdfDocument));
-    (*doc)->arena = arena;
-    (*doc)->ctx = ctx;
-    (*doc)->version = version;
-    (*doc)->startxref = startxref;
-    (*doc)->xref = xref;
-    (*doc)->trailer = NULL;
-    (*doc)->catalog = NULL;
+    *resolver = arena_alloc(arena, sizeof(PdfResolver));
+    (*resolver)->arena = arena;
+    (*resolver)->ctx = ctx;
+    (*resolver)->version = version;
+    (*resolver)->startxref = startxref;
+    (*resolver)->xref = xref;
+    (*resolver)->trailer = NULL;
+    (*resolver)->catalog = NULL;
 
     return PDF_OK;
 }
 
-Arena* pdf_doc_arena(PdfDocument* doc) {
-    RELEASE_ASSERT(doc);
+PdfOptionalResolver pdf_op_resolver_some(PdfResolver* resolver) {
+    RELEASE_ASSERT(resolver);
 
-    return doc->arena;
+    return (PdfOptionalResolver
+    ) {.present = true, .unwrap_indirect_objs = true, .resolver = resolver};
 }
 
-PdfResult pdf_get_trailer(PdfDocument* doc, PdfTrailer* trailer) {
-    RELEASE_ASSERT(doc);
+PdfOptionalResolver pdf_op_resolver_none(bool unwrap_indirect_objs) {
+    return (PdfOptionalResolver
+    ) {.present = false,
+       .unwrap_indirect_objs = unwrap_indirect_objs,
+       .resolver = NULL};
+}
+
+bool pdf_op_resolver_valid(PdfOptionalResolver resolver) {
+    return !resolver.present || resolver.resolver;
+}
+
+Arena* pdf_resolver_arena(PdfResolver* resolver) {
+    RELEASE_ASSERT(resolver);
+
+    return resolver->arena;
+}
+
+PdfResult pdf_get_trailer(PdfResolver* resolver, PdfTrailer* trailer) {
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(trailer);
 
-    if (doc->trailer) {
-        *trailer = *doc->trailer;
+    if (resolver->trailer) {
+        *trailer = *resolver->trailer;
         return PDF_OK;
     }
 
-    PDF_PROPAGATE(pdf_ctx_seek(doc->ctx, pdf_ctx_buffer_len(doc->ctx)));
-    PDF_PROPAGATE(pdf_ctx_seek_line_start(doc->ctx));
+    PDF_PROPAGATE(pdf_ctx_seek(resolver->ctx, pdf_ctx_buffer_len(resolver->ctx))
+    );
+    PDF_PROPAGATE(pdf_ctx_seek_line_start(resolver->ctx));
 
-    while (pdf_ctx_expect(doc->ctx, "trailer") != PDF_OK
-           && pdf_ctx_offset(doc->ctx) != 0) {
-        PDF_PROPAGATE(pdf_ctx_shift(doc->ctx, -1));
-        PDF_PROPAGATE(pdf_ctx_seek_line_start(doc->ctx));
+    while (pdf_ctx_expect(resolver->ctx, "trailer") != PDF_OK
+           && pdf_ctx_offset(resolver->ctx) != 0) {
+        PDF_PROPAGATE(pdf_ctx_shift(resolver->ctx, -1));
+        PDF_PROPAGATE(pdf_ctx_seek_line_start(resolver->ctx));
     }
 
-    PDF_PROPAGATE(pdf_ctx_seek_next_line(doc->ctx));
+    PDF_PROPAGATE(pdf_ctx_seek_next_line(resolver->ctx));
 
-    PdfObject* trailer_dict = arena_alloc(doc->arena, sizeof(PdfObject));
-    PDF_PROPAGATE(pdf_parse_object(doc->arena, doc->ctx, trailer_dict, false));
+    PdfObject* trailer_dict = arena_alloc(resolver->arena, sizeof(PdfObject));
+    PDF_PROPAGATE(
+        pdf_parse_object(resolver->arena, resolver->ctx, trailer_dict, false)
+    );
 
-    PDF_PROPAGATE(pdf_deserialize_trailer(trailer_dict, doc, trailer));
+    PDF_PROPAGATE(pdf_deserialize_trailer(
+        trailer_dict,
+        resolver->arena,
+        pdf_op_resolver_some(resolver),
+        trailer
+    ));
 
-    doc->trailer = arena_alloc(doc->arena, sizeof(PdfTrailer));
-    *doc->trailer = *trailer;
+    resolver->trailer = arena_alloc(resolver->arena, sizeof(PdfTrailer));
+    *resolver->trailer = *trailer;
 
     return PDF_OK;
 }
 
-PdfResult pdf_get_catalog(PdfDocument* doc, PdfCatalog* catalog) {
-    RELEASE_ASSERT(doc);
+PdfResult pdf_get_catalog(PdfResolver* resolver, PdfCatalog* catalog) {
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(catalog);
 
-    if (doc->catalog) {
-        *catalog = *doc->catalog;
+    if (resolver->catalog) {
+        *catalog = *resolver->catalog;
         return PDF_OK;
     }
 
     PdfTrailer trailer;
-    PDF_PROPAGATE(pdf_get_trailer(doc, &trailer));
-    PDF_PROPAGATE(pdf_resolve_catalog(&trailer.root, doc, catalog));
+    PDF_PROPAGATE(pdf_get_trailer(resolver, &trailer));
+    PDF_PROPAGATE(pdf_resolve_catalog(&trailer.root, resolver, catalog));
 
-    doc->catalog = arena_alloc(doc->arena, sizeof(PdfCatalog));
-    *doc->catalog = *catalog;
+    resolver->catalog = arena_alloc(resolver->arena, sizeof(PdfCatalog));
+    *resolver->catalog = *catalog;
 
     return PDF_OK;
 }
 
-PdfResult
-pdf_resolve(PdfDocument* doc, PdfIndirectRef ref, PdfObject* resolved) {
-    RELEASE_ASSERT(doc);
+PdfResult pdf_resolve_ref(
+    PdfResolver* resolver,
+    PdfIndirectRef ref,
+    PdfObject* resolved
+) {
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(resolved);
 
     XRefEntry* entry;
+    PDF_PROPAGATE(pdf_xref_get_entry(
+        resolver->xref,
+        ref.object_id,
+        ref.generation,
+        &entry
+    ));
+
+    PDF_PROPAGATE(pdf_ctx_seek(resolver->ctx, entry->offset));
+
+    entry->object = arena_alloc(resolver->arena, sizeof(PdfObject));
     PDF_PROPAGATE(
-        pdf_xref_get_entry(doc->xref, ref.object_id, ref.generation, &entry)
+        pdf_parse_object(resolver->arena, resolver->ctx, entry->object, false)
     );
-
-    PDF_PROPAGATE(pdf_ctx_seek(doc->ctx, entry->offset));
-
-    entry->object = arena_alloc(doc->arena, sizeof(PdfObject));
-    PDF_PROPAGATE(pdf_parse_object(doc->arena, doc->ctx, entry->object, false));
     *resolved = *entry->object;
 
     return PDF_OK;
@@ -326,24 +360,5 @@ TEST_FUNC(test_startxref_invalid3) {
     arena_free(arena);
     return TEST_RESULT_PASS;
 }
-
-// TEST_FUNC(test_trailer) {
-//     char buffer[] =
-//         "%PDF-1.7\nxref\n0 1\n0000000000 65536 f\ntrailer\n<</Size
-//         1>>\nstartxref\n9\n%%EOF";
-//     Arena* arena = arena_new(128);
-
-//     PdfResult result = PDF_OK;
-//     PdfDocument* doc = pdf_document_new(arena, buffer, strlen(buffer),
-//     &result); TEST_ASSERT_EQ((PdfResult)PDF_OK, result); TEST_ASSERT(doc);
-
-//     PdfSchemaTrailer* trailer = pdf_get_trailer(doc, &result);
-//     TEST_ASSERT_EQ((PdfResult)PDF_OK, result);
-//     TEST_ASSERT(trailer);
-
-//     TEST_ASSERT_EQ(trailer->size, 1);
-
-//     return TEST_RESULT_PASS;
-// }
 
 #endif // TEST

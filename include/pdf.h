@@ -1,9 +1,9 @@
 #pragma once
 
 #include "pdf_catalog.h"
-#include "pdf_doc.h"
+#include "pdf_resolver.h"
 #include "pdf_result.h"
 #include "pdf_trailer.h"
 
-PdfResult pdf_get_trailer(PdfDocument* doc, PdfTrailer* trailer);
-PdfResult pdf_get_catalog(PdfDocument* doc, PdfCatalog* catalog);
+PdfResult pdf_get_trailer(PdfResolver* resolver, PdfTrailer* trailer);
+PdfResult pdf_get_catalog(PdfResolver* resolver, PdfCatalog* catalog);

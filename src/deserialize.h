@@ -3,8 +3,8 @@
 #include <stddef.h>
 
 #include "log.h"
-#include "pdf_doc.h"
 #include "pdf_object.h"
+#include "pdf_resolver.h"
 #include "pdf_result.h"
 
 typedef enum {
@@ -29,7 +29,8 @@ typedef struct {
 
 typedef PdfResult (*PdfDeserializerFn)(
     PdfObject* object,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     void* deserialized
 );
 
@@ -69,18 +70,87 @@ typedef struct {
     PdfFieldDebugInfo debug;
 } PdfFieldDescriptor;
 
+typedef struct {
+    size_t offset;
+    PdfFieldInfo info;
+    PdfFieldDebugInfo debug;
+} PdfOperandDescriptor;
+
+PdfResult pdf_resolve_object(
+    PdfOptionalResolver resolver,
+    PdfObject* object,
+    PdfObject* resolved
+);
+
+PdfResult pdf_deserialize_object_field(
+    void* field_ptr,
+    PdfObject* object,
+    PdfObjectFieldData field_data
+);
+PdfResult pdf_deserialize_ref_field(
+    void* field_ptr,
+    PdfObject* object,
+    PdfRefFieldData field_data
+);
+PdfResult pdf_deserialize_custom_field(
+    void* field_ptr,
+    PdfObject* object,
+    Arena* arena,
+    PdfDeserializerFn deserializer,
+    PdfOptionalResolver resolver
+);
+PdfResult pdf_deserialize_array_field(
+    void* field_ptr,
+    PdfObject* object,
+    PdfArrayFieldData field_data,
+    Arena* arena,
+    PdfOptionalResolver resolver
+);
+PdfResult pdf_deserialize_as_array_field(
+    void* field_ptr,
+    PdfObject* object,
+    PdfArrayFieldData field_data,
+    Arena* arena,
+    PdfOptionalResolver resolver
+);
+PdfResult pdf_deserialize_optional_field(
+    void* field_ptr,
+    PdfObject* object,
+    PdfOptionalFieldData field_data,
+    Arena* arena,
+    PdfOptionalResolver resolver
+);
+
 PdfResult pdf_deserialize_object(
     void* target,
     PdfObject* object,
     PdfFieldDescriptor* fields,
     size_t num_fields,
-    PdfDocument* doc
+    Arena* arena,
+    PdfOptionalResolver resolver
+);
+
+PdfResult pdf_deserialize_operands(
+    void* target,
+    PdfOperandDescriptor* descriptors,
+    size_t num_descriptors,
+    Vec* operands,
+    Arena* arena
 );
 
 #define PDF_FIELD(struct_type, key_str, field_name, field_info)                \
     {                                                                          \
         .key = (key_str), .offset = offsetof(struct_type, field_name),         \
         .info = (field_info), .debug = {                                       \
+            .file = RELATIVE_FILE_PATH,                                        \
+            .line = __LINE__                                                   \
+        }                                                                      \
+    }
+
+#define PDF_OPERAND(struct_type, field_name, field_info)                       \
+    {                                                                          \
+        .offset = offsetof(struct_type, field_name), .info = (field_info),     \
+        .debug = {                                                             \
             .file = RELATIVE_FILE_PATH,                                        \
             .line = __LINE__                                                   \
         }                                                                      \
@@ -136,21 +206,27 @@ PdfResult pdf_deserialize_object(
 )                                                                              \
     PdfResult pdf_resolve_##lowercase_name(                                    \
         base_struct##Ref* ref,                                                 \
-        PdfDocument* doc,                                                      \
+        PdfResolver* resolver,                                                 \
         base_struct* resolved                                                  \
     ) {                                                                        \
         RELEASE_ASSERT(ref);                                                   \
-        RELEASE_ASSERT(doc);                                                   \
+        RELEASE_ASSERT(resolver);                                              \
         RELEASE_ASSERT(resolved);                                              \
         if (ref->resolved) {                                                   \
             *resolved = *(base_struct*)ref->resolved;                          \
             return PDF_OK;                                                     \
         }                                                                      \
         PdfObject* object =                                                    \
-            arena_alloc(pdf_doc_arena(doc), sizeof(PdfObject));                \
-        PDF_PROPAGATE(pdf_resolve(doc, ref->ref, object));                     \
-        PDF_PROPAGATE(deserialize_fn(object, doc, resolved));                  \
-        ref->resolved = arena_alloc(pdf_doc_arena(doc), sizeof(base_struct));  \
+            arena_alloc(pdf_resolver_arena(resolver), sizeof(PdfObject));      \
+        PDF_PROPAGATE(pdf_resolve_ref(resolver, ref->ref, object));            \
+        PDF_PROPAGATE(deserialize_fn(                                          \
+            object,                                                            \
+            pdf_resolver_arena(resolver),                                      \
+            pdf_op_resolver_some(resolver),                                    \
+            resolved                                                           \
+        ));                                                                    \
+        ref->resolved =                                                        \
+            arena_alloc(pdf_resolver_arena(resolver), sizeof(base_struct));    \
         *(base_struct*)ref->resolved = *resolved;                              \
         return PDF_OK;                                                         \
     }
@@ -158,8 +234,9 @@ PdfResult pdf_deserialize_object(
 #define PDF_UNTYPED_DESERIALIZER_WRAPPER(deserialize_fn, wrapper_name)         \
     PdfResult wrapper_name(                                                    \
         PdfObject* object,                                                     \
-        PdfDocument* doc,                                                      \
+        Arena* arena,                                                          \
+        PdfOptionalResolver resolver,                                          \
         void* deserialized                                                     \
     ) {                                                                        \
-        return deserialize_fn(object, doc, deserialized);                      \
+        return deserialize_fn(object, arena, resolver, deserialized);          \
     }

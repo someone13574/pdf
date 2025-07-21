@@ -4,132 +4,126 @@
 
 #include "arena.h"
 #include "log.h"
-#include "pdf_doc.h"
 #include "pdf_object.h"
+#include "pdf_resolver.h"
 #include "pdf_result.h"
 #include "vec.h"
 
-PdfResult
-resolve_object(PdfDocument* doc, PdfObject* object, PdfObject* resolved) {
-    RELEASE_ASSERT(doc);
+PdfResult pdf_resolve_object(
+    PdfOptionalResolver resolver,
+    PdfObject* object,
+    PdfObject* resolved
+) {
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(resolved);
 
-    if (object->type == PDF_OBJECT_TYPE_INDIRECT_OBJECT) {
+    if (object->type == PDF_OBJECT_TYPE_INDIRECT_OBJECT
+        && resolver.unwrap_indirect_objs) {
         LOG_TRACE_G("deserde", "Unwrapping indirect object");
-        return resolve_object(
-            doc,
+        return pdf_resolve_object(
+            resolver,
             object->data.indirect_object.object,
             resolved
         );
     }
 
-    if (object->type == PDF_OBJECT_TYPE_INDIRECT_REF) {
+    if (object->type == PDF_OBJECT_TYPE_INDIRECT_REF && resolver.present) {
         LOG_TRACE_G("deserde", "Resolving indirect reference");
 
         PdfObject indirect_object;
-        PDF_PROPAGATE(
-            pdf_resolve(doc, object->data.indirect_ref, &indirect_object)
-        );
+        PDF_PROPAGATE(pdf_resolve_ref(
+            resolver.resolver,
+            object->data.indirect_ref,
+            &indirect_object
+        ));
 
-        return resolve_object(doc, &indirect_object, resolved);
+        return pdf_resolve_object(resolver, &indirect_object, resolved);
     }
+
+    LOG_TRACE_G("deserde", "Resolved type is %d", object->type);
 
     *resolved = *object;
     return PDF_OK;
 }
 
-PdfResult deserialize_object_field(
-    void* field_ptr,
-    PdfObject* object,
-    PdfObjectFieldData field_data,
-    PdfDocument* doc
-);
-PdfResult deserialize_ref_field(
-    void* field_ptr,
-    PdfObject* object,
-    PdfRefFieldData field_data
-);
-PdfResult deserialize_custom_field(
-    void* field_ptr,
-    PdfObject* object,
-    PdfDeserializerFn deserializer,
-    PdfDocument* doc
-);
-PdfResult deserialize_array_field(
-    void* field_ptr,
-    PdfObject* object,
-    PdfArrayFieldData field_data,
-    PdfDocument* doc
-);
-PdfResult deserialize_as_array_field(
-    void* field_ptr,
-    PdfObject* object,
-    PdfArrayFieldData field_data,
-    PdfDocument* doc
-);
-PdfResult deserialize_optional_field(
-    void* field_ptr,
-    PdfObject* object,
-    PdfOptionalFieldData field_data,
-    PdfDocument* doc
-);
-
 PdfResult deserialize_field(
     void* field_ptr,
     PdfObject* object,
     PdfFieldInfo field_info,
-    PdfDocument* doc
+    Arena* arena,
+    PdfOptionalResolver resolver
 ) {
+    RELEASE_ASSERT(field_ptr);
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+
+    PdfObject resolved_object;
+
+    bool is_ref_field = field_info.kind == PDF_FIELD_KIND_REF;
+    bool is_indirect_obj_field = field_info.kind == PDF_FIELD_KIND_OBJECT
+        && (field_info.data.object.type == PDF_OBJECT_TYPE_INDIRECT_REF
+            || field_info.data.object.type == PDF_OBJECT_TYPE_INDIRECT_OBJECT);
+    if (is_ref_field || is_indirect_obj_field) {
+        resolved_object = *object;
+    } else {
+        PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved_object));
+    }
+
     switch (field_info.kind) {
         case PDF_FIELD_KIND_OBJECT: {
-            PDF_PROPAGATE(deserialize_object_field(
+            PDF_PROPAGATE(pdf_deserialize_object_field(
                 field_ptr,
-                object,
-                field_info.data.object,
-                doc
+                &resolved_object,
+                field_info.data.object
             ));
             break;
         }
         case PDF_FIELD_KIND_REF: {
-            PDF_PROPAGATE(
-                deserialize_ref_field(field_ptr, object, field_info.data.ref)
-            );
+            PDF_PROPAGATE(pdf_deserialize_ref_field(
+                field_ptr,
+                &resolved_object,
+                field_info.data.ref
+            ));
             break;
         }
         case PDF_FIELD_KIND_CUSTOM: {
-            PDF_PROPAGATE(deserialize_custom_field(
+            PDF_PROPAGATE(pdf_deserialize_custom_field(
                 field_ptr,
-                object,
+                &resolved_object,
+                arena,
                 field_info.data.custom,
-                doc
+                resolver
             ));
             break;
         }
         case PDF_FIELD_KIND_ARRAY: {
-            PDF_PROPAGATE(deserialize_array_field(
+            PDF_PROPAGATE(pdf_deserialize_array_field(
                 field_ptr,
-                object,
+                &resolved_object,
                 field_info.data.array,
-                doc
+                arena,
+                resolver
             ));
             break;
         }
         case PDF_FIELD_KIND_AS_ARRAY: {
-            PDF_PROPAGATE(deserialize_as_array_field(
+            PDF_PROPAGATE(pdf_deserialize_as_array_field(
                 field_ptr,
-                object,
+                &resolved_object,
                 field_info.data.array,
-                doc
+                arena,
+                resolver
             ));
             break;
         }
         case PDF_FIELD_KIND_OPTIONAL: {
-            PDF_PROPAGATE(deserialize_optional_field(
+            PDF_PROPAGATE(pdf_deserialize_optional_field(
                 field_ptr,
-                object,
+                &resolved_object,
                 field_info.data.optional,
-                doc
+                arena,
+                resolver
             ));
             break;
         }
@@ -141,81 +135,70 @@ PdfResult deserialize_field(
     return PDF_OK;
 }
 
-PdfResult deserialize_object_field(
+PdfResult pdf_deserialize_object_field(
     void* field_ptr,
     PdfObject* object,
-    PdfObjectFieldData field_data,
-    PdfDocument* doc
+    PdfObjectFieldData field_data
 ) {
     RELEASE_ASSERT(field_ptr);
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(doc);
-
-    PdfObject resolved_object;
-    if (field_data.type == PDF_OBJECT_TYPE_INDIRECT_OBJECT
-        || field_data.type == PDF_OBJECT_TYPE_INDIRECT_REF) {
-        resolved_object = *object;
-    } else {
-        PDF_PROPAGATE(resolve_object(doc, object, &resolved_object));
-    }
 
     LOG_TRACE_G(
         "deserde",
         "Deserializing object field with type `%d` and expected type `%d`",
-        resolved_object.type,
+        object->type,
         field_data.type
     );
 
-    if (resolved_object.type != field_data.type) {
+    if (object->type != field_data.type) {
         LOG_ERROR_G(
             "deserde",
             "Incorrect type for object field. Expected `%d`, got `%d`",
             field_data.type,
-            resolved_object.type
+            object->type
         );
         return PDF_ERR_INCORRECT_TYPE;
     }
 
-    switch (resolved_object.type) {
+    switch (object->type) {
         case PDF_OBJECT_TYPE_BOOLEAN: {
-            *(PdfBoolean*)field_ptr = resolved_object.data.boolean;
+            *(PdfBoolean*)field_ptr = object->data.boolean;
             break;
         }
         case PDF_OBJECT_TYPE_INTEGER: {
-            *(PdfInteger*)field_ptr = resolved_object.data.integer;
+            *(PdfInteger*)field_ptr = object->data.integer;
             break;
         }
         case PDF_OBJECT_TYPE_REAL: {
-            *(PdfReal*)field_ptr = resolved_object.data.real;
+            *(PdfReal*)field_ptr = object->data.real;
             break;
         }
         case PDF_OBJECT_TYPE_STRING: {
-            *(PdfString*)field_ptr = resolved_object.data.string;
+            *(PdfString*)field_ptr = object->data.string;
             break;
         }
         case PDF_OBJECT_TYPE_NAME: {
-            *(PdfName*)field_ptr = resolved_object.data.name;
+            *(PdfName*)field_ptr = object->data.name;
             break;
         }
         case PDF_OBJECT_TYPE_ARRAY: {
-            *(PdfArray*)field_ptr = resolved_object.data.array;
+            *(PdfArray*)field_ptr = object->data.array;
             break;
         }
         case PDF_OBJECT_TYPE_DICT: {
-            *(PdfDict*)field_ptr = resolved_object.data.dict;
+            *(PdfDict*)field_ptr = object->data.dict;
             break;
         }
         case PDF_OBJECT_TYPE_STREAM: {
-            *(PdfStream*)field_ptr = resolved_object.data.stream;
+            *(PdfStream*)field_ptr = object->data.stream;
             break;
         }
         case PDF_OBJECT_TYPE_INDIRECT_OBJECT: {
-            *(PdfIndirectObject*)field_ptr =
-                resolved_object.data.indirect_object;
+            *(PdfIndirectObject*)field_ptr = object->data.indirect_object;
             break;
         }
         case PDF_OBJECT_TYPE_INDIRECT_REF: {
-            *(PdfIndirectRef*)field_ptr = resolved_object.data.indirect_ref;
+            *(PdfIndirectRef*)field_ptr = object->data.indirect_ref;
             break;
         }
         case PDF_OBJECT_TYPE_NULL: {
@@ -226,7 +209,7 @@ PdfResult deserialize_object_field(
     return PDF_OK;
 }
 
-PdfResult deserialize_ref_field(
+PdfResult pdf_deserialize_ref_field(
     void* field_ptr,
     PdfObject* object,
     PdfRefFieldData field_data
@@ -251,53 +234,55 @@ PdfResult deserialize_ref_field(
     return PDF_OK;
 }
 
-PdfResult deserialize_custom_field(
+PdfResult pdf_deserialize_custom_field(
     void* field_ptr,
     PdfObject* object,
+    Arena* arena,
     PdfDeserializerFn deserializer,
-    PdfDocument* doc
+    PdfOptionalResolver resolver
 ) {
     RELEASE_ASSERT(field_ptr);
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(deserializer);
-    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
 
-    return deserializer(object, doc, field_ptr);
+    return deserializer(object, arena, resolver, field_ptr);
 }
 
 PdfResult deserialize_array_element(
     PdfObject* element,
     PdfArrayFieldData field_data,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     void** deserialized
 ) {
     RELEASE_ASSERT(element);
-    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
     RELEASE_ASSERT(deserialized);
 
-    *deserialized = arena_alloc(pdf_doc_arena(doc), field_data.element_size);
+    *deserialized = arena_alloc(arena, field_data.element_size);
     memset(*deserialized, 0, field_data.element_size);
 
     return deserialize_field(
         *deserialized,
         element,
         *field_data.element_info,
-        doc
+        arena,
+        resolver
     );
 }
 
-PdfResult deserialize_array_field(
+PdfResult pdf_deserialize_array_field(
     void* field_ptr,
     PdfObject* object,
     PdfArrayFieldData field_data,
-    PdfDocument* doc
+    Arena* arena,
+    PdfOptionalResolver resolver
 ) {
     RELEASE_ASSERT(field_ptr);
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(doc);
-
-    PdfObject resolved_object;
-    PDF_PROPAGATE(resolve_object(doc, object, &resolved_object));
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
 
     if (object->type != PDF_OBJECT_TYPE_ARRAY) {
         LOG_ERROR_G(
@@ -314,16 +299,20 @@ PdfResult deserialize_array_field(
         vec_len(object->data.array.elements)
     );
 
-    Vec* deserialized_elements = vec_new(pdf_doc_arena(doc));
+    Vec* deserialized_elements = vec_new(arena);
     for (size_t idx = 0; idx < vec_len(object->data.array.elements); idx++) {
         LOG_TRACE_G("deserde", "Deserializing array element %zu", idx);
 
         PdfObject* element = vec_get(object->data.array.elements, idx);
 
         void* deserialized;
-        PDF_PROPAGATE(
-            deserialize_array_element(element, field_data, doc, &deserialized)
-        );
+        PDF_PROPAGATE(deserialize_array_element(
+            element,
+            field_data,
+            arena,
+            resolver,
+            &deserialized
+        ));
 
         vec_push(deserialized_elements, deserialized);
     }
@@ -334,53 +323,58 @@ PdfResult deserialize_array_field(
     return PDF_OK;
 }
 
-PdfResult deserialize_as_array_field(
+PdfResult pdf_deserialize_as_array_field(
     void* field_ptr,
     PdfObject* object,
     PdfArrayFieldData field_data,
-    PdfDocument* doc
+    Arena* arena,
+    PdfOptionalResolver resolver
 ) {
     RELEASE_ASSERT(field_ptr);
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(doc);
-
-    PdfObject resolved_object;
-    PDF_PROPAGATE(resolve_object(doc, object, &resolved_object));
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
 
     if (object->type == PDF_OBJECT_TYPE_ARRAY) {
-        return deserialize_array_field(field_ptr, object, field_data, doc);
+        return pdf_deserialize_array_field(
+            field_ptr,
+            object,
+            field_data,
+            arena,
+            resolver
+        );
     }
 
     LOG_TRACE_G("deserde", "Deserializing single element as array field");
 
     void* deserialized;
-    PDF_PROPAGATE(
-        deserialize_array_element(object, field_data, doc, &deserialized)
-    );
+    PDF_PROPAGATE(deserialize_array_element(
+        object,
+        field_data,
+        arena,
+        resolver,
+        &deserialized
+    ));
 
-    Vec* deserialized_elements = vec_new(pdf_doc_arena(doc));
+    Vec* deserialized_elements = vec_new(arena);
     vec_push(deserialized_elements, deserialized);
 
     void* vec_ptr = (char*)field_ptr + field_data.vec_offset;
-    LOG_INFO(
-        "Vector offset: %zu, ptr=%p",
-        field_data.vec_offset,
-        (void*)vec_ptr
-    );
     *(Vec**)vec_ptr = deserialized_elements;
 
     return PDF_OK;
 }
 
-PdfResult deserialize_optional_field(
+PdfResult pdf_deserialize_optional_field(
     void* field_ptr,
     PdfObject* object,
     PdfOptionalFieldData field_data,
-    PdfDocument* doc
+    Arena* arena,
+    PdfOptionalResolver resolver
 ) {
     RELEASE_ASSERT(field_ptr);
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
 
     void* discriminant_ptr = (char*)field_ptr + field_data.discriminant_offset;
     *(bool*)discriminant_ptr = true;
@@ -391,7 +385,8 @@ PdfResult deserialize_optional_field(
         (char*)field_ptr + field_data.data_offset,
         object,
         *field_data.inner_info,
-        doc
+        arena,
+        resolver
     );
 }
 
@@ -400,27 +395,32 @@ PdfResult pdf_deserialize_object(
     PdfObject* object,
     PdfFieldDescriptor* fields,
     size_t num_fields,
-    PdfDocument* doc
+    Arena* arena,
+    PdfOptionalResolver resolver
 ) {
     RELEASE_ASSERT(target);
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(fields);
-    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+
+    // Resolve object
+    PdfObject resolved_object;
+    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved_object));
 
     // Check object type
-    PDF_PROPAGATE(resolve_object(doc, object, object));
-
-    if (object->type != PDF_OBJECT_TYPE_DICT) {
+    if (resolved_object.type != PDF_OBJECT_TYPE_DICT) {
         return PDF_ERR_OBJECT_NOT_DICT;
     }
 
-    LOG_DEBUG_G("deserde", "Deserializing dictionary object");
+    LOG_INFO_G("deserde", "Deserializing dictionary object");
 
     // Reject unknown keys
-    for (size_t entry_idx = 0; entry_idx < vec_len(object->data.dict.entries);
+    for (size_t entry_idx = 0;
+         entry_idx < vec_len(resolved_object.data.dict.entries);
          entry_idx++) {
         bool found = false;
-        PdfDictEntry* entry = vec_get(object->data.dict.entries, entry_idx);
+        PdfDictEntry* entry =
+            vec_get(resolved_object.data.dict.entries, entry_idx);
 
         for (size_t field_idx = 0; field_idx < num_fields; field_idx++) {
             if (strcmp(entry->key->data.name, fields[field_idx].key) == 0) {
@@ -451,18 +451,20 @@ PdfResult pdf_deserialize_object(
     for (size_t field_idx = 0; field_idx < num_fields; field_idx++) {
         bool found = false;
         PdfFieldDescriptor* field = &fields[field_idx];
-        LOG_TRACE_G(
+        LOG_DEBUG_G(
             "deserde",
-            "Field: `%s` (\x1b[4m%s:%lu\x1b[0m)",
+            "Field: `%s` (\x1b[4m%s:%lu\x1b[0m) (kind=%d)",
             field->key,
             field->debug.file,
-            field->debug.line
+            field->debug.line,
+            field->info.kind
         );
 
         for (size_t entry_idx = 0;
-             entry_idx < vec_len(object->data.dict.entries);
+             entry_idx < vec_len(resolved_object.data.dict.entries);
              entry_idx++) {
-            PdfDictEntry* entry = vec_get(object->data.dict.entries, entry_idx);
+            PdfDictEntry* entry =
+                vec_get(resolved_object.data.dict.entries, entry_idx);
             if (strcmp(entry->key->data.name, fields[field_idx].key) != 0) {
                 continue;
             }
@@ -471,7 +473,8 @@ PdfResult pdf_deserialize_object(
                 (char*)target + field->offset,
                 entry->value,
                 field->info,
-                doc
+                arena,
+                resolver
             ));
 
             found = true;
@@ -485,6 +488,82 @@ PdfResult pdf_deserialize_object(
     }
 
     LOG_TRACE_G("deserde", "Finished deserializing dictionary object");
+
+    return PDF_OK;
+}
+
+PdfResult pdf_deserialize_operands(
+    void* target,
+    PdfOperandDescriptor* descriptors,
+    size_t num_descriptors,
+    Vec* operands,
+    Arena* arena
+) {
+    RELEASE_ASSERT(target);
+    RELEASE_ASSERT(descriptors);
+    RELEASE_ASSERT(operands);
+    RELEASE_ASSERT(arena);
+
+    if (num_descriptors > vec_len(operands)) {
+        return PDF_ERR_MISSING_OPERAND;
+    }
+
+    if (num_descriptors < vec_len(operands)) {
+        return PDF_ERR_EXCESS_OPERAND;
+    }
+
+    for (size_t idx = 0; idx < num_descriptors; idx++) {
+        PdfOperandDescriptor descriptor = descriptors[idx];
+        PdfObject* operand = vec_get(operands, idx);
+        void* field_ptr = (char*)target + descriptor.offset;
+
+        switch (descriptor.info.kind) {
+            case PDF_FIELD_KIND_OBJECT: {
+                PDF_PROPAGATE(pdf_deserialize_object_field(
+                    field_ptr,
+                    operand,
+                    descriptor.info.data.object
+                ));
+                break;
+            }
+            case PDF_FIELD_KIND_CUSTOM: {
+                PDF_PROPAGATE(pdf_deserialize_custom_field(
+                    field_ptr,
+                    operand,
+                    arena,
+                    descriptor.info.data.custom,
+                    pdf_op_resolver_none(false)
+                ));
+                break;
+            }
+            case PDF_FIELD_KIND_ARRAY: {
+                PDF_PROPAGATE(pdf_deserialize_array_field(
+                    field_ptr,
+                    operand,
+                    descriptor.info.data.array,
+                    arena,
+                    pdf_op_resolver_none(false)
+                ));
+                break;
+            }
+            case PDF_FIELD_KIND_AS_ARRAY: {
+                PDF_PROPAGATE(pdf_deserialize_array_field(
+                    field_ptr,
+                    operand,
+                    descriptor.info.data.array,
+                    arena,
+                    pdf_op_resolver_none(false)
+                ));
+                break;
+            }
+            case PDF_FIELD_KIND_IGNORED: {
+                break;
+            }
+            default: {
+                return PDF_ERR_INVALID_OPERAND_DESCRIPTOR;
+            }
+        }
+    }
 
     return PDF_OK;
 }
@@ -503,22 +582,23 @@ PdfResult pdf_deserialize_object(
             object,                                                            \
             fields,                                                            \
             sizeof(fields) / sizeof(PdfFieldDescriptor),                       \
-            doc                                                                \
+            arena,                                                             \
+            resolver                                                           \
         ));                                                                    \
         return PDF_OK;                                                         \
     } while (0)
 
 #define DESERIALIZER_TEST_HELPER()                                             \
-    PdfDocument* doc;                                                          \
+    PdfResolver* resolver;                                                     \
     TEST_ASSERT_EQ(                                                            \
         (PdfResult)PDF_OK,                                                     \
-        pdf_document_new(arena, buffer, strlen(buffer), &doc)                  \
+        pdf_resolver_new(arena, buffer, strlen(buffer), &resolver)             \
     );                                                                         \
     PdfObject object;                                                          \
     TEST_ASSERT_EQ(                                                            \
         (PdfResult)PDF_OK,                                                     \
-        pdf_resolve(                                                           \
-            doc,                                                               \
+        pdf_resolve_ref(                                                       \
+            resolver,                                                          \
             (PdfIndirectRef) {.object_id = 1, .generation = 0},                \
             &object                                                            \
         )                                                                      \
@@ -539,7 +619,8 @@ typedef struct {
 
 PdfResult deserialize_test_objects_struct(
     PdfObject* object,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     TestDeserializeObjectsStruct* deserialized
 ) {
     PdfFieldDescriptor fields[] = {
@@ -618,7 +699,12 @@ TEST_FUNC(test_deserialize_objects) {
     TestDeserializeObjectsStruct deserialized;
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
-        deserialize_test_objects_struct(&object, doc, &deserialized)
+        deserialize_test_objects_struct(
+            &object,
+            arena,
+            pdf_op_resolver_some(resolver),
+            &deserialized
+        )
     );
 
     TEST_ASSERT_EQ(true, deserialized.boolean);
@@ -672,7 +758,8 @@ typedef struct {
 
 PdfResult deserialize_test_inner_struct(
     PdfObject* object,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     TestDeserializeInnerStruct* deserialized
 ) {
     PdfFieldDescriptor fields[] = {
@@ -716,7 +803,8 @@ typedef struct {
 
 PdfResult deserialize_test_ref_struct(
     PdfObject* object,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     TestDeserializeRefStruct* deserialized
 ) {
     PdfFieldDescriptor fields[] = {PDF_FIELD(
@@ -745,7 +833,12 @@ TEST_FUNC(test_deserialize_ref) {
     TestDeserializeRefStruct deserialized;
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
-        deserialize_test_ref_struct(&object, doc, &deserialized)
+        deserialize_test_ref_struct(
+            &object,
+            arena,
+            pdf_op_resolver_some(resolver),
+            &deserialized
+        )
     );
 
     TestDeserializeInnerStruct resolved;
@@ -753,7 +846,7 @@ TEST_FUNC(test_deserialize_ref) {
         (PdfResult)PDF_OK,
         pdf_resolve_test_deserialize_inner_struct(
             &deserialized.reference,
-            doc,
+            resolver,
             &resolved
         )
     );
@@ -771,7 +864,8 @@ typedef struct {
 
 PdfResult deserialize_test_inline_struct(
     PdfObject* object,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     TestDeserializeInlineStruct* deserialized
 ) {
     PdfFieldDescriptor fields[] = {PDF_FIELD(
@@ -795,17 +889,17 @@ TEST_FUNC(test_deserialize_inline_struct) {
         pdf_construct_deserde_test_doc(objects, 2, "<< /Size 3 >>", arena);
     LOG_DEBUG("Buffer:\n%s", buffer);
 
-    PdfDocument* doc;
+    PdfResolver* resolver;
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
-        pdf_document_new(arena, buffer, strlen(buffer), &doc)
+        pdf_resolver_new(arena, buffer, strlen(buffer), &resolver)
     );
 
     PdfObject object;
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
-        pdf_resolve(
-            doc,
+        pdf_resolve_ref(
+            resolver,
             (PdfIndirectRef) {.object_id = 1, .generation = 0},
             &object
         )
@@ -814,7 +908,12 @@ TEST_FUNC(test_deserialize_inline_struct) {
     TestDeserializeInlineStruct deserialized;
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
-        deserialize_test_inline_struct(&object, doc, &deserialized)
+        deserialize_test_inline_struct(
+            &object,
+            arena,
+            pdf_op_resolver_some(resolver),
+            &deserialized
+        )
     );
 
     TEST_ASSERT_EQ("There", deserialized.inner.hello);
@@ -835,7 +934,8 @@ typedef struct {
 
 PdfResult deserialize_test_inline_optional(
     PdfObject* object,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     TestDeserializeInlineOptional* deserialized
 ) {
     PdfFieldDescriptor fields[] = {PDF_FIELD(
@@ -867,7 +967,12 @@ TEST_FUNC(test_deserialize_inline_optional) {
     TestDeserializeInlineOptional deserialized;
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
-        deserialize_test_inline_optional(&object, doc, &deserialized)
+        deserialize_test_inline_optional(
+            &object,
+            arena,
+            pdf_op_resolver_some(resolver),
+            &deserialized
+        )
     );
 
     TEST_ASSERT(deserialized.inner.discriminant);
@@ -888,7 +993,8 @@ typedef struct {
 
 PdfResult deserialize_test_primitive_arrays(
     PdfObject* object,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     TestDeserializePrimitiveArrays* deserialized
 ) {
     PdfFieldDescriptor fields[] = {
@@ -932,7 +1038,12 @@ TEST_FUNC(test_deserialize_primitive_arrays) {
     TestDeserializePrimitiveArrays deserialized;
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
-        deserialize_test_primitive_arrays(&object, doc, &deserialized)
+        deserialize_test_primitive_arrays(
+            &object,
+            arena,
+            pdf_op_resolver_some(resolver),
+            &deserialized
+        )
     );
 
     TEST_ASSERT(deserialized.strings.elements);
@@ -973,7 +1084,8 @@ typedef struct {
 
 PdfResult deserialize_test_complex_array(
     PdfObject* object,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     TestDeserializeTestComplexArray* deserialized
 ) {
     PdfFieldDescriptor fields[] = {PDF_FIELD(
@@ -1005,7 +1117,12 @@ TEST_FUNC(test_deserialize_custom_array) {
     TestDeserializeTestComplexArray deserialized;
     TEST_ASSERT_EQ(
         (PdfResult)PDF_OK,
-        deserialize_test_complex_array(&object, doc, &deserialized)
+        deserialize_test_complex_array(
+            &object,
+            arena,
+            pdf_op_resolver_some(resolver),
+            &deserialized
+        )
     );
 
     TEST_ASSERT(deserialized.inners.elements);

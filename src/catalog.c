@@ -1,18 +1,20 @@
 #include "deserialize.h"
 #include "log.h"
 #include "pdf_catalog.h"
-#include "pdf_doc.h"
 #include "pdf_object.h"
 #include "pdf_page.h"
+#include "pdf_resolver.h"
 #include "pdf_result.h"
 
 PdfResult pdf_deserialize_catalog(
     PdfObject* object,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     PdfCatalog* deserialized
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
     RELEASE_ASSERT(deserialized);
 
     PdfFieldDescriptor fields[] = {
@@ -31,7 +33,8 @@ PdfResult pdf_deserialize_catalog(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
-        doc
+        arena,
+        resolver
     ));
 
     return PDF_OK;

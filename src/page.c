@@ -1,8 +1,8 @@
 #include "deserialize.h"
 #include "log.h"
-#include "pdf_doc.h"
 #include "pdf_object.h"
 #include "pdf_page.h"
+#include "pdf_resolver.h"
 #include "pdf_result.h"
 
 PDF_DESERIALIZABLE_REF_IMPL(
@@ -13,11 +13,13 @@ PDF_DESERIALIZABLE_REF_IMPL(
 
 PdfResult pdf_deserialize_page_tree_node(
     PdfObject* object,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     PdfPageTreeNode* deserialized
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
     RELEASE_ASSERT(deserialized);
 
     PdfFieldDescriptor fields[] = {
@@ -56,7 +58,8 @@ PdfResult pdf_deserialize_page_tree_node(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
-        doc
+        arena,
+        resolver
     ));
 
     return PDF_OK;
@@ -64,11 +67,13 @@ PdfResult pdf_deserialize_page_tree_node(
 
 PdfResult pdf_deserialize_page(
     PdfObject* object,
-    PdfDocument* doc,
+    Arena* arena,
+    PdfOptionalResolver resolver,
     PdfPage* deserialized
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(doc);
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
     RELEASE_ASSERT(deserialized);
 
     PdfFieldDescriptor fields[] = {
@@ -115,7 +120,8 @@ PdfResult pdf_deserialize_page(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
-        doc
+        arena,
+        resolver
     ));
 
     return PDF_OK;
