@@ -32,7 +32,9 @@ typedef enum {
     PDF_ERR_SFNT_EOF,
     PDF_ERR_SFNT_MISSING_TABLE,
     PDF_ERR_SFNT_TABLE_CHECKSUM,
-    PDF_ERR_CMAP_INVALID_PLATFORM
+    PDF_ERR_CMAP_INVALID_PLATFORM,
+    PDF_ERR_CMAP_INVALID_GIA_LEN,
+    PDF_ERR_CMAP_RESERVED_PAD
 } PdfResult;
 
 #define PDF_PROPAGATE(op)                                                      \

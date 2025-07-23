@@ -43,13 +43,20 @@ DARRAY_NAME* DARRAY_FN(new)(Arena* arena, size_t num_elements) {
 
     LOG_INFO_G(
         "array",
-        "Creating new " STRINGIFY(DARRAY_NAME) " (Vec<" STRINGIFY(DARRAY_TYPE
-        ) ">)"
+        "Creating new " STRINGIFY(DARRAY_NAME) " (Array<" STRINGIFY(DARRAY_TYPE
+        ) ", %zu>)",
+        num_elements
     );
 
     DARRAY_NAME* array = arena_alloc(arena, sizeof(DARRAY_NAME));
     array->len = num_elements;
-    array->elements = arena_alloc(arena, sizeof(DARRAY_TYPE) * num_elements);
+
+    if (num_elements != 0) {
+        array->elements =
+            arena_alloc(arena, sizeof(DARRAY_TYPE) * num_elements);
+    } else {
+        array->elements = NULL;
+    }
 
     return array;
 }
@@ -66,6 +73,21 @@ DARRAY_NAME* DARRAY_FN(new_init)(
     for (size_t idx = 0; idx < num_elements; idx++) {
         array->elements[idx] = initial_value;
     }
+
+    return array;
+}
+
+// Creates a new arena-backed array from an array initializer list
+DARRAY_NAME* DARRAY_FN(new_from)(
+    Arena* arena,
+    size_t num_elements,
+    DARRAY_TYPE arr[num_elements]
+) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(arr);
+
+    DARRAY_NAME* array = DARRAY_FN(new)(arena, num_elements);
+    array->elements = arr;
 
     return array;
 }
@@ -118,6 +140,13 @@ void DARRAY_FN(set)(DARRAY_NAME* array, size_t idx, DARRAY_TYPE value) {
     RELEASE_ASSERT(idx < array->len);
 
     array->elements[idx] = value;
+}
+
+// Gets the length of the array
+size_t DARRAY_FN(len)(DARRAY_NAME* array) {
+    RELEASE_ASSERT(array);
+
+    return array->len;
 }
 
 // Undefines

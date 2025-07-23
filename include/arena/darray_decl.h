@@ -39,6 +39,13 @@ DARRAY_NAME* DARRAY_FN(new_init)(
     DARRAY_TYPE initial_value
 );
 
+// Creates a new arena-backed array from an array initializer list
+DARRAY_NAME* DARRAY_FN(new_from)(
+    Arena* arena,
+    size_t num_elements,
+    DARRAY_TYPE arr[num_elements]
+);
+
 // Gets the element stored at index `idx` and stores it in `out`. If the index
 // is out of bounds, false is returned and `out` isn't set.
 bool DARRAY_FN(get)(DARRAY_NAME* array, size_t idx, DARRAY_TYPE* out);
@@ -49,6 +56,9 @@ bool DARRAY_FN(get_ptr)(DARRAY_NAME* array, size_t idx, DARRAY_TYPE** out);
 
 // Sets the element stored at index `idx`, which must be in bounds.
 void DARRAY_FN(set)(DARRAY_NAME* array, size_t idx, DARRAY_TYPE value);
+
+// Gets the length of the array
+size_t DARRAY_FN(len)(DARRAY_NAME* array);
 
 // Undefines
 #undef DARRAY_NAME

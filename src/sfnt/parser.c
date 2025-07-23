@@ -102,3 +102,17 @@ PdfResult sfnt_parser_read_uint32(SfntParser* parser, uint32_t* out) {
 
     return PDF_OK;
 }
+
+PdfResult
+sfnt_parser_read_uint16_array(SfntParser* parser, SfntUint16Array* array) {
+    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(array);
+
+    for (size_t idx = 0; idx < sfnt_uint16_array_len(array); idx++) {
+        uint16_t word;
+        PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &word));
+        sfnt_uint16_array_set(array, idx, word);
+    }
+
+    return PDF_OK;
+}

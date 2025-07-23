@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "pdf/result.h"
+#include "sfnt/cmap.h"
 
 typedef struct {
     uint8_t* buffer;
@@ -22,3 +23,6 @@ PdfResult sfnt_subparser_new(
 
 PdfResult sfnt_parser_read_uint16(SfntParser* parser, uint16_t* out);
 PdfResult sfnt_parser_read_uint32(SfntParser* parser, uint32_t* out);
+
+PdfResult
+sfnt_parser_read_uint16_array(SfntParser* parser, SfntUint16Array* array);

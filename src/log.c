@@ -119,7 +119,7 @@ void logger_init(void) {
     const char* env = getenv("PDF_LOG_LEVEL");
 
     if (!env) {
-        env = "*=debug";
+        env = "*=debug,vec=info,array=info,arena=info";
     }
 
     num_logger_rules = parse_rules(env, NULL, 0);
@@ -190,7 +190,7 @@ void logger_log(
         file_and_group_len += 4;
     }
 
-    int file_pad_available = 32;
+    int file_pad_available = 48;
     int file_pad = 0;
 
     do {

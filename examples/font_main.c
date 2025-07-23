@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "arena/arena.h"
 #include "log.h"
@@ -61,10 +62,19 @@ int main(int argc, char** argv) {
     );
 
     SfntFont* font;
-    PDF_REQUIRE(sfnt_font_new(arena, buffer, buffer_len, &font));
-
     SfntCmap cmap;
+    PDF_REQUIRE(sfnt_font_new(arena, buffer, buffer_len, &font));
     PDF_REQUIRE(sfnt_font_cmap(font, &cmap));
+
+    const char* test_text = "Hello World!";
+    for (size_t idx = 0; idx < strlen(test_text); idx++) {
+        uint32_t cid = (uint32_t)test_text[idx];
+        LOG_INFO(
+            "cid=%u, gid=%u",
+            cid,
+            sfnt_cmap_map_cid(&cmap.mapping_table, cid)
+        );
+    }
 
     LOG_INFO("Finished");
 

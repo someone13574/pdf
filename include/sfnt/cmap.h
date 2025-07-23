@@ -26,7 +26,6 @@ typedef struct {
     uint16_t entry_selector;
     uint16_t range_shift;
     SfntUint16Array* end_code;
-    uint16_t reserved_pad;
     SfntUint16Array* start_code;
     SfntUint16Array* id_delta;
     SfntUint16Array* id_range_offset;
@@ -45,6 +44,8 @@ typedef struct {
     uint16_t version;
     uint16_t num_subtables;
     SfntCmapHeaderVec* headers;
+    SfntCmapSubtable mapping_table;
 } SfntCmap;
 
 void sfnt_cmap_select_encoding(SfntCmap* cmap, size_t* encoding_idx);
+uint32_t sfnt_cmap_map_cid(SfntCmapSubtable* subtable, uint32_t cid);

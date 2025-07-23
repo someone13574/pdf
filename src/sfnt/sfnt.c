@@ -58,7 +58,13 @@ PdfResult sfnt_font_cmap(SfntFont* font, SfntCmap* cmap) {
     sfnt_cmap_select_encoding(cmap, &encoding_idx);
     LOG_INFO_G("sfnt", "Selected cmap encoding table %zu", encoding_idx);
 
-    PDF_PROPAGATE(sfnt_cmap_get_encoding(cmap, &parser, encoding_idx));
+    PDF_PROPAGATE(sfnt_cmap_get_encoding(
+        font->arena,
+        cmap,
+        &parser,
+        encoding_idx,
+        &cmap->mapping_table
+    ));
 
     return PDF_OK;
 }
