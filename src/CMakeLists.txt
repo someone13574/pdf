@@ -1,35 +1,42 @@
 set(HEADER_LIST
-    "${pdf_SOURCE_DIR}/include/pdf.h"
-    "${pdf_SOURCE_DIR}/include/pdf_resolver.h"
-    "${pdf_SOURCE_DIR}/include/pdf_object.h"
-    "${pdf_SOURCE_DIR}/include/pdf_types.h"
-    "${pdf_SOURCE_DIR}/include/pdf_result.h"
-    "${pdf_SOURCE_DIR}/include/pdf_trailer.h"
-    "${pdf_SOURCE_DIR}/include/pdf_catalog.h"
-    "${pdf_SOURCE_DIR}/include/pdf_page.h"
-    "${pdf_SOURCE_DIR}/include/pdf_content_stream.h"
-    "${pdf_SOURCE_DIR}/include/pdf_content_op.h"
+    "${pdf_SOURCE_DIR}/include/pdf/pdf.h"
+    "${pdf_SOURCE_DIR}/include/pdf/resolver.h"
+    "${pdf_SOURCE_DIR}/include/pdf/object.h"
+    "${pdf_SOURCE_DIR}/include/pdf/types.h"
+    "${pdf_SOURCE_DIR}/include/pdf/result.h"
+    "${pdf_SOURCE_DIR}/include/pdf/trailer.h"
+    "${pdf_SOURCE_DIR}/include/pdf/catalog.h"
+    "${pdf_SOURCE_DIR}/include/pdf/page.h"
+    "${pdf_SOURCE_DIR}/include/pdf/content_stream.h"
+    "${pdf_SOURCE_DIR}/include/pdf/content_op.h"
+    "${pdf_SOURCE_DIR}/include/sfnt/sfnt.h"
+    "${pdf_SOURCE_DIR}/include/sfnt/cmap.h"
     "${pdf_SOURCE_DIR}/include/log.h"
     "${pdf_SOURCE_DIR}/include/test.h"
-    "${pdf_SOURCE_DIR}/include/vec.h"
-    "${pdf_SOURCE_DIR}/include/arena.h")
+    "${pdf_SOURCE_DIR}/include/arena/arena.h")
 set(SOURCE_FILE_LIST
     pdf.c
     log.c
     test.c
     test_helpers.c test_helpers.h
-    arena.c
-    vec.c
+    arena/arena.c
+    arena/dvec_test.c
+    arena/darray_test.c
     ctx.c ctx.h
     object.c object.h
     types.c
     deserialize.c deserialize.h
+    deserialize_types.c
     trailer.c
     catalog.c
     page.c
     content_stream/stream.c
     content_stream/op.c content_stream/op.h
     content_stream/operator.c content_stream/operator.h
+    sfnt/sfnt.c
+    sfnt/parser.c sfnt/parser.h
+    sfnt/directory.c sfnt/directory.h
+    sfnt/cmap.c sfnt/cmap.h
     xref.c xref.h
     ${HEADER_LIST})
 

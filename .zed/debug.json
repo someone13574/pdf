@@ -1,12 +1,23 @@
 [
   {
-    "label": "Debug",
+    "label": "Debug pdf-example",
     "build": {
       "command": "scripts/dev-build.sh",
       "args": [],
       "cwd": "$ZED_WORKTREE_ROOT"
     },
-    "program": "$ZED_WORKTREE_ROOT/build/cli/pdf-cli",
+    "program": "$ZED_WORKTREE_ROOT/build/examples/pdf-example",
+    "request": "launch",
+    "adapter": "CodeLLDB"
+  },
+  {
+    "label": "Debug font-example",
+    "build": {
+      "command": "scripts/dev-build.sh",
+      "args": [],
+      "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    "program": "$ZED_WORKTREE_ROOT/build/examples/font-example",
     "request": "launch",
     "adapter": "CodeLLDB"
   }

@@ -1,18 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "arena.h"
+#include "arena/arena.h"
 #include "log.h"
-#include "pdf.h"
-#include "pdf_catalog.h"
-#include "pdf_content_stream.h"
-#include "pdf_object.h"
-#include "pdf_page.h"
-#include "pdf_resolver.h"
-#include "pdf_result.h"
-#include "vec.h"
+#include "pdf/catalog.h"
+#include "pdf/content_stream.h"
+#include "pdf/object.h"
+#include "pdf/page.h"
+#include "pdf/pdf.h"
+#include "pdf/resolver.h"
+#include "pdf/result.h"
 
-char* load_file_to_buffer(Arena* arena, const char* path, size_t* out_size) {
+static char*
+load_file_to_buffer(Arena* arena, const char* path, size_t* out_size) {
     FILE* file = fopen(path, "rb");
     *out_size = 0;
     if (!file) {
@@ -74,19 +74,26 @@ int main(int argc, char** argv) {
         pdf_resolve_page_tree_node(&catalog.pages, resolver, &page_tree_root)
     );
 
-    for (size_t idx = 0; idx < vec_len(page_tree_root.kids); idx++) {
-        PdfPageRef* page_ref = vec_get(page_tree_root.kids, idx);
+    for (size_t idx = 0; idx < pdf_void_vec_len(page_tree_root.kids); idx++) {
+        void* page_ptr;
+        RELEASE_ASSERT(pdf_void_vec_get(page_tree_root.kids, idx, &page_ptr));
         PdfPage page;
-        PDF_REQUIRE(pdf_resolve_page(page_ref, resolver, &page));
+        PDF_REQUIRE(pdf_resolve_page(page_ptr, resolver, &page));
 
         printf("%s\n", pdf_fmt_object(arena, page.raw_dict));
 
         if (page.contents.discriminant) {
             for (size_t contents_idx = 0;
-                 contents_idx < vec_len(page.contents.value.elements);
+                 contents_idx < pdf_void_vec_len(page.contents.value.elements);
                  contents_idx++) {
-                PdfStream* content =
-                    vec_get(page.contents.value.elements, contents_idx);
+                void* content_ptr;
+                RELEASE_ASSERT(pdf_void_vec_get(
+                    page.contents.value.elements,
+                    contents_idx,
+                    &content_ptr
+                ));
+                PdfStream* content = content_ptr;
+
                 printf("%s\n", content->stream_bytes);
 
                 PdfContentStream stream;

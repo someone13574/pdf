@@ -1,12 +1,13 @@
 #pragma once
 
 #include "operator.h"
-#include "pdf_result.h"
-#include "vec.h"
+#include "pdf/content_stream.h"
+#include "pdf/object.h"
+#include "pdf/result.h"
 
 PdfResult pdf_deserialize_content_op(
     PdfOperator op,
-    Vec* operands,
+    PdfObjectVec* operands,
     Arena* arena,
-    Vec* operation_queue
+    PdfContentOpVec* operation_queue
 );

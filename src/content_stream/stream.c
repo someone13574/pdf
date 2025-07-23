@@ -3,14 +3,13 @@
 
 #include "../ctx.h"
 #include "../object.h"
-#include "arena.h"
+#include "arena/arena.h"
 #include "log.h"
 #include "op.h"
 #include "operator.h"
-#include "pdf_content_stream.h"
-#include "pdf_object.h"
-#include "pdf_result.h"
-#include "vec.h"
+#include "pdf/content_stream.h"
+#include "pdf/object.h"
+#include "pdf/result.h"
 
 PdfResult pdf_deserialize_content_stream(
     PdfStream* stream,
@@ -25,19 +24,19 @@ PdfResult pdf_deserialize_content_stream(
         pdf_ctx_new(arena, stream->stream_bytes, strlen(stream->stream_bytes));
     PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
-    Vec* operands = vec_new(arena);
-    Vec* operations = vec_new(arena);
+    PdfObjectVec* operands = pdf_object_vec_new(arena);
+    PdfContentOpVec* operations = pdf_content_op_vec_new(arena);
 
     while (pdf_ctx_offset(ctx) != pdf_ctx_buffer_len(ctx)) {
         // Parse operands
-        vec_clear(operands);
+        pdf_object_vec_clear(operands);
 
         PdfObject operand;
         size_t restore_offset = pdf_ctx_offset(ctx);
         while (pdf_parse_operand_object(arena, ctx, &operand) == PDF_OK) {
             PdfObject* operand_alloc = arena_alloc(arena, sizeof(PdfObject));
             *operand_alloc = operand;
-            vec_push(operands, operand_alloc);
+            pdf_object_vec_push(operands, operand_alloc);
 
             PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
             restore_offset = pdf_ctx_offset(ctx);

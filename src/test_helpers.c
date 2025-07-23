@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "arena.h"
+#include "arena/arena.h"
 
 static char* format_alloc(Arena* arena, const char* fmt, ...)
     __attribute__((format(printf, 2, 3)));

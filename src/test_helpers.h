@@ -4,7 +4,7 @@
 
 #include <stddef.h>
 
-#include "arena.h"
+#include "arena/arena.h"
 
 char* pdf_construct_deserde_test_doc(
     const char** objects,

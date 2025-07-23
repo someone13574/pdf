@@ -1,14 +1,10 @@
 #pragma once
 
 #include "ctx.h"
-#include "pdf_object.h"
-#include "pdf_result.h"
+#include "pdf/object.h"
+#include "pdf/result.h"
 
-typedef struct {
-    Arena* arena;
-    PdfCtx* ctx;
-    Vec* subsections;
-} XRefTable;
+typedef struct XRefTable XRefTable;
 
 typedef struct {
     size_t offset;
@@ -18,7 +14,7 @@ typedef struct {
 } XRefEntry;
 
 PdfResult
-pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, XRefTable* xref);
+pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, XRefTable** xref);
 
 PdfResult pdf_xref_get_entry(
     XRefTable* xref,

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "pdf_object.h"
-#include "pdf_types.h"
+#include "pdf/object.h"
+#include "pdf/types.h"
 
 typedef enum {
     PDF_CONTENT_OP_BEGIN_TEXT, // BT
@@ -34,3 +34,8 @@ typedef struct {
         PdfContentOpShowText show_text;
     } data;
 } PdfContentOp;
+
+#define DVEC_NAME PdfContentOpVec
+#define DVEC_LOWERCASE_NAME pdf_content_op_vec
+#define DVEC_TYPE PdfContentOp
+#include "arena/dvec_decl.h"

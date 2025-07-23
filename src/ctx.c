@@ -7,9 +7,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "arena.h"
+#include "arena/arena.h"
 #include "log.h"
-#include "pdf_result.h"
+#include "pdf/result.h"
 
 struct PdfCtx {
     char* buffer;

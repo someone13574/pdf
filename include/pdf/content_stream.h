@@ -1,12 +1,12 @@
 #pragma once
 
-#include "arena.h"
-#include "pdf_object.h"
-#include "pdf_result.h"
-#include "vec.h"
+#include "arena/arena.h"
+#include "pdf/content_op.h"
+#include "pdf/object.h"
+#include "pdf/result.h"
 
 typedef struct {
-    Vec* operations;
+    PdfContentOpVec* operations;
 } PdfContentStream;
 
 PdfResult pdf_deserialize_content_stream(

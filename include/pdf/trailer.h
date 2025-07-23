@@ -1,9 +1,9 @@
 #pragma once
 
-#include "pdf_catalog.h"
-#include "pdf_object.h"
-#include "pdf_resolver.h"
-#include "pdf_result.h"
+#include "pdf/catalog.h"
+#include "pdf/object.h"
+#include "pdf/resolver.h"
+#include "pdf/result.h"
 
 typedef struct {
     PdfInteger size;

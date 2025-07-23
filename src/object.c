@@ -7,12 +7,21 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "arena.h"
+#include "arena/arena.h"
 #include "ctx.h"
 #include "log.h"
-#include "pdf_object.h"
-#include "pdf_result.h"
-#include "vec.h"
+#include "pdf/object.h"
+#include "pdf/result.h"
+
+#define DVEC_NAME PdfObjectVec
+#define DVEC_LOWERCASE_NAME pdf_object_vec
+#define DVEC_TYPE PdfObject*
+#include "arena/dvec_impl.h"
+
+#define DVEC_NAME PdfDictEntryVec
+#define DVEC_LOWERCASE_NAME pdf_dict_entry_vec
+#define DVEC_TYPE PdfDictEntry
+#include "arena/dvec_impl.h"
 
 PdfResult pdf_parse_true(PdfCtx* ctx, PdfObject* object);
 PdfResult pdf_parse_false(PdfCtx* ctx, PdfObject* object);
@@ -38,7 +47,7 @@ PdfResult pdf_parse_stream(
     Arena* arena,
     PdfCtx* ctx,
     char** stream_bytes,
-    Vec* stream_dict
+    PdfDictEntryVec* stream_dict
 );
 
 PdfResult pdf_parse_object(
@@ -524,7 +533,7 @@ PdfResult pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     PDF_PROPAGATE(pdf_ctx_expect(ctx, "["));
     PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
-    Vec* elements = vec_new(arena);
+    PdfObjectVec* elements = pdf_object_vec_new(arena);
 
     char peeked;
     while (pdf_ctx_peek(ctx, &peeked) == PDF_OK && peeked != ']') {
@@ -536,7 +545,7 @@ PdfResult pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfObject* object) {
 
         PdfObject* allocated = arena_alloc(arena, sizeof(PdfObject));
         *allocated = element;
-        vec_push(elements, allocated);
+        pdf_object_vec_push(elements, allocated);
     }
 
     PDF_PROPAGATE(pdf_ctx_expect(ctx, "]"));
@@ -561,7 +570,7 @@ PdfResult pdf_parse_dict(
     PDF_PROPAGATE(pdf_ctx_expect(ctx, "<<"));
     PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
-    Vec* entries = vec_new(arena);
+    PdfDictEntryVec* entries = pdf_dict_entry_vec_new(arena);
 
     char peeked;
     while (pdf_ctx_peek(ctx, &peeked) == PDF_OK && peeked != '>') {
@@ -577,11 +586,10 @@ PdfResult pdf_parse_dict(
         );
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
-        PdfDictEntry* entry = arena_alloc(arena, sizeof(PdfDictEntry));
-        entry->key = key;
-        entry->value = value;
-
-        vec_push(entries, entry);
+        pdf_dict_entry_vec_push(
+            entries,
+            (PdfDictEntry) {.key = key, .value = value}
+        );
     }
 
     PDF_PROPAGATE(pdf_ctx_expect(ctx, ">>"));
@@ -629,7 +637,7 @@ PdfResult pdf_parse_stream(
     Arena* arena,
     PdfCtx* ctx,
     char** stream_body,
-    Vec* stream_dict
+    PdfDictEntryVec* stream_dict
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(ctx);
@@ -651,15 +659,17 @@ PdfResult pdf_parse_stream(
 
     // Get length
     int32_t length = -1;
-    for (size_t entry_idx = 0; entry_idx < vec_len(stream_dict); entry_idx++) {
-        PdfDictEntry* entry = vec_get(stream_dict, entry_idx);
-        if (!entry || !entry->key || !entry->value
-            || entry->value->type != PDF_OBJECT_TYPE_INTEGER
-            || strcmp("Length", entry->key->data.name) != 0) {
+    for (size_t entry_idx = 0; entry_idx < pdf_dict_entry_vec_len(stream_dict);
+         entry_idx++) {
+        PdfDictEntry entry;
+        RELEASE_ASSERT(pdf_dict_entry_vec_get(stream_dict, entry_idx, &entry));
+        if (!entry.key || !entry.value
+            || entry.value->type != PDF_OBJECT_TYPE_INTEGER
+            || strcmp("Length", entry.key->data.name) != 0) {
             continue;
         }
 
-        length = entry->value->data.integer;
+        length = entry.value->data.integer;
     }
 
     if (length < 0) {
@@ -815,8 +825,8 @@ char* pdf_fmt_object_indented(
             return format_alloc(arena, "/%s", object->data.name);
         }
         case PDF_OBJECT_TYPE_ARRAY: {
-            Vec* items = object->data.array.elements;
-            size_t num_items = vec_len(items);
+            PdfObjectVec* items = object->data.array.elements;
+            size_t num_items = pdf_object_vec_len(items);
             if (num_items == 0) {
                 return format_alloc(arena, "[]");
             }
@@ -825,9 +835,12 @@ char* pdf_fmt_object_indented(
             char** item_strs = arena_alloc(arena, sizeof(char*) * num_items);
             bool array_contains_indirect = false;
             for (size_t idx = 0; idx < num_items; idx++) {
+                PdfObject* element;
+                RELEASE_ASSERT(pdf_object_vec_get(items, idx, &element));
+
                 item_strs[idx] = pdf_fmt_object_indented(
                     arena,
-                    vec_get(items, idx),
+                    element,
                     indent + 2,
                     &array_contains_indirect
                 );
@@ -865,23 +878,26 @@ char* pdf_fmt_object_indented(
             }
         }
         case PDF_OBJECT_TYPE_DICT: {
-            Vec* entries = object->data.dict.entries;
+            PdfDictEntryVec* entries = object->data.dict.entries;
 
-            if (vec_len(entries) == 0) {
+            if (pdf_dict_entry_vec_len(entries) == 0) {
                 return format_alloc(arena, "<< >>");
             } else {
                 char* buffer = format_alloc(arena, "<<");
-                for (size_t idx = 0; idx < vec_len(entries); idx++) {
-                    PdfDictEntry* entry = vec_get(entries, idx);
+                for (size_t idx = 0; idx < pdf_dict_entry_vec_len(entries);
+                     idx++) {
+                    PdfDictEntry entry;
+                    RELEASE_ASSERT(pdf_dict_entry_vec_get(entries, idx, &entry)
+                    );
                     char* key_text = pdf_fmt_object_indented(
                         arena,
-                        entry->key,
+                        entry.key,
                         indent + 2,
                         NULL
                     );
                     char* value_text = pdf_fmt_object_indented(
                         arena,
-                        entry->value,
+                        entry.value,
                         indent + (int)strlen(key_text) + 3,
                         NULL
                     );
@@ -966,7 +982,7 @@ char* pdf_fmt_object(Arena* arena, PdfObject* object) {
 
     unsigned long len = strlen(formatted);
     char* allocated = arena_alloc(arena, sizeof(char) * (len + 1));
-    strncpy(allocated, formatted, (size_t)len);
+    strncpy(allocated, formatted, (size_t)len + 1);
     arena_free(temp_arena);
 
     return allocated;
@@ -1251,32 +1267,38 @@ TEST_FUNC(test_object_array) {
         PDF_OBJECT_TYPE_ARRAY
     );
 
-    PdfObject* element0 = vec_get(object.data.array.elements, 0);
+    PdfObject* element0;
+    TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 0, &element0));
     TEST_ASSERT(element0);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element0->type);
     TEST_ASSERT_EQ((int32_t)549, element0->data.integer);
 
-    PdfObject* element1 = vec_get(object.data.array.elements, 1);
+    PdfObject* element1;
+    TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 1, &element1));
     TEST_ASSERT(element1);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_REAL, element1->type);
     TEST_ASSERT_EQ(3.14, element1->data.real);
 
-    PdfObject* element2 = vec_get(object.data.array.elements, 2);
+    PdfObject* element2;
+    TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 2, &element2));
     TEST_ASSERT(element2);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_BOOLEAN, element2->type);
     TEST_ASSERT_EQ(false, element2->data.boolean);
 
-    PdfObject* element3 = vec_get(object.data.array.elements, 3);
+    PdfObject* element3;
+    TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 3, &element3));
     TEST_ASSERT(element3);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, element3->type);
     TEST_ASSERT_EQ("Ralph", element3->data.string);
 
-    PdfObject* element4 = vec_get(object.data.array.elements, 4);
+    PdfObject* element4;
+    TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 4, &element4));
     TEST_ASSERT(element4);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, element4->type);
     TEST_ASSERT_EQ("SomeName", element4->data.name);
 
-    TEST_ASSERT(!vec_get(object.data.array.elements, 5));
+    PdfObject* element5;
+    TEST_ASSERT(!pdf_object_vec_get(object.data.array.elements, 5, &element5));
 
     return TEST_RESULT_PASS;
 }
@@ -1287,32 +1309,39 @@ TEST_FUNC(test_object_array_whitespace) {
         PDF_OBJECT_TYPE_ARRAY
     );
 
-    PdfObject* element0 = vec_get(object.data.array.elements, 0);
+    PdfObject* element0;
+    TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 0, &element0));
     TEST_ASSERT(element0);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element0->type);
     TEST_ASSERT_EQ((int32_t)549, element0->data.integer);
 
-    PdfObject* element1 = vec_get(object.data.array.elements, 1);
+    PdfObject* element1;
+    TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 1, &element1));
     TEST_ASSERT(element1);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_REAL, element1->type);
     TEST_ASSERT_EQ(3.14, element1->data.real);
 
-    PdfObject* element2 = vec_get(object.data.array.elements, 2);
+    PdfObject* element2;
+    TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 2, &element2));
     TEST_ASSERT(element2);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_BOOLEAN, element2->type);
     TEST_ASSERT_EQ(false, element2->data.boolean);
 
-    PdfObject* element3 = vec_get(object.data.array.elements, 3);
+    PdfObject* element3;
+    TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 3, &element3));
     TEST_ASSERT(element3);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, element3->type);
     TEST_ASSERT_EQ("Ralph", element3->data.string);
 
-    PdfObject* element4 = vec_get(object.data.array.elements, 4);
+    PdfObject* element4;
+    TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 4, &element4));
     TEST_ASSERT(element4);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, element4->type);
     TEST_ASSERT_EQ("SomeName", element4->data.name);
 
-    TEST_ASSERT(!vec_get(object.data.array.elements, 5));
+    PdfObject* element5;
+    TEST_ASSERT(!pdf_object_vec_get(object.data.array.elements, 5, &element5));
+    TEST_ASSERT(!element5);
 
     return TEST_RESULT_PASS;
 }
@@ -1320,30 +1349,40 @@ TEST_FUNC(test_object_array_whitespace) {
 TEST_FUNC(test_object_array_nested) {
     SETUP_VALID_PARSE_OBJECT("[[1 2][3 4]]", PDF_OBJECT_TYPE_ARRAY);
 
-    PdfObject* element0 = vec_get(object.data.array.elements, 0);
+    PdfObject* element0;
+    TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 0, &element0));
     TEST_ASSERT(element0);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_ARRAY, element0->type);
 
-    PdfObject* element00 = vec_get(element0->data.array.elements, 0);
+    PdfObject* element00;
+    TEST_ASSERT(pdf_object_vec_get(element0->data.array.elements, 0, &element00)
+    );
     TEST_ASSERT(element00);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element00->type);
     TEST_ASSERT_EQ((int32_t)1, element00->data.integer);
 
-    PdfObject* element01 = vec_get(element0->data.array.elements, 1);
+    PdfObject* element01;
+    TEST_ASSERT(pdf_object_vec_get(element0->data.array.elements, 1, &element01)
+    );
     TEST_ASSERT(element01);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element01->type);
     TEST_ASSERT_EQ((int32_t)2, element01->data.integer);
 
-    PdfObject* element1 = vec_get(object.data.array.elements, 1);
+    PdfObject* element1;
+    TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 1, &element1));
     TEST_ASSERT(element1);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_ARRAY, element1->type);
 
-    PdfObject* element10 = vec_get(element1->data.array.elements, 0);
+    PdfObject* element10;
+    TEST_ASSERT(pdf_object_vec_get(element1->data.array.elements, 0, &element10)
+    );
     TEST_ASSERT(element10);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element10->type);
     TEST_ASSERT_EQ((int32_t)3, element10->data.integer);
 
-    PdfObject* element11 = vec_get(element1->data.array.elements, 1);
+    PdfObject* element11;
+    TEST_ASSERT(pdf_object_vec_get(element1->data.array.elements, 1, &element11)
+    );
     TEST_ASSERT(element11);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element11->type);
     TEST_ASSERT_EQ((int32_t)4, element11->data.integer);
@@ -1353,14 +1392,14 @@ TEST_FUNC(test_object_array_nested) {
 
 TEST_FUNC(test_object_array_empty) {
     SETUP_VALID_PARSE_OBJECT("[]", PDF_OBJECT_TYPE_ARRAY);
-    TEST_ASSERT_EQ((size_t)0, vec_len(object.data.array.elements));
+    TEST_ASSERT_EQ((size_t)0, pdf_object_vec_len(object.data.array.elements));
 
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_array_offset) {
     SETUP_VALID_PARSE_OBJECT_WITH_OFFSET("[]  ", PDF_OBJECT_TYPE_ARRAY, 2);
-    TEST_ASSERT_EQ((size_t)0, vec_len(object.data.array.elements));
+    TEST_ASSERT_EQ((size_t)0, pdf_object_vec_len(object.data.array.elements));
 
     return TEST_RESULT_PASS;
 }
@@ -1388,96 +1427,96 @@ TEST_FUNC(test_object_dict) {
         PDF_OBJECT_TYPE_DICT
     );
 
-    PdfDictEntry* entry0 = vec_get(object.data.dict.entries, 0);
-    TEST_ASSERT(entry0);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry0->key->type);
-    TEST_ASSERT_EQ("Type", entry0->key->data.name);
-    TEST_ASSERT(entry0->value);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry0->value->type);
-    TEST_ASSERT_EQ("Example", entry0->value->data.name);
+    PdfDictEntry entry0;
+    TEST_ASSERT(pdf_dict_entry_vec_get(object.data.dict.entries, 0, &entry0));
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry0.key->type);
+    TEST_ASSERT_EQ("Type", entry0.key->data.name);
+    TEST_ASSERT(entry0.value);
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry0.value->type);
+    TEST_ASSERT_EQ("Example", entry0.value->data.name);
 
-    PdfDictEntry* entry1 = vec_get(object.data.dict.entries, 1);
-    TEST_ASSERT(entry1);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry1->key->type);
-    TEST_ASSERT_EQ("Subtype", entry1->key->data.name);
-    TEST_ASSERT(entry1->value);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry1->value->type);
-    TEST_ASSERT_EQ("DictionaryExample", entry1->value->data.name);
+    PdfDictEntry entry1;
+    TEST_ASSERT(pdf_dict_entry_vec_get(object.data.dict.entries, 1, &entry1));
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry1.key->type);
+    TEST_ASSERT_EQ("Subtype", entry1.key->data.name);
+    TEST_ASSERT(entry1.value);
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry1.value->type);
+    TEST_ASSERT_EQ("DictionaryExample", entry1.value->data.name);
 
-    PdfDictEntry* entry2 = vec_get(object.data.dict.entries, 2);
-    TEST_ASSERT(entry2);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry2->key->type);
-    TEST_ASSERT_EQ("Version", entry2->key->data.name);
-    TEST_ASSERT(entry2->value);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_REAL, entry2->value->type);
-    TEST_ASSERT_EQ(0.01, entry2->value->data.real);
+    PdfDictEntry entry2;
+    TEST_ASSERT(pdf_dict_entry_vec_get(object.data.dict.entries, 2, &entry2));
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry2.key->type);
+    TEST_ASSERT_EQ("Version", entry2.key->data.name);
+    TEST_ASSERT(entry2.value);
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_REAL, entry2.value->type);
+    TEST_ASSERT_EQ(0.01, entry2.value->data.real);
 
-    PdfDictEntry* entry3 = vec_get(object.data.dict.entries, 3);
-    TEST_ASSERT(entry3);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry3->key->type);
-    TEST_ASSERT_EQ("IntegerItem", entry3->key->data.name);
-    TEST_ASSERT(entry3->value);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, entry3->value->type);
-    TEST_ASSERT_EQ((int32_t)12, entry3->value->data.integer);
+    PdfDictEntry entry3;
+    TEST_ASSERT(pdf_dict_entry_vec_get(object.data.dict.entries, 3, &entry3));
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry3.key->type);
+    TEST_ASSERT_EQ("IntegerItem", entry3.key->data.name);
+    TEST_ASSERT(entry3.value);
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, entry3.value->type);
+    TEST_ASSERT_EQ((int32_t)12, entry3.value->data.integer);
 
-    PdfDictEntry* entry4 = vec_get(object.data.dict.entries, 4);
-    TEST_ASSERT(entry4);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry4->key->type);
-    TEST_ASSERT_EQ("StringItem", entry4->key->data.name);
-    TEST_ASSERT(entry4->value);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, entry4->value->type);
-    TEST_ASSERT_EQ("a string", entry4->value->data.string);
+    PdfDictEntry entry4;
+    TEST_ASSERT(pdf_dict_entry_vec_get(object.data.dict.entries, 4, &entry4));
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry4.key->type);
+    TEST_ASSERT_EQ("StringItem", entry4.key->data.name);
+    TEST_ASSERT(entry4.value);
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, entry4.value->type);
+    TEST_ASSERT_EQ("a string", entry4.value->data.string);
 
-    PdfDictEntry* entry5 = vec_get(object.data.dict.entries, 5);
-    TEST_ASSERT(entry5);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry5->key->type);
-    TEST_ASSERT_EQ("Subdictionary", entry5->key->data.name);
-    TEST_ASSERT(entry5->value);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_DICT, entry5->value->type);
+    PdfDictEntry entry5;
+    TEST_ASSERT(pdf_dict_entry_vec_get(object.data.dict.entries, 5, &entry5));
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry5.key->type);
+    TEST_ASSERT_EQ("Subdictionary", entry5.key->data.name);
+    TEST_ASSERT(entry5.value);
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_DICT, entry5.value->type);
 
-    Vec* subdict = entry5->value->data.dict.entries;
+    PdfDictEntryVec* subdict = entry5.value->data.dict.entries;
 
-    PdfDictEntry* sub0 = vec_get(subdict, 0);
-    TEST_ASSERT(sub0);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, sub0->key->type);
-    TEST_ASSERT_EQ("Item1", sub0->key->data.name);
-    TEST_ASSERT(sub0->value);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_REAL, sub0->value->type);
-    TEST_ASSERT_EQ(0.4, sub0->value->data.real);
+    PdfDictEntry sub0;
+    TEST_ASSERT(pdf_dict_entry_vec_get(subdict, 0, &sub0));
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, sub0.key->type);
+    TEST_ASSERT_EQ("Item1", sub0.key->data.name);
+    TEST_ASSERT(sub0.value);
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_REAL, sub0.value->type);
+    TEST_ASSERT_EQ(0.4, sub0.value->data.real);
 
-    PdfDictEntry* sub1 = vec_get(subdict, 1);
-    TEST_ASSERT(sub1);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, sub1->key->type);
-    TEST_ASSERT_EQ("Item2", sub1->key->data.name);
-    TEST_ASSERT(sub1->value);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_BOOLEAN, sub1->value->type);
-    TEST_ASSERT_EQ(true, sub1->value->data.boolean);
+    PdfDictEntry sub1;
+    TEST_ASSERT(pdf_dict_entry_vec_get(subdict, 1, &sub1));
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, sub1.key->type);
+    TEST_ASSERT_EQ("Item2", sub1.key->data.name);
+    TEST_ASSERT(sub1.value);
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_BOOLEAN, sub1.value->type);
+    TEST_ASSERT_EQ(true, sub1.value->data.boolean);
 
-    PdfDictEntry* sub2 = vec_get(subdict, 2);
-    TEST_ASSERT(sub2);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, sub2->key->type);
-    TEST_ASSERT_EQ("LastItem", sub2->key->data.name);
-    TEST_ASSERT(sub2->value);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, sub2->value->type);
-    TEST_ASSERT_EQ("not!", sub2->value->data.string);
+    PdfDictEntry sub2;
+    TEST_ASSERT(pdf_dict_entry_vec_get(subdict, 2, &sub2));
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, sub2.key->type);
+    TEST_ASSERT_EQ("LastItem", sub2.key->data.name);
+    TEST_ASSERT(sub2.value);
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, sub2.value->type);
+    TEST_ASSERT_EQ("not!", sub2.value->data.string);
 
-    PdfDictEntry* sub3 = vec_get(subdict, 3);
-    TEST_ASSERT(sub3);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, sub3->key->type);
-    TEST_ASSERT_EQ("VeryLastItem", sub3->key->data.name);
-    TEST_ASSERT(sub3->value);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, sub3->value->type);
-    TEST_ASSERT_EQ("OK", sub3->value->data.string);
+    PdfDictEntry sub3;
+    TEST_ASSERT(pdf_dict_entry_vec_get(subdict, 3, &sub3));
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, sub3.key->type);
+    TEST_ASSERT_EQ("VeryLastItem", sub3.key->data.name);
+    TEST_ASSERT(sub3.value);
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, sub3.value->type);
+    TEST_ASSERT_EQ("OK", sub3.value->data.string);
 
-    TEST_ASSERT_EQ((size_t)4, vec_len(subdict));
-    TEST_ASSERT_EQ((size_t)6, vec_len(object.data.dict.entries));
+    TEST_ASSERT_EQ((size_t)4, pdf_dict_entry_vec_len(subdict));
+    TEST_ASSERT_EQ((size_t)6, pdf_dict_entry_vec_len(object.data.dict.entries));
 
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_dict_empty) {
     SETUP_VALID_PARSE_OBJECT("<<>>", PDF_OBJECT_TYPE_DICT);
-    TEST_ASSERT_EQ((size_t)0, vec_len(object.data.dict.entries));
+    TEST_ASSERT_EQ((size_t)0, pdf_dict_entry_vec_len(object.data.dict.entries));
 
     return TEST_RESULT_PASS;
 }
@@ -1485,21 +1524,21 @@ TEST_FUNC(test_object_dict_empty) {
 TEST_FUNC(test_object_dict_unpadded) {
     SETUP_VALID_PARSE_OBJECT("<</A 1/B 2>>", PDF_OBJECT_TYPE_DICT);
 
-    PdfDictEntry* entry0 = vec_get(object.data.dict.entries, 0);
-    TEST_ASSERT(entry0);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry0->key->type);
-    TEST_ASSERT_EQ("A", entry0->key->data.name);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, entry0->value->type);
-    TEST_ASSERT_EQ((int32_t)1, entry0->value->data.integer);
+    PdfDictEntry entry0;
+    TEST_ASSERT(pdf_dict_entry_vec_get(object.data.dict.entries, 0, &entry0));
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry0.key->type);
+    TEST_ASSERT_EQ("A", entry0.key->data.name);
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, entry0.value->type);
+    TEST_ASSERT_EQ((int32_t)1, entry0.value->data.integer);
 
-    PdfDictEntry* entry1 = vec_get(object.data.dict.entries, 1);
-    TEST_ASSERT(entry1);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry1->key->type);
-    TEST_ASSERT_EQ("B", entry1->key->data.name);
-    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, entry1->value->type);
-    TEST_ASSERT_EQ((int32_t)2, entry1->value->data.integer);
+    PdfDictEntry entry1;
+    TEST_ASSERT(pdf_dict_entry_vec_get(object.data.dict.entries, 1, &entry1));
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry1.key->type);
+    TEST_ASSERT_EQ("B", entry1.key->data.name);
+    TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, entry1.value->type);
+    TEST_ASSERT_EQ((int32_t)2, entry1.value->data.integer);
 
-    TEST_ASSERT_EQ((size_t)2, vec_len(object.data.dict.entries));
+    TEST_ASSERT_EQ((size_t)2, pdf_dict_entry_vec_len(object.data.dict.entries));
     return TEST_RESULT_PASS;
 }
 

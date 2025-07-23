@@ -1,17 +1,17 @@
-#include "pdf.h"
+#include "pdf/pdf.h"
 
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "arena.h"
+#include "arena/arena.h"
 #include "ctx.h"
 #include "log.h"
 #include "object.h"
-#include "pdf_catalog.h"
-#include "pdf_object.h"
-#include "pdf_resolver.h"
-#include "pdf_result.h"
-#include "pdf_trailer.h"
+#include "pdf/catalog.h"
+#include "pdf/object.h"
+#include "pdf/resolver.h"
+#include "pdf/result.h"
+#include "pdf/trailer.h"
 #include "xref.h"
 
 struct PdfResolver {
@@ -51,8 +51,8 @@ PdfResult pdf_resolver_new(
     LOG_DEBUG_G("doc-info", "Startxref: %zu", startxref);
 
     PdfResult xref_result = PDF_OK;
-    XRefTable* xref = arena_alloc(arena, sizeof(XRefTable));
-    PDF_PROPAGATE(pdf_xref_new(arena, ctx, startxref, xref));
+    XRefTable* xref;
+    PDF_PROPAGATE(pdf_xref_new(arena, ctx, startxref, &xref));
     if (xref_result != PDF_OK) {
         LOG_ERROR("Failed to create xref table");
         return xref_result;

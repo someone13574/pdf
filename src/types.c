@@ -1,7 +1,8 @@
+#include "pdf/types.h"
+
 #include "log.h"
-#include "pdf_object.h"
-#include "pdf_result.h"
-#include "pdf_types.h"
+#include "pdf/object.h"
+#include "pdf/result.h"
 
 PdfResult pdf_deserialize_number(PdfObject* object, PdfNumber* deserialized) {
     RELEASE_ASSERT(object);

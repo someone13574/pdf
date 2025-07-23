@@ -1,10 +1,10 @@
 #pragma once
 
 #include "deserialize_types.h"
-#include "pdf_object.h"
-#include "pdf_page.h"
-#include "pdf_resolver.h"
-#include "pdf_result.h"
+#include "pdf/object.h"
+#include "pdf/page.h"
+#include "pdf/resolver.h"
+#include "pdf/result.h"
 
 // Catalog
 typedef struct {

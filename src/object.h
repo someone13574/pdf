@@ -1,9 +1,9 @@
 #pragma once
 
-#include "arena.h"
+#include "arena/arena.h"
 #include "ctx.h"
-#include "pdf_object.h"
-#include "pdf_result.h"
+#include "pdf/object.h"
+#include "pdf/result.h"
 
 PdfResult pdf_parse_object(
     Arena* arena,

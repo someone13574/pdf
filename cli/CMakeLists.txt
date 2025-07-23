@@ -1,5 +1,0 @@
-add_executable(pdf-cli main.c)
-target_link_libraries(pdf-cli PRIVATE pdf)
-target_compile_definitions(pdf-cli PRIVATE DEBUG TEST)
-target_compile_options(pdf-cli PRIVATE -fsanitize=address)
-target_link_options(pdf-cli PRIVATE -fsanitize=address)

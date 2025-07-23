@@ -2,8 +2,7 @@
 
 #include <stdint.h>
 
-#include "pdf_result.h"
-#include "vec.h"
+#include "pdf/result.h"
 
 typedef struct PdfObject PdfObject;
 
@@ -13,18 +12,28 @@ typedef double PdfReal;
 typedef char* PdfString;
 typedef char* PdfName;
 
-typedef struct {
-    Vec* elements;
-} PdfArray;
+#define DVEC_NAME PdfObjectVec
+#define DVEC_LOWERCASE_NAME pdf_object_vec
+#define DVEC_TYPE PdfObject*
+#include "arena/dvec_decl.h"
 
 typedef struct {
-    Vec* entries;
-} PdfDict;
+    PdfObjectVec* elements;
+} PdfArray;
 
 typedef struct {
     PdfObject* key;
     PdfObject* value;
 } PdfDictEntry;
+
+#define DVEC_NAME PdfDictEntryVec
+#define DVEC_LOWERCASE_NAME pdf_dict_entry_vec
+#define DVEC_TYPE PdfDictEntry
+#include "arena/dvec_decl.h"
+
+typedef struct {
+    PdfDictEntryVec* entries;
+} PdfDict;
 
 typedef struct {
     PdfObject* stream_dict;

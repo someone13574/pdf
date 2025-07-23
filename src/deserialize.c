@@ -2,12 +2,12 @@
 
 #include <string.h>
 
-#include "arena.h"
+#include "arena/arena.h"
+#include "deserialize_types.h"
 #include "log.h"
-#include "pdf_object.h"
-#include "pdf_resolver.h"
-#include "pdf_result.h"
-#include "vec.h"
+#include "pdf/object.h"
+#include "pdf/resolver.h"
+#include "pdf/result.h"
 
 PdfResult pdf_resolve_object(
     PdfOptionalResolver resolver,
@@ -296,14 +296,18 @@ PdfResult pdf_deserialize_array_field(
     LOG_TRACE_G(
         "deserde",
         "Deserializing array field with %zu elements",
-        vec_len(object->data.array.elements)
+        pdf_object_vec_len(object->data.array.elements)
     );
 
-    Vec* deserialized_elements = vec_new(arena);
-    for (size_t idx = 0; idx < vec_len(object->data.array.elements); idx++) {
+    PdfVoidVec* deserialized_elements = pdf_void_vec_new(arena);
+    for (size_t idx = 0; idx < pdf_object_vec_len(object->data.array.elements);
+         idx++) {
         LOG_TRACE_G("deserde", "Deserializing array element %zu", idx);
 
-        PdfObject* element = vec_get(object->data.array.elements, idx);
+        PdfObject* element = NULL;
+        RELEASE_ASSERT(
+            pdf_object_vec_get(object->data.array.elements, idx, &element)
+        );
 
         void* deserialized;
         PDF_PROPAGATE(deserialize_array_element(
@@ -314,11 +318,11 @@ PdfResult pdf_deserialize_array_field(
             &deserialized
         ));
 
-        vec_push(deserialized_elements, deserialized);
+        pdf_void_vec_push(deserialized_elements, deserialized);
     }
 
     void* vec_ptr = (char*)field_ptr + field_data.vec_offset;
-    *(Vec**)vec_ptr = deserialized_elements;
+    *(PdfVoidVec**)vec_ptr = deserialized_elements;
 
     return PDF_OK;
 }
@@ -356,11 +360,11 @@ PdfResult pdf_deserialize_as_array_field(
         &deserialized
     ));
 
-    Vec* deserialized_elements = vec_new(arena);
-    vec_push(deserialized_elements, deserialized);
+    PdfVoidVec* deserialized_elements = pdf_void_vec_new(arena);
+    pdf_void_vec_push(deserialized_elements, deserialized);
 
     void* vec_ptr = (char*)field_ptr + field_data.vec_offset;
-    *(Vec**)vec_ptr = deserialized_elements;
+    *(PdfVoidVec**)vec_ptr = deserialized_elements;
 
     return PDF_OK;
 }
@@ -416,19 +420,24 @@ PdfResult pdf_deserialize_object(
 
     // Reject unknown keys
     for (size_t entry_idx = 0;
-         entry_idx < vec_len(resolved_object.data.dict.entries);
+         entry_idx < pdf_dict_entry_vec_len(resolved_object.data.dict.entries);
          entry_idx++) {
         bool found = false;
-        PdfDictEntry* entry =
-            vec_get(resolved_object.data.dict.entries, entry_idx);
+
+        PdfDictEntry entry;
+        pdf_dict_entry_vec_get(
+            resolved_object.data.dict.entries,
+            entry_idx,
+            &entry
+        );
 
         for (size_t field_idx = 0; field_idx < num_fields; field_idx++) {
-            if (strcmp(entry->key->data.name, fields[field_idx].key) == 0) {
+            if (strcmp(entry.key->data.name, fields[field_idx].key) == 0) {
                 if (found) {
                     LOG_ERROR_G(
                         "deserde",
                         "Duplicate dict key `%s`",
-                        entry->key->data.name
+                        entry.key->data.name
                     );
                     return PDF_ERR_DUPLICATE_KEY;
                 }
@@ -441,7 +450,7 @@ PdfResult pdf_deserialize_object(
             LOG_ERROR_G(
                 "deserde",
                 "Dict key `%s` is not a known field",
-                entry->key->data.name
+                entry.key->data.name
             );
             return PDF_ERR_UNKNOWN_KEY;
         }
@@ -460,18 +469,22 @@ PdfResult pdf_deserialize_object(
             field->info.kind
         );
 
-        for (size_t entry_idx = 0;
-             entry_idx < vec_len(resolved_object.data.dict.entries);
+        for (size_t entry_idx = 0; entry_idx
+             < pdf_dict_entry_vec_len(resolved_object.data.dict.entries);
              entry_idx++) {
-            PdfDictEntry* entry =
-                vec_get(resolved_object.data.dict.entries, entry_idx);
-            if (strcmp(entry->key->data.name, fields[field_idx].key) != 0) {
+            PdfDictEntry entry;
+            pdf_dict_entry_vec_get(
+                resolved_object.data.dict.entries,
+                entry_idx,
+                &entry
+            );
+            if (strcmp(entry.key->data.name, fields[field_idx].key) != 0) {
                 continue;
             }
 
             PDF_PROPAGATE(deserialize_field(
                 (char*)target + field->offset,
-                entry->value,
+                entry.value,
                 field->info,
                 arena,
                 resolver
@@ -496,7 +509,7 @@ PdfResult pdf_deserialize_operands(
     void* target,
     PdfOperandDescriptor* descriptors,
     size_t num_descriptors,
-    Vec* operands,
+    PdfObjectVec* operands,
     Arena* arena
 ) {
     RELEASE_ASSERT(target);
@@ -504,17 +517,18 @@ PdfResult pdf_deserialize_operands(
     RELEASE_ASSERT(operands);
     RELEASE_ASSERT(arena);
 
-    if (num_descriptors > vec_len(operands)) {
+    if (num_descriptors > pdf_object_vec_len(operands)) {
         return PDF_ERR_MISSING_OPERAND;
     }
 
-    if (num_descriptors < vec_len(operands)) {
+    if (num_descriptors < pdf_object_vec_len(operands)) {
         return PDF_ERR_EXCESS_OPERAND;
     }
 
     for (size_t idx = 0; idx < num_descriptors; idx++) {
         PdfOperandDescriptor descriptor = descriptors[idx];
-        PdfObject* operand = vec_get(operands, idx);
+        PdfObject* operand = NULL;
+        RELEASE_ASSERT(pdf_object_vec_get(operands, idx, &operand));
         void* field_ptr = (char*)target + descriptor.offset;
 
         switch (descriptor.info.kind) {
@@ -714,30 +728,38 @@ TEST_FUNC(test_deserialize_objects) {
     TEST_ASSERT_EQ("Hello", deserialized.name);
 
     TEST_ASSERT(deserialized.array.elements);
-    TEST_ASSERT_EQ((size_t)3, vec_len(deserialized.array.elements));
+    TEST_ASSERT_EQ((size_t)3, pdf_object_vec_len(deserialized.array.elements));
     for (size_t idx = 0; idx < 3; idx++) {
-        PdfObject* element = vec_get(deserialized.array.elements, idx);
+        PdfObject* element;
+        TEST_ASSERT(
+            pdf_object_vec_get(deserialized.array.elements, idx, &element)
+        );
         TEST_ASSERT(element);
         TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element->type);
         TEST_ASSERT_EQ((PdfInteger)idx + 1, element->data.integer);
     }
 
     TEST_ASSERT(deserialized.dict.entries);
-    TEST_ASSERT_EQ((size_t)2, vec_len(deserialized.dict.entries));
+    TEST_ASSERT_EQ(
+        (size_t)2,
+        pdf_dict_entry_vec_len(deserialized.dict.entries)
+    );
     for (size_t idx = 0; idx < 2; idx++) {
-        PdfDictEntry* entry = vec_get(deserialized.dict.entries, idx);
-        TEST_ASSERT(entry);
+        PdfDictEntry entry;
+        TEST_ASSERT(
+            pdf_dict_entry_vec_get(deserialized.dict.entries, idx, &entry)
+        );
 
-        TEST_ASSERT(entry->key);
-        TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry->key->type);
-        TEST_ASSERT_EQ(idx == 0 ? "A" : "B", entry->key->data.name);
+        TEST_ASSERT(entry.key);
+        TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry.key->type);
+        TEST_ASSERT_EQ(idx == 0 ? "A" : "B", entry.key->data.name);
 
-        TEST_ASSERT(entry->value);
+        TEST_ASSERT(entry.value);
         TEST_ASSERT_EQ(
             (PdfObjectType)PDF_OBJECT_TYPE_INTEGER,
-            entry->value->type
+            entry.value->type
         );
-        TEST_ASSERT_EQ((PdfInteger)idx + 1, entry->value->data.integer);
+        TEST_ASSERT_EQ((PdfInteger)idx + 1, entry.value->data.integer);
     }
 
     TEST_ASSERT(deserialized.stream.stream_dict);
@@ -1047,30 +1069,23 @@ TEST_FUNC(test_deserialize_primitive_arrays) {
     );
 
     TEST_ASSERT(deserialized.strings.elements);
-    TEST_ASSERT_EQ((size_t)2, vec_len(deserialized.strings.elements));
-    TEST_ASSERT_EQ(
-        "Hello",
-        *(PdfString*)vec_get(deserialized.strings.elements, 0)
-    );
-    TEST_ASSERT_EQ(
-        "World",
-        *(PdfString*)vec_get(deserialized.strings.elements, 1)
-    );
+    TEST_ASSERT_EQ((size_t)2, pdf_void_vec_len(deserialized.strings.elements));
+
+    void* out;
+    TEST_ASSERT(pdf_void_vec_get(deserialized.strings.elements, 0, &out));
+    TEST_ASSERT_EQ("Hello", *(PdfString*)out);
+    TEST_ASSERT(pdf_void_vec_get(deserialized.strings.elements, 1, &out));
+    TEST_ASSERT_EQ("World", *(PdfString*)out);
 
     TEST_ASSERT(deserialized.integers.elements);
-    TEST_ASSERT_EQ((size_t)3, vec_len(deserialized.integers.elements));
-    TEST_ASSERT_EQ(
-        (PdfInteger)4,
-        *(PdfInteger*)vec_get(deserialized.integers.elements, 0)
-    );
-    TEST_ASSERT_EQ(
-        (PdfInteger)5,
-        *(PdfInteger*)vec_get(deserialized.integers.elements, 1)
-    );
-    TEST_ASSERT_EQ(
-        (PdfInteger)6,
-        *(PdfInteger*)vec_get(deserialized.integers.elements, 2)
-    );
+    TEST_ASSERT_EQ((size_t)3, pdf_void_vec_len(deserialized.integers.elements));
+
+    TEST_ASSERT(pdf_void_vec_get(deserialized.integers.elements, 0, &out));
+    TEST_ASSERT_EQ((PdfInteger)4, *(PdfInteger*)out);
+    TEST_ASSERT(pdf_void_vec_get(deserialized.integers.elements, 1, &out));
+    TEST_ASSERT_EQ((PdfInteger)5, *(PdfInteger*)out);
+    TEST_ASSERT(pdf_void_vec_get(deserialized.integers.elements, 2, &out));
+    TEST_ASSERT_EQ((PdfInteger)6, *(PdfInteger*)out);
 
     return TEST_RESULT_PASS;
 }
@@ -1126,19 +1141,19 @@ TEST_FUNC(test_deserialize_custom_array) {
     );
 
     TEST_ASSERT(deserialized.inners.elements);
-    TEST_ASSERT_EQ((size_t)2, vec_len(deserialized.inners.elements));
+    TEST_ASSERT_EQ((size_t)2, pdf_void_vec_len(deserialized.inners.elements));
 
-    TestDeserializeInnerStruct* element0 =
-        vec_get(deserialized.inners.elements, 0);
+    void* element0;
+    TEST_ASSERT(pdf_void_vec_get(deserialized.inners.elements, 0, &element0));
     TEST_ASSERT(element0);
-    TEST_ASSERT_EQ("There", element0->hello);
-    TEST_ASSERT_EQ(42, element0->world);
+    TEST_ASSERT_EQ("There", ((TestDeserializeInnerStruct*)element0)->hello);
+    TEST_ASSERT_EQ(42, ((TestDeserializeInnerStruct*)element0)->world);
 
-    TestDeserializeInnerStruct* element1 =
-        vec_get(deserialized.inners.elements, 1);
+    void* element1;
+    TEST_ASSERT(pdf_void_vec_get(deserialized.inners.elements, 1, &element1));
     TEST_ASSERT(element1);
-    TEST_ASSERT_EQ("Example", element1->hello);
-    TEST_ASSERT_EQ(5, element1->world);
+    TEST_ASSERT_EQ("Example", ((TestDeserializeInnerStruct*)element1)->hello);
+    TEST_ASSERT_EQ(5, ((TestDeserializeInnerStruct*)element1)->world);
 
     return TEST_RESULT_PASS;
 }

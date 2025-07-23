@@ -29,6 +29,10 @@ typedef enum {
     PDF_ERR_CTX_SCAN_LIMIT,
     PDF_ERR_CTX_BORROWED,
     PDF_ERR_CTX_NOT_BORROWED,
+    PDF_ERR_SFNT_EOF,
+    PDF_ERR_SFNT_MISSING_TABLE,
+    PDF_ERR_SFNT_TABLE_CHECKSUM,
+    PDF_ERR_CMAP_INVALID_PLATFORM
 } PdfResult;
 
 #define PDF_PROPAGATE(op)                                                      \

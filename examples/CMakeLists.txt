@@ -1,0 +1,11 @@
+add_executable(pdf-example pdf_main.c)
+target_link_libraries(pdf-example PRIVATE pdf)
+target_compile_definitions(pdf-example PRIVATE DEBUG TEST)
+target_compile_options(pdf-example PRIVATE -fsanitize=address)
+target_link_options(pdf-example PRIVATE -fsanitize=address)
+
+add_executable(font-example font_main.c)
+target_link_libraries(font-example PRIVATE pdf)
+target_compile_definitions(font-example PRIVATE DEBUG TEST)
+target_compile_options(font-example PRIVATE -fsanitize=address)
+target_link_options(font-example PRIVATE -fsanitize=address)

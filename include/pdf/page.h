@@ -1,14 +1,14 @@
 #pragma once
 
 #include "deserialize_types.h"
-#include "pdf_object.h"
-#include "pdf_resolver.h"
+#include "pdf/object.h"
+#include "pdf/resolver.h"
 
 // Page tree node
 typedef struct {
     PdfName type;
     PdfOpDict parent;
-    Vec* kids;
+    PdfVoidVec* kids;
     PdfInteger count;
     PdfObject* raw_dict;
 } PdfPageTreeNode;

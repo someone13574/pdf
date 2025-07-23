@@ -1,25 +1,28 @@
 #include "op.h"
 
 #include "../deserialize.h"
-#include "arena.h"
+#include "arena/arena.h"
 #include "log.h"
-#include "pdf_content_op.h"
-#include "pdf_object.h"
-#include "pdf_result.h"
-#include "pdf_types.h"
-#include "vec.h"
+#include "pdf/content_op.h"
+#include "pdf/object.h"
+#include "pdf/result.h"
+#include "pdf/types.h"
+
+#define DVEC_NAME PdfContentOpVec
+#define DVEC_LOWERCASE_NAME pdf_content_op_vec
+#define DVEC_TYPE PdfContentOp
+#include "../arena/dvec_impl.h"
 
 PdfContentOp*
-new_queue_op(Vec* operation_queue, Arena* arena, PdfContentOpKind op) {
-    PdfContentOp* new_op = arena_alloc(arena, sizeof(PdfContentOp));
-    new_op->kind = op;
-
-    vec_push(operation_queue, new_op);
-    return new_op;
+new_queue_op(PdfContentOpVec* operation_queue, PdfContentOpKind op) {
+    return pdf_content_op_vec_push(
+        operation_queue,
+        (PdfContentOp) {.kind = op}
+    );
 }
 
 PdfResult pdf_deserialize_set_font_op(
-    Vec* operands,
+    PdfObjectVec* operands,
     Arena* arena,
     PdfContentOpSetFont* deserialized
 ) {
@@ -49,7 +52,7 @@ PdfResult pdf_deserialize_set_font_op(
 }
 
 PdfResult pdf_deserialize_next_line_op(
-    Vec* operands,
+    PdfObjectVec* operands,
     Arena* arena,
     PdfContentOpNextLine* deserialized
 ) {
@@ -79,7 +82,7 @@ PdfResult pdf_deserialize_next_line_op(
 }
 
 PdfResult pdf_deserialize_show_text_op(
-    Vec* operands,
+    PdfObjectVec* operands,
     Arena* arena,
     PdfContentOpShowText* deserialized
 ) {
@@ -103,9 +106,9 @@ PdfResult pdf_deserialize_show_text_op(
 
 PdfResult pdf_deserialize_content_op(
     PdfOperator op,
-    Vec* operands,
+    PdfObjectVec* operands,
     Arena* arena,
-    Vec* operation_queue
+    PdfContentOpVec* operation_queue
 ) {
     RELEASE_ASSERT(operands);
     RELEASE_ASSERT(arena);
@@ -113,16 +116,16 @@ PdfResult pdf_deserialize_content_op(
 
     switch (op) {
         case PDF_OPERATOR_BT: {
-            new_queue_op(operation_queue, arena, PDF_CONTENT_OP_BEGIN_TEXT);
+            new_queue_op(operation_queue, PDF_CONTENT_OP_BEGIN_TEXT);
             return PDF_OK;
         };
         case PDF_OPERATOR_ET: {
-            new_queue_op(operation_queue, arena, PDF_CONTENT_OP_END_TEXT);
+            new_queue_op(operation_queue, PDF_CONTENT_OP_END_TEXT);
             return PDF_OK;
         };
         case PDF_OPERATOR_Tf: {
             PdfContentOp* new_op =
-                new_queue_op(operation_queue, arena, PDF_CONTENT_OP_SET_FONT);
+                new_queue_op(operation_queue, PDF_CONTENT_OP_SET_FONT);
             return pdf_deserialize_set_font_op(
                 operands,
                 arena,
@@ -131,7 +134,7 @@ PdfResult pdf_deserialize_content_op(
         }
         case PDF_OPERATOR_Td: {
             PdfContentOp* new_op =
-                new_queue_op(operation_queue, arena, PDF_CONTENT_OP_NEXT_LINE);
+                new_queue_op(operation_queue, PDF_CONTENT_OP_NEXT_LINE);
             return pdf_deserialize_next_line_op(
                 operands,
                 arena,
@@ -140,7 +143,7 @@ PdfResult pdf_deserialize_content_op(
         }
         case PDF_OPERATOR_Tj: {
             PdfContentOp* new_op =
-                new_queue_op(operation_queue, arena, PDF_CONTENT_OP_SHOW_TEXT);
+                new_queue_op(operation_queue, PDF_CONTENT_OP_SHOW_TEXT);
             return pdf_deserialize_show_text_op(
                 operands,
                 arena,

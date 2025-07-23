@@ -1,7 +1,7 @@
 #pragma once
 
-#include "pdf_object.h"
-#include "pdf_resolver.h"
+#include "pdf/object.h"
+#include "pdf/resolver.h"
 
 typedef struct {
     enum { PDF_NUMBER_TYPE_INTEGER, PDF_NUMBER_TYPE_REAL } type;

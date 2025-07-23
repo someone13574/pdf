@@ -1,11 +1,12 @@
-#include "arena.h"
+#include "pdf/trailer.h"
+
+#include "arena/arena.h"
 #include "deserialize.h"
 #include "log.h"
-#include "pdf_catalog.h"
-#include "pdf_object.h"
-#include "pdf_resolver.h"
-#include "pdf_result.h"
-#include "pdf_trailer.h"
+#include "pdf/catalog.h"
+#include "pdf/object.h"
+#include "pdf/resolver.h"
+#include "pdf/result.h"
 
 PdfResult pdf_deserialize_trailer(
     PdfObject* object,

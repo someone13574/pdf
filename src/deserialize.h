@@ -3,9 +3,9 @@
 #include <stddef.h>
 
 #include "log.h"
-#include "pdf_object.h"
-#include "pdf_resolver.h"
-#include "pdf_result.h"
+#include "pdf/object.h"
+#include "pdf/resolver.h"
+#include "pdf/result.h"
 
 typedef enum {
     PDF_FIELD_KIND_OBJECT,
@@ -134,7 +134,7 @@ PdfResult pdf_deserialize_operands(
     void* target,
     PdfOperandDescriptor* descriptors,
     size_t num_descriptors,
-    Vec* operands,
+    PdfObjectVec* operands,
     Arena* arena
 );
 

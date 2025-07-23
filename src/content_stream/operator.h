@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../ctx.h"
-#include "pdf_result.h"
+#include "pdf/result.h"
 
 typedef enum {
     // General graphics state

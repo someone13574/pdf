@@ -3,8 +3,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "arena.h"
-#include "pdf_result.h"
+#include "arena/arena.h"
+#include "pdf/result.h"
 
 typedef struct PdfCtx PdfCtx;
 
