@@ -3,6 +3,7 @@
 #include "arena/arena.h"
 #include "cmap.h"
 #include "directory.h"
+#include "head.h"
 #include "log.h"
 #include "parser.h"
 #include "pdf/result.h"
@@ -12,6 +13,7 @@ struct SfntFont {
     Arena* arena;
     SfntParser parser;
     SfntFontDirectory directory;
+    SfntHead head;
 };
 
 PdfResult sfnt_font_new(
@@ -32,6 +34,23 @@ PdfResult sfnt_font_new(
         sfnt_parse_directory(arena, &(*font)->parser, &(*font)->directory)
     );
 
+    SfntDirectoryEntry* head_entry;
+    PDF_PROPAGATE(
+        sfnt_directory_get_entry(&(*font)->directory, 0x68656164, &head_entry)
+    );
+
+    SfntParser head_parser;
+    PDF_PROPAGATE(sfnt_subparser_new(
+        &(*font)->parser,
+        head_entry->offset,
+        head_entry->length,
+        head_entry->checksum,
+        true,
+        &head_parser
+    ));
+
+    PDF_PROPAGATE(sfnt_parse_head(&head_parser, &(*font)->head));
+
     return PDF_OK;
 }
 
@@ -49,6 +68,7 @@ PdfResult sfnt_font_cmap(SfntFont* font, SfntCmap* cmap) {
         entry->offset,
         entry->length,
         entry->checksum,
+        false,
         &parser
     ));
 

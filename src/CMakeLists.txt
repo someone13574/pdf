@@ -11,6 +11,7 @@ set(HEADER_LIST
     "${pdf_SOURCE_DIR}/include/pdf/content_op.h"
     "${pdf_SOURCE_DIR}/include/sfnt/sfnt.h"
     "${pdf_SOURCE_DIR}/include/sfnt/cmap.h"
+    "${pdf_SOURCE_DIR}/include/sfnt/types.h"
     "${pdf_SOURCE_DIR}/include/log.h"
     "${pdf_SOURCE_DIR}/include/test.h"
     "${pdf_SOURCE_DIR}/include/arena/arena.h")
@@ -37,6 +38,8 @@ set(SOURCE_FILE_LIST
     sfnt/parser.c sfnt/parser.h
     sfnt/directory.c sfnt/directory.h
     sfnt/cmap.c sfnt/cmap.h
+    sfnt/head.c sfnt/head.h
+    sfnt/types.c
     xref.c xref.h
     ${HEADER_LIST})
 
