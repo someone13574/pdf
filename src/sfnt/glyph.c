@@ -80,7 +80,7 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
         // Coordinate stays the same
         if ((flags.flags & SFNT_SIMPLE_GLYPH_X_SHORT) == 0
             && (flags.flags & SFNT_SIMPLE_GLYPH_X_MODIFIER) != 0) {
-            LOG_TRACE_G("sfnt", "Delta-x: %d", 0);
+            LOG_DIAG(TRACE, SFNT, "Delta-x: %d", 0);
             continue;
         }
 
@@ -97,8 +97,9 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
                     x_coord_idx++,
                     (int16_t)(positive ? delta_mag : -(int16_t)delta_mag)
                 );
-                LOG_TRACE_G(
-                    "sfnt",
+                LOG_DIAG(
+                    TRACE,
+                    SFNT,
                     "Delta-x: %d",
                     (int16_t)(positive ? delta_mag : -(int16_t)delta_mag)
                 );
@@ -106,7 +107,7 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
                 int16_t delta;
                 PDF_PROPAGATE(sfnt_parser_read_int16(parser, &delta));
                 sfnt_int16_array_set(data->x_coords, x_coord_idx++, delta);
-                LOG_TRACE_G("sfnt", "Delta-x: %d", delta);
+                LOG_DIAG(TRACE, SFNT, "Delta-x: %d", delta);
             }
         }
     }
@@ -122,7 +123,7 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
         // Coordinate stays the same
         if ((flags.flags & SFNT_SIMPLE_GLYPH_Y_SHORT) == 0
             && (flags.flags & SFNT_SIMPLE_GLYPH_Y_MODIFIER) != 0) {
-            LOG_TRACE_G("sfnt", "Delta-y: %d", 0);
+            LOG_DIAG(TRACE, SFNT, "Delta-y: %d", 0);
             continue;
         }
 
@@ -139,8 +140,9 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
                     y_coord_idx++,
                     (int16_t)(positive ? delta_mag : -(int16_t)delta_mag)
                 );
-                LOG_TRACE_G(
-                    "sfnt",
+                LOG_DIAG(
+                    TRACE,
+                    SFNT,
                     "Delta-y: %d",
                     (int16_t)(positive ? delta_mag : -(int16_t)delta_mag)
                 );
@@ -148,7 +150,7 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
                 int16_t delta;
                 PDF_PROPAGATE(sfnt_parser_read_int16(parser, &delta));
                 sfnt_int16_array_set(data->y_coords, y_coord_idx++, delta);
-                LOG_TRACE_G("sfnt", "Delta-y: %d", delta);
+                LOG_DIAG(TRACE, SFNT, "Delta-y: %d", delta);
             }
         }
     }

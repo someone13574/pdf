@@ -46,9 +46,10 @@
             );                                                                 \
             va_end(args);                                                      \
             logger_log(                                                        \
-                1,                                                             \
-                "test-assert",                                                 \
-                LOG_LEVEL_ERROR,                                               \
+                "TEST",                                                        \
+                LOG_SEVERITY_PANIC,                                            \
+                LOG_DIAG_VERBOSITY_INFO,                                       \
+                LOG_DIAG_VERBOSITY_TRACE,                                      \
                 file,                                                          \
                 line,                                                          \
                 "Assertion failed: (" print_ecp " " #cmp_op " " print_ecp      \
@@ -59,9 +60,10 @@
             );                                                                 \
         } else {                                                               \
             logger_log(                                                        \
-                1,                                                             \
-                "test-assert",                                                 \
-                LOG_LEVEL_ERROR,                                               \
+                "TEST",                                                        \
+                LOG_SEVERITY_PANIC,                                            \
+                LOG_DIAG_VERBOSITY_INFO,                                       \
+                LOG_DIAG_VERBOSITY_TRACE,                                      \
                 file,                                                          \
                 line,                                                          \
                 "Assertion failed: (" print_ecp " " #cmp_op " " print_ecp ")", \
@@ -106,9 +108,10 @@
             );                                                                 \
             va_end(args);                                                      \
             logger_log(                                                        \
-                1,                                                             \
-                "test-assert",                                                 \
-                LOG_LEVEL_ERROR,                                               \
+                "TEST",                                                        \
+                LOG_SEVERITY_PANIC,                                            \
+                LOG_DIAG_VERBOSITY_INFO,                                       \
+                LOG_DIAG_VERBOSITY_TRACE,                                      \
                 file,                                                          \
                 line,                                                          \
                 "Assertion failed: (" print_ecp " " #cmp_op_dsp " " print_ecp  \
@@ -120,9 +123,10 @@
             );                                                                 \
         } else {                                                               \
             logger_log(                                                        \
-                1,                                                             \
-                "test-assert",                                                 \
-                LOG_LEVEL_ERROR,                                               \
+                "TEST",                                                        \
+                LOG_SEVERITY_PANIC,                                            \
+                LOG_DIAG_VERBOSITY_INFO,                                       \
+                LOG_DIAG_VERBOSITY_TRACE,                                      \
                 file,                                                          \
                 line,                                                          \
                 "Assertion failed: (" print_ecp " " #cmp_op_dsp " " print_ecp  \
@@ -190,9 +194,10 @@ TestResult __test_assert_eq_str(
     (void)eps;
     if (!a || !b) {
         logger_log(
-            1,
-            "test-assert",
-            LOG_LEVEL_ERROR,
+            "TEST",
+            LOG_SEVERITY_PANIC,
+            LOG_DIAG_VERBOSITY_INFO,
+            LOG_DIAG_VERBOSITY_TRACE,
             file,
             line,
             "String passed to test assertion is null"
@@ -214,9 +219,10 @@ TestResult __test_assert_eq_str(
         );
         va_end(args);
         logger_log(
-            1,
-            "test-assert",
-            LOG_LEVEL_ERROR,
+            "TEST",
+            LOG_SEVERITY_PANIC,
+            LOG_DIAG_VERBOSITY_INFO,
+            LOG_DIAG_VERBOSITY_TRACE,
             file,
             line,
             "Assertion failed: (\"%s\" == \"%s\"): %s",
@@ -226,9 +232,10 @@ TestResult __test_assert_eq_str(
         );
     } else {
         logger_log(
-            1,
-            "test-assert",
-            LOG_LEVEL_ERROR,
+            "TEST",
+            LOG_SEVERITY_PANIC,
+            LOG_DIAG_VERBOSITY_INFO,
+            LOG_DIAG_VERBOSITY_TRACE,
             file,
             line,
             "Assertion failed: (\"%s\" == \"%s\")",
@@ -251,9 +258,10 @@ TestResult __test_assert_ne_str(
     (void)eps;
     if (!a || !b) {
         logger_log(
-            1,
-            "test-assert",
-            LOG_LEVEL_ERROR,
+            "TEST",
+            LOG_SEVERITY_PANIC,
+            LOG_DIAG_VERBOSITY_INFO,
+            LOG_DIAG_VERBOSITY_TRACE,
             file,
             line,
             "String passed to test assertion is null"
@@ -275,9 +283,10 @@ TestResult __test_assert_ne_str(
         );
         va_end(args);
         logger_log(
-            1,
-            "test-assert",
-            LOG_LEVEL_ERROR,
+            "TEST",
+            LOG_SEVERITY_PANIC,
+            LOG_DIAG_VERBOSITY_INFO,
+            LOG_DIAG_VERBOSITY_TRACE,
             file,
             line,
             "Assertion failed: \"%s\" != \"%s\": %s",
@@ -287,9 +296,10 @@ TestResult __test_assert_ne_str(
         );
     } else {
         logger_log(
-            1,
-            "test-assert",
-            LOG_LEVEL_ERROR,
+            "TEST",
+            LOG_SEVERITY_PANIC,
+            LOG_DIAG_VERBOSITY_INFO,
+            LOG_DIAG_VERBOSITY_TRACE,
             file,
             line,
             "Assertion failed: \"%s\" != \"%s\"",
@@ -325,7 +335,7 @@ int test_entry(void) {
     _TestFuncEntry* stop = __stop_test_registry;
 
     ptrdiff_t num_tests = stop - start;
-    LOG_INFO_G("test", "Running %ld tests...", num_tests);
+    LOG_DIAG(INFO, TEST, "Running %ld tests...", num_tests);
     print_line();
 
     int passed = 0;
@@ -413,8 +423,9 @@ int test_entry(void) {
             waitpid(pid, &status, 0);
 
             if (WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS) {
-                LOG_DEBUG_G(
-                    "test",
+                LOG_DIAG(
+                    DEBUG,
+                    TEST,
                     "Test `%s` (\x1b[4m%s:%lu\x1b[0m) passed",
                     entry->name,
                     entry->file,
@@ -438,8 +449,8 @@ int test_entry(void) {
                 }
 #endif // TEST_NO_CAPTURE
 
-                LOG_ERROR_G(
-                    "test",
+                LOG_ERROR(
+                    TEST,
                     "Test `%s` (\x1b[4m%s:%lu\x1b[0m) failed",
                     entry->name,
                     entry->file,
@@ -460,8 +471,9 @@ int test_entry(void) {
     print_line();
 
     if (failed == 0) {
-        LOG_INFO_G(
-            "test",
+        LOG_DIAG(
+            INFO,
+            TEST,
             "Test results: %d/%d passed, %d/%d failed",
             passed,
             passed + failed,
@@ -469,8 +481,8 @@ int test_entry(void) {
             passed + failed
         );
     } else {
-        LOG_ERROR_G(
-            "test",
+        LOG_ERROR(
+            TEST,
             "Test results: %d/%d passed, %d/%d failed",
             passed,
             passed + failed,

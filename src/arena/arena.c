@@ -16,7 +16,7 @@ typedef struct {
 } ArenaBlock;
 
 void arena_block_init(ArenaBlock* block, size_t size) {
-    LOG_INFO_G("arena", "Allocating new arena block with size %zu", size);
+    LOG_DIAG(INFO, ARENA, "Allocating new arena block with size %zu", size);
 
     RELEASE_ASSERT(block);
     RELEASE_ASSERT(
@@ -32,7 +32,7 @@ void arena_block_init(ArenaBlock* block, size_t size) {
 
     void* alloc = malloc(size);
     if (!alloc) {
-        LOG_ERROR_G("arena", "Arena block of size %zu allocation failed", size);
+        LOG_ERROR(ARENA, "Arena block of size %zu allocation failed", size);
         exit(EXIT_FAILURE);
     }
 
@@ -72,7 +72,7 @@ Arena* arena_new(size_t block_size) {
 void arena_free(Arena* arena) {
     RELEASE_ASSERT(arena);
 
-    LOG_INFO_G("arena", "Freeing arena");
+    LOG_DIAG(INFO, ARENA, "Freeing arena");
 
     for (size_t block = 0; block < arena->num_blocks; block++) {
         free((void*)arena->blocks[block].start);
@@ -92,8 +92,9 @@ void* arena_alloc_align(Arena* arena, size_t size, size_t align) {
     RELEASE_ASSERT(align > 0);
     RELEASE_ASSERT((align & (align - 1)) == 0);
 
-    LOG_DEBUG_G(
-        "arena",
+    LOG_DIAG(
+        DEBUG,
+        ARENA,
         "Allocating %zu bytes on arena with align %zu",
         size,
         align
@@ -113,8 +114,9 @@ void* arena_alloc_align(Arena* arena, size_t size, size_t align) {
         // Use this block
         block->ptr = aligned_ptr;
 
-        LOG_TRACE_G(
-            "arena",
+        LOG_DIAG(
+            TRACE,
+            ARENA,
             "Allocating on block %zu. %zu/%zu bytes remaining",
             block_idx,
             block->ptr - block->start,
@@ -128,7 +130,7 @@ void* arena_alloc_align(Arena* arena, size_t size, size_t align) {
     ArenaBlock* new_array =
         realloc(arena->blocks, sizeof(ArenaBlock) * (arena->num_blocks + 1));
     if (!new_array) {
-        LOG_ERROR_G("arena", "Arena block list allocation failed");
+        LOG_ERROR(ARENA, "Arena block list allocation failed");
         exit(EXIT_FAILURE);
     }
 
@@ -163,7 +165,7 @@ void arena_reset(Arena* arena) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(arena->blocks);
 
-    LOG_DEBUG_G("arena", "Resetting arena");
+    LOG_DIAG(DEBUG, ARENA, "Resetting arena");
 
     for (size_t block_idx = 0; block_idx < arena->num_blocks; block_idx++) {
         ArenaBlock* block = &arena->blocks[block_idx];

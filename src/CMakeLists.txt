@@ -13,6 +13,7 @@ set(HEADER_LIST
     "${pdf_SOURCE_DIR}/include/sfnt/glyph.h"
     "${pdf_SOURCE_DIR}/include/sfnt/types.h"
     "${pdf_SOURCE_DIR}/include/log.h"
+    "${pdf_SOURCE_DIR}/include/log_groups.h"
     "${pdf_SOURCE_DIR}/include/test.h"
     "${pdf_SOURCE_DIR}/include/arena/arena.h")
 set(SOURCE_FILE_LIST

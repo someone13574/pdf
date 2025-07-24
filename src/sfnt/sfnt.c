@@ -5,7 +5,7 @@
 #include "directory.h"
 #include "glyph.h"
 #include "head.h"
-#include "local.h"
+#include "loca.h"
 #include "log.h"
 #include "maxp.h"
 #include "parser.h"
@@ -19,7 +19,7 @@ struct SfntFont {
     SfntFontDirectory directory;
     SfntHead head;
     SfntMaxp maxp;
-    SfntLocal local;
+    SfntLoca loca;
     SfntCmap cmap;
 };
 
@@ -27,8 +27,9 @@ PdfResult new_table_parser(SfntFont* font, uint32_t tag, SfntParser* parser) {
     RELEASE_ASSERT(font);
     RELEASE_ASSERT(parser);
 
-    LOG_INFO_G(
-        "sfnt",
+    LOG_DIAG(
+        INFO,
+        SFNT,
         "New subparser for table `%c%c%c%c`",
         (tag >> 24) & 0xff,
         (tag >> 16) & 0xff,
@@ -47,8 +48,9 @@ PdfResult new_table_parser(SfntFont* font, uint32_t tag, SfntParser* parser) {
         parser
     ));
 
-    LOG_TRACE_G(
-        "sfnt",
+    LOG_DIAG(
+        TRACE,
+        SFNT,
         "Table entry: offset=%u, len=%u",
         entry->offset,
         entry->length
@@ -87,14 +89,14 @@ PdfResult sfnt_font_new(
     PDF_PROPAGATE(new_table_parser(*font, 0x6d617870, &maxp_parser));
     PDF_PROPAGATE(sfnt_parse_maxp(&maxp_parser, &(*font)->maxp));
 
-    SfntParser local_parser;
-    PDF_PROPAGATE(new_table_parser(*font, 0x6c6f6361, &local_parser));
-    PDF_PROPAGATE(sfnt_parse_local(
+    SfntParser loca_parser;
+    PDF_PROPAGATE(new_table_parser(*font, 0x6c6f6361, &loca_parser));
+    PDF_PROPAGATE(sfnt_parse_loca(
         arena,
-        &local_parser,
+        &loca_parser,
         &(*font)->head,
         &(*font)->maxp,
-        &(*font)->local
+        &(*font)->loca
     ));
 
     PDF_PROPAGATE(new_table_parser(*font, 0x676c7966, &(*font)->glyf_parser));
@@ -108,9 +110,9 @@ PdfResult sfnt_get_glyph(SfntFont* font, uint32_t cid, SfntGlyph* glyph) {
 
     uint32_t gid = sfnt_cmap_map_cid(&font->cmap.mapping_table, cid);
     uint32_t offset;
-    PDF_PROPAGATE(sfnt_local_glyph_offset(&font->local, gid, &offset));
+    PDF_PROPAGATE(sfnt_loca_glyph_offset(&font->loca, gid, &offset));
 
-    LOG_DEBUG_G("sfnt", "cid=%u, gid=%u, offset=%u", cid, gid, offset);
+    LOG_DIAG(DEBUG, SFNT, "cid=%u, gid=%u, offset=%u", cid, gid, offset);
 
     PDF_PROPAGATE(sfnt_parser_seek(&font->glyf_parser, (size_t)offset));
     PDF_PROPAGATE(sfnt_parse_glyph(font->arena, &font->glyf_parser, glyph));

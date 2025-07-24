@@ -44,17 +44,17 @@ PdfResult pdf_resolver_new(
 
     uint8_t version;
     PDF_PROPAGATE(pdf_parse_header(ctx, &version));
-    LOG_INFO_G("doc-info", "File Version 1.%hhu", version);
+    LOG_DIAG(INFO, DOC, "File Version 1.%hhu", version);
 
     size_t startxref;
     PDF_PROPAGATE(pdf_parse_startxref(ctx, &startxref));
-    LOG_DEBUG_G("doc-info", "Startxref: %zu", startxref);
+    LOG_DIAG(DEBUG, DOC, "Startxref: %zu", startxref);
 
     PdfResult xref_result = PDF_OK;
     XRefTable* xref;
     PDF_PROPAGATE(pdf_xref_new(arena, ctx, startxref, &xref));
     if (xref_result != PDF_OK) {
-        LOG_ERROR("Failed to create xref table");
+        LOG_ERROR(DOC, "Failed to create xref table");
         return xref_result;
     }
 

@@ -60,7 +60,7 @@ PdfResult pdf_parse_object(
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(object);
 
-    LOG_INFO_G("object", "Parsing object at offset %zu", pdf_ctx_offset(ctx));
+    LOG_DIAG(INFO, OBJECT, "Parsing object at offset %zu", pdf_ctx_offset(ctx));
 
     char peeked, peeked_next;
     PDF_PROPAGATE(pdf_ctx_peek(ctx, &peeked));
@@ -86,8 +86,9 @@ PdfResult pdf_parse_object(
             return result;
         }
 
-        LOG_DEBUG_G(
-            "object",
+        LOG_DIAG(
+            DEBUG,
+            OBJECT,
             "Failed to parse indirect object/reference. Attempting to parse number."
         );
         PDF_PROPAGATE(pdf_ctx_seek(ctx, restore_offset));
@@ -115,8 +116,9 @@ pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(object);
 
-    LOG_DEBUG_G(
-        "object",
+    LOG_DIAG(
+        DEBUG,
+        OBJECT,
         "Parsing operand object at offset %zu in stream ctx",
         pdf_ctx_offset(ctx)
     );
@@ -194,7 +196,12 @@ PdfResult pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(object);
 
-    LOG_TRACE_G("object", "Parsing number at offset %zu", pdf_ctx_offset(ctx));
+    LOG_DIAG(
+        TRACE,
+        OBJECT,
+        "Parsing number at offset %zu",
+        pdf_ctx_offset(ctx)
+    );
 
     // Parse sign
     char sign_char;
@@ -233,7 +240,7 @@ PdfResult pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
 
     if ((decimal_peek_result == PDF_OK && decimal_char != '.')
         || decimal_peek_result == PDF_ERR_CTX_EOF) {
-        LOG_TRACE_G("object", "Number is integer");
+        LOG_DIAG(TRACE, OBJECT, "Number is integer");
         PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular)
         );
 
@@ -257,7 +264,7 @@ PdfResult pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
         PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, NULL));
     }
 
-    LOG_TRACE_G("object", "Number is real");
+    LOG_DIAG(TRACE, OBJECT, "Number is real");
 
     // Parse trailing digits
     double trailing_acc = 0.0;
@@ -459,7 +466,7 @@ PdfResult pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
         length++;
     }
 
-    LOG_DEBUG("Length %zu", length);
+    LOG_DIAG(DEBUG, OBJECT, "Length %zu", length);
     PDF_PROPAGATE(pdf_ctx_seek(ctx, start_offset + length));
     PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
 
@@ -713,7 +720,7 @@ PdfResult pdf_parse_indirect(
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(number_fallback);
 
-    LOG_DEBUG_G("object", "Parsing indirect object or reference");
+    LOG_DIAG(DEBUG, OBJECT, "Parsing indirect object or reference");
 
     // Parse object id
     uint64_t object_id;
@@ -741,7 +748,7 @@ PdfResult pdf_parse_indirect(
     if (peeked == 'R') {
         PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, NULL));
 
-        LOG_DEBUG_G("object", "Parsed indirect reference");
+        LOG_DIAG(DEBUG, OBJECT, "Parsed indirect reference");
 
         object->type = PDF_OBJECT_TYPE_INDIRECT_REF;
         object->data.indirect_ref.object_id = object_id;
@@ -749,7 +756,7 @@ PdfResult pdf_parse_indirect(
 
         return PDF_OK;
     } else {
-        LOG_DEBUG_G("object", "Parsed indirect object");
+        LOG_DIAG(DEBUG, OBJECT, "Parsed indirect object");
 
         PDF_PROPAGATE(pdf_ctx_expect(ctx, "obj"));
         PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, false, &is_pdf_non_regular)
@@ -788,6 +795,7 @@ static char* format_alloc(Arena* arena, const char* fmt, ...) {
     va_list args_copy;
     va_copy(args_copy, args);
     int needed = vsnprintf(NULL, 0, fmt, args_copy);
+    va_end(args_copy);
     char* buffer = arena_alloc(arena, (size_t)needed + 1);
     vsprintf(buffer, fmt, args);
     va_end(args);
@@ -861,7 +869,7 @@ char* pdf_fmt_object_indented(
                     if (new_buffer) {
                         buffer = new_buffer;
                     } else {
-                        LOG_ERROR("Format failed");
+                        LOG_ERROR(OBJECT, "Object formatting failed");
                         return NULL;
                     }
                 }

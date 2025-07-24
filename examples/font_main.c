@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
         PDF_REQUIRE(sfnt_get_glyph(font, cid, &glyph));
     }
 
-    LOG_INFO("Finished");
+    LOG_DIAG(INFO, EXAMPLE, "Finished");
 
     arena_free(arena);
     return 0;

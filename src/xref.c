@@ -77,8 +77,9 @@ PdfResult pdf_xref_parse_entry(
     RELEASE_ASSERT(entry < subsection->num_entries);
 
     if (!subsection->entries) {
-        LOG_DEBUG_G(
-            "xref",
+        LOG_DIAG(
+            DEBUG,
+            XREF,
             "Initializing entries table for subsection with %zu entries",
             subsection->num_entries
         );
@@ -98,7 +99,7 @@ PdfResult pdf_xref_parse_entry(
     // Check if start of line
     PDF_PROPAGATE(pdf_ctx_seek_line_start(ctx));
     if (pdf_ctx_offset(ctx) != entry_offset) {
-        LOG_ERROR_G("xref", "XRef entry not aligned to line start");
+        LOG_ERROR(XREF, "XRef entry not aligned to line start");
         return PDF_ERR_INVALID_XREF;
     }
 
@@ -131,7 +132,7 @@ pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, XRefTable** xref) {
 
     PdfResult line_seek_result = pdf_ctx_seek_line_start(ctx);
     if (line_seek_result == PDF_OK && pdf_ctx_offset(ctx) != xrefstart) {
-        LOG_WARN_G("parse", "xrefstart not pointing to start of line");
+        LOG_WARN(SFNT_PARSE, "xrefstart not pointing to start of line");
         return PDF_ERR_INVALID_XREF;
     }
 
@@ -149,8 +150,9 @@ pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, XRefTable** xref) {
 
     // Parse subsections
     do {
-        LOG_TRACE_G(
-            "xref",
+        LOG_DIAG(
+            TRACE,
+            XREF,
             "Parsing subsection %zu",
             xref_subsection_vec_len((*xref)->subsections)
         );
@@ -167,7 +169,7 @@ pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, XRefTable** xref) {
             &subsection_start
         );
         if (parse_result != PDF_OK) {
-            LOG_TRACE_G("xref", "Bad subsection header");
+            LOG_DIAG(TRACE, XREF, "Bad subsection header");
 
             if (xref_subsection_vec_len((*xref)->subsections) == 0) {
                 return parse_result;
@@ -177,8 +179,9 @@ pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, XRefTable** xref) {
         }
 
         // Push to vec
-        LOG_DEBUG_G(
-            "xref",
+        LOG_DIAG(
+            DEBUG,
+            XREF,
             "subsection=%zu, subsection_start=%lu, first_object=%lu, num_objects=%lu",
             xref_subsection_vec_len((*xref)->subsections),
             subsection_start,
@@ -199,8 +202,9 @@ pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, XRefTable** xref) {
         PdfResult seek_end_result =
             pdf_ctx_seek(ctx, subsection_start + 20 * num_objects - 2);
         if (seek_end_result != PDF_OK) {
-            LOG_TRACE_G(
-                "xref",
+            LOG_DIAG(
+                TRACE,
+                XREF,
                 "Failed to seek end of section. Start offset %zu, %lu objects",
                 subsection_start,
                 num_objects
@@ -215,7 +219,7 @@ pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, XRefTable** xref) {
         }
     } while (1);
 
-    LOG_TRACE_G("xref", "Finished parsing subsection headers");
+    LOG_DIAG(TRACE, XREF, "Finished parsing subsection headers");
 
     return PDF_OK;
 }
@@ -229,8 +233,9 @@ PdfResult pdf_xref_get_entry(
     RELEASE_ASSERT(xref);
     RELEASE_ASSERT(entry);
 
-    LOG_DEBUG_G(
-        "xref",
+    LOG_DIAG(
+        DEBUG,
+        XREF,
         "Getting xref object %zu with generation %zu",
         object_id,
         generation
@@ -255,8 +260,9 @@ PdfResult pdf_xref_get_entry(
         size_t entry_idx = object_id - subsection->first_object;
         if (!subsection->entries // ASan fails at this if statement
             || !subsection->entries[entry_idx].entry_parsed) {
-            LOG_TRACE_G(
-                "xref",
+            LOG_DIAG(
+                TRACE,
+                XREF,
                 "Parsing xref object %zu in subsection %zu",
                 object_id,
                 subsection_idx

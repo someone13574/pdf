@@ -65,8 +65,8 @@ PdfResult sfnt_subparser_new(
     }
 
     if (sum != checksum) {
-        LOG_WARN_G(
-            "sfnt",
+        LOG_WARN(
+            SFNT,
             "SFNT checksum mismatch %llu != %llu",
             (unsigned long long)checksum,
             (unsigned long long)sum

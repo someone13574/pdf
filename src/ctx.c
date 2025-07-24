@@ -51,7 +51,7 @@ size_t pdf_ctx_offset(PdfCtx* ctx) {
 
 PdfResult pdf_ctx_seek(PdfCtx* ctx, size_t offset) {
     RELEASE_ASSERT(ctx);
-    LOG_TRACE_G("ctx", "Seeking offset %zu", offset);
+    LOG_DIAG(TRACE, CTX, "Seeking offset %zu", offset);
 
     if (offset > ctx->buffer_len) {
         return PDF_ERR_CTX_EOF;
@@ -63,12 +63,13 @@ PdfResult pdf_ctx_seek(PdfCtx* ctx, size_t offset) {
 
 PdfResult pdf_ctx_shift(PdfCtx* ctx, ssize_t relative_offset) {
     RELEASE_ASSERT(ctx);
-    LOG_TRACE_G("ctx", "Shifting offset by %ld", relative_offset);
+    LOG_DIAG(TRACE, CTX, "Shifting offset by %ld", relative_offset);
 
     if (relative_offset < 0) {
         if (ctx->offset < (size_t)(-relative_offset)) {
-            LOG_TRACE_G(
-                "ctx",
+            LOG_DIAG(
+                TRACE,
+                CTX,
                 "New offset is out of bounds. Restoring offset to %zu",
                 ctx->offset
             );
@@ -79,8 +80,9 @@ PdfResult pdf_ctx_shift(PdfCtx* ctx, ssize_t relative_offset) {
     } else {
         size_t new_offset = ctx->offset + (size_t)relative_offset;
         if (new_offset > ctx->buffer_len) {
-            LOG_TRACE_G(
-                "ctx",
+            LOG_DIAG(
+                TRACE,
+                CTX,
                 "New offset is out of bounds. Restoring offset to %zu",
                 ctx->offset
             );
@@ -90,7 +92,7 @@ PdfResult pdf_ctx_shift(PdfCtx* ctx, ssize_t relative_offset) {
         ctx->offset = new_offset;
     }
 
-    LOG_TRACE_G("ctx", "New ctx offset is %zu", ctx->offset);
+    LOG_DIAG(TRACE, CTX, "New ctx offset is %zu", ctx->offset);
     return PDF_OK;
 }
 
@@ -121,7 +123,7 @@ PdfResult pdf_ctx_peek(PdfCtx* ctx, char* peeked) {
     }
 
     *peeked = ctx->buffer[ctx->offset];
-    LOG_TRACE_G("ctx", "Ctx char at offset %zu: '%c'", ctx->offset, *peeked);
+    LOG_DIAG(TRACE, CTX, "Ctx char at offset %zu: '%c'", ctx->offset, *peeked);
 
     return PDF_OK;
 }
@@ -147,7 +149,7 @@ PdfResult pdf_ctx_expect(PdfCtx* ctx, const char* text) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(text);
 
-    LOG_DEBUG_G("ctx", "Expecting text \"%s\"", text);
+    LOG_DIAG(DEBUG, CTX, "Expecting text \"%s\"", text);
 
     if (ctx->borrowed_substr) {
         return PDF_ERR_CTX_BORROWED;
@@ -184,7 +186,7 @@ pdf_ctx_require_char_type(PdfCtx* ctx, bool permit_eof, bool (*eval)(char)) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(eval);
 
-    LOG_TRACE_G("ctx", "Expecting character type at offset %zu", ctx->offset);
+    LOG_DIAG(TRACE, CTX, "Expecting character type at offset %zu", ctx->offset);
 
     char peeked;
     PdfResult peek_result = (pdf_ctx_peek(ctx, &peeked));
@@ -197,7 +199,7 @@ pdf_ctx_require_char_type(PdfCtx* ctx, bool permit_eof, bool (*eval)(char)) {
     }
 
     if (!eval(peeked)) {
-        LOG_TRACE_G("ctx", "Character type didn't match");
+        LOG_DIAG(TRACE, CTX, "Character type didn't match");
         return PDF_ERR_CTX_EXPECT;
     }
 
@@ -208,8 +210,9 @@ PdfResult pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(text);
 
-    LOG_DEBUG_G(
-        "ctx",
+    LOG_DIAG(
+        DEBUG,
+        CTX,
         "Backscanning for text \"%s\" with char limit %zu (0=none)",
         text,
         limit
@@ -238,7 +241,7 @@ PdfResult pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit) {
         offset = ctx->offset;
     }
 
-    LOG_TRACE_G("ctx", "Backscanned to %zu", offset);
+    LOG_DIAG(TRACE, CTX, "Backscanned to %zu", offset);
     pdf_ctx_seek(ctx, offset);
     return PDF_OK;
 }
@@ -250,7 +253,7 @@ PdfResult pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit) {
 PdfResult pdf_ctx_seek_line_start(PdfCtx* ctx) {
     RELEASE_ASSERT(ctx);
 
-    LOG_DEBUG_G("ctx", "Finding line start");
+    LOG_DIAG(DEBUG, CTX, "Finding line start");
 
     if (ctx->borrowed_substr) {
         return PDF_ERR_CTX_BORROWED;
@@ -302,7 +305,7 @@ PdfResult pdf_ctx_seek_line_start(PdfCtx* ctx) {
 PdfResult pdf_ctx_seek_next_line(PdfCtx* ctx) {
     RELEASE_ASSERT(ctx);
 
-    LOG_DEBUG_G("ctx", "Finding next line");
+    LOG_DIAG(DEBUG, CTX, "Finding next line");
 
     if (ctx->borrowed_substr) {
         return PDF_ERR_CTX_BORROWED;
@@ -338,7 +341,7 @@ PdfResult pdf_ctx_seek_next_line(PdfCtx* ctx) {
 PdfResult pdf_ctx_consume_whitespace(PdfCtx* ctx) {
     RELEASE_ASSERT(ctx);
 
-    LOG_DEBUG_G("ctx", "Consuming whitespace");
+    LOG_DIAG(DEBUG, CTX, "Consuming whitespace");
 
     char peeked;
     while (pdf_ctx_peek(ctx, &peeked) == PDF_OK && is_pdf_whitespace(peeked)) {
@@ -357,8 +360,9 @@ PdfResult pdf_ctx_borrow_substr(
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(substr);
 
-    LOG_DEBUG_G(
-        "ctx",
+    LOG_DIAG(
+        DEBUG,
+        CTX,
         "Borrowing substring starting at %zu with length %zu",
         offset,
         length
@@ -378,7 +382,7 @@ PdfResult pdf_ctx_borrow_substr(
 
     ctx->borrow_term_replaced = ctx->buffer[ctx->borrow_term_offset];
     ctx->buffer[ctx->borrow_term_offset] = '\0';
-    LOG_TRACE_G("ctx", "Borrowed substr: \"%s\"", *substr);
+    LOG_DIAG(TRACE, CTX, "Borrowed substr: \"%s\"", *substr);
 
     return PDF_OK;
 }
@@ -386,7 +390,7 @@ PdfResult pdf_ctx_borrow_substr(
 PdfResult pdf_ctx_release_substr(PdfCtx* ctx) {
     RELEASE_ASSERT(ctx);
 
-    LOG_DEBUG_G("ctx", "Releasing substr");
+    LOG_DIAG(DEBUG, CTX, "Releasing substr");
 
     if (!ctx->borrowed_substr) {
         return PDF_ERR_CTX_NOT_BORROWED;
@@ -410,7 +414,7 @@ PdfResult pdf_ctx_parse_int(
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(value);
 
-    LOG_DEBUG_G("ctx", "Parsing int at %zu", ctx->offset);
+    LOG_DIAG(DEBUG, CTX, "Parsing int at %zu", ctx->offset);
 
     size_t start_offset = ctx->offset;
 
@@ -449,7 +453,7 @@ PdfResult pdf_ctx_parse_int(
     pdf_ctx_seek(ctx, start_offset + processed_length);
     *value = acc;
 
-    LOG_TRACE_G("ctx", "Parsed int %lu. Length is %u", acc, processed_length);
+    LOG_DIAG(TRACE, CTX, "Parsed int %lu. Length is %u", acc, processed_length);
     return PDF_OK;
 }
 

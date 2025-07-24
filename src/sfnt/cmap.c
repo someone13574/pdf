@@ -101,7 +101,7 @@ size_t sfnt_cmap_select_encoding(SfntCmap* cmap) {
         LOG_TODO("Non-unicode");
     }
 
-    LOG_INFO_G("sfnt", "Selected cmap encoding table %zu", encoding_idx);
+    LOG_DIAG(INFO, SFNT, "Selected cmap encoding table %zu", encoding_idx);
 
     return encoding_idx;
 }
@@ -204,11 +204,7 @@ uint16_t cmap_format4_map(SfntCmapFormat4* subtable, uint16_t cid) {
     }
 
     if (segment == SIZE_MAX) {
-        LOG_WARN_G(
-            "sfnt",
-            "No valid cmap format4 segment for cid %d",
-            (int)cid
-        );
+        LOG_WARN(SFNT, "No valid cmap format4 segment for cid %d", (int)cid);
         return 0;
     }
 

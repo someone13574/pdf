@@ -41,8 +41,9 @@ struct DARRAY_NAME {
 DARRAY_NAME* DARRAY_FN(new)(Arena* arena, size_t num_elements) {
     RELEASE_ASSERT(arena);
 
-    LOG_DEBUG_G(
-        "array",
+    LOG_DIAG(
+        DEBUG,
+        ARRAY,
         "Creating new " STRINGIFY(DARRAY_NAME) " (Array<" STRINGIFY(DARRAY_TYPE
         ) ", %zu>)",
         num_elements
@@ -98,8 +99,9 @@ bool DARRAY_FN(get)(DARRAY_NAME* array, size_t idx, DARRAY_TYPE* out) {
     RELEASE_ASSERT(array);
     RELEASE_ASSERT(out);
 
-    LOG_DEBUG_G(
-        "array",
+    LOG_DIAG(
+        DEBUG,
+        ARRAY,
         "Getting " STRINGIFY(DARRAY_TYPE
         ) " element at idx %zu from array " STRINGIFY(DARRAY_NAME),
         idx
@@ -119,8 +121,9 @@ bool DARRAY_FN(get_ptr)(DARRAY_NAME* array, size_t idx, DARRAY_TYPE** out) {
     RELEASE_ASSERT(array);
     RELEASE_ASSERT(out);
 
-    LOG_DEBUG_G(
-        "array",
+    LOG_DIAG(
+        DEBUG,
+        ARRAY,
         "Getting reference to " STRINGIFY(DARRAY_TYPE
         ) " element at idx %zu from array " STRINGIFY(DARRAY_NAME),
         idx

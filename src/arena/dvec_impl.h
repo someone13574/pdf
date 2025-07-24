@@ -46,8 +46,9 @@ struct DVEC_NAME {
 DVEC_NAME* DVEC_FN(new)(Arena* arena) {
     RELEASE_ASSERT(arena);
 
-    LOG_DEBUG_G(
-        "vec",
+    LOG_DIAG(
+        DEBUG,
+        VEC,
         "Creating new " STRINGIFY(DVEC_NAME) " (Vec<" STRINGIFY(DVEC_TYPE) ">)"
     );
 
@@ -64,8 +65,9 @@ DVEC_NAME* DVEC_FN(new)(Arena* arena) {
 DVEC_TYPE* DVEC_FN(push)(DVEC_NAME* vec, DVEC_TYPE element) {
     RELEASE_ASSERT(vec);
 
-    LOG_DEBUG_G(
-        "vec",
+    LOG_DIAG(
+        DEBUG,
+        VEC,
         "Pushing " STRINGIFY(DVEC_TYPE) " to " STRINGIFY(DVEC_NAME) " vec"
     );
 
@@ -74,7 +76,7 @@ DVEC_TYPE* DVEC_FN(push)(DVEC_NAME* vec, DVEC_TYPE element) {
     RELEASE_ASSERT(block_idx < DVEC_MAX_BLOCKS, "Vector max length reached");
 
     if (block_idx >= vec->allocated_blocks) {
-        LOG_TRACE_G("vec", "Allocating new vec block at idx %zu", block_idx);
+        LOG_DIAG(TRACE, VEC, "Allocating new vec block at idx %zu", block_idx);
 
         size_t block_size = (size_t)1 << block_idx;
         vec->blocks[block_idx] =
@@ -84,8 +86,9 @@ DVEC_TYPE* DVEC_FN(push)(DVEC_NAME* vec, DVEC_TYPE element) {
     }
 
     size_t offset = vec->len - (((size_t)1 << block_idx) - 1);
-    LOG_TRACE_G(
-        "vec",
+    LOG_DIAG(
+        TRACE,
+        VEC,
         "Element %zu is in block idx %zu at offset %zu",
         vec->len,
         block_idx,
@@ -104,8 +107,9 @@ bool DVEC_FN(get)(DVEC_NAME* vec, size_t idx, DVEC_TYPE* out) {
     RELEASE_ASSERT(vec);
     RELEASE_ASSERT(out);
 
-    LOG_DEBUG_G(
-        "vec",
+    LOG_DIAG(
+        DEBUG,
+        VEC,
         "Getting " STRINGIFY(DVEC_TYPE
         ) " element at idx %zu from vec " STRINGIFY(DVEC_NAME),
         idx
@@ -118,8 +122,9 @@ bool DVEC_FN(get)(DVEC_NAME* vec, size_t idx, DVEC_TYPE* out) {
     size_t block_idx =
         8 * sizeof(size_t) - 1 - (size_t)__builtin_clzll(idx + 1);
     size_t offset = idx - (((size_t)1 << block_idx) - 1);
-    LOG_TRACE_G(
-        "vec",
+    LOG_DIAG(
+        TRACE,
+        VEC,
         "Element %zu is in block idx %zu at offset %zu",
         idx,
         block_idx,
@@ -136,8 +141,9 @@ bool DVEC_FN(get_ptr)(DVEC_NAME* vec, size_t idx, DVEC_TYPE** out) {
     RELEASE_ASSERT(vec);
     RELEASE_ASSERT(out);
 
-    LOG_DEBUG_G(
-        "vec",
+    LOG_DIAG(
+        DEBUG,
+        VEC,
         "Getting " STRINGIFY(DVEC_TYPE
         ) " element at idx %zu from vec " STRINGIFY(DVEC_NAME),
         idx
@@ -150,8 +156,9 @@ bool DVEC_FN(get_ptr)(DVEC_NAME* vec, size_t idx, DVEC_TYPE** out) {
     size_t block_idx =
         8 * sizeof(size_t) - 1 - (size_t)__builtin_clzll(idx + 1);
     size_t offset = idx - (((size_t)1 << block_idx) - 1);
-    LOG_TRACE_G(
-        "vec",
+    LOG_DIAG(
+        TRACE,
+        VEC,
         "Element %zu is in block idx %zu at offset %zu",
         idx,
         block_idx,
@@ -168,8 +175,9 @@ bool DVEC_FN(pop)(DVEC_NAME* vec, DVEC_TYPE* out) {
     RELEASE_ASSERT(vec);
     RELEASE_ASSERT(out);
 
-    LOG_DEBUG_G(
-        "vec",
+    LOG_DIAG(
+        DEBUG,
+        VEC,
         "Popping " STRINGIFY(DVEC_TYPE) "  element from " STRINGIFY(DVEC_NAME)
     );
 

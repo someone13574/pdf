@@ -8,15 +8,15 @@
 
 typedef struct {
     SfntUint32Array* offsets;
-} SfntLocal;
+} SfntLoca;
 
-PdfResult sfnt_parse_local(
+PdfResult sfnt_parse_loca(
     Arena* arena,
     SfntParser* parser,
     SfntHead* head,
     SfntMaxp* maxp,
-    SfntLocal* local
+    SfntLoca* loca
 );
 
 PdfResult
-sfnt_local_glyph_offset(SfntLocal* local, uint32_t gid, uint32_t* offset);
+sfnt_loca_glyph_offset(SfntLoca* loca, uint32_t gid, uint32_t* offset);

@@ -178,8 +178,8 @@ TestResult __test_assert_ne_str(
 #define TEST_ASSERT(cond, ...)                                                 \
     do {                                                                       \
         if (!(cond)) {                                                         \
-            LOG_ERROR_G(                                                       \
-                "test-assert",                                                 \
+            LOG_ERROR(                                                         \
+                TEST,                                                          \
                 "Assertion failed: \"" #cond "\"" __VA_OPT__(": ") __VA_ARGS__ \
             );                                                                 \
             return TEST_RESULT_FAIL;                                           \
