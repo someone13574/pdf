@@ -35,7 +35,10 @@ typedef enum {
     PDF_ERR_CMAP_INVALID_PLATFORM,
     PDF_ERR_CMAP_INVALID_GIA_LEN,
     PDF_ERR_CMAP_RESERVED_PAD,
-    PDF_ERR_SFNT_BAD_MAGIC
+    PDF_ERR_MAXP_INVALID_VERSION,
+    PDF_ERR_SFNT_BAD_MAGIC,
+    PDF_ERR_SFNT_BAD_HEAD,
+    PDF_ERR_SFNT_INVALID_GID
 } PdfResult;
 
 #define PDF_PROPAGATE(op)                                                      \

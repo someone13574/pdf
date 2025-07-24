@@ -46,7 +46,7 @@ struct DVEC_NAME {
 DVEC_NAME* DVEC_FN(new)(Arena* arena) {
     RELEASE_ASSERT(arena);
 
-    LOG_INFO_G(
+    LOG_DEBUG_G(
         "vec",
         "Creating new " STRINGIFY(DVEC_NAME) " (Vec<" STRINGIFY(DVEC_TYPE) ">)"
     );

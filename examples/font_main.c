@@ -5,7 +5,7 @@
 #include "arena/arena.h"
 #include "log.h"
 #include "pdf/result.h"
-#include "sfnt/cmap.h"
+#include "sfnt/glyph.h"
 #include "sfnt/sfnt.h"
 
 static uint8_t*
@@ -62,18 +62,14 @@ int main(int argc, char** argv) {
     );
 
     SfntFont* font;
-    SfntCmap cmap;
     PDF_REQUIRE(sfnt_font_new(arena, buffer, buffer_len, &font));
-    PDF_REQUIRE(sfnt_font_cmap(font, &cmap));
 
     const char* test_text = "Hello World!";
     for (size_t idx = 0; idx < strlen(test_text); idx++) {
         uint32_t cid = (uint32_t)test_text[idx];
-        LOG_INFO(
-            "cid=%u, gid=%u",
-            cid,
-            sfnt_cmap_map_cid(&cmap.mapping_table, cid)
-        );
+
+        SfntGlyph glyph;
+        PDF_REQUIRE(sfnt_get_glyph(font, cid, &glyph));
     }
 
     LOG_INFO("Finished");

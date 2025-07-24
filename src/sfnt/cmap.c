@@ -6,19 +6,24 @@
 #include "log.h"
 #include "parser.h"
 #include "pdf/result.h"
-#include "sfnt/cmap.h"
-
-#define DARRAY_NAME SfntUint16Array
-#define DARRAY_LOWERCASE_NAME sfnt_uint16_array
-#define DARRAY_TYPE uint16_t
-#include "../arena/darray_impl.h"
 
 #define DVEC_NAME SfntCmapHeaderVec
 #define DVEC_LOWERCASE_NAME sfnt_cmap_header_vec
 #define DVEC_TYPE SfntCmapHeader
 #include "../arena/dvec_impl.h"
 
-PdfResult sfnt_parse_cmap_subtable(
+static size_t sfnt_cmap_select_encoding(SfntCmap* cmap);
+static PdfResult
+parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data);
+static PdfResult sfnt_cmap_get_encoding(
+    Arena* arena,
+    SfntCmap* cmap,
+    SfntParser* parser,
+    size_t idx,
+    SfntCmapSubtable* subtable
+);
+
+PdfResult sfnt_parse_cmap_header(
     Arena* arena,
     SfntParser* parser,
     SfntCmapHeader* subtable
@@ -47,20 +52,29 @@ PdfResult sfnt_parse_cmap(Arena* arena, SfntParser* parser, SfntCmap* cmap) {
 
     cmap->headers = sfnt_cmap_header_vec_new(arena);
     for (size_t idx = 0; idx < cmap->num_subtables; idx++) {
-        SfntCmapHeader subtable;
-        PDF_PROPAGATE(sfnt_parse_cmap_subtable(arena, parser, &subtable));
-        sfnt_cmap_header_vec_push(cmap->headers, subtable);
+        SfntCmapHeader header;
+        PDF_PROPAGATE(sfnt_parse_cmap_header(arena, parser, &header));
+        sfnt_cmap_header_vec_push(cmap->headers, header);
     }
+
+    size_t encoding_idx = sfnt_cmap_select_encoding(cmap);
+    PDF_PROPAGATE(sfnt_cmap_get_encoding(
+        arena,
+        cmap,
+        parser,
+        encoding_idx,
+        &cmap->mapping_table
+    ));
 
     return PDF_OK;
 }
 
-void sfnt_cmap_select_encoding(SfntCmap* cmap, size_t* encoding_idx) {
+size_t sfnt_cmap_select_encoding(SfntCmap* cmap) {
     RELEASE_ASSERT(cmap);
-    RELEASE_ASSERT(encoding_idx);
 
     bool found_unicode = false;
     bool found_non_bmp_unicode = false;
+    size_t encoding_idx = 0;
 
     for (size_t idx = 0; idx < (size_t)cmap->num_subtables; idx++) {
         SfntCmapHeader subtable;
@@ -77,11 +91,19 @@ void sfnt_cmap_select_encoding(SfntCmap* cmap, size_t* encoding_idx) {
                 found_non_bmp_unicode = true;
             }
 
-            *encoding_idx = idx;
+            encoding_idx = idx;
         } else if (found_unicode) {
             continue;
         }
     }
+
+    if (!found_unicode) {
+        LOG_TODO("Non-unicode");
+    }
+
+    LOG_INFO_G("sfnt", "Selected cmap encoding table %zu", encoding_idx);
+
+    return encoding_idx;
 }
 
 static PdfResult

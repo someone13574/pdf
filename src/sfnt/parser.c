@@ -77,6 +77,41 @@ PdfResult sfnt_subparser_new(
     return PDF_OK;
 }
 
+PdfResult sfnt_parser_seek(SfntParser* parser, size_t offset) {
+    RELEASE_ASSERT(parser);
+
+    if (offset >= parser->buffer_len) {
+        return PDF_ERR_SFNT_EOF;
+    }
+
+    parser->offset = offset;
+    return PDF_OK;
+}
+
+PdfResult sfnt_parser_read_int8(SfntParser* parser, int8_t* out) {
+    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(out);
+
+    if (parser->offset + 1 > parser->buffer_len) {
+        return PDF_ERR_SFNT_EOF;
+    }
+
+    *out = (int8_t)parser->buffer[parser->offset++];
+    return PDF_OK;
+}
+
+PdfResult sfnt_parser_read_uint8(SfntParser* parser, uint8_t* out) {
+    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(out);
+
+    if (parser->offset + 1 > parser->buffer_len) {
+        return PDF_ERR_SFNT_EOF;
+    }
+
+    *out = parser->buffer[parser->offset++];
+    return PDF_OK;
+}
+
 PdfResult sfnt_parser_read_int16(SfntParser* parser, int16_t* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
@@ -134,8 +169,8 @@ PdfResult sfnt_parser_read_int64(SfntParser* parser, int64_t* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
-    uint32_t x;
-    PDF_PROPAGATE(sfnt_parser_read_uint32(parser, &x));
+    uint64_t x;
+    PDF_PROPAGATE(sfnt_parser_read_uint64(parser, &x));
     *out = (int64_t)x;
     return PDF_OK;
 }
@@ -157,6 +192,20 @@ PdfResult sfnt_parser_read_uint64(SfntParser* parser, uint64_t* out) {
         | ((uint64_t)parser->buffer[parser->offset + 6] << 8)
         | (uint64_t)parser->buffer[parser->offset + 7];
     parser->offset += 8;
+
+    return PDF_OK;
+}
+
+PdfResult
+sfnt_parser_read_uint8_array(SfntParser* parser, SfntUint8Array* array) {
+    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(array);
+
+    for (size_t idx = 0; idx < sfnt_uint8_array_len(array); idx++) {
+        uint8_t byte;
+        PDF_PROPAGATE(sfnt_parser_read_uint8(parser, &byte));
+        sfnt_uint8_array_set(array, idx, byte);
+    }
 
     return PDF_OK;
 }

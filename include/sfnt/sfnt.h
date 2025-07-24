@@ -4,7 +4,7 @@
 
 #include "arena/arena.h"
 #include "pdf/result.h"
-#include "sfnt/cmap.h"
+#include "sfnt/glyph.h"
 #include "sfnt/types.h"
 
 typedef struct {
@@ -56,4 +56,4 @@ PdfResult sfnt_font_new(
     SfntFont** font
 );
 
-PdfResult sfnt_font_cmap(SfntFont* font, SfntCmap* cmap);
+PdfResult sfnt_get_glyph(SfntFont* font, uint32_t cid, SfntGlyph* glyph);

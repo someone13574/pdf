@@ -1,10 +1,10 @@
-#ifndef DARRAY_DECL_H
-#define DARRAY_DECL_H
+#ifndef DARRAY_IMPL_H
+#define DARRAY_IMPL_H
 
 #include "arena/arena.h"
 #include "log.h"
 
-#endif // DARRAY_DECL_H
+#endif // DARRAY_IMPL_H
 
 // Check arguments
 #ifndef DARRAY_NAME
@@ -41,7 +41,7 @@ struct DARRAY_NAME {
 DARRAY_NAME* DARRAY_FN(new)(Arena* arena, size_t num_elements) {
     RELEASE_ASSERT(arena);
 
-    LOG_INFO_G(
+    LOG_DEBUG_G(
         "array",
         "Creating new " STRINGIFY(DARRAY_NAME) " (Array<" STRINGIFY(DARRAY_TYPE
         ) ", %zu>)",

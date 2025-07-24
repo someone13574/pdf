@@ -32,5 +32,10 @@ PdfResult sfnt_parse_head(SfntParser* parser, SfntHead* head) {
         return PDF_ERR_SFNT_BAD_MAGIC;
     }
 
+    if (head->idx_to_loc_format != 0 && head->idx_to_loc_format != 1) {
+        LOG_ERROR_G("sfnt", "Invalid idx_to_loc_format");
+        return PDF_ERR_SFNT_BAD_HEAD;
+    }
+
     return PDF_OK;
 }
