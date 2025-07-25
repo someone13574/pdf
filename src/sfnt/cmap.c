@@ -3,14 +3,14 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
-#include "log.h"
+#include "logger/log.h"
 #include "parser.h"
-#include "pdf/error.h"
+#include "pdf_error/error.h"
 
 #define DVEC_NAME SfntCmapHeaderVec
 #define DVEC_LOWERCASE_NAME sfnt_cmap_header_vec
 #define DVEC_TYPE SfntCmapHeader
-#include "../arena/dvec_impl.h"
+#include "arena/dvec_impl.h"
 
 static size_t sfnt_cmap_select_encoding(SfntCmap* cmap);
 static PdfError*
@@ -261,7 +261,7 @@ uint32_t sfnt_cmap_map_cid(SfntCmapSubtable* subtable, uint32_t cid) {
 }
 
 #ifdef TEST
-#include "test.h"
+#include "test/test.h"
 
 TEST_FUNC(test_cmap_format4_mapping) {
     Arena* arena = arena_new(1024);

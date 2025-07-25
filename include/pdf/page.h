@@ -1,6 +1,6 @@
 #pragma once
 
-#include "deserialize_types.h"
+#include "pdf/deserde_types.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 

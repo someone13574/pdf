@@ -5,4 +5,4 @@ set -e
 CC=clang CXX=clang++ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j 8
 echo "----------------"
-build/src/pdf-test "$@"
+build/src/test/pdf-test-main "$@"

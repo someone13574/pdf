@@ -1,12 +1,12 @@
 #ifdef TEST
 
 #include "arena/arena.h"
-#include "test.h"
+#include "test/test.h"
 
 #define DVEC_NAME MyTestVec
 #define DVEC_LOWERCASE_NAME my_test_vec
 #define DVEC_TYPE int
-#include "dvec_impl.h"
+#include "arena/dvec_impl.h"
 
 TEST_FUNC(test_vec_new) {
     Arena* arena = arena_new(1024);

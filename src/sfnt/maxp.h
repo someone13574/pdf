@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #include "parser.h"
-#include "pdf/error.h"
+#include "pdf_error/error.h"
 #include "sfnt/types.h"
 
 typedef struct {

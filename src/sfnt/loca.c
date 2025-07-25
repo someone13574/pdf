@@ -1,9 +1,9 @@
 #include "loca.h"
 
-#include "log.h"
+#include "logger/log.h"
 #include "maxp.h"
 #include "parser.h"
-#include "pdf/error.h"
+#include "pdf_error/error.h"
 
 PdfError* sfnt_parse_loca(
     Arena* arena,

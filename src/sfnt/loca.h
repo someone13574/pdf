@@ -3,7 +3,7 @@
 #include "arena/arena.h"
 #include "maxp.h"
 #include "parser.h"
-#include "pdf/error.h"
+#include "pdf_error/error.h"
 #include "sfnt/sfnt.h"
 
 typedef struct {

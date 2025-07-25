@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
-#include "pdf/error.h"
+#include "pdf_error/error.h"
 #include "sfnt/glyph.h"
 #include "sfnt/types.h"
 

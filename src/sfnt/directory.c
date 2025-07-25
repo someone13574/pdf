@@ -3,15 +3,15 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
-#include "log.h"
+#include "logger/log.h"
 #include "parser.h"
-#include "pdf/error.h"
+#include "pdf_error/error.h"
 #include "sfnt/sfnt.h"
 
 #define DARRAY_NAME SfntDirectoryEntryVec
 #define DARRAY_LOWERCASE_NAME sfnt_directory_entry_array
 #define DARRAY_TYPE SfntDirectoryEntry
-#include "../arena/darray_impl.h"
+#include "arena/darray_impl.h"
 
 PdfError*
 sfnt_parse_directory_entry(SfntParser* parser, SfntDirectoryEntry* entry) {

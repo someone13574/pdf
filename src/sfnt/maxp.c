@@ -1,8 +1,8 @@
 #include "maxp.h"
 
-#include "log.h"
+#include "logger/log.h"
 #include "parser.h"
-#include "pdf/error.h"
+#include "pdf_error/error.h"
 
 PdfError* sfnt_parse_maxp(SfntParser* parser, SfntMaxp* maxp) {
     RELEASE_ASSERT(parser);

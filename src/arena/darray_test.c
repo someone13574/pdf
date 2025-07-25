@@ -1,12 +1,12 @@
 #ifdef TEST
 
 #include "arena/arena.h"
-#include "test.h"
+#include "test/test.h"
 
 #define DARRAY_NAME MyTestArray
 #define DARRAY_LOWERCASE_NAME my_test_array
 #define DARRAY_TYPE int
-#include "darray_impl.h"
+#include "arena/darray_impl.h"
 
 TEST_FUNC(test_array_new) {
     Arena* arena = arena_new(1024);

@@ -2,7 +2,7 @@
 
 #include "arena/arena.h"
 #include "parser.h"
-#include "pdf/error.h"
+#include "pdf_error/error.h"
 #include "sfnt/sfnt.h"
 
 PdfError* sfnt_parse_directory(

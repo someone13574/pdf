@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-#include "log.h"
-#include "pdf/error.h"
+#include "logger/log.h"
+#include "pdf_error/error.h"
 #include "sfnt/types.h"
 
 void sfnt_parser_new(uint8_t* buffer, size_t buffer_len, SfntParser* parser) {

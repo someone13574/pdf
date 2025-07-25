@@ -2,8 +2,8 @@
 
 #include "arena/arena.h"
 #include "pdf/content_op.h"
-#include "pdf/error.h"
 #include "pdf/object.h"
+#include "pdf_error/error.h"
 
 typedef struct {
     PdfContentOpVec* operations;

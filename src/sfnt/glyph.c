@@ -3,14 +3,14 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
-#include "log.h"
+#include "logger/log.h"
 #include "parser.h"
-#include "pdf/error.h"
+#include "pdf_error/error.h"
 
 #define DVEC_NAME SfntSimpleGlyphFlagsVec
 #define DVEC_LOWERCASE_NAME sfnt_simple_glyph_flags_vec
 #define DVEC_TYPE SfntSimpleGlyphFlags
-#include "../arena/dvec_impl.h"
+#include "arena/dvec_impl.h"
 
 PdfError*
 sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {

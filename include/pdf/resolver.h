@@ -1,8 +1,8 @@
 #pragma once
 
 #include "arena/arena.h"
-#include "pdf/error.h"
 #include "pdf/object.h"
+#include "pdf_error/error.h"
 
 typedef struct PdfResolver PdfResolver;
 

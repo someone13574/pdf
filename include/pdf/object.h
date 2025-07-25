@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#include "pdf/error.h"
+#include "pdf_error/error.h"
 
 typedef struct PdfObject PdfObject;
 

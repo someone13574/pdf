@@ -1,8 +1,8 @@
 #include "head.h"
 
-#include "log.h"
+#include "logger/log.h"
 #include "parser.h"
-#include "pdf/error.h"
+#include "pdf_error/error.h"
 
 PdfError* sfnt_parse_head(SfntParser* parser, SfntHead* head) {
     RELEASE_ASSERT(parser);

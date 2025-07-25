@@ -6,10 +6,10 @@
 #include "glyph.h"
 #include "head.h"
 #include "loca.h"
-#include "log.h"
+#include "logger/log.h"
 #include "maxp.h"
 #include "parser.h"
-#include "pdf/error.h"
+#include "pdf_error/error.h"
 
 struct SfntFont {
     Arena* arena;

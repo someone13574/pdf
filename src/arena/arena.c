@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "log.h"
+#include "logger/log.h"
 
 static const size_t MAX_BLOCK_SIZE = 1ULL << 30;
 
@@ -172,7 +172,7 @@ void arena_reset(Arena* arena) {
 }
 
 #ifdef TEST
-#include "test.h"
+#include "test/test.h"
 
 TEST_FUNC(test_arena_simple_alloc) {
     Arena* arena = arena_new(1024);
