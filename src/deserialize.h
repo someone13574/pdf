@@ -3,9 +3,9 @@
 #include <stddef.h>
 
 #include "log.h"
+#include "pdf/error.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf/result.h"
 
 typedef enum {
     PDF_FIELD_KIND_OBJECT,
@@ -27,7 +27,7 @@ typedef struct {
     size_t object_ref_offset;
 } PdfRefFieldData;
 
-typedef PdfResult (*PdfDeserializerFn)(
+typedef PdfError* (*PdfDeserializerFn)(
     PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
@@ -76,44 +76,44 @@ typedef struct {
     PdfFieldDebugInfo debug;
 } PdfOperandDescriptor;
 
-PdfResult pdf_resolve_object(
+PdfError* pdf_resolve_object(
     PdfOptionalResolver resolver,
     PdfObject* object,
     PdfObject* resolved
 );
 
-PdfResult pdf_deserialize_object_field(
+PdfError* pdf_deserialize_object_field(
     void* field_ptr,
     PdfObject* object,
     PdfObjectFieldData field_data
 );
-PdfResult pdf_deserialize_ref_field(
+PdfError* pdf_deserialize_ref_field(
     void* field_ptr,
     PdfObject* object,
     PdfRefFieldData field_data
 );
-PdfResult pdf_deserialize_custom_field(
+PdfError* pdf_deserialize_custom_field(
     void* field_ptr,
     PdfObject* object,
     Arena* arena,
     PdfDeserializerFn deserializer,
     PdfOptionalResolver resolver
 );
-PdfResult pdf_deserialize_array_field(
+PdfError* pdf_deserialize_array_field(
     void* field_ptr,
     PdfObject* object,
     PdfArrayFieldData field_data,
     Arena* arena,
     PdfOptionalResolver resolver
 );
-PdfResult pdf_deserialize_as_array_field(
+PdfError* pdf_deserialize_as_array_field(
     void* field_ptr,
     PdfObject* object,
     PdfArrayFieldData field_data,
     Arena* arena,
     PdfOptionalResolver resolver
 );
-PdfResult pdf_deserialize_optional_field(
+PdfError* pdf_deserialize_optional_field(
     void* field_ptr,
     PdfObject* object,
     PdfOptionalFieldData field_data,
@@ -121,7 +121,7 @@ PdfResult pdf_deserialize_optional_field(
     PdfOptionalResolver resolver
 );
 
-PdfResult pdf_deserialize_object(
+PdfError* pdf_deserialize_object(
     void* target,
     PdfObject* object,
     PdfFieldDescriptor* fields,
@@ -130,7 +130,7 @@ PdfResult pdf_deserialize_object(
     PdfOptionalResolver resolver
 );
 
-PdfResult pdf_deserialize_operands(
+PdfError* pdf_deserialize_operands(
     void* target,
     PdfOperandDescriptor* descriptors,
     size_t num_descriptors,
@@ -204,7 +204,7 @@ PdfResult pdf_deserialize_operands(
     lowercase_name,                                                            \
     deserialize_fn                                                             \
 )                                                                              \
-    PdfResult pdf_resolve_##lowercase_name(                                    \
+    PdfError* pdf_resolve_##lowercase_name(                                    \
         base_struct##Ref* ref,                                                 \
         PdfResolver* resolver,                                                 \
         base_struct* resolved                                                  \
@@ -214,7 +214,7 @@ PdfResult pdf_deserialize_operands(
         RELEASE_ASSERT(resolved);                                              \
         if (ref->resolved) {                                                   \
             *resolved = *(base_struct*)ref->resolved;                          \
-            return PDF_OK;                                                     \
+            return NULL;                                                       \
         }                                                                      \
         PdfObject* object =                                                    \
             arena_alloc(pdf_resolver_arena(resolver), sizeof(PdfObject));      \
@@ -228,11 +228,11 @@ PdfResult pdf_deserialize_operands(
         ref->resolved =                                                        \
             arena_alloc(pdf_resolver_arena(resolver), sizeof(base_struct));    \
         *(base_struct*)ref->resolved = *resolved;                              \
-        return PDF_OK;                                                         \
+        return NULL;                                                           \
     }
 
 #define PDF_UNTYPED_DESERIALIZER_WRAPPER(deserialize_fn, wrapper_name)         \
-    PdfResult wrapper_name(                                                    \
+    PdfError* wrapper_name(                                                    \
         PdfObject* object,                                                     \
         Arena* arena,                                                          \
         PdfOptionalResolver resolver,                                          \

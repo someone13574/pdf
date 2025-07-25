@@ -13,7 +13,7 @@ typedef struct {
     PdfObject* raw_dict;
 } PdfPageTreeNode;
 
-PdfResult pdf_deserialize_page_tree_node(
+PdfError* pdf_deserialize_page_tree_node(
     PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
@@ -34,7 +34,7 @@ typedef struct {
     PdfObject* raw_dict;
 } PdfPage;
 
-PdfResult pdf_deserialize_page(
+PdfError* pdf_deserialize_page(
     PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,

@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #include "parser.h"
-#include "pdf/result.h"
+#include "pdf/error.h"
 #include "sfnt/types.h"
 
 typedef struct {
@@ -24,4 +24,4 @@ typedef struct {
     uint16_t max_component_depth;
 } SfntMaxp;
 
-PdfResult sfnt_parse_maxp(SfntParser* parser, SfntMaxp* maxp);
+PdfError* sfnt_parse_maxp(SfntParser* parser, SfntMaxp* maxp);

@@ -4,11 +4,11 @@
 #include "deserialize.h"
 #include "log.h"
 #include "pdf/catalog.h"
+#include "pdf/error.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf/result.h"
 
-PdfResult pdf_deserialize_trailer(
+PdfError* pdf_deserialize_trailer(
     PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
@@ -39,5 +39,5 @@ PdfResult pdf_deserialize_trailer(
         resolver
     ));
 
-    return PDF_OK;
+    return NULL;
 }

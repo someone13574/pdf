@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../ctx.h"
-#include "pdf/result.h"
+#include "pdf/error.h"
 
 typedef enum {
     // General graphics state
@@ -307,4 +307,4 @@ typedef enum {
                     // from previous matching BX onward.
 } PdfOperator;
 
-PdfResult pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator);
+PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator);

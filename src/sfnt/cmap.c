@@ -5,7 +5,7 @@
 #include "arena/arena.h"
 #include "log.h"
 #include "parser.h"
-#include "pdf/result.h"
+#include "pdf/error.h"
 
 #define DVEC_NAME SfntCmapHeaderVec
 #define DVEC_LOWERCASE_NAME sfnt_cmap_header_vec
@@ -13,9 +13,9 @@
 #include "../arena/dvec_impl.h"
 
 static size_t sfnt_cmap_select_encoding(SfntCmap* cmap);
-static PdfResult
+static PdfError*
 parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data);
-static PdfResult sfnt_cmap_get_encoding(
+static PdfError* sfnt_cmap_get_encoding(
     Arena* arena,
     SfntCmap* cmap,
     SfntParser* parser,
@@ -23,7 +23,7 @@ static PdfResult sfnt_cmap_get_encoding(
     SfntCmapSubtable* subtable
 );
 
-PdfResult sfnt_parse_cmap_header(
+PdfError* sfnt_parse_cmap_header(
     Arena* arena,
     SfntParser* parser,
     SfntCmapHeader* subtable
@@ -38,10 +38,10 @@ PdfResult sfnt_parse_cmap_header(
     );
     PDF_PROPAGATE(sfnt_parser_read_uint32(parser, &subtable->offset));
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parse_cmap(Arena* arena, SfntParser* parser, SfntCmap* cmap) {
+PdfError* sfnt_parse_cmap(Arena* arena, SfntParser* parser, SfntCmap* cmap) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(cmap);
@@ -66,7 +66,7 @@ PdfResult sfnt_parse_cmap(Arena* arena, SfntParser* parser, SfntCmap* cmap) {
         &cmap->mapping_table
     ));
 
-    return PDF_OK;
+    return NULL;
 }
 
 size_t sfnt_cmap_select_encoding(SfntCmap* cmap) {
@@ -106,7 +106,7 @@ size_t sfnt_cmap_select_encoding(SfntCmap* cmap) {
     return encoding_idx;
 }
 
-static PdfResult
+static PdfError*
 parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(data);
@@ -125,7 +125,10 @@ parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data) {
     size_t num_bytes = num_words * 2;
     size_t glyph_index_array_bytes = data->length - num_bytes;
     if ((glyph_index_array_bytes & 0x1) != 0) {
-        return PDF_ERR_CMAP_INVALID_GIA_LEN;
+        return PDF_ERROR(
+            PDF_ERR_CMAP_INVALID_GIA_LEN,
+            "The glyph index array's length isn't word-aligned"
+        );
     }
     data->glyph_index_array =
         sfnt_uint16_array_new(arena, glyph_index_array_bytes / 2);
@@ -143,13 +146,16 @@ parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data) {
     );
 
     if (reserved_pad != 0) {
-        return PDF_ERR_CMAP_RESERVED_PAD;
+        return PDF_ERROR(
+            PDF_ERR_CMAP_RESERVED_PAD,
+            "The cmap format4 reserved pad word wasn't zero"
+        );
     }
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_cmap_get_encoding(
+PdfError* sfnt_cmap_get_encoding(
     Arena* arena,
     SfntCmap* cmap,
     SfntParser* parser,
@@ -177,7 +183,7 @@ PdfResult sfnt_cmap_get_encoding(
         }
     }
 
-    return PDF_OK;
+    return NULL;
 }
 
 uint16_t cmap_format4_map(SfntCmapFormat4* subtable, uint16_t cid) {

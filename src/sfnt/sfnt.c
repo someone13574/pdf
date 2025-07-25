@@ -9,7 +9,7 @@
 #include "log.h"
 #include "maxp.h"
 #include "parser.h"
-#include "pdf/result.h"
+#include "pdf/error.h"
 
 struct SfntFont {
     Arena* arena;
@@ -23,7 +23,7 @@ struct SfntFont {
     SfntCmap cmap;
 };
 
-PdfResult new_table_parser(SfntFont* font, uint32_t tag, SfntParser* parser) {
+PdfError* new_table_parser(SfntFont* font, uint32_t tag, SfntParser* parser) {
     RELEASE_ASSERT(font);
     RELEASE_ASSERT(parser);
 
@@ -56,10 +56,10 @@ PdfResult new_table_parser(SfntFont* font, uint32_t tag, SfntParser* parser) {
         entry->length
     );
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_font_new(
+PdfError* sfnt_font_new(
     Arena* arena,
     uint8_t* buffer,
     size_t buffer_len,
@@ -101,10 +101,10 @@ PdfResult sfnt_font_new(
 
     PDF_PROPAGATE(new_table_parser(*font, 0x676c7966, &(*font)->glyf_parser));
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_get_glyph(SfntFont* font, uint32_t cid, SfntGlyph* glyph) {
+PdfError* sfnt_get_glyph(SfntFont* font, uint32_t cid, SfntGlyph* glyph) {
     RELEASE_ASSERT(font);
     RELEASE_ASSERT(glyph);
 
@@ -117,5 +117,5 @@ PdfResult sfnt_get_glyph(SfntFont* font, uint32_t cid, SfntGlyph* glyph) {
     PDF_PROPAGATE(sfnt_parser_seek(&font->glyf_parser, (size_t)offset));
     PDF_PROPAGATE(sfnt_parse_glyph(font->arena, &font->glyf_parser, glyph));
 
-    return PDF_OK;
+    return NULL;
 }

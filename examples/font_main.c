@@ -4,7 +4,7 @@
 
 #include "arena/arena.h"
 #include "log.h"
-#include "pdf/result.h"
+#include "pdf/error.h"
 #include "sfnt/glyph.h"
 #include "sfnt/sfnt.h"
 

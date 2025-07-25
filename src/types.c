@@ -1,10 +1,10 @@
 #include "pdf/types.h"
 
 #include "log.h"
+#include "pdf/error.h"
 #include "pdf/object.h"
-#include "pdf/result.h"
 
-PdfResult pdf_deserialize_number(PdfObject* object, PdfNumber* deserialized) {
+PdfError* pdf_deserialize_number(PdfObject* object, PdfNumber* deserialized) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(deserialized);
 
@@ -20,14 +20,17 @@ PdfResult pdf_deserialize_number(PdfObject* object, PdfNumber* deserialized) {
             break;
         }
         default: {
-            return PDF_ERR_INCORRECT_TYPE;
+            return PDF_ERROR(
+                PDF_ERR_INCORRECT_TYPE,
+                "Numbers must be either integers or reals"
+            );
         }
     }
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult pdf_deserialize_number_wrapper(
+PdfError* pdf_deserialize_number_wrapper(
     PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,

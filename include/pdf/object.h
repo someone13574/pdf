@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#include "pdf/result.h"
+#include "pdf/error.h"
 
 typedef struct PdfObject PdfObject;
 
@@ -103,7 +103,7 @@ struct PdfObject {
 };
 
 // Gets the value associated with a given key in a dictionary object
-PdfResult
+PdfError*
 pdf_object_dict_get(PdfObject* dict, const char* key, PdfObject* object);
 
 // Generates a pretty-printed PdfObject string. If no arena is passed, you must

@@ -8,10 +8,10 @@
 #include "op.h"
 #include "operator.h"
 #include "pdf/content_stream.h"
+#include "pdf/error.h"
 #include "pdf/object.h"
-#include "pdf/result.h"
 
-PdfResult pdf_deserialize_content_stream(
+PdfError* pdf_deserialize_content_stream(
     PdfStream* stream,
     Arena* arena,
     PdfContentStream* deserialized
@@ -33,7 +33,9 @@ PdfResult pdf_deserialize_content_stream(
 
         PdfObject operand;
         size_t restore_offset = pdf_ctx_offset(ctx);
-        while (pdf_parse_operand_object(arena, ctx, &operand) == PDF_OK) {
+        while (
+            pdf_error_free_is_ok(pdf_parse_operand_object(arena, ctx, &operand))
+        ) {
             PdfObject* operand_alloc = arena_alloc(arena, sizeof(PdfObject));
             *operand_alloc = operand;
             pdf_object_vec_push(operands, operand_alloc);
@@ -58,5 +60,5 @@ PdfResult pdf_deserialize_content_stream(
 
     deserialized->operations = operations;
 
-    return PDF_OK;
+    return NULL;
 }

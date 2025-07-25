@@ -5,11 +5,11 @@
 #include "log.h"
 #include "pdf/catalog.h"
 #include "pdf/content_stream.h"
+#include "pdf/error.h"
 #include "pdf/object.h"
 #include "pdf/page.h"
 #include "pdf/pdf.h"
 #include "pdf/resolver.h"
-#include "pdf/result.h"
 
 static char*
 load_file_to_buffer(Arena* arena, const char* path, size_t* out_size) {

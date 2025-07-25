@@ -3,7 +3,7 @@ set(HEADER_LIST
     "${pdf_SOURCE_DIR}/include/pdf/resolver.h"
     "${pdf_SOURCE_DIR}/include/pdf/object.h"
     "${pdf_SOURCE_DIR}/include/pdf/types.h"
-    "${pdf_SOURCE_DIR}/include/pdf/result.h"
+    "${pdf_SOURCE_DIR}/include/pdf/error.h"
     "${pdf_SOURCE_DIR}/include/pdf/trailer.h"
     "${pdf_SOURCE_DIR}/include/pdf/catalog.h"
     "${pdf_SOURCE_DIR}/include/pdf/page.h"
@@ -20,6 +20,7 @@ set(SOURCE_FILE_LIST
     pdf.c
     log.c
     test.c
+    error.c
     test_helpers.c test_helpers.h
     arena/arena.c
     arena/dvec_test.c

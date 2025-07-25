@@ -2,9 +2,9 @@
 
 #include "deserialize.h"
 #include "log.h"
+#include "pdf/error.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf/result.h"
 
 PDF_DESERIALIZABLE_REF_IMPL(
     PdfPageTreeNode,
@@ -12,7 +12,7 @@ PDF_DESERIALIZABLE_REF_IMPL(
     pdf_deserialize_page_tree_node
 )
 
-PdfResult pdf_deserialize_page_tree_node(
+PdfError* pdf_deserialize_page_tree_node(
     PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
@@ -63,10 +63,10 @@ PdfResult pdf_deserialize_page_tree_node(
         resolver
     ));
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult pdf_deserialize_page(
+PdfError* pdf_deserialize_page(
     PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
@@ -125,7 +125,7 @@ PdfResult pdf_deserialize_page(
         resolver
     ));
 
-    return PDF_OK;
+    return NULL;
 }
 
 PDF_DESERIALIZABLE_REF_IMPL(PdfPage, page, pdf_deserialize_page)

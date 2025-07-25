@@ -2,15 +2,15 @@
 
 #include "arena/arena.h"
 #include "ctx.h"
+#include "pdf/error.h"
 #include "pdf/object.h"
-#include "pdf/result.h"
 
-PdfResult pdf_parse_object(
+PdfError* pdf_parse_object(
     Arena* arena,
     PdfCtx* ctx,
     PdfObject* object,
     bool in_indirect_obj
 );
 
-PdfResult
+PdfError*
 pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object);

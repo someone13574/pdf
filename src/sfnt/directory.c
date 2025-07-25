@@ -5,7 +5,7 @@
 #include "arena/arena.h"
 #include "log.h"
 #include "parser.h"
-#include "pdf/result.h"
+#include "pdf/error.h"
 #include "sfnt/sfnt.h"
 
 #define DARRAY_NAME SfntDirectoryEntryVec
@@ -13,7 +13,7 @@
 #define DARRAY_TYPE SfntDirectoryEntry
 #include "../arena/darray_impl.h"
 
-PdfResult
+PdfError*
 sfnt_parse_directory_entry(SfntParser* parser, SfntDirectoryEntry* entry) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(entry);
@@ -23,10 +23,10 @@ sfnt_parse_directory_entry(SfntParser* parser, SfntDirectoryEntry* entry) {
     PDF_PROPAGATE(sfnt_parser_read_uint32(parser, &entry->offset));
     PDF_PROPAGATE(sfnt_parser_read_uint32(parser, &entry->length));
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parse_directory(
+PdfError* sfnt_parse_directory(
     Arena* arena,
     SfntParser* parser,
     SfntFontDirectory* directory
@@ -50,10 +50,10 @@ PdfResult sfnt_parse_directory(
         sfnt_directory_entry_array_set(directory->entries, idx, entry);
     }
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_directory_get_entry(
+PdfError* sfnt_directory_get_entry(
     SfntFontDirectory* directory,
     uint32_t tag,
     SfntDirectoryEntry** entry
@@ -70,9 +70,16 @@ PdfResult sfnt_directory_get_entry(
         ));
         if (directory_entry->tag == tag) {
             *entry = directory_entry;
-            return PDF_OK;
+            return NULL;
         }
     }
 
-    return PDF_ERR_SFNT_MISSING_TABLE;
+    return PDF_ERROR(
+        PDF_ERR_SFNT_MISSING_TABLE,
+        "Couldn't find the entry for the table `%c%c%c%c` in the directory",
+        (tag >> 24) & 0xff,
+        (tag >> 16) & 0xff,
+        (tag >> 8) & 0xff,
+        tag & 0xff
+    );
 }

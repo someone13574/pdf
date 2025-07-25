@@ -10,8 +10,8 @@
 #include "arena/arena.h"
 #include "ctx.h"
 #include "log.h"
+#include "pdf/error.h"
 #include "pdf/object.h"
-#include "pdf/result.h"
 
 #define DVEC_NAME PdfObjectVec
 #define DVEC_LOWERCASE_NAME pdf_object_vec
@@ -23,34 +23,34 @@
 #define DVEC_TYPE PdfDictEntry
 #include "arena/dvec_impl.h"
 
-PdfResult pdf_parse_true(PdfCtx* ctx, PdfObject* object);
-PdfResult pdf_parse_false(PdfCtx* ctx, PdfObject* object);
-PdfResult pdf_parse_null(PdfCtx* ctx, PdfObject* object);
-PdfResult pdf_parse_number(PdfCtx* ctx, PdfObject* object);
-PdfResult
+PdfError* pdf_parse_true(PdfCtx* ctx, PdfObject* object);
+PdfError* pdf_parse_false(PdfCtx* ctx, PdfObject* object);
+PdfError* pdf_parse_null(PdfCtx* ctx, PdfObject* object);
+PdfError* pdf_parse_number(PdfCtx* ctx, PdfObject* object);
+PdfError*
 pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object);
-PdfResult pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object);
-PdfResult pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfObject* object);
-PdfResult pdf_parse_dict(
+PdfError* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object);
+PdfError* pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfObject* object);
+PdfError* pdf_parse_dict(
     Arena* arena,
     PdfCtx* ctx,
     PdfObject* object,
     bool in_indirect_obj
 );
-PdfResult pdf_parse_indirect(
+PdfError* pdf_parse_indirect(
     Arena* arena,
     PdfCtx* ctx,
     PdfObject* object,
     bool* number_fallback
 );
-PdfResult pdf_parse_stream(
+PdfError* pdf_parse_stream(
     Arena* arena,
     PdfCtx* ctx,
     char** stream_bytes,
     PdfDictEntryVec* stream_dict
 );
 
-PdfResult pdf_parse_object(
+PdfError* pdf_parse_object(
     Arena* arena,
     PdfCtx* ctx,
     PdfObject* object,
@@ -65,9 +65,11 @@ PdfResult pdf_parse_object(
     char peeked, peeked_next;
     PDF_PROPAGATE(pdf_ctx_peek(ctx, &peeked));
 
-    PdfResult peeked_next_result = pdf_ctx_peek_next(ctx, &peeked_next);
-    if (peeked == '<' && peeked_next_result != PDF_OK) {
-        return peeked_next_result;
+    PdfError* peeked_next_error = pdf_ctx_peek_next(ctx, &peeked_next);
+    if (peeked == '<' && peeked_next_error) {
+        return peeked_next_error;
+    } else if (peeked_next_error) {
+        pdf_error_free(peeked_next_error);
     }
 
     if (peeked == 't') {
@@ -79,11 +81,15 @@ PdfResult pdf_parse_object(
     } else if (isdigit((unsigned char)peeked)) {
         size_t restore_offset = pdf_ctx_offset(ctx);
         bool number_fallback = true;
-        PdfResult result =
+        PdfError* error =
             pdf_parse_indirect(arena, ctx, object, &number_fallback);
 
-        if (result == PDF_OK || !number_fallback) {
-            return result;
+        if (!error || !number_fallback) {
+            return error;
+        }
+
+        if (error) {
+            pdf_error_free(error);
         }
 
         LOG_DIAG(
@@ -108,10 +114,13 @@ PdfResult pdf_parse_object(
         return pdf_parse_null(ctx, object);
     }
 
-    return PDF_ERR_INVALID_OBJECT;
+    return PDF_ERROR(
+        PDF_ERR_INVALID_OBJECT,
+        "There wasn't a valid signaler for the object"
+    );
 }
 
-PdfResult
+PdfError*
 pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(object);
@@ -126,9 +135,13 @@ pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     char peeked, peeked_next;
     PDF_PROPAGATE(pdf_ctx_peek(ctx, &peeked));
 
-    PdfResult peeked_next_result = pdf_ctx_peek_next(ctx, &peeked_next);
-    if (peeked == '<' && peeked_next_result != PDF_OK) {
-        return peeked_next_result;
+    PdfError* peeked_next_error = pdf_ctx_peek_next(ctx, &peeked_next);
+    if (peeked == '<' && peeked_next_error) {
+        return peeked_next_error;
+    }
+
+    if (peeked_next_error) {
+        pdf_error_free(peeked_next_error);
     }
 
     if (peeked == 't') {
@@ -151,10 +164,13 @@ pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object) {
         return pdf_parse_null(ctx, object);
     }
 
-    return PDF_ERR_INVALID_OBJECT;
+    return PDF_ERROR(
+        PDF_ERR_INVALID_OBJECT,
+        "There wasn't a valid signaler for the object"
+    );
 }
 
-PdfResult pdf_parse_true(PdfCtx* ctx, PdfObject* object) {
+PdfError* pdf_parse_true(PdfCtx* ctx, PdfObject* object) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(object);
 
@@ -164,10 +180,10 @@ PdfResult pdf_parse_true(PdfCtx* ctx, PdfObject* object) {
     object->type = PDF_OBJECT_TYPE_BOOLEAN;
     object->data.boolean = true;
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult pdf_parse_false(PdfCtx* ctx, PdfObject* object) {
+PdfError* pdf_parse_false(PdfCtx* ctx, PdfObject* object) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(object);
 
@@ -177,10 +193,10 @@ PdfResult pdf_parse_false(PdfCtx* ctx, PdfObject* object) {
     object->type = PDF_OBJECT_TYPE_BOOLEAN;
     object->data.boolean = false;
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult pdf_parse_null(PdfCtx* ctx, PdfObject* object) {
+PdfError* pdf_parse_null(PdfCtx* ctx, PdfObject* object) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(object);
 
@@ -189,10 +205,10 @@ PdfResult pdf_parse_null(PdfCtx* ctx, PdfObject* object) {
 
     object->type = PDF_OBJECT_TYPE_NULL;
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
+PdfError* pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(object);
 
@@ -220,7 +236,8 @@ PdfResult pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
     int64_t leading_acc = 0;
     bool has_leading = false;
 
-    while (pdf_ctx_peek(ctx, &digit_char) == PDF_OK && isdigit(digit_char)) {
+    while (pdf_error_free_is_ok(pdf_ctx_peek(ctx, &digit_char))
+           && isdigit(digit_char)) {
         has_leading = true;
         int64_t digit = digit_char - '0';
 
@@ -236,30 +253,38 @@ PdfResult pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
 
     // Parse decimal point
     char decimal_char;
-    PdfResult decimal_peek_result = pdf_ctx_peek(ctx, &decimal_char);
+    PdfError* decimal_peek_error = pdf_ctx_peek(ctx, &decimal_char);
 
-    if ((decimal_peek_result == PDF_OK && decimal_char != '.')
-        || decimal_peek_result == PDF_ERR_CTX_EOF) {
+    if ((!decimal_peek_error && decimal_char != '.')
+        || (decimal_peek_error
+            && pdf_error_code(decimal_peek_error) == PDF_ERR_CTX_EOF)) {
+        if (decimal_peek_error) {
+            pdf_error_free(decimal_peek_error);
+        }
+
         LOG_DIAG(TRACE, OBJECT, "Number is integer");
         PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular)
         );
 
         if (!has_leading) {
-            return PDF_ERR_INVALID_NUMBER;
+            return PDF_ERROR(PDF_ERR_INVALID_NUMBER);
         }
 
         leading_acc *= sign;
         if (leading_acc < (int64_t)INT32_MIN
             || leading_acc > (int64_t)INT32_MAX) {
-            return PDF_ERR_NUMBER_LIMIT;
+            return PDF_ERROR(
+                PDF_ERR_NUMBER_LIMIT,
+                "The magnitude of the parsed integer was too large"
+            );
         }
 
         object->type = PDF_OBJECT_TYPE_INTEGER;
         object->data.integer = (int32_t)leading_acc;
 
-        return PDF_OK;
-    } else if (decimal_peek_result != PDF_OK) {
-        return decimal_peek_result;
+        return NULL;
+    } else if (decimal_peek_error) {
+        return decimal_peek_error;
     } else {
         PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, NULL));
     }
@@ -271,7 +296,8 @@ PdfResult pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
     double trailing_weight = 0.1;
     bool has_trailing = false;
 
-    while (pdf_ctx_peek(ctx, &digit_char) == PDF_OK && isdigit(digit_char)) {
+    while (pdf_error_free_is_ok(pdf_ctx_peek(ctx, &digit_char))
+           && isdigit(digit_char)) {
         has_trailing = true;
 
         trailing_acc += (double)(digit_char - '0') * trailing_weight;
@@ -283,23 +309,29 @@ PdfResult pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
     PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
 
     double value = ((double)leading_acc + trailing_acc) * (double)sign;
-    const double PDF_FLOAT_MAX = 3.403e38;
+    const double PDF_REAL_MAX = 3.403e38;
 
-    if (value > PDF_FLOAT_MAX || value < -PDF_FLOAT_MAX) {
-        return PDF_ERR_NUMBER_LIMIT;
+    if (value > PDF_REAL_MAX || value < -PDF_REAL_MAX) {
+        return PDF_ERROR(
+            PDF_ERR_NUMBER_LIMIT,
+            "The magnitude of the parsed real was too large"
+        );
     }
 
     if (!has_leading && !has_trailing) {
-        return PDF_ERR_INVALID_NUMBER;
+        return PDF_ERROR(
+            PDF_ERR_INVALID_NUMBER,
+            "A real value shall contain one or more decimal digits"
+        );
     }
 
     object->type = PDF_OBJECT_TYPE_REAL;
     object->data.real = value;
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult
+PdfError*
 pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(ctx);
@@ -315,7 +347,8 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     size_t start_offset = pdf_ctx_offset(ctx);
 
     while (open_parenthesis > 0
-           && pdf_ctx_peek_and_advance(ctx, &peeked_char) == PDF_OK) {
+           && pdf_error_free_is_ok(pdf_ctx_peek_and_advance(ctx, &peeked_char))
+    ) {
         length++;
 
         if (peeked_char == '(' && escape == 0) {
@@ -332,7 +365,10 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     }
 
     if (open_parenthesis != 0) {
-        return PDF_ERR_UNBALANCED_STR;
+        return PDF_ERROR(
+            PDF_ERR_UNBALANCED_STR,
+            "String literal parenthesis was not closed."
+        );
     }
 
     PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
@@ -424,7 +460,7 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     object->type = PDF_OBJECT_TYPE_STRING;
     object->data.string = parsed;
 
-    return PDF_OK;
+    return NULL;
 }
 
 bool char_to_hex(char c, int* out) {
@@ -442,7 +478,7 @@ bool char_to_hex(char c, int* out) {
     }
 }
 
-PdfResult pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
+PdfError* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(object);
@@ -454,13 +490,16 @@ PdfResult pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     size_t length = 0;
     char peeked;
 
-    while (pdf_ctx_peek_and_advance(ctx, &peeked) == PDF_OK) {
+    while (pdf_error_free_is_ok(pdf_ctx_peek_and_advance(ctx, &peeked))) {
         if (!is_pdf_regular(peeked)) {
             break;
         }
 
         if (peeked < '!' || peeked > '~') {
-            return PDF_ERR_NAME_UNESCAPED_CHAR;
+            return PDF_ERROR(
+                PDF_ERR_NAME_UNESCAPED_CHAR,
+                "Regular characters that are outside the range EXCLAMATION MARK(21h) (!) to TILDE (7Eh) (~) should be written using the hexadecimal notation."
+            );
         }
 
         length++;
@@ -495,7 +534,10 @@ PdfResult pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
             case 1: {
                 int value;
                 if (!char_to_hex(c, &value)) {
-                    return PDF_ERR_NAME_BAD_CHAR_CODE;
+                    return PDF_ERROR(
+                        PDF_ERR_NAME_BAD_CHAR_CODE,
+                        "Expected a hex value following a number sign in a name object"
+                    );
                 }
 
                 hex_code = value << 4;
@@ -505,7 +547,10 @@ PdfResult pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
             case 2: {
                 int value;
                 if (!char_to_hex(c, &value)) {
-                    return PDF_ERR_NAME_BAD_CHAR_CODE;
+                    return PDF_ERROR(
+                        PDF_ERR_NAME_BAD_CHAR_CODE,
+                        "Expected two hex values following a number sign in a name object"
+                    );
                 }
 
                 hex_code |= value;
@@ -520,7 +565,10 @@ PdfResult pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     }
 
     if (escape != 0) {
-        return PDF_ERR_NAME_BAD_CHAR_CODE;
+        return PDF_ERROR(
+            PDF_ERR_NAME_BAD_CHAR_CODE,
+            "Non-regular character in name escape sequence"
+        );
     }
 
     PDF_PROPAGATE(pdf_ctx_release_substr(ctx));
@@ -529,10 +577,10 @@ PdfResult pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     object->type = PDF_OBJECT_TYPE_NAME;
     object->data.name = name;
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfObject* object) {
+PdfError* pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(object);
@@ -543,7 +591,7 @@ PdfResult pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     PdfObjectVec* elements = pdf_object_vec_new(arena);
 
     char peeked;
-    while (pdf_ctx_peek(ctx, &peeked) == PDF_OK && peeked != ']') {
+    while (pdf_error_free_is_ok(pdf_ctx_peek(ctx, &peeked)) && peeked != ']') {
         PdfObject element;
         PDF_PROPAGATE(pdf_parse_object(arena, ctx, &element, false));
         PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, false, is_pdf_non_regular)
@@ -561,10 +609,10 @@ PdfResult pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     object->type = PDF_OBJECT_TYPE_ARRAY;
     object->data.array.elements = elements;
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult pdf_parse_dict(
+PdfError* pdf_parse_dict(
     Arena* arena,
     PdfCtx* ctx,
     PdfObject* object,
@@ -580,7 +628,7 @@ PdfResult pdf_parse_dict(
     PdfDictEntryVec* entries = pdf_dict_entry_vec_new(arena);
 
     char peeked;
-    while (pdf_ctx_peek(ctx, &peeked) == PDF_OK && peeked != '>') {
+    while (pdf_error_free_is_ok(pdf_ctx_peek(ctx, &peeked)) && peeked != '>') {
         PdfObject* key = arena_alloc(arena, sizeof(PdfObject));
         PDF_PROPAGATE(pdf_parse_name(arena, ctx, key));
         PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, false, is_pdf_non_regular)
@@ -609,19 +657,21 @@ PdfResult pdf_parse_dict(
     if (in_indirect_obj) {
         size_t restore_offset = pdf_ctx_offset(ctx);
 
-        PdfResult consume_result = pdf_ctx_consume_whitespace(ctx);
-        if (consume_result != PDF_OK) {
+        PdfError* consume_error = pdf_ctx_consume_whitespace(ctx);
+        if (consume_error) {
             // Not a stream
-            pdf_ctx_seek(ctx, restore_offset);
-            return PDF_OK;
+            pdf_error_free_is_ok(pdf_ctx_seek(ctx, restore_offset));
+            return NULL;
         }
 
         char* stream_bytes;
-        if (pdf_parse_stream(arena, ctx, &stream_bytes, entries) != PDF_OK
+        if (!pdf_error_free_is_ok(
+                pdf_parse_stream(arena, ctx, &stream_bytes, entries)
+            )
             || !stream_bytes) {
             // Not a stream
-            pdf_ctx_seek(ctx, restore_offset);
-            return PDF_OK;
+            pdf_error_free_is_ok(pdf_ctx_seek(ctx, restore_offset));
+            return NULL;
         }
 
         // Type is a stream
@@ -634,13 +684,13 @@ PdfResult pdf_parse_dict(
         object->data.stream.stream_dict = stream_dict;
         object->data.stream.stream_bytes = stream_bytes;
 
-        return PDF_OK;
+        return NULL;
     }
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult pdf_parse_stream(
+PdfError* pdf_parse_stream(
     Arena* arena,
     PdfCtx* ctx,
     char** stream_body,
@@ -661,7 +711,10 @@ PdfResult pdf_parse_stream(
     } else if (peeked_newline == '\r') {
         PDF_PROPAGATE(pdf_ctx_expect(ctx, "\r\n"));
     } else {
-        return PDF_ERR_CTX_EXPECT;
+        return PDF_ERROR(
+            PDF_ERR_CTX_EXPECT,
+            "There must be a newline following the `stream` keyword"
+        );
     }
 
     // Get length
@@ -680,7 +733,7 @@ PdfResult pdf_parse_stream(
     }
 
     if (length < 0) {
-        return PDF_ERR_STREAM_INVALID_LENGTH;
+        return PDF_ERROR(PDF_ERR_STREAM_INVALID_LENGTH);
     }
 
     // Copy stream body
@@ -700,16 +753,19 @@ PdfResult pdf_parse_stream(
 
     // Parse end
     PDF_PROPAGATE(pdf_ctx_shift(ctx, length));
-    if (pdf_ctx_expect(ctx, "\nendstream") != PDF_OK
-        && pdf_ctx_expect(ctx, "\r\nendstream") != PDF_OK
-        && pdf_ctx_expect(ctx, "\rendstream") != PDF_OK) {
-        return PDF_ERR_CTX_EXPECT;
+    if (!pdf_error_free_is_ok(pdf_ctx_expect(ctx, "\nendstream"))
+        && !pdf_error_free_is_ok(pdf_ctx_expect(ctx, "\r\nendstream"))
+        && !pdf_error_free_is_ok(pdf_ctx_expect(ctx, "\rendstream"))) {
+        return PDF_ERROR(
+            PDF_ERR_CTX_EXPECT,
+            "Missing newline and `endstream` keyword at expected location"
+        );
     }
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult pdf_parse_indirect(
+PdfError* pdf_parse_indirect(
     Arena* arena,
     PdfCtx* ctx,
     PdfObject* object,
@@ -727,7 +783,10 @@ PdfResult pdf_parse_indirect(
     uint32_t int_length;
     PDF_PROPAGATE(pdf_ctx_parse_int(ctx, NULL, &object_id, &int_length));
     if (int_length == 0) {
-        return PDF_ERR_CTX_EXPECT;
+        return PDF_ERROR(
+            PDF_ERR_CTX_EXPECT,
+            "Expected an integer for the object_id of indirect reference/object"
+        );
     }
 
     PDF_PROPAGATE(pdf_ctx_expect(ctx, " "));
@@ -736,7 +795,10 @@ PdfResult pdf_parse_indirect(
     uint64_t generation;
     PDF_PROPAGATE(pdf_ctx_parse_int(ctx, NULL, &generation, &int_length));
     if (int_length == 0) {
-        return PDF_ERR_CTX_EXPECT;
+        return PDF_ERROR(
+            PDF_ERR_CTX_EXPECT,
+            "Expected an integer for the generation of indirect reference/object"
+        );
     }
 
     PDF_PROPAGATE(pdf_ctx_expect(ctx, " "));
@@ -754,7 +816,7 @@ PdfResult pdf_parse_indirect(
         object->data.indirect_ref.object_id = object_id;
         object->data.indirect_ref.generation = generation;
 
-        return PDF_OK;
+        return NULL;
     } else {
         LOG_DIAG(DEBUG, OBJECT, "Parsed indirect object");
 
@@ -779,7 +841,7 @@ PdfResult pdf_parse_indirect(
         object->data.indirect_object.object_id = object_id;
         object->data.indirect_object.generation = generation;
 
-        return PDF_OK;
+        return NULL;
     }
 }
 
@@ -1010,8 +1072,7 @@ char* pdf_fmt_object(Arena* arena, PdfObject* object) {
     char buffer[] = buf;                                                       \
     PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));                  \
     PdfObject object;                                                          \
-    PdfResult result = pdf_parse_object(arena, ctx, &object, false);           \
-    TEST_ASSERT_EQ((PdfResult)PDF_OK, result, "Result was not ok");            \
+    TEST_PDF_REQUIRE(pdf_parse_object(arena, ctx, &object, false));            \
     TEST_ASSERT_EQ(                                                            \
         (PdfObjectType)(object_type),                                          \
         object.type,                                                           \
@@ -1032,8 +1093,7 @@ char* pdf_fmt_object(Arena* arena, PdfObject* object) {
     PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));                  \
                                                                                \
     PdfObject object;                                                          \
-    PdfResult result = pdf_parse_object(arena, ctx, &object, false);           \
-    TEST_ASSERT_EQ((PdfResult)(err), result, "Incorrect error type");
+    TEST_PDF_REQUIRE_ERR(pdf_parse_object(arena, ctx, &object, false), (err));
 
 TEST_FUNC(test_object_bool_true) {
     SETUP_VALID_PARSE_OBJECT("true", PDF_OBJECT_TYPE_BOOLEAN);
