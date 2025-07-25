@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "log.h"
-#include "pdf/result.h"
+#include "pdf/error.h"
 #include "sfnt/types.h"
 
 void sfnt_parser_new(uint8_t* buffer, size_t buffer_len, SfntParser* parser) {
@@ -16,7 +16,7 @@ void sfnt_parser_new(uint8_t* buffer, size_t buffer_len, SfntParser* parser) {
     parser->offset = 0;
 }
 
-PdfResult sfnt_subparser_new(
+PdfError* sfnt_subparser_new(
     SfntParser* parent,
     uint32_t offset,
     uint32_t len,
@@ -28,7 +28,10 @@ PdfResult sfnt_subparser_new(
     RELEASE_ASSERT(parser);
 
     if (offset + len > parent->buffer_len) {
-        return PDF_ERR_SFNT_EOF;
+        return PDF_ERROR(
+            PDF_ERR_SFNT_EOF,
+            "Sfnt subparser length overflowed parent bounds"
+        );
     }
 
     parser->buffer = parent->buffer + offset;
@@ -65,69 +68,68 @@ PdfResult sfnt_subparser_new(
     }
 
     if (sum != checksum) {
-        LOG_WARN(
-            SFNT,
+        return PDF_ERROR(
+            PDF_ERR_SFNT_TABLE_CHECKSUM,
             "SFNT checksum mismatch %llu != %llu",
             (unsigned long long)checksum,
             (unsigned long long)sum
         );
-        return PDF_ERR_SFNT_TABLE_CHECKSUM;
     }
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parser_seek(SfntParser* parser, size_t offset) {
+PdfError* sfnt_parser_seek(SfntParser* parser, size_t offset) {
     RELEASE_ASSERT(parser);
 
     if (offset >= parser->buffer_len) {
-        return PDF_ERR_SFNT_EOF;
+        return PDF_ERROR(PDF_ERR_SFNT_EOF);
     }
 
     parser->offset = offset;
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parser_read_int8(SfntParser* parser, int8_t* out) {
+PdfError* sfnt_parser_read_int8(SfntParser* parser, int8_t* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
     if (parser->offset + 1 > parser->buffer_len) {
-        return PDF_ERR_SFNT_EOF;
+        return PDF_ERROR(PDF_ERR_SFNT_EOF);
     }
 
     *out = (int8_t)parser->buffer[parser->offset++];
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parser_read_uint8(SfntParser* parser, uint8_t* out) {
+PdfError* sfnt_parser_read_uint8(SfntParser* parser, uint8_t* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
     if (parser->offset + 1 > parser->buffer_len) {
-        return PDF_ERR_SFNT_EOF;
+        return PDF_ERROR(PDF_ERR_SFNT_EOF);
     }
 
     *out = parser->buffer[parser->offset++];
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parser_read_int16(SfntParser* parser, int16_t* out) {
+PdfError* sfnt_parser_read_int16(SfntParser* parser, int16_t* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
     uint16_t x;
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &x));
     *out = (int16_t)x;
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parser_read_uint16(SfntParser* parser, uint16_t* out) {
+PdfError* sfnt_parser_read_uint16(SfntParser* parser, uint16_t* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
     if (parser->offset + 2 > parser->buffer_len) {
-        return PDF_ERR_SFNT_EOF;
+        return PDF_ERROR(PDF_ERR_SFNT_EOF);
     }
 
     uint32_t parsed = ((uint32_t)parser->buffer[parser->offset] << 8)
@@ -135,25 +137,25 @@ PdfResult sfnt_parser_read_uint16(SfntParser* parser, uint16_t* out) {
     *out = (uint16_t)parsed;
     parser->offset += 2;
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parser_read_int32(SfntParser* parser, int32_t* out) {
+PdfError* sfnt_parser_read_int32(SfntParser* parser, int32_t* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
     uint32_t x;
     PDF_PROPAGATE(sfnt_parser_read_uint32(parser, &x));
     *out = (int32_t)x;
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parser_read_uint32(SfntParser* parser, uint32_t* out) {
+PdfError* sfnt_parser_read_uint32(SfntParser* parser, uint32_t* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
     if (parser->offset + 4 > parser->buffer_len) {
-        return PDF_ERR_SFNT_EOF;
+        return PDF_ERROR(PDF_ERR_SFNT_EOF);
     }
 
     *out = ((uint32_t)parser->buffer[parser->offset] << 24)
@@ -162,25 +164,25 @@ PdfResult sfnt_parser_read_uint32(SfntParser* parser, uint32_t* out) {
         | (uint32_t)parser->buffer[parser->offset + 3];
     parser->offset += 4;
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parser_read_int64(SfntParser* parser, int64_t* out) {
+PdfError* sfnt_parser_read_int64(SfntParser* parser, int64_t* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
     uint64_t x;
     PDF_PROPAGATE(sfnt_parser_read_uint64(parser, &x));
     *out = (int64_t)x;
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parser_read_uint64(SfntParser* parser, uint64_t* out) {
+PdfError* sfnt_parser_read_uint64(SfntParser* parser, uint64_t* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
     if (parser->offset + 8 > parser->buffer_len) {
-        return PDF_ERR_SFNT_EOF;
+        return PDF_ERROR(PDF_ERR_SFNT_EOF);
     }
 
     *out = ((uint64_t)parser->buffer[parser->offset] << 56)
@@ -193,10 +195,10 @@ PdfResult sfnt_parser_read_uint64(SfntParser* parser, uint64_t* out) {
         | (uint64_t)parser->buffer[parser->offset + 7];
     parser->offset += 8;
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult
+PdfError*
 sfnt_parser_read_uint8_array(SfntParser* parser, SfntUint8Array* array) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(array);
@@ -207,10 +209,10 @@ sfnt_parser_read_uint8_array(SfntParser* parser, SfntUint8Array* array) {
         sfnt_uint8_array_set(array, idx, byte);
     }
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult
+PdfError*
 sfnt_parser_read_uint16_array(SfntParser* parser, SfntUint16Array* array) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(array);
@@ -221,50 +223,50 @@ sfnt_parser_read_uint16_array(SfntParser* parser, SfntUint16Array* array) {
         sfnt_uint16_array_set(array, idx, word);
     }
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parser_read_short_frac(SfntParser* parser, SfntShortFrac* out) {
+PdfError* sfnt_parser_read_short_frac(SfntParser* parser, SfntShortFrac* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
     int16_t x;
     PDF_PROPAGATE(sfnt_parser_read_int16(parser, &x));
     *out = (SfntShortFrac)x;
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parser_read_fixed(SfntParser* parser, SfntFixed* out) {
+PdfError* sfnt_parser_read_fixed(SfntParser* parser, SfntFixed* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
     int32_t x;
     PDF_PROPAGATE(sfnt_parser_read_int32(parser, &x));
     *out = (SfntFixed)x;
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parser_read_fword(SfntParser* parser, SfntFWord* out) {
+PdfError* sfnt_parser_read_fword(SfntParser* parser, SfntFWord* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
     int16_t x;
     PDF_PROPAGATE(sfnt_parser_read_int16(parser, &x));
     *out = (SfntFWord)x;
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parser_read_ufword(SfntParser* parser, SfntUFWord* out) {
+PdfError* sfnt_parser_read_ufword(SfntParser* parser, SfntUFWord* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
     uint16_t x;
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &x));
     *out = (SfntUFWord)x;
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult
+PdfError*
 sfnt_parser_read_long_date_time(SfntParser* parser, SfntLongDateTime* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
@@ -272,5 +274,5 @@ sfnt_parser_read_long_date_time(SfntParser* parser, SfntLongDateTime* out) {
     int64_t x;
     PDF_PROPAGATE(sfnt_parser_read_int64(parser, &x));
     *out = (SfntLongDateTime)x;
-    return PDF_OK;
+    return NULL;
 }

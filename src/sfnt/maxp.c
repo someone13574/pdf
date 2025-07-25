@@ -2,9 +2,9 @@
 
 #include "log.h"
 #include "parser.h"
-#include "pdf/result.h"
+#include "pdf/error.h"
 
-PdfResult sfnt_parse_maxp(SfntParser* parser, SfntMaxp* maxp) {
+PdfError* sfnt_parse_maxp(SfntParser* parser, SfntMaxp* maxp) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(maxp);
 
@@ -12,9 +12,13 @@ PdfResult sfnt_parse_maxp(SfntParser* parser, SfntMaxp* maxp) {
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &maxp->num_glyphs));
 
     if (maxp->version == 0x5000) {
-        return PDF_OK;
+        return NULL;
     } else if (maxp->version != 0x10000) {
-        return PDF_ERR_MAXP_INVALID_VERSION;
+        return PDF_ERROR(
+            PDF_ERR_MAXP_INVALID_VERSION,
+            "Invalid maxp version %u",
+            maxp->version
+        );
     }
 
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &maxp->max_points));
@@ -35,5 +39,5 @@ PdfResult sfnt_parse_maxp(SfntParser* parser, SfntMaxp* maxp) {
     );
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &maxp->max_component_depth));
 
-    return PDF_OK;
+    return NULL;
 }

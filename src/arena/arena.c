@@ -32,8 +32,7 @@ void arena_block_init(ArenaBlock* block, size_t size) {
 
     void* alloc = malloc(size);
     if (!alloc) {
-        LOG_ERROR(ARENA, "Arena block of size %zu allocation failed", size);
-        exit(EXIT_FAILURE);
+        LOG_PANIC("Arena block of size %zu allocation failed", size);
     }
 
     block->start = (uintptr_t)alloc;
@@ -130,8 +129,7 @@ void* arena_alloc_align(Arena* arena, size_t size, size_t align) {
     ArenaBlock* new_array =
         realloc(arena->blocks, sizeof(ArenaBlock) * (arena->num_blocks + 1));
     if (!new_array) {
-        LOG_ERROR(ARENA, "Arena block list allocation failed");
-        exit(EXIT_FAILURE);
+        LOG_PANIC("Arena block list allocation failed");
     }
 
     arena->blocks = new_array;

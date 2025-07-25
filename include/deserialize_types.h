@@ -10,7 +10,7 @@
         PdfIndirectRef ref;                                                    \
         void* resolved;                                                        \
     } base_struct##Ref;                                                        \
-    PdfResult pdf_resolve_##lowercase_name(                                    \
+    PdfError* pdf_resolve_##lowercase_name(                                    \
         base_struct##Ref* ref,                                                 \
         PdfResolver* resolver,                                                 \
         base_struct* resolved                                                  \

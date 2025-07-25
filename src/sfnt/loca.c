@@ -3,9 +3,9 @@
 #include "log.h"
 #include "maxp.h"
 #include "parser.h"
-#include "pdf/result.h"
+#include "pdf/error.h"
 
-PdfResult sfnt_parse_loca(
+PdfError* sfnt_parse_loca(
     Arena* arena,
     SfntParser* parser,
     SfntHead* head,
@@ -48,17 +48,21 @@ PdfResult sfnt_parse_loca(
         }
     }
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult
+PdfError*
 sfnt_loca_glyph_offset(SfntLoca* loca, uint32_t gid, uint32_t* offset) {
     RELEASE_ASSERT(loca);
     RELEASE_ASSERT(offset);
 
     if (!sfnt_uint32_array_get(loca->offsets, gid, offset)) {
-        return PDF_ERR_SFNT_INVALID_GID;
+        return PDF_ERROR(
+            PDF_ERR_SFNT_INVALID_GID,
+            "Couldn't find loca entry for glyph id %u",
+            gid
+        );
     }
 
-    return PDF_OK;
+    return NULL;
 }

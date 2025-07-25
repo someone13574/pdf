@@ -2,9 +2,9 @@
 
 #include "log.h"
 #include "parser.h"
-#include "pdf/result.h"
+#include "pdf/error.h"
 
-PdfResult sfnt_parse_head(SfntParser* parser, SfntHead* head) {
+PdfError* sfnt_parse_head(SfntParser* parser, SfntHead* head) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(head);
 
@@ -29,13 +29,16 @@ PdfResult sfnt_parse_head(SfntParser* parser, SfntHead* head) {
     PDF_PROPAGATE(sfnt_parser_read_int16(parser, &head->glyph_data_format));
 
     if (magic_number != 0x5f0f3cf5) {
-        return PDF_ERR_SFNT_BAD_MAGIC;
+        return PDF_ERROR(PDF_ERR_SFNT_BAD_MAGIC);
     }
 
     if (head->idx_to_loc_format != 0 && head->idx_to_loc_format != 1) {
-        LOG_ERROR(SFNT, "Invalid idx_to_loc_format");
-        return PDF_ERR_SFNT_BAD_HEAD;
+        return PDF_ERROR(
+            PDF_ERR_SFNT_BAD_HEAD,
+            "Invalid idx_to_loc_format. Expected 0 or 1, found %u",
+            head->idx_to_loc_format
+        );
     }
 
-    return PDF_OK;
+    return NULL;
 }

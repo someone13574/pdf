@@ -3,4 +3,4 @@
 #include "parser.h"
 #include "sfnt/sfnt.h"
 
-PdfResult sfnt_parse_head(SfntParser* parser, SfntHead* head);
+PdfError* sfnt_parse_head(SfntParser* parser, SfntHead* head);

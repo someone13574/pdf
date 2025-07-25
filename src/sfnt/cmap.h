@@ -43,5 +43,5 @@ typedef struct {
     SfntCmapSubtable mapping_table;
 } SfntCmap;
 
-PdfResult sfnt_parse_cmap(Arena* arena, SfntParser* parser, SfntCmap* cmap);
+PdfError* sfnt_parse_cmap(Arena* arena, SfntParser* parser, SfntCmap* cmap);
 uint32_t sfnt_cmap_map_cid(SfntCmapSubtable* subtable, uint32_t cid);

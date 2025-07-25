@@ -5,14 +5,14 @@
 #include "arena/arena.h"
 #include "log.h"
 #include "parser.h"
-#include "pdf/result.h"
+#include "pdf/error.h"
 
 #define DVEC_NAME SfntSimpleGlyphFlagsVec
 #define DVEC_LOWERCASE_NAME sfnt_simple_glyph_flags_vec
 #define DVEC_TYPE SfntSimpleGlyphFlags
 #include "../arena/dvec_impl.h"
 
-PdfResult
+PdfError*
 sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(parser);
@@ -155,10 +155,10 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
         }
     }
 
-    return PDF_OK;
+    return NULL;
 }
 
-PdfResult sfnt_parse_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
+PdfError* sfnt_parse_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(glyph);
@@ -171,7 +171,7 @@ PdfResult sfnt_parse_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
 
     if (glyph->num_contours == 0) {
         glyph->glyph_type = SFNT_GLYPH_TYPE_NONE;
-        return PDF_OK;
+        return NULL;
     }
 
     if (glyph->num_contours > 0) {

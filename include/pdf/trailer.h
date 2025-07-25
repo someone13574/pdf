@@ -1,9 +1,9 @@
 #pragma once
 
 #include "pdf/catalog.h"
+#include "pdf/error.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf/result.h"
 
 typedef struct {
     PdfInteger size;
@@ -11,7 +11,7 @@ typedef struct {
     PdfObject* raw_dict;
 } PdfTrailer;
 
-PdfResult pdf_deserialize_trailer(
+PdfError* pdf_deserialize_trailer(
     PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,

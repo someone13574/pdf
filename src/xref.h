@@ -1,8 +1,8 @@
 #pragma once
 
 #include "ctx.h"
+#include "pdf/error.h"
 #include "pdf/object.h"
-#include "pdf/result.h"
 
 typedef struct XRefTable XRefTable;
 
@@ -13,10 +13,10 @@ typedef struct {
     PdfObject* object;
 } XRefEntry;
 
-PdfResult
+PdfError*
 pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, XRefTable** xref);
 
-PdfResult pdf_xref_get_entry(
+PdfError* pdf_xref_get_entry(
     XRefTable* xref,
     size_t object_id,
     size_t generation,

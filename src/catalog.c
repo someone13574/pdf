@@ -2,12 +2,12 @@
 
 #include "deserialize.h"
 #include "log.h"
+#include "pdf/error.h"
 #include "pdf/object.h"
 #include "pdf/page.h"
 #include "pdf/resolver.h"
-#include "pdf/result.h"
 
-PdfResult pdf_deserialize_catalog(
+PdfError* pdf_deserialize_catalog(
     PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
@@ -38,7 +38,7 @@ PdfResult pdf_deserialize_catalog(
         resolver
     ));
 
-    return PDF_OK;
+    return NULL;
 }
 
 PDF_DESERIALIZABLE_REF_IMPL(PdfCatalog, catalog, pdf_deserialize_catalog)

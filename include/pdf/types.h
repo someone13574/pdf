@@ -12,8 +12,8 @@ typedef struct {
     } value;
 } PdfNumber;
 
-PdfResult pdf_deserialize_number(PdfObject* object, PdfNumber* deserialized);
-PdfResult pdf_deserialize_number_wrapper(
+PdfError* pdf_deserialize_number(PdfObject* object, PdfNumber* deserialized);
+PdfError* pdf_deserialize_number_wrapper(
     PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,

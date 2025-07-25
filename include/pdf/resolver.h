@@ -1,8 +1,8 @@
 #pragma once
 
 #include "arena/arena.h"
+#include "pdf/error.h"
 #include "pdf/object.h"
-#include "pdf/result.h"
 
 typedef struct PdfResolver PdfResolver;
 
@@ -12,7 +12,7 @@ typedef struct {
     PdfResolver* resolver;
 } PdfOptionalResolver;
 
-PdfResult pdf_resolver_new(
+PdfError* pdf_resolver_new(
     Arena* arena,
     char* buffer,
     size_t buffer_size,
@@ -24,5 +24,5 @@ PdfOptionalResolver pdf_op_resolver_none(bool unwrap_indirect_objs);
 bool pdf_op_resolver_valid(PdfOptionalResolver resolver);
 
 Arena* pdf_resolver_arena(PdfResolver* resolver);
-PdfResult
+PdfError*
 pdf_resolve_ref(PdfResolver* resolver, PdfIndirectRef ref, PdfObject* resolved);

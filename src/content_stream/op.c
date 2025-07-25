@@ -4,8 +4,8 @@
 #include "arena/arena.h"
 #include "log.h"
 #include "pdf/content_op.h"
+#include "pdf/error.h"
 #include "pdf/object.h"
-#include "pdf/result.h"
 #include "pdf/types.h"
 
 #define DVEC_NAME PdfContentOpVec
@@ -21,7 +21,7 @@ new_queue_op(PdfContentOpVec* operation_queue, PdfContentOpKind op) {
     );
 }
 
-PdfResult pdf_deserialize_set_font_op(
+PdfError* pdf_deserialize_set_font_op(
     PdfObjectVec* operands,
     Arena* arena,
     PdfContentOpSetFont* deserialized
@@ -51,7 +51,7 @@ PdfResult pdf_deserialize_set_font_op(
     );
 }
 
-PdfResult pdf_deserialize_next_line_op(
+PdfError* pdf_deserialize_next_line_op(
     PdfObjectVec* operands,
     Arena* arena,
     PdfContentOpNextLine* deserialized
@@ -81,7 +81,7 @@ PdfResult pdf_deserialize_next_line_op(
     );
 }
 
-PdfResult pdf_deserialize_show_text_op(
+PdfError* pdf_deserialize_show_text_op(
     PdfObjectVec* operands,
     Arena* arena,
     PdfContentOpShowText* deserialized
@@ -104,7 +104,7 @@ PdfResult pdf_deserialize_show_text_op(
     );
 }
 
-PdfResult pdf_deserialize_content_op(
+PdfError* pdf_deserialize_content_op(
     PdfOperator op,
     PdfObjectVec* operands,
     Arena* arena,
@@ -117,11 +117,11 @@ PdfResult pdf_deserialize_content_op(
     switch (op) {
         case PDF_OPERATOR_BT: {
             new_queue_op(operation_queue, PDF_CONTENT_OP_BEGIN_TEXT);
-            return PDF_OK;
+            return NULL;
         };
         case PDF_OPERATOR_ET: {
             new_queue_op(operation_queue, PDF_CONTENT_OP_END_TEXT);
-            return PDF_OK;
+            return NULL;
         };
         case PDF_OPERATOR_Tf: {
             PdfContentOp* new_op =
