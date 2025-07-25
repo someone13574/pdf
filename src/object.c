@@ -86,7 +86,9 @@ PdfError* pdf_parse_object(
 
         if (!error || !number_fallback) {
             return error;
-        } else if (error) {
+        }
+
+        if (error) {
             pdf_error_free(error);
         }
 
@@ -663,7 +665,9 @@ PdfError* pdf_parse_dict(
         }
 
         char* stream_bytes;
-        if (pdf_parse_stream(arena, ctx, &stream_bytes, entries)
+        if (!pdf_error_free_is_ok(
+                pdf_parse_stream(arena, ctx, &stream_bytes, entries)
+            )
             || !stream_bytes) {
             // Not a stream
             pdf_error_free_is_ok(pdf_ctx_seek(ctx, restore_offset));
