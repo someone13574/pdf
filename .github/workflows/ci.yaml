@@ -1,0 +1,27 @@
+name: Build & Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Clang 17
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-17 clang-tidy-17
+      - name: Configure build
+        run: |
+          CC=clang-17 CXX=clang++-17 cmake -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - name: Build
+        run: |
+          cmake --build build -- -j$(nproc)
+      - name: Run tests
+        run: |
+          build/src/test/pdf-test-main
