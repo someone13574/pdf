@@ -52,7 +52,7 @@ static void pdf_error_ctx_display(PdfErrorCtx* chain) {
             LOG_DIAG_VERBOSITY_TRACE,
             chain->file,
             chain->line,
-            "Error context: %s, \"%s\"",
+            "Error context: func=`%s`, msg=\"%s\"",
             chain->func,
             chain->message
         );
@@ -64,7 +64,7 @@ static void pdf_error_ctx_display(PdfErrorCtx* chain) {
             LOG_DIAG_VERBOSITY_TRACE,
             chain->file,
             chain->line,
-            "Error context: %s",
+            "Error context: func=`%s`",
             chain->func
         );
     }
