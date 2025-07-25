@@ -1,0 +1,23 @@
+name: clang-format
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 2
+      - uses: jayllyz/clang-format-action@v1
+        with:
+          clang-version: 17
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "style: clang format files"
+          branch: ${{ github.head_ref }}
