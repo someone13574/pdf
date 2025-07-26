@@ -213,7 +213,6 @@ void canvas_draw_line(
     double y1,
     double x2,
     double y2,
-    double spacing,
     double radius,
     uint32_t rgba
 ) {
@@ -223,10 +222,69 @@ void canvas_draw_line(
     double dy = y2 - y1;
     double dist = sqrt(dx * dx + dy * dy);
 
-    for (int segment = 1; segment < (int)(dist / spacing); segment++) {
-        double t = spacing * segment / dist;
+    for (int pixel = 1; pixel < (int)(dist); pixel++) {
+        double t = pixel / dist;
         canvas_draw_circle(canvas, x1 + dx * t, y1 + dy * t, radius, rgba);
     }
+}
+
+void canvas_draw_bezier(
+    Canvas* canvas,
+    double x1,
+    double y1,
+    double x2,
+    double y2,
+    double cx,
+    double cy,
+    double flatness,
+    double radius,
+    uint32_t rgba
+) {
+    RELEASE_ASSERT(canvas);
+
+    // Check if line is flat
+    double mid_x = (x1 + x2) / 2.0;
+    double mid_y = (y1 + y2) / 2.0;
+    double flatness_x = cx - mid_x;
+    double flatness_y = cy - mid_y;
+    if (sqrt(flatness_x * flatness_x + flatness_y * flatness_y) < flatness) {
+        canvas_draw_line(canvas, x1, y1, x2, y2, radius, rgba);
+        return;
+    }
+
+    // Recurse
+    double c1x = (x1 + cx) / 2.0;
+    double c1y = (y1 + cy) / 2.0;
+    double c2x = (x2 + cx) / 2.0;
+    double c2y = (y2 + cy) / 2.0;
+
+    double xm = (c1x + c2x) * 0.5;
+    double ym = (c1y + c2y) * 0.5;
+
+    canvas_draw_bezier(
+        canvas,
+        x1,
+        y1,
+        xm,
+        ym,
+        c1x,
+        c1y,
+        flatness,
+        radius,
+        rgba
+    );
+    canvas_draw_bezier(
+        canvas,
+        xm,
+        ym,
+        x2,
+        y2,
+        c2x,
+        c2y,
+        flatness,
+        radius,
+        rgba
+    );
 }
 
 bool canvas_write_file(Canvas* canvas, const char* path) {

@@ -28,7 +28,18 @@ void canvas_draw_line(
     double y1,
     double x2,
     double y2,
-    double spacing,
+    double radius,
+    uint32_t rgba
+);
+void canvas_draw_bezier(
+    Canvas* canvas,
+    double x1,
+    double y1,
+    double x2,
+    double y2,
+    double cx,
+    double cy,
+    double flatness,
     double radius,
     uint32_t rgba
 );

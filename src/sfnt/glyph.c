@@ -77,12 +77,15 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
         // Coordinate stays the same
         if ((flags.flags & SFNT_SIMPLE_GLYPH_X_SHORT) == 0
             && (flags.flags & SFNT_SIMPLE_GLYPH_X_MODIFIER) != 0) {
-            LOG_DIAG(TRACE, SFNT, "Delta-x: %d", 0);
-            sfnt_glyph_point_array_set(
-                data->points,
-                x_coord_idx++,
-                (SfntGlyphPoint) {.on_curve = on_curve, .delta_x = 0}
-            );
+            LOG_DIAG(TRACE, SFNT, "Delta-x (zero): %d", 0);
+            for (size_t repetition = 0; repetition < flags.repetitions + 1;
+                 repetition++) {
+                sfnt_glyph_point_array_set(
+                    data->points,
+                    x_coord_idx++,
+                    (SfntGlyphPoint) {.on_curve = on_curve, .delta_x = 0}
+                );
+            }
             continue;
         }
 
@@ -97,7 +100,7 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
 
                 int16_t delta_x =
                     (int16_t)(positive ? delta_mag : -(int16_t)delta_mag);
-                LOG_DIAG(TRACE, SFNT, "Delta-x: %d", delta_x);
+                LOG_DIAG(TRACE, SFNT, "Delta-x (short): %d", delta_x);
                 sfnt_glyph_point_array_set(
                     data->points,
                     x_coord_idx++,
@@ -130,15 +133,17 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
         // Coordinate stays the same
         if ((flags.flags & SFNT_SIMPLE_GLYPH_Y_SHORT) == 0
             && (flags.flags & SFNT_SIMPLE_GLYPH_Y_MODIFIER) != 0) {
-            LOG_DIAG(TRACE, SFNT, "Delta-y: %d", 0);
-
-            SfntGlyphPoint* point;
-            RELEASE_ASSERT(sfnt_glyph_point_array_get_ptr(
-                data->points,
-                y_coord_idx++,
-                &point
-            ));
-            point->delta_y = 0;
+            LOG_DIAG(TRACE, SFNT, "Delta-y (zero): %d", 0);
+            for (size_t repetition = 0; repetition < flags.repetitions + 1;
+                 repetition++) {
+                SfntGlyphPoint* point;
+                RELEASE_ASSERT(sfnt_glyph_point_array_get_ptr(
+                    data->points,
+                    y_coord_idx++,
+                    &point
+                ));
+                point->delta_y = 0;
+            }
 
             continue;
         }
@@ -154,7 +159,7 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
 
                 int16_t delta_y =
                     (int16_t)(positive ? delta_mag : -(int16_t)delta_mag);
-                LOG_DIAG(TRACE, SFNT, "Delta-y: %d", delta_y);
+                LOG_DIAG(TRACE, SFNT, "Delta-y (short): %d", delta_y);
                 SfntGlyphPoint* point;
                 RELEASE_ASSERT(sfnt_glyph_point_array_get_ptr(
                     data->points,
@@ -230,7 +235,6 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
 
     int32_t x_coord = 0;
     int32_t y_coord = 0;
-    uint16_t contour_start = 0;
 
     for (size_t contour_idx = 0;
          contour_idx < sfnt_uint16_array_len(data.end_pts_of_contours);
@@ -242,6 +246,7 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
             &contour_end
         ));
 
+        uint16_t contour_start = 0;
         if (contour_idx != 0) {
             RELEASE_ASSERT(sfnt_uint16_array_get(
                 data.end_pts_of_contours,
@@ -251,69 +256,112 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
             contour_start++;
         }
 
-        bool has_prev_point = false;
-        bool has_first_point = false;
-        double prev_x, prev_y, first_x, first_y;
-        for (size_t point_idx = contour_start; point_idx <= contour_end;
-             point_idx++) {
-            SfntGlyphPoint point;
-            RELEASE_ASSERT(
-                sfnt_glyph_point_array_get(data.points, point_idx, &point)
-            );
+        bool has_curve_start = false;
+        bool has_curve_control = false;
 
-            x_coord += point.delta_x;
-            y_coord += point.delta_y;
+        int32_t contour_start_x = x_coord;
+        int32_t contour_start_y = y_coord;
+        int32_t contour_end_x = x_coord;
+        int32_t contour_end_y = y_coord;
+        double curve_start_x, curve_start_y, curve_control_x, curve_control_y;
 
-            double x = (x_coord - glyph->x_min) * scale + offset_x;
-            double y = (y_coord - glyph->y_min) * scale + offset_y;
-            y = (double)(resolution - 1) - y;
+        for (size_t pass = 0; pass < 2; pass++) {
+            x_coord = contour_start_x;
+            y_coord = contour_start_y;
 
-            canvas_draw_circle(
-                canvas,
-                x,
-                y,
-                10.0,
-                point.on_curve ? 0xff0000ff : 0x00ff00ff
-            );
+            for (size_t point_idx = contour_start; point_idx <= contour_end;
+                 point_idx++) {
+                SfntGlyphPoint point;
+                RELEASE_ASSERT(
+                    sfnt_glyph_point_array_get(data.points, point_idx, &point)
+                );
 
-            if (point.on_curve) {
-                if (has_prev_point) {
+                x_coord += point.delta_x;
+                y_coord += point.delta_y;
+
+                if (point_idx == contour_end) {
+                    contour_end_x = x_coord;
+                    contour_end_y = y_coord;
+                }
+
+                double x = (x_coord - glyph->x_min) * scale + offset_x;
+                double y = (y_coord - glyph->y_min) * scale + offset_y;
+                y = (double)(resolution - 1) - y;
+
+                if (!has_curve_start && point.on_curve) {
+                    has_curve_start = true;
+                    curve_start_x = x;
+                    curve_start_y = y;
+                } else if (has_curve_start && !has_curve_control && !point.on_curve) {
+                    has_curve_control = true;
+                    curve_control_x = x;
+                    curve_control_y = y;
+                } else if (has_curve_start && !has_curve_control && point.on_curve) {
                     canvas_draw_line(
                         canvas,
+                        curve_start_x,
+                        curve_start_y,
                         x,
                         y,
-                        prev_x,
-                        prev_y,
-                        1.0,
-                        2.0,
+                        5.0,
                         0x000000ff
                     );
-                }
 
-                if (!has_first_point) {
-                    has_first_point = true;
-                    first_x = x;
-                    first_y = y;
-                }
+                    curve_start_x = x;
+                    curve_start_y = y;
+                    if (pass != 0) {
+                        break;
+                    }
+                } else if (has_curve_start && has_curve_control && point.on_curve) {
+                    canvas_draw_bezier(
+                        canvas,
+                        curve_start_x,
+                        curve_start_y,
+                        x,
+                        y,
+                        curve_control_x,
+                        curve_control_y,
+                        0.1,
+                        5.0,
+                        0x000000ff
+                    );
 
-                has_prev_point = true;
-                prev_x = x;
-                prev_y = y;
+                    curve_start_x = x;
+                    curve_start_y = y;
+                    has_curve_control = false;
+                    if (pass != 0) {
+                        break;
+                    }
+                } else if (has_curve_start && has_curve_control && !point.on_curve) {
+                    double mid_x = (curve_control_x + x) / 2.0;
+                    double mid_y = (curve_control_y + y) / 2.0;
+
+                    canvas_draw_bezier(
+                        canvas,
+                        curve_start_x,
+                        curve_start_y,
+                        mid_x,
+                        mid_y,
+                        curve_control_x,
+                        curve_control_y,
+                        0.1,
+                        5.0,
+                        0x000000ff
+                    );
+
+                    curve_start_x = mid_x;
+                    curve_start_y = mid_y;
+                    curve_control_x = x;
+                    curve_control_y = y;
+                    if (pass != 0) {
+                        break;
+                    }
+                }
             }
         }
 
-        if (has_first_point) {
-            canvas_draw_line(
-                canvas,
-                prev_x,
-                prev_y,
-                first_x,
-                first_y,
-                1.0,
-                2.0,
-                0x000000ff
-            );
-        }
+        x_coord = contour_end_x;
+        y_coord = contour_end_y;
     }
 
     return canvas;
