@@ -9,7 +9,7 @@ add_library(sfnt
     maxp.c maxp.h
     parser.c parser.h)
 target_include_directories(sfnt PUBLIC "${pdf_SOURCE_DIR}/include")
-target_link_libraries(sfnt PUBLIC arena)
+target_link_libraries(sfnt PUBLIC arena canvas)
 target_link_libraries(sfnt PRIVATE pdf-error pdf-logger pdf-test)
 target_compile_features(sfnt PUBLIC c_std_23)
 target_compile_options(sfnt PRIVATE -fsanitize=address)

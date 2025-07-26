@@ -7,7 +7,7 @@
     X(ARENA, OFF, GLOBAL)                                                      \
     X(ARRAY, INHERIT, ARENA)                                                   \
     X(VEC, INHERIT, ARENA)                                                     \
-    X(CANVAS, TRACE, GLOBAL)                                                   \
+    X(CANVAS, INHERIT, GLOBAL)                                                 \
     X(PDF, INHERIT, GLOBAL)                                                    \
     X(DOC, TRACE, PDF)                                                         \
     X(XREF, INHERIT, PDF)                                                      \

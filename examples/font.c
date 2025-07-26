@@ -53,10 +53,6 @@ int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
 
-    Canvas* canvas = canvas_new(100, 100, 0xffffffff);
-    canvas_write_file(canvas, "test.bmp");
-    canvas_free(canvas);
-
     Arena* arena = arena_new(4096);
 
     size_t buffer_len;
@@ -69,13 +65,10 @@ int main(int argc, char** argv) {
     SfntFont* font;
     PDF_REQUIRE(sfnt_font_new(arena, buffer, buffer_len, &font));
 
-    const char* test_text = "Hello World!";
-    for (size_t idx = 0; idx < strlen(test_text); idx++) {
-        uint32_t cid = (uint32_t)test_text[idx];
-
-        SfntGlyph glyph;
-        PDF_REQUIRE(sfnt_get_glyph(font, cid, &glyph));
-    }
+    SfntGlyph glyph;
+    PDF_REQUIRE(sfnt_get_glyph(font, (uint32_t)'M', &glyph));
+    Canvas* canvas = sfnt_glyph_render(arena, &glyph, 2048);
+    canvas_write_file(canvas, "glyph.bmp");
 
     LOG_DIAG(INFO, EXAMPLE, "Finished");
 

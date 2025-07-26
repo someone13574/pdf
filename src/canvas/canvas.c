@@ -1,10 +1,12 @@
 #include "canvas/canvas.h"
 
 #include <inttypes.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <string.h>
 
+#include "arena/arena.h"
 #include "logger/log.h"
 
 #define BMP_HEADER_LEN 14
@@ -62,7 +64,8 @@ write_bmp_info_header(uint8_t* target, uint32_t width, uint32_t height) {
     write_u32(target + 20, 0); // image size, can be 0 for BI_RGB
 }
 
-Canvas* canvas_new(uint32_t width, uint32_t height, uint32_t rgba) {
+Canvas*
+canvas_new(Arena* arena, uint32_t width, uint32_t height, uint32_t rgba) {
     uint32_t file_size =
         BMP_HEADER_LEN + BMP_INFO_HEADER_LEN + width * height * 4;
 
@@ -76,15 +79,12 @@ Canvas* canvas_new(uint32_t width, uint32_t height, uint32_t rgba) {
         rgba
     );
 
-    Canvas* canvas = malloc(sizeof(Canvas));
-    RELEASE_ASSERT(canvas);
-
+    Canvas* canvas = arena_alloc(arena, sizeof(Canvas));
     canvas->width = width;
     canvas->height = height;
     canvas->file_size = file_size;
-
-    canvas->data = calloc(file_size, 1);
-    RELEASE_ASSERT(canvas->data);
+    canvas->data = arena_alloc(arena, file_size);
+    memset(canvas->data, 0, file_size);
 
     write_bmp_header(canvas->data, file_size);
     write_bmp_info_header(canvas->data + BMP_HEADER_LEN, width, height);
@@ -101,15 +101,6 @@ Canvas* canvas_new(uint32_t width, uint32_t height, uint32_t rgba) {
     }
 
     return canvas;
-}
-
-void canvas_free(Canvas* canvas) {
-    RELEASE_ASSERT(canvas);
-
-    LOG_DIAG(INFO, CANVAS, "Freeing canvas");
-
-    free(canvas->data);
-    free(canvas);
 }
 
 uint32_t canvas_width(Canvas* canvas) {
@@ -157,6 +148,85 @@ void canvas_set_rgba(Canvas* canvas, uint32_t x, uint32_t y, uint32_t rgba) {
     canvas->data[pixel_offset + 1] = (rgba >> 16) & 0xff;
     canvas->data[pixel_offset] = (rgba >> 8) & 0xff;
     canvas->data[pixel_offset + 3] = rgba & 0xff;
+}
+
+static uint32_t clamp_and_floor(double value, uint32_t max) {
+    if (value < 0) {
+        return 0;
+    }
+
+    if (value > max) {
+        return max;
+    }
+
+    return (uint32_t)value;
+}
+
+static uint32_t clamp_and_ceil(double value, uint32_t max) {
+    if (value < 0) {
+        return 0;
+    }
+
+    if (value > max) {
+        return max;
+    }
+
+    return (uint32_t)ceil(value);
+}
+
+void canvas_draw_circle(
+    Canvas* canvas,
+    double x,
+    double y,
+    double radius,
+    uint32_t rgba
+) {
+    RELEASE_ASSERT(canvas);
+
+    double min_x = x - radius;
+    double min_y = y - radius;
+    double max_x = x + radius;
+    double max_y = y + radius;
+
+    for (uint32_t current_y = clamp_and_floor(min_y, canvas->height - 1);
+         current_y < clamp_and_ceil(max_y, canvas->height - 1);
+         current_y++) {
+        for (uint32_t current_x = clamp_and_floor(min_x, canvas->width - 1);
+             current_x < clamp_and_ceil(max_x, canvas->width - 1);
+             current_x++) {
+            if (sqrt(
+                    pow((double)current_x + 0.5 - x, 2.0)
+                    + pow((double)current_y + 0.5 - y, 2.0)
+                )
+                > radius) {
+                continue;
+            }
+
+            canvas_set_rgba(canvas, current_x, current_y, rgba);
+        }
+    }
+}
+
+void canvas_draw_line(
+    Canvas* canvas,
+    double x1,
+    double y1,
+    double x2,
+    double y2,
+    double spacing,
+    double radius,
+    uint32_t rgba
+) {
+    RELEASE_ASSERT(canvas);
+
+    double dx = x2 - x1;
+    double dy = y2 - y1;
+    double dist = sqrt(dx * dx + dy * dy);
+
+    for (int segment = 1; segment < (int)(dist / spacing); segment++) {
+        double t = spacing * segment / dist;
+        canvas_draw_circle(canvas, x1 + dx * t, y1 + dy * t, radius, rgba);
+    }
 }
 
 bool canvas_write_file(Canvas* canvas, const char* path) {

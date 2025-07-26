@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#include "arena/arena.h"
+#include "canvas/canvas.h"
 #include "types.h"
 
 typedef enum {
@@ -24,12 +26,22 @@ typedef struct {
 #include "arena/dvec_decl.h"
 
 typedef struct {
+    bool on_curve;
+    int16_t delta_x;
+    int16_t delta_y;
+} SfntGlyphPoint;
+
+#define DARRAY_NAME SfntGlyphPointArray
+#define DARRAY_LOWERCASE_NAME sfnt_glyph_point_array
+#define DARRAY_TYPE SfntGlyphPoint
+#include "arena/darray_decl.h"
+
+typedef struct {
     SfntUint16Array* end_pts_of_contours;
     uint16_t instruction_len;
     SfntUint8Array* instructions;
     SfntSimpleGlyphFlagsVec* flags;
-    SfntInt16Array* x_coords;
-    SfntInt16Array* y_coords;
+    SfntGlyphPointArray* points;
 } SfntSimpleGlyph;
 
 typedef struct {
@@ -58,3 +70,5 @@ typedef struct {
         SfntComponentGlyphPart compound;
     } data;
 } SfntGlyph;
+
+Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution);
