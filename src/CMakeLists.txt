@@ -1,4 +1,5 @@
 add_subdirectory(arena)
+add_subdirectory(canvas)
 add_subdirectory(logger)
 add_subdirectory(pdf)
 add_subdirectory(pdf_error)

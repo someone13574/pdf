@@ -5,7 +5,7 @@ target_compile_options(pdf-example PRIVATE -fsanitize=address)
 target_link_options(pdf-example PRIVATE -fsanitize=address)
 
 add_executable(font-example font.c)
-target_link_libraries(font-example PRIVATE sfnt)
+target_link_libraries(font-example PRIVATE sfnt canvas)
 target_compile_definitions(font-example PRIVATE DEBUG TEST)
 target_compile_options(font-example PRIVATE -fsanitize=address)
 target_link_options(font-example PRIVATE -fsanitize=address)

@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "arena/arena.h"
+#include "canvas/canvas.h"
 #include "logger/log.h"
 #include "pdf_error/error.h"
 #include "sfnt/glyph.h"
@@ -51,6 +52,10 @@ load_file_to_buffer(Arena* arena, const char* path, size_t* out_size) {
 int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
+
+    Canvas* canvas = canvas_new(100, 100, 0xffffffff);
+    canvas_write_file(canvas, "test.bmp");
+    canvas_free(canvas);
 
     Arena* arena = arena_new(4096);
 
