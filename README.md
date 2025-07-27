@@ -4,3 +4,4 @@
 - [Let's write a PDF file](https://speakerdeck.com/ange/lets-write-a-pdf-file)
 - [TrueType Reference Manual](https://developer.apple.com/fonts/TrueType-Reference-Manual/)
 - [BMP Wiki](https://en.wikipedia.org/wiki/BMP_file_format)
+- [Partitioning a Polygon into _y_-monotone Pieces](https://www.youtube.com/watch?v=IkA-2Y9lBvM)

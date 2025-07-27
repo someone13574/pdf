@@ -26,25 +26,21 @@ PdfError* sfnt_parse_loca(
         maxp->num_glyphs
     );
 
-    loca->offsets = sfnt_uint32_array_new(arena, maxp->num_glyphs);
+    loca->offsets = uint32_array_new(arena, maxp->num_glyphs);
 
     if (head->idx_to_loc_format == 0) {
         // Short format
         for (size_t idx = 0; idx < maxp->num_glyphs; idx++) {
             uint16_t word_offset;
             PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &word_offset));
-            sfnt_uint32_array_set(
-                loca->offsets,
-                idx,
-                (uint32_t)word_offset * 2
-            );
+            uint32_array_set(loca->offsets, idx, (uint32_t)word_offset * 2);
         }
     } else {
         // Long format
         for (size_t idx = 0; idx < maxp->num_glyphs; idx++) {
             uint32_t byte_offset;
             PDF_PROPAGATE(sfnt_parser_read_uint32(parser, &byte_offset));
-            sfnt_uint32_array_set(loca->offsets, idx, byte_offset);
+            uint32_array_set(loca->offsets, idx, byte_offset);
         }
     }
 
@@ -56,7 +52,7 @@ sfnt_loca_glyph_offset(SfntLoca* loca, uint32_t gid, uint32_t* offset) {
     RELEASE_ASSERT(loca);
     RELEASE_ASSERT(offset);
 
-    if (!sfnt_uint32_array_get(loca->offsets, gid, offset)) {
+    if (!uint32_array_get(loca->offsets, gid, offset)) {
         return PDF_ERROR(
             PDF_ERR_SFNT_INVALID_GID,
             "Couldn't find loca entry for glyph id %u",

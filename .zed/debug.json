@@ -20,5 +20,16 @@
     "program": "$ZED_WORKTREE_ROOT/build/examples/font-example",
     "request": "launch",
     "adapter": "CodeLLDB"
+  },
+  {
+    "label": "Debug tessellation-example",
+    "build": {
+      "command": "scripts/dev-build.sh",
+      "args": [],
+      "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    "program": "$ZED_WORKTREE_ROOT/build/examples/tessellation-example",
+    "request": "launch",
+    "adapter": "CodeLLDB"
   }
 ]

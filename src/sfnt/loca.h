@@ -7,7 +7,7 @@
 #include "sfnt/sfnt.h"
 
 typedef struct {
-    SfntUint32Array* offsets;
+    Uint32Array* offsets;
 } SfntLoca;
 
 PdfError* sfnt_parse_loca(

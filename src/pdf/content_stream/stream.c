@@ -53,7 +53,7 @@ PdfError* pdf_deserialize_content_stream(
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
         // Deserialize operation
-        PDF_REQUIRE(
+        PDF_PROPAGATE(
             pdf_deserialize_content_op(operator, operands, arena, operations)
         );
     }

@@ -115,11 +115,10 @@ parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data) {
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->language));
 
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->seg_count_x2));
-    data->end_code = sfnt_uint16_array_new(arena, data->seg_count_x2 / 2);
-    data->start_code = sfnt_uint16_array_new(arena, data->seg_count_x2 / 2);
-    data->id_delta = sfnt_uint16_array_new(arena, data->seg_count_x2 / 2);
-    data->id_range_offset =
-        sfnt_uint16_array_new(arena, data->seg_count_x2 / 2);
+    data->end_code = uint16_array_new(arena, data->seg_count_x2 / 2);
+    data->start_code = uint16_array_new(arena, data->seg_count_x2 / 2);
+    data->id_delta = uint16_array_new(arena, data->seg_count_x2 / 2);
+    data->id_range_offset = uint16_array_new(arena, data->seg_count_x2 / 2);
 
     size_t num_words = 8 + 4 * (data->seg_count_x2 / 2);
     size_t num_bytes = num_words * 2;
@@ -131,7 +130,7 @@ parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data) {
         );
     }
     data->glyph_index_array =
-        sfnt_uint16_array_new(arena, glyph_index_array_bytes / 2);
+        uint16_array_new(arena, glyph_index_array_bytes / 2);
 
     uint16_t reserved_pad;
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->search_range));
@@ -197,10 +196,9 @@ uint16_t cmap_format4_map(SfntCmapFormat4* subtable, uint16_t cid) {
     for (size_t seg_idx = 0; seg_idx < seg_count; seg_idx++) {
         uint16_t end_code;
         RELEASE_ASSERT(
-            sfnt_uint16_array_get(subtable->start_code, seg_idx, &start_code)
+            uint16_array_get(subtable->start_code, seg_idx, &start_code)
         );
-        RELEASE_ASSERT(
-            sfnt_uint16_array_get(subtable->end_code, seg_idx, &end_code)
+        RELEASE_ASSERT(uint16_array_get(subtable->end_code, seg_idx, &end_code)
         );
 
         if (cid >= start_code && cid <= end_code) {
@@ -216,13 +214,10 @@ uint16_t cmap_format4_map(SfntCmapFormat4* subtable, uint16_t cid) {
 
     // Map cid to gid
     uint16_t id_delta, id_range_offset;
-    RELEASE_ASSERT(sfnt_uint16_array_get(subtable->id_delta, segment, &id_delta)
+    RELEASE_ASSERT(uint16_array_get(subtable->id_delta, segment, &id_delta));
+    RELEASE_ASSERT(
+        uint16_array_get(subtable->id_range_offset, segment, &id_range_offset)
     );
-    RELEASE_ASSERT(sfnt_uint16_array_get(
-        subtable->id_range_offset,
-        segment,
-        &id_range_offset
-    ));
 
     if (id_range_offset == 0) {
         return (uint16_t)(cid + id_delta);
@@ -234,7 +229,7 @@ uint16_t cmap_format4_map(SfntCmapFormat4* subtable, uint16_t cid) {
 
     size_t glyph_idx = word_offset + idx_in_segment - glyph_idx_array_offset;
     uint16_t uncorrected_gid;
-    RELEASE_ASSERT(sfnt_uint16_array_get(
+    RELEASE_ASSERT(uint16_array_get(
         subtable->glyph_index_array,
         glyph_idx,
         &uncorrected_gid
@@ -267,22 +262,22 @@ TEST_FUNC(test_cmap_format4_mapping) {
     Arena* arena = arena_new(1024);
     SfntCmapFormat4 table = {
         .seg_count_x2 = 8,
-        .end_code = sfnt_uint16_array_new_from(
+        .end_code = uint16_array_new_from(
             arena,
             4,
             (uint16_t[4]) {20, 90, 153, 0xffff}
         ),
-        .start_code = sfnt_uint16_array_new_from(
+        .start_code = uint16_array_new_from(
             arena,
             4,
             (uint16_t[4]) {10, 30, 100, 0xffff}
         ),
-        .id_delta = sfnt_uint16_array_new_from(
+        .id_delta = uint16_array_new_from(
             arena,
             4,
             (uint16_t[4]) {(uint16_t)-9, (uint16_t)-18, (uint16_t)-27, 1}
         ),
-        .id_range_offset = sfnt_uint16_array_new_init(arena, 4, 0)
+        .id_range_offset = uint16_array_new_init(arena, 4, 0)
     };
 
     TEST_ASSERT_EQ((uint16_t)1, cmap_format4_map(&table, 10));

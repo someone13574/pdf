@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "arena/common.h"
 #include "pdf_error/error.h"
 #include "sfnt/types.h"
 
@@ -33,10 +34,8 @@ PdfError* sfnt_parser_read_uint32(SfntParser* parser, uint32_t* out);
 PdfError* sfnt_parser_read_int64(SfntParser* parser, int64_t* out);
 PdfError* sfnt_parser_read_uint64(SfntParser* parser, uint64_t* out);
 
-PdfError*
-sfnt_parser_read_uint8_array(SfntParser* parser, SfntUint8Array* array);
-PdfError*
-sfnt_parser_read_uint16_array(SfntParser* parser, SfntUint16Array* array);
+PdfError* sfnt_parser_read_uint8_array(SfntParser* parser, Uint8Array* array);
+PdfError* sfnt_parser_read_uint16_array(SfntParser* parser, Uint16Array* array);
 
 PdfError* sfnt_parser_read_short_frac(SfntParser* parser, SfntShortFrac* out);
 PdfError* sfnt_parser_read_fixed(SfntParser* parser, SfntFixed* out);

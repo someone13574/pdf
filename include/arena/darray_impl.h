@@ -1,6 +1,8 @@
 #ifndef DARRAY_IMPL_H
 #define DARRAY_IMPL_H
 
+#include <string.h>
+
 #include "arena/arena.h"
 #include "logger/log.h"
 
@@ -8,17 +10,17 @@
 
 // Check arguments
 #ifndef DARRAY_NAME
-#error "DARRAY_NAME is not defined"
+#warning "DARRAY_NAME is not defined"
 #define DARRAY_NAME PlaceholderArray
 #endif // DARRAY_NAME
 
 #ifndef DARRAY_LOWERCASE_NAME
-#error "DARRAY_LOWERCASE_NAME is not defined"
+#warning "DARRAY_LOWERCASE_NAME is not defined"
 #define DARRAY_LOWERCASE_NAME placeholder_array
 #endif // DARRAY_LOWERCASE_NAME
 
 #ifndef DARRAY_TYPE
-#error "DARRAY_TYPE is not defined"
+#warning "DARRAY_TYPE is not defined"
 #define DARRAY_TYPE int
 #endif // DARRAY_TYPE
 
@@ -88,7 +90,7 @@ DARRAY_NAME* DARRAY_FN(new_from)(
     RELEASE_ASSERT(arr);
 
     DARRAY_NAME* array = DARRAY_FN(new)(arena, num_elements);
-    array->elements = arr;
+    memcpy(array->elements, arr, sizeof(DARRAY_TYPE) * num_elements);
 
     return array;
 }

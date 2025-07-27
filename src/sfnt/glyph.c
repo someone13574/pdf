@@ -29,19 +29,19 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
     SfntSimpleGlyph* data = &glyph->data.simple;
 
     data->end_pts_of_contours =
-        sfnt_uint16_array_new(arena, (size_t)glyph->num_contours);
+        uint16_array_new(arena, (size_t)glyph->num_contours);
     PDF_PROPAGATE(
         sfnt_parser_read_uint16_array(parser, data->end_pts_of_contours)
     );
 
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->instruction_len));
-    data->instructions = sfnt_uint8_array_new(arena, data->instruction_len);
+    data->instructions = uint8_array_new(arena, data->instruction_len);
     PDF_PROPAGATE(sfnt_parser_read_uint8_array(parser, data->instructions));
 
     uint16_t last_point_idx;
-    RELEASE_ASSERT(sfnt_uint16_array_get(
+    RELEASE_ASSERT(uint16_array_get(
         data->end_pts_of_contours,
-        sfnt_uint16_array_len(data->end_pts_of_contours) - 1,
+        uint16_array_len(data->end_pts_of_contours) - 1,
         &last_point_idx
     ));
 
@@ -210,7 +210,13 @@ PdfError* sfnt_parse_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
     LOG_TODO("Compound glyphs");
 }
 
-Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
+Canvas* sfnt_glyph_render(
+    Arena* arena,
+    SfntGlyph* glyph,
+    uint32_t resolution,
+    double line_width,
+    double flatness
+) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(glyph);
     RELEASE_ASSERT(resolution > 0);
@@ -237,10 +243,10 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
     int32_t y_coord = 0;
 
     for (size_t contour_idx = 0;
-         contour_idx < sfnt_uint16_array_len(data.end_pts_of_contours);
+         contour_idx < uint16_array_len(data.end_pts_of_contours);
          contour_idx++) {
         uint16_t contour_end;
-        RELEASE_ASSERT(sfnt_uint16_array_get(
+        RELEASE_ASSERT(uint16_array_get(
             data.end_pts_of_contours,
             contour_idx,
             &contour_end
@@ -248,7 +254,7 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
 
         uint16_t contour_start = 0;
         if (contour_idx != 0) {
-            RELEASE_ASSERT(sfnt_uint16_array_get(
+            RELEASE_ASSERT(uint16_array_get(
                 data.end_pts_of_contours,
                 contour_idx - 1,
                 &contour_start
@@ -303,7 +309,7 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
                         curve_start_y,
                         x,
                         y,
-                        5.0,
+                        line_width,
                         0x000000ff
                     );
 
@@ -321,8 +327,8 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
                         y,
                         curve_control_x,
                         curve_control_y,
-                        0.1,
-                        5.0,
+                        flatness,
+                        line_width,
                         0x000000ff
                     );
 
@@ -344,8 +350,8 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
                         mid_y,
                         curve_control_x,
                         curve_control_y,
-                        0.1,
-                        5.0,
+                        flatness,
+                        line_width,
                         0x000000ff
                     );
 

@@ -198,29 +198,28 @@ PdfError* sfnt_parser_read_uint64(SfntParser* parser, uint64_t* out) {
     return NULL;
 }
 
-PdfError*
-sfnt_parser_read_uint8_array(SfntParser* parser, SfntUint8Array* array) {
+PdfError* sfnt_parser_read_uint8_array(SfntParser* parser, Uint8Array* array) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(array);
 
-    for (size_t idx = 0; idx < sfnt_uint8_array_len(array); idx++) {
+    for (size_t idx = 0; idx < uint8_array_len(array); idx++) {
         uint8_t byte;
         PDF_PROPAGATE(sfnt_parser_read_uint8(parser, &byte));
-        sfnt_uint8_array_set(array, idx, byte);
+        uint8_array_set(array, idx, byte);
     }
 
     return NULL;
 }
 
 PdfError*
-sfnt_parser_read_uint16_array(SfntParser* parser, SfntUint16Array* array) {
+sfnt_parser_read_uint16_array(SfntParser* parser, Uint16Array* array) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(array);
 
-    for (size_t idx = 0; idx < sfnt_uint16_array_len(array); idx++) {
+    for (size_t idx = 0; idx < uint16_array_len(array); idx++) {
         uint16_t word;
         PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &word));
-        sfnt_uint16_array_set(array, idx, word);
+        uint16_array_set(array, idx, word);
     }
 
     return NULL;

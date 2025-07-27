@@ -242,6 +242,9 @@ void canvas_draw_bezier(
 ) {
     RELEASE_ASSERT(canvas);
 
+    canvas_draw_circle(canvas, x1, y1, radius * 3.0, rgba);
+    canvas_draw_circle(canvas, x2, y2, radius * 3.0, rgba);
+
     // Check if line is flat
     double mid_x = (x1 + x2) / 2.0;
     double mid_y = (y1 + y2) / 2.0;

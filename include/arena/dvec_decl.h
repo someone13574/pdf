@@ -7,17 +7,17 @@
 
 // Check arguments
 #ifndef DVEC_NAME
-#error "DVEC_NAME is not defined"
+#warning "DVEC_NAME is not defined"
 #define DVEC_NAME PlaceholderVec
 #endif // DVEC_NAME
 
 #ifndef DVEC_LOWERCASE_NAME
-#error "DVEC_LOWERCASE_NAME is not defined"
+#warning "DVEC_LOWERCASE_NAME is not defined"
 #define DVEC_LOWERCASE_NAME placeholder_vec
 #endif // DVEC_LOWERCASE_NAME
 
 #ifndef DVEC_TYPE
-#error "DVEC_TYPE is not defined"
+#warning "DVEC_TYPE is not defined"
 #define DVEC_TYPE PlaceholderVec
 #endif // DVEC_TYPE
 
@@ -44,7 +44,7 @@ bool DVEC_FN(get)(DVEC_NAME* vec, size_t idx, DVEC_TYPE* out);
 bool DVEC_FN(get_ptr)(DVEC_NAME* vec, size_t idx, DVEC_TYPE** out);
 
 // Pops an element from the vector, storing the pop'ed element in `out` and
-// returning a bool indicating whether the vector was empty.
+// returning a bool indicating whether the operation was successful.
 bool DVEC_FN(pop)(DVEC_NAME* vec, DVEC_TYPE* out);
 
 // Clears the vector, making it's length zero. This does not free any memory.

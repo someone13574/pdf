@@ -27,6 +27,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
         -Wno-error=unused-parameter
         -Wno-error=unused-variable
         -Wno-error=unreachable-code
+        -Wno-error=cpp
     )
 endif()
 

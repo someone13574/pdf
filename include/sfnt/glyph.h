@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
+#include "arena/common.h"
 #include "canvas/canvas.h"
 #include "types.h"
 
@@ -37,9 +38,9 @@ typedef struct {
 #include "arena/darray_decl.h"
 
 typedef struct {
-    SfntUint16Array* end_pts_of_contours;
+    Uint16Array* end_pts_of_contours;
     uint16_t instruction_len;
-    SfntUint8Array* instructions;
+    Uint8Array* instructions;
     SfntSimpleGlyphFlagsVec* flags;
     SfntGlyphPointArray* points;
 } SfntSimpleGlyph;
@@ -71,4 +72,10 @@ typedef struct {
     } data;
 } SfntGlyph;
 
-Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution);
+Canvas* sfnt_glyph_render(
+    Arena* arena,
+    SfntGlyph* glyph,
+    uint32_t resolution,
+    double line_width,
+    double flatness
+);

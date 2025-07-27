@@ -7,6 +7,7 @@
     X(ARENA, OFF, GLOBAL)                                                      \
     X(ARRAY, INHERIT, ARENA)                                                   \
     X(VEC, INHERIT, ARENA)                                                     \
+    X(LINKED_LIST, INHERIT, ARENA)                                             \
     X(CANVAS, INHERIT, GLOBAL)                                                 \
     X(PDF, INHERIT, GLOBAL)                                                    \
     X(DOC, TRACE, PDF)                                                         \

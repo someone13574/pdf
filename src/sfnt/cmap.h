@@ -21,11 +21,11 @@ typedef struct {
     uint16_t search_range;
     uint16_t entry_selector;
     uint16_t range_shift;
-    SfntUint16Array* end_code;
-    SfntUint16Array* start_code;
-    SfntUint16Array* id_delta;
-    SfntUint16Array* id_range_offset;
-    SfntUint16Array* glyph_index_array;
+    Uint16Array* end_code;
+    Uint16Array* start_code;
+    Uint16Array* id_delta;
+    Uint16Array* id_range_offset;
+    Uint16Array* glyph_index_array;
 } SfntCmapFormat4;
 
 typedef struct {
