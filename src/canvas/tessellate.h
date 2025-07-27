@@ -2,17 +2,23 @@
 
 #include "canvas/canvas.h"
 
-typedef struct {
-    double x;
-    double y;
-} TessPoint;
+typedef enum {
+    TESS_POINT_TYPE_REGULAR,
+    TESS_POINT_TYPE_START,
+    TESS_POINT_TYPE_END,
+    TESS_POINT_TYPE_SPLIT,
+    TESS_POINT_TYPE_MERGE
+} TessPointType;
 
-typedef struct {
+typedef struct TessPoint {
     double x;
     double y;
-    size_t point_idx;
-    size_t contour_idx;
-} TessQueuePoint;
+    struct TessPoint* next;
+    struct TessPoint* prev;
+    TessPointType type;
+    bool prev_below;
+    bool next_below;
+} TessPoint;
 
 #define DVEC_NAME TessPointVec
 #define DVEC_LOWERCASE_NAME tess_point_vec
@@ -21,11 +27,13 @@ typedef struct {
 
 #define DLINKED_NAME TessPointQueue
 #define DLINKED_LOWERCASE_NAME tess_point_queue
-#define DLINKED_TYPE TessQueuePoint
+#define DLINKED_TYPE TessPoint*
 #include "arena/dlinked_decl.h"
 
 typedef struct {
     TessPointVec* points;
+    TessPoint* start;
+    TessPoint* end;
 } TessContour;
 
 #define DVEC_NAME TessContourVec
