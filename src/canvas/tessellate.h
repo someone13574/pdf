@@ -10,31 +10,30 @@ typedef enum {
     TESS_POINT_TYPE_MERGE
 } TessPointType;
 
+typedef struct TessContour TessContour;
+
 typedef struct TessPoint {
     double x;
     double y;
+
     struct TessPoint* next;
     struct TessPoint* prev;
+    TessContour* contour;
+
     TessPointType type;
     bool prev_below;
     bool next_below;
 } TessPoint;
-
-#define DVEC_NAME TessPointVec
-#define DVEC_LOWERCASE_NAME tess_point_vec
-#define DVEC_TYPE TessPoint
-#include "arena/dvec_decl.h"
 
 #define DLINKED_NAME TessPointQueue
 #define DLINKED_LOWERCASE_NAME tess_point_queue
 #define DLINKED_TYPE TessPoint*
 #include "arena/dlinked_decl.h"
 
-typedef struct {
-    TessPointVec* points;
+struct TessContour {
     TessPoint* start;
     TessPoint* end;
-} TessContour;
+};
 
 #define DVEC_NAME TessContourVec
 #define DVEC_LOWERCASE_NAME tess_contour_vec

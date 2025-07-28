@@ -4,11 +4,6 @@
 #include "canvas/canvas.h"
 #include "logger/log.h"
 
-#define DVEC_NAME TessPointVec
-#define DVEC_LOWERCASE_NAME tess_point_vec
-#define DVEC_TYPE TessPoint
-#include "arena/dvec_impl.h"
-
 #define DLINKED_NAME TessPointQueue
 #define DLINKED_LOWERCASE_NAME tess_point_queue
 #define DLINKED_TYPE TessPoint*
@@ -16,7 +11,6 @@
 
 typedef struct {
     TessPoint* helper;
-    TessPoint* prev_helper;
 
     TessPoint* start;
     TessPoint* end;
@@ -30,8 +24,53 @@ typedef struct {
 static TessContour tess_contour_new(Arena* arena) {
     RELEASE_ASSERT(arena);
 
-    return (TessContour
-    ) {.points = tess_point_vec_new(arena), .start = NULL, .end = NULL};
+    return (TessContour) {.start = NULL, .end = NULL};
+}
+
+static TessPoint* tess_contour_split(
+    Arena* arena,
+    TessPoint* point_a,
+    TessPoint* point_b,
+    TessContourVec* contours
+) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(point_a);
+    RELEASE_ASSERT(point_b);
+    RELEASE_ASSERT(contours);
+    RELEASE_ASSERT(point_a->contour == point_b->contour);
+
+    // Make a copy of the splice points
+    TessPoint* point_a2 = arena_alloc(arena, sizeof(TessPoint));
+    TessPoint* point_b2 = arena_alloc(arena, sizeof(TessPoint));
+    *point_a2 = *point_a;
+    *point_b2 = *point_b;
+
+    // Close the original contour
+    point_a->next = point_b;
+    point_b->prev = point_a;
+    point_a->contour->start = point_b;
+    point_a->contour->end = point_a;
+
+    // Create a new contour
+    TessContour* new_contour = tess_contour_vec_push(
+        contours,
+        (TessContour) {.start = point_a2, .end = point_b2}
+    );
+
+    // Close the new contour
+    point_a2->prev = point_b2;
+    point_b2->next = point_a2;
+    point_a2->next->prev = point_a2;
+    point_b2->prev->next = point_b2;
+
+    // Assign moved points to new contour
+    TessPoint* point = point_a2;
+    do {
+        point->contour = new_contour;
+        point = point->next;
+    } while (point != point_a2);
+
+    return point_a2;
 }
 
 static bool
@@ -53,103 +92,77 @@ static bool tess_compare_points(TessPoint** lhs, TessPoint** rhs) {
 }
 
 static void tess_contour_add_point(
+    Arena* arena,
     TessContour* contour,
     TessPointQueue* point_queue,
     double x,
     double y
 ) {
+    RELEASE_ASSERT(arena);
     RELEASE_ASSERT(contour);
+    RELEASE_ASSERT(point_queue);
 
-    TessPoint* prev_point = NULL;
-    size_t num_points = tess_point_vec_len(contour->points);
-    if (num_points != 0) {
-        RELEASE_ASSERT(
-            tess_point_vec_get_ptr(contour->points, num_points - 1, &prev_point)
-        );
+    TessPoint* point = arena_alloc(arena, sizeof(TessPoint));
+    point->x = x;
+    point->y = y;
+    point->type = TESS_POINT_TYPE_REGULAR;
+    point->prev_below = false;
+    point->next_below = false;
+    point->contour = contour;
+
+    if (!contour->start) {
+        point->prev = point;
+        point->next = point;
+        contour->start = point;
+        contour->end = point;
+    } else {
+        point->prev = contour->end;
+        point->next = contour->start;
+        contour->end->next = point;
+        contour->start->prev = point;
+        contour->end = point;
     }
 
-    TessPoint* point = tess_point_vec_push(
-        contour->points,
-        (TessPoint
-        ) {.x = x,
-           .y = y,
-           .next = NULL,
-           .prev = prev_point,
-           .type = TESS_POINT_TYPE_REGULAR}
-    );
     tess_point_queue_insert_sorted(
         point_queue,
         point,
         tess_compare_points,
         true
     );
-
-    if (num_points == 0) {
-        contour->start = point;
-    }
-    if (prev_point) {
-        prev_point->next = point;
-    }
-    contour->end = point;
-}
-
-static void tess_contour_close(TessContour* contour) {
-    RELEASE_ASSERT(contour);
-
-    size_t num_points = tess_point_vec_len(contour->points);
-    if (num_points == 0) {
-        return;
-    }
-
-    TessPoint *start_point, *end_point;
-    RELEASE_ASSERT(tess_point_vec_get_ptr(contour->points, 0, &start_point));
-    RELEASE_ASSERT(
-        tess_point_vec_get_ptr(contour->points, num_points - 1, &end_point)
-    );
-
-    start_point->prev = end_point;
-    end_point->next = start_point;
 }
 
 static void tess_contour_assign_types(TessContour* contour) {
-    size_t num_points = tess_point_vec_len(contour->points);
-    for (size_t idx = 0; idx < num_points; idx++) {
-        TessPoint* curr_point;
-        RELEASE_ASSERT(tess_point_vec_get_ptr(contour->points, idx, &curr_point)
-        );
+    RELEASE_ASSERT(contour);
 
-        bool prev_below = tess_compare_xy(
-            curr_point->x,
-            curr_point->y,
-            curr_point->prev->x,
-            curr_point->prev->y
-        );
-        bool next_below = tess_compare_xy(
-            curr_point->x,
-            curr_point->y,
-            curr_point->next->x,
-            curr_point->next->y
-        );
-        bool left_to_right = curr_point->prev->x < curr_point->x
-            && curr_point->x < curr_point->next->x;
+    TessPoint* point = contour->start;
+    if (!point) {
+        return;
+    }
 
-        if (prev_below && next_below) {
+    do {
+        point->prev_below =
+            tess_compare_xy(point->x, point->y, point->prev->x, point->prev->y);
+        point->next_below =
+            tess_compare_xy(point->x, point->y, point->next->x, point->next->y);
+        bool left_to_right =
+            point->prev->x < point->x && point->x < point->next->x;
+
+        if (point->prev_below && point->next_below) {
             if (left_to_right) {
-                curr_point->type = TESS_POINT_TYPE_START;
+                point->type = TESS_POINT_TYPE_START;
             } else {
-                curr_point->type = TESS_POINT_TYPE_SPLIT;
+                point->type = TESS_POINT_TYPE_SPLIT;
             }
-        } else if (!prev_below && !next_below) {
+        } else if (!point->prev_below && !point->next_below) {
             if (left_to_right) {
-                curr_point->type = TESS_POINT_TYPE_MERGE;
+                point->type = TESS_POINT_TYPE_MERGE;
             } else {
-                curr_point->type = TESS_POINT_TYPE_END;
+                point->type = TESS_POINT_TYPE_END;
             }
         }
 
-        curr_point->prev_below = prev_below;
-        curr_point->next_below = next_below;
-    }
+        point = point->next;
+    } while (point != contour->start);
 }
 
 #define DVEC_NAME TessContourVec
@@ -169,19 +182,8 @@ void tess_poly_new(Arena* arena, TessPoly* poly) {
 void tess_poly_move_to(TessPoly* poly, double x, double y) {
     RELEASE_ASSERT(poly);
 
-    size_t num_contours = tess_contour_vec_len(poly->contours);
-    if (num_contours != 0) {
-        TessContour* last_contour;
-        RELEASE_ASSERT(tess_contour_vec_get_ptr(
-            poly->contours,
-            num_contours - 1,
-            &last_contour
-        ));
-        tess_contour_close(last_contour);
-    }
-
     TessContour contour = tess_contour_new(poly->arena);
-    tess_contour_add_point(&contour, poly->point_queue, x, y);
+    tess_contour_add_point(poly->arena, &contour, poly->point_queue, x, y);
 
     tess_contour_vec_push(poly->contours, contour);
 }
@@ -197,7 +199,7 @@ void tess_poly_line_to(TessPoly* poly, double x, double y) {
         tess_contour_vec_get_ptr(poly->contours, contour_idx - 1, &contour)
     );
 
-    tess_contour_add_point(contour, poly->point_queue, x, y);
+    tess_contour_add_point(poly->arena, contour, poly->point_queue, x, y);
 }
 
 static void tess_poly_debug_render(
@@ -218,18 +220,6 @@ static void tess_poly_debug_render(
          edge_idx++) {
         TessActiveEdge edge;
         RELEASE_ASSERT(tess_active_edges_get(edges, edge_idx, &edge));
-
-        if (edge.prev_helper) {
-            canvas_draw_line(
-                canvas,
-                edge.prev_helper->x,
-                edge.prev_helper->y,
-                edge.helper->x,
-                edge.helper->y,
-                1.0,
-                0x71a8f0ff
-            );
-        }
 
         canvas_draw_line(
             canvas,
@@ -264,20 +254,15 @@ void tess_poly_tessellate(TessPoly* poly) {
     Arena* arena = arena_new(1024);
     TessActiveEdges* active_edges = tess_active_edges_new(arena);
 
-    size_t num_contours = tess_contour_vec_len(poly->contours);
-    if (num_contours != 0) {
-        TessContour* last_contour;
-        RELEASE_ASSERT(tess_contour_vec_get_ptr(
-            poly->contours,
-            num_contours - 1,
-            &last_contour
-        ));
-        tess_contour_close(last_contour);
+    for (size_t contour_idx = 0;
+         contour_idx < tess_contour_vec_len(poly->contours);
+         contour_idx++) {
+        TessContour* contour;
+        RELEASE_ASSERT(
+            tess_contour_vec_get_ptr(poly->contours, contour_idx, &contour)
+        );
+        tess_contour_assign_types(contour);
     }
-
-    TessContour contour;
-    RELEASE_ASSERT(tess_contour_vec_get(poly->contours, 0, &contour));
-    tess_contour_assign_types(&contour);
 
     for (size_t queue_idx = 0;
          queue_idx < tess_point_queue_len(poly->point_queue);
@@ -322,10 +307,12 @@ void tess_poly_tessellate(TessPoly* poly) {
         if (project_edge) {
             if (point->type == TESS_POINT_TYPE_SPLIT
                 || project_edge->helper->type == TESS_POINT_TYPE_MERGE) {
-                // Add line from the helper to the point
-                project_edge->prev_helper = project_edge->helper;
-            } else {
-                project_edge->prev_helper = NULL;
+                point = tess_contour_split(
+                    poly->arena,
+                    point,
+                    project_edge->helper,
+                    poly->contours
+                );
             }
 
             project_edge->helper = point;
@@ -344,10 +331,7 @@ void tess_poly_tessellate(TessPoly* poly) {
             tess_active_edges_push_back(
                 active_edges,
                 (TessActiveEdge
-                ) {.helper = point,
-                   .prev_helper = NULL,
-                   .start = point,
-                   .end = point->prev}
+                ) {.helper = point, .start = point, .end = point->prev}
             );
         }
 
@@ -355,10 +339,7 @@ void tess_poly_tessellate(TessPoly* poly) {
             tess_active_edges_push_back(
                 active_edges,
                 (TessActiveEdge
-                ) {.helper = point,
-                   .prev_helper = NULL,
-                   .start = point,
-                   .end = point->next}
+                ) {.helper = point, .start = point, .end = point->next}
             );
         }
 
@@ -375,8 +356,12 @@ void tess_poly_tessellate(TessPoly* poly) {
             // Terminate edge
             if (edge->end == point) {
                 if (edge->helper->type == TESS_POINT_TYPE_MERGE) {
-                    // Add line from the helper to the line
-                    edge->prev_helper = edge->helper;
+                    point = tess_contour_split(
+                        poly->arena,
+                        point,
+                        edge->helper,
+                        poly->contours
+                    );
                     edge->helper = point;
                 }
 
@@ -388,7 +373,7 @@ void tess_poly_tessellate(TessPoly* poly) {
                     project_edge_idx
                 );
 
-                tess_active_edges_remove(active_edges, (size_t)edge_idx);
+                // tess_active_edges_remove(active_edges, (size_t)edge_idx);
             }
         }
     }
