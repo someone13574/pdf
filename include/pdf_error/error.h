@@ -43,7 +43,7 @@ typedef enum {
 typedef struct PdfError PdfError;
 
 PdfError* pdf_error_new(PdfErrorCode code) __attribute__((returns_nonnull));
-void pdf_error_free(PdfError* error) __attribute__((nonnull(1)));
+void pdf_error_free(PdfError* error);
 
 PdfError* pdf_error_add_context(
     PdfError* error,
@@ -53,9 +53,9 @@ PdfError* pdf_error_add_context(
     const char* fmt,
     ...
 ) __attribute__((returns_nonnull)) __attribute__((format(printf, 5, 6)));
-PdfErrorCode pdf_error_code(PdfError* error) __attribute__((nonnull(1)));
+PdfErrorCode pdf_error_code(PdfError* error);
 
-void pdf_error_print(PdfError* error) __attribute__((nonnull(1)));
+void pdf_error_print(PdfError* error);
 void pdf_error_unwrap(PdfError* error, const char* file, unsigned long line)
     __attribute__((noreturn));
 bool pdf_error_free_is_ok(PdfError* error);

@@ -1041,6 +1041,8 @@ char* pdf_fmt_object_indented(
             return format_alloc(arena, "null");
         }
     }
+
+    return format_alloc(arena, "unreachable");
 }
 
 char* pdf_fmt_object(Arena* arena, PdfObject* object) {

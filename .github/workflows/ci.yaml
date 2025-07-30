@@ -8,20 +8,37 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler:
+          - name: clang-17
+            cc: clang-17
+            cxx: clang++-17
+            packages: clang-17 clang-tidy-17
+          - name: gcc-14
+            cc: gcc-14
+            cxx: g++-14
+            packages: gcc-14 g++-14
+      fail-fast: false
+    name: Build with ${{ matrix.compiler.name }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install Clang 17
+
+      - name: Install ${{ matrix.compiler.name }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-17 clang-tidy-17
+          sudo apt-get install -y ${{ matrix.compiler.packages }}
+
       - name: Configure build
         run: |
-          CC=clang-17 CXX=clang++-17 cmake -B build \
+          CC=${{ matrix.compiler.cc }} CXX=${{ matrix.compiler.cxx }} cmake -B build-${{ matrix.compiler.name }} \
             -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
       - name: Build
         run: |
-          cmake --build build -- -j$(nproc)
+          cmake --build build-${{ matrix.compiler.name }} -- -j$(nproc)
+
       - name: Run tests
         run: |
-          build/src/test/pdf-test-main
+          build-${{ matrix.compiler.name }}/src/test/pdf-test-main

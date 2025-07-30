@@ -120,8 +120,8 @@ parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data) {
     data->id_delta = uint16_array_new(arena, data->seg_count_x2 / 2);
     data->id_range_offset = uint16_array_new(arena, data->seg_count_x2 / 2);
 
-    size_t num_words = 8 + 4 * (data->seg_count_x2 / 2);
-    size_t num_bytes = num_words * 2;
+    int num_words = 8 + 4 * (data->seg_count_x2 / 2);
+    size_t num_bytes = (size_t)num_words * 2;
     size_t glyph_index_array_bytes = data->length - num_bytes;
     if ((glyph_index_array_bytes & 0x1) != 0) {
         return PDF_ERROR(
