@@ -56,6 +56,9 @@ void path_builder_line_to(PathBuilder* builder, double x, double y) {
     if (builder->first_edge) {
         builder->prev_edge->next = half_edge;
         half_edge->prev = builder->prev_edge;
+
+        builder->prev_edge->twin->prev = half_edge->twin;
+        half_edge->twin->next = builder->prev_edge->twin;
     } else {
         builder->first_edge = half_edge;
     }
@@ -73,8 +76,8 @@ void path_builder_end_contour(PathBuilder* builder) {
 
     DcelHalfEdge* closing_edge = dcel_add_edge(
         builder->contour,
-        builder->first_edge->origin,
-        builder->prev_vertex
+        builder->prev_vertex,
+        builder->first_edge->origin
     );
 
     builder->first_edge->prev = closing_edge;
@@ -82,7 +85,11 @@ void path_builder_end_contour(PathBuilder* builder) {
     closing_edge->next = builder->first_edge;
     closing_edge->prev = builder->prev_edge;
 
-    dcel_add_face(builder->contour, closing_edge);
+    builder->first_edge->twin->next = closing_edge->twin;
+    builder->prev_edge->twin->prev = closing_edge->twin;
+    closing_edge->twin->next = builder->prev_edge->twin;
+    closing_edge->twin->prev = builder->first_edge->twin;
+
     dcel_vec_push(builder->contours, builder->contour);
 
     builder->contour = NULL;
@@ -95,11 +102,19 @@ Canvas*
 path_builder_render(PathBuilder* builder, uint32_t width, uint32_t height) {
     Canvas* canvas = canvas_new(builder->arena, width, height, 0xffffffff);
 
-    for (size_t contour_idx = 0; contour_idx < dcel_vec_len(builder->contours);
+    if (dcel_vec_len(builder->contours) == 0) {
+        return canvas;
+    }
+
+    Dcel* dcel;
+    RELEASE_ASSERT(dcel_vec_get(builder->contours, 0, &dcel));
+
+    for (size_t contour_idx = 1; contour_idx < dcel_vec_len(builder->contours);
          contour_idx++) {
         Dcel* contour;
         RELEASE_ASSERT(dcel_vec_get(builder->contours, contour_idx, &contour));
-        dcel_render(contour, canvas);
+
+        dcel_overlay(dcel, contour);
     }
 
     return canvas;

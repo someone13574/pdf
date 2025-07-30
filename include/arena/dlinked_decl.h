@@ -86,6 +86,16 @@ void DLINKED_FN(insert_sorted)(
     bool ascending
 );
 
+// Merges `other` into `linked_list`, such that `linked_list` is sorted,
+// assuming both input lists were already sorted. If `other` or `linked_list`
+// were not sorted, the behavior is undefined.
+void DLINKED_FN(merge_sorted)(
+    DLINKED_NAME* linked_list,
+    DLINKED_NAME* other,
+    bool (*cmp_less_than)(DLINKED_TYPE* lhs, DLINKED_TYPE* rhs),
+    bool ascending
+);
+
 // Clears the linked-list, making it's length zero. This does not free any
 // memory.
 void DLINKED_FN(clear)(DLINKED_NAME* linked_list);

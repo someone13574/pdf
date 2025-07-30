@@ -82,6 +82,11 @@ void DLINKED_FN(set_cursor)(DLINKED_NAME* linked_list, size_t idx) {
     RELEASE_ASSERT(linked_list);
     RELEASE_ASSERT(idx < linked_list->len);
 
+    if (!linked_list->cursor) {
+        linked_list->cursor_idx = 0;
+        linked_list->cursor = linked_list->front;
+    }
+
     LOG_DIAG(TRACE, LINKED_LIST, "Moving cursor to idx %zu", idx);
 
     // Move cursor to best starting point
@@ -240,6 +245,7 @@ void DLINKED_FN(insert)(
     } else {
         // Within list
         DLINKED_FN(set_cursor)(linked_list, idx);
+        RELEASE_ASSERT(linked_list->cursor);
 
         block->prev = linked_list->cursor->prev;
         block->next = linked_list->cursor;
@@ -312,52 +318,6 @@ DLINKED_TYPE DLINKED_FN(remove)(DLINKED_NAME* linked_list, size_t idx) {
     return block->data;
 }
 
-// Inserts an element into a sorted linked list. If the list is not sorted, the
-// behavior is undefined. `cmp_less_than` should return `true` when lhs is less
-// than rhs.
-void DLINKED_FN(insert_sorted)(
-    DLINKED_NAME* linked_list,
-    DLINKED_TYPE element,
-    bool (*cmp_less_than)(DLINKED_TYPE* lhs, DLINKED_TYPE* rhs),
-    bool ascending
-) {
-    RELEASE_ASSERT(linked_list);
-    RELEASE_ASSERT(cmp_less_than);
-
-    // Handle zero-length
-    if (linked_list->len == 0) {
-        DLINKED_FN(insert)(linked_list, 0, element);
-        return;
-    }
-
-    // Reset cursor to the start of the list if the insertion point is before
-    // the cursor
-    if (linked_list->cursor
-        && cmp_less_than(&element, &linked_list->cursor->data) == ascending) {
-        linked_list->cursor_idx = 0;
-        linked_list->cursor = linked_list->front;
-    }
-
-    RELEASE_ASSERT(linked_list->cursor);
-
-    // Find insertion idx
-    while (linked_list->cursor->next
-           && (cmp_less_than(&element, &linked_list->cursor->data) != ascending)
-    ) {
-        linked_list->cursor_idx++;
-        linked_list->cursor = linked_list->cursor->next;
-    }
-
-    size_t insert_idx = linked_list->cursor_idx;
-    if (linked_list->cursor->next == NULL
-        && (cmp_less_than(&linked_list->cursor->data, &element) == ascending)) {
-        insert_idx = linked_list->len;
-    }
-
-    // Insert
-    DLINKED_FN(insert)(linked_list, insert_idx, element);
-}
-
 // Inserts an element the start of the list
 void DLINKED_FN(push_front)(DLINKED_NAME* linked_list, DLINKED_TYPE element) {
     RELEASE_ASSERT(linked_list);
@@ -394,6 +354,114 @@ bool DLINKED_FN(pop_back)(DLINKED_NAME* linked_list, DLINKED_TYPE* out) {
 
     *out = DLINKED_FN(remove)(linked_list, linked_list->len - 1);
     return true;
+}
+
+// Inserts an element into a sorted linked list. If the list is not sorted, the
+// behavior is undefined. `cmp_less_than` should return `true` when lhs is less
+// than rhs.
+void DLINKED_FN(insert_sorted)(
+    DLINKED_NAME* linked_list,
+    DLINKED_TYPE element,
+    bool (*cmp_less_than)(DLINKED_TYPE* lhs, DLINKED_TYPE* rhs),
+    bool ascending
+) {
+    RELEASE_ASSERT(linked_list);
+    RELEASE_ASSERT(cmp_less_than);
+
+    LOG_DIAG(
+        DEBUG,
+        LINKED_LIST,
+        "Inserting " STRINGIFY(DLINKED_TYPE
+        ) " element into sorted " STRINGIFY(DLINKED_TYPE) " list in %s",
+        ascending ? "ascending order" : "descending order"
+    );
+
+    // Handle zero-length
+    if (linked_list->len == 0) {
+        DLINKED_FN(insert)(linked_list, 0, element);
+        return;
+    }
+
+    // Reset cursor to the start of the list if the insertion point is before
+    // the cursor
+    if (linked_list->cursor
+        && cmp_less_than(&element, &linked_list->cursor->data) == ascending) {
+        linked_list->cursor_idx = 0;
+        linked_list->cursor = linked_list->front;
+    }
+
+    RELEASE_ASSERT(linked_list->cursor);
+
+    // Find insertion idx
+    while (linked_list->cursor->next
+           && (cmp_less_than(&element, &linked_list->cursor->data) != ascending)
+    ) {
+        linked_list->cursor_idx++;
+        linked_list->cursor = linked_list->cursor->next;
+    }
+
+    size_t insert_idx = linked_list->cursor_idx;
+    if (linked_list->cursor->next == NULL
+        && (cmp_less_than(&linked_list->cursor->data, &element) == ascending)) {
+        insert_idx = linked_list->len;
+    }
+
+    // Insert
+    DLINKED_FN(insert)(linked_list, insert_idx, element);
+}
+
+// Merges `other` into `linked_list`, such that `linked_list` is sorted,
+// assuming both input lists were already sorted. If `other` or `linked_list`
+// were not sorted, the behavior is undefined.
+void DLINKED_FN(merge_sorted)(
+    DLINKED_NAME* linked_list,
+    DLINKED_NAME* other,
+    bool (*cmp_less_than)(DLINKED_TYPE* lhs, DLINKED_TYPE* rhs),
+    bool ascending
+) {
+    RELEASE_ASSERT(linked_list);
+    RELEASE_ASSERT(other);
+    RELEASE_ASSERT(cmp_less_than);
+
+    LOG_DIAG(
+        INFO,
+        LINKED_LIST,
+        "Merging sorted " STRINGIFY(DLINKED_NAME) " lists in %s",
+        ascending ? "ascending order" : "descending order"
+    );
+
+    if (other->len == 0) {
+        return;
+    }
+
+    // Initialize local cursors
+    size_t current_index = 0;
+    DLINKED_BLOCK_NAME* current_node = linked_list->front;
+    DLINKED_BLOCK_NAME* other_node = other->front;
+
+    // Iterate through each element in other
+    while (other_node) {
+        // Find insertion position in linked_list
+        while (current_node
+               && cmp_less_than(&current_node->data, &other_node->data)
+                   == ascending) {
+            current_node = current_node->next;
+            current_index++;
+        }
+
+        // Insert the element at the found position
+        DLINKED_FN(insert)(linked_list, current_index, other_node->data);
+
+        // Update local cursor
+        if (current_node != NULL) {
+            current_index++;
+        } else {
+            current_index = linked_list->len;
+        }
+
+        // Move to next element in other
+        other_node = other_node->next;
+    }
 }
 
 // Clears the linked-list, making it's length zero. This does not free any

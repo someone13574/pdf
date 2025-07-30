@@ -1,3 +1,4 @@
+#include "arena/arena.h"
 #ifdef TEST
 
 #include "test/test.h"
@@ -7,7 +8,7 @@
 #define DLINKED_TYPE int
 #include "arena/dlinked_impl.h"
 
-TEST_FUNC(test_list_new) {
+TEST_FUNC(test_linked_list_new) {
     Arena* arena = arena_new(1024);
     MyTestList* list = my_test_list_new(arena);
 
@@ -18,7 +19,7 @@ TEST_FUNC(test_list_new) {
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_push_back_and_get) {
+TEST_FUNC(test_linked_push_back_and_get) {
     Arena* arena = arena_new(1024);
     MyTestList* list = my_test_list_new(arena);
 
@@ -40,7 +41,7 @@ TEST_FUNC(test_push_back_and_get) {
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_push_front_and_order) {
+TEST_FUNC(test_linked_push_front_and_order) {
     Arena* arena = arena_new(1024);
     MyTestList* list = my_test_list_new(arena);
 
@@ -59,7 +60,7 @@ TEST_FUNC(test_push_front_and_order) {
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_pop_front_and_back) {
+TEST_FUNC(test_linked_pop_front_and_back) {
     Arena* arena = arena_new(1024);
     MyTestList* list = my_test_list_new(arena);
 
@@ -88,7 +89,7 @@ TEST_FUNC(test_pop_front_and_back) {
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_insert_and_remove) {
+TEST_FUNC(test_linked_insert_and_remove) {
     Arena* arena = arena_new(1024);
     MyTestList* list = my_test_list_new(arena);
 
@@ -116,7 +117,7 @@ TEST_FUNC(test_insert_and_remove) {
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_set_and_get_ptr) {
+TEST_FUNC(test_linked_set_and_get_ptr) {
     Arena* arena = arena_new(1024);
     MyTestList* list = my_test_list_new(arena);
 
@@ -145,7 +146,7 @@ TEST_FUNC(test_set_and_get_ptr) {
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_get_out_of_bounds) {
+TEST_FUNC(test_linked_get_out_of_bounds) {
     Arena* arena = arena_new(1024);
     MyTestList* list = my_test_list_new(arena);
     int dummy;
@@ -163,7 +164,7 @@ TEST_FUNC(test_get_out_of_bounds) {
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_mixed_operations) {
+TEST_FUNC(test_linked_mixed_operations) {
     Arena* arena = arena_new(1024);
     MyTestList* list = my_test_list_new(arena);
     int v;
@@ -196,7 +197,7 @@ TEST_FUNC(test_mixed_operations) {
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_clear) {
+TEST_FUNC(test_linked_clear) {
     Arena* arena = arena_new(1024);
     MyTestList* list = my_test_list_new(arena);
 
@@ -237,7 +238,7 @@ static bool int_less(int* lhs, int* rhs) {
     return *lhs < *rhs;
 }
 
-TEST_FUNC(test_insert_sorted_ascending) {
+TEST_FUNC(test_linked_insert_sorted_ascending) {
     Arena* arena = arena_new(1024);
     MyTestList* list = my_test_list_new(arena);
     int element;
@@ -276,7 +277,7 @@ TEST_FUNC(test_insert_sorted_ascending) {
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_insert_sorted_descending) {
+TEST_FUNC(test_linked_insert_sorted_descending) {
     Arena* arena = arena_new(1024);
     MyTestList* list = my_test_list_new(arena);
     int element;
@@ -309,6 +310,120 @@ TEST_FUNC(test_insert_sorted_descending) {
     for (size_t idx = 0; idx < 6; idx++) {
         TEST_ASSERT(my_test_list_get(list, idx, &element));
         TEST_ASSERT_EQ(expected[idx], element);
+    }
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_linked_merge_ascending) {
+    Arena* arena = arena_new(1024);
+    MyTestList* list = my_test_list_new(arena);
+    MyTestList* other = my_test_list_new(arena);
+
+    // Create first list
+    my_test_list_push_back(list, 2);
+    my_test_list_push_back(list, 6);
+    my_test_list_push_back(list, 11);
+
+    // Create other list
+    my_test_list_push_back(other, 2);
+    my_test_list_push_back(other, 3);
+    my_test_list_push_back(other, 4);
+    my_test_list_push_back(other, 12);
+
+    // Merge `other` into `list`
+    my_test_list_merge_sorted(list, other, int_less, true);
+
+    // Check output
+    int list_expected[] = {2, 2, 3, 4, 6, 11, 12};
+    for (size_t idx = 0; idx < 7; idx++) {
+        int element;
+        TEST_ASSERT(
+            my_test_list_get(list, idx, &element),
+            "Failed to get element %zu of the merged list",
+            idx
+        );
+        TEST_ASSERT_EQ(
+            list_expected[idx],
+            element,
+            "Unexpected element at index %zu",
+            idx
+        );
+    }
+
+    // Check that other was not modified
+    int other_expected[] = {2, 3, 4, 12};
+    for (size_t idx = 0; idx < 4; idx++) {
+        int element;
+        TEST_ASSERT(
+            my_test_list_get(other, idx, &element),
+            "Failed to get element %zu of the other list",
+            idx
+        );
+        TEST_ASSERT_EQ(
+            other_expected[idx],
+            element,
+            "Unexpected element at index %zu",
+            idx
+        );
+    }
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_linked_merge_descending) {
+    Arena* arena = arena_new(1024);
+    MyTestList* list = my_test_list_new(arena);
+    MyTestList* other = my_test_list_new(arena);
+
+    // Create first list
+    my_test_list_push_back(list, 11);
+    my_test_list_push_back(list, 6);
+    my_test_list_push_back(list, 2);
+
+    // Create other list
+    my_test_list_push_back(other, 12);
+    my_test_list_push_back(other, 4);
+    my_test_list_push_back(other, 3);
+    my_test_list_push_back(other, 2);
+
+    // Merge `other` into `list`
+    my_test_list_merge_sorted(list, other, int_less, false);
+
+    // Check output
+    int list_expected[] = {12, 11, 6, 4, 3, 2, 2};
+    for (size_t idx = 0; idx < 7; idx++) {
+        int element;
+        TEST_ASSERT(
+            my_test_list_get(list, idx, &element),
+            "Failed to get element %zu of the merged list",
+            idx
+        );
+        TEST_ASSERT_EQ(
+            list_expected[idx],
+            element,
+            "Unexpected element at index %zu",
+            idx
+        );
+    }
+
+    // Check that other was not modified
+    int other_expected[] = {12, 4, 3, 2};
+    for (size_t idx = 0; idx < 4; idx++) {
+        int element;
+        TEST_ASSERT(
+            my_test_list_get(other, idx, &element),
+            "Failed to get element %zu of the other list",
+            idx
+        );
+        TEST_ASSERT_EQ(
+            other_expected[idx],
+            element,
+            "Unexpected element at index %zu",
+            idx
+        );
     }
 
     arena_free(arena);
