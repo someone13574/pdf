@@ -57,7 +57,7 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
             PDF_PROPAGATE(sfnt_parser_read_uint8(parser, &flags.repetitions));
         }
 
-        point_idx += flags.repetitions + 1;
+        point_idx += (uint16_t)(flags.repetitions + 1);
         sfnt_simple_glyph_flags_vec_push(data->flags, flags);
     }
 
@@ -78,7 +78,8 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
         if ((flags.flags & SFNT_SIMPLE_GLYPH_X_SHORT) == 0
             && (flags.flags & SFNT_SIMPLE_GLYPH_X_MODIFIER) != 0) {
             LOG_DIAG(TRACE, SFNT, "Delta-x (zero): %d", 0);
-            for (size_t repetition = 0; repetition < flags.repetitions + 1;
+            for (size_t repetition = 0;
+                 repetition < (size_t)(flags.repetitions + 1);
                  repetition++) {
                 sfnt_glyph_point_array_set(
                     data->points,
@@ -90,7 +91,8 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
         }
 
         // Repeat
-        for (size_t repetition = 0; repetition < flags.repetitions + 1;
+        for (size_t repetition = 0;
+             repetition < (size_t)(flags.repetitions + 1);
              repetition++) {
             if ((flags.flags & SFNT_SIMPLE_GLYPH_X_SHORT) != 0) {
                 bool positive =
@@ -134,7 +136,8 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
         if ((flags.flags & SFNT_SIMPLE_GLYPH_Y_SHORT) == 0
             && (flags.flags & SFNT_SIMPLE_GLYPH_Y_MODIFIER) != 0) {
             LOG_DIAG(TRACE, SFNT, "Delta-y (zero): %d", 0);
-            for (size_t repetition = 0; repetition < flags.repetitions + 1;
+            for (size_t repetition = 0;
+                 repetition < (size_t)(flags.repetitions + 1);
                  repetition++) {
                 SfntGlyphPoint* point;
                 RELEASE_ASSERT(sfnt_glyph_point_array_get_ptr(
@@ -149,7 +152,8 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
         }
 
         // Repeat
-        for (size_t repetition = 0; repetition < flags.repetitions + 1;
+        for (size_t repetition = 0;
+             repetition < (size_t)(flags.repetitions + 1);
              repetition++) {
             if ((flags.flags & SFNT_SIMPLE_GLYPH_Y_SHORT) != 0) {
                 bool positive =

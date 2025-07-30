@@ -25,7 +25,8 @@ typedef enum {
 #define LOG_EXPAND_INHERIT(parent) LOG_GROUP_##parent##_VERBOSITY
 
 #define X(group, verbosity, parent)                                            \
-    enum { LOG_GROUP_##group##_VERBOSITY = LOG_EXPAND_##verbosity(parent) };
+    static const LogDiagVerbosity LOG_GROUP_##group##_VERBOSITY =              \
+        LOG_EXPAND_##verbosity(parent);
 
 LOG_GROUPS
 

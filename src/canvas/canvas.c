@@ -22,17 +22,17 @@ struct Canvas {
 static void write_u16(uint8_t* target, uint16_t value) {
     RELEASE_ASSERT(target);
 
-    target[0] = (value >> 0) & 0xff;
-    target[1] = (value >> 8) & 0xff;
+    target[0] = (uint8_t)((value >> 0) & 0xff);
+    target[1] = (uint8_t)((value >> 8) & 0xff);
 }
 
 static void write_u32(uint8_t* target, uint32_t value) {
     RELEASE_ASSERT(target);
 
-    target[0] = (value >> 0) & 0xff;
-    target[1] = (value >> 8) & 0xff;
-    target[2] = (value >> 16) & 0xff;
-    target[3] = (value >> 24) & 0xff;
+    target[0] = (uint8_t)((value >> 0) & 0xff);
+    target[1] = (uint8_t)((value >> 8) & 0xff);
+    target[2] = (uint8_t)((value >> 16) & 0xff);
+    target[3] = (uint8_t)((value >> 24) & 0xff);
 }
 
 static void write_bmp_header(uint8_t* target, uint32_t file_size) {
@@ -89,10 +89,10 @@ canvas_new(Arena* arena, uint32_t width, uint32_t height, uint32_t rgba) {
     write_bmp_header(canvas->data, file_size);
     write_bmp_info_header(canvas->data + BMP_HEADER_LEN, width, height);
 
-    uint8_t r = (rgba >> 24) & 0xff;
-    uint8_t g = (rgba >> 16) & 0xff;
-    uint8_t b = (rgba >> 8) & 0xff;
-    uint8_t a = rgba & 0xff;
+    uint8_t r = (uint8_t)((rgba >> 24) & 0xff);
+    uint8_t g = (uint8_t)((rgba >> 16) & 0xff);
+    uint8_t b = (uint8_t)((rgba >> 8) & 0xff);
+    uint8_t a = (uint8_t)(rgba & 0xff);
     for (uint32_t idx = 0; idx < width * height; idx++) {
         canvas->data[BMP_HEADER_LEN + BMP_INFO_HEADER_LEN + idx * 4] = b;
         canvas->data[BMP_HEADER_LEN + BMP_INFO_HEADER_LEN + idx * 4 + 1] = g;
@@ -144,10 +144,10 @@ void canvas_set_rgba(Canvas* canvas, uint32_t x, uint32_t y, uint32_t rgba) {
     uint32_t pixel_offset = BMP_HEADER_LEN + BMP_INFO_HEADER_LEN
         + ((canvas->height - y - 1) * canvas->width + x) * 4;
 
-    canvas->data[pixel_offset + 2] = (rgba >> 24) & 0xff;
-    canvas->data[pixel_offset + 1] = (rgba >> 16) & 0xff;
-    canvas->data[pixel_offset] = (rgba >> 8) & 0xff;
-    canvas->data[pixel_offset + 3] = rgba & 0xff;
+    canvas->data[pixel_offset + 2] = (uint8_t)((rgba >> 24) & 0xff);
+    canvas->data[pixel_offset + 1] = (uint8_t)((rgba >> 16) & 0xff);
+    canvas->data[pixel_offset] = (uint8_t)((rgba >> 8) & 0xff);
+    canvas->data[pixel_offset + 3] = (uint8_t)(rgba & 0xff);
 }
 
 static uint32_t clamp_and_floor(double value, uint32_t max) {

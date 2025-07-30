@@ -30,6 +30,8 @@ static const char* severity_text(
                     return "\x1b[32m[DIAG]\x1b[0m ";
                 }
             }
+
+            return "";
         }
         case LOG_SEVERITY_WARN: {
             return "\x1b[33m[WARN]\x1b[0m ";
@@ -41,6 +43,8 @@ static const char* severity_text(
             return "\x1b[31m\x1b[1m[PANIC]\x1b[0m";
         }
     }
+
+    return "";
 }
 
 void logger_log(

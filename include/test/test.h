@@ -126,8 +126,8 @@ TestResult __test_assert_ne_str(
             __builtin_types_compatible_p(long double, __typeof__(eps)),        \
             "Epsilon must be a long double"                                    \
         );                                                                     \
-        __typeof__(a) _a = (a);                                                \
-        __typeof__(b) _b = (b);                                                \
+        __typeof__(a) _a = a;                                                  \
+        __typeof__(b) _b = b;                                                  \
         __typeof__(eps) _eps = (eps);                                          \
         _Static_assert(                                                        \
             __builtin_types_compatible_p(__typeof__(_a), __typeof__(_b))       \
@@ -152,9 +152,9 @@ TestResult __test_assert_ne_str(
             __builtin_types_compatible_p(long double, __typeof__(eps)),        \
             "Epsilon must be a long double"                                    \
         );                                                                     \
-        __typeof__(a) _a = (a);                                                \
-        __typeof__(b) _b = (b);                                                \
-        __typeof__(eps) _eps = (eps);                                          \
+        __typeof__(a) _a = a;                                                  \
+        __typeof__(b) _b = b;                                                  \
+        __typeof__(eps) _eps = eps;                                            \
         _Static_assert(                                                        \
             __builtin_types_compatible_p(__typeof__(_a), __typeof__(_b))       \
             || (__TEST_TYPE_IS_STR(_a) && __TEST_TYPE_IS_STR(_b))              \
