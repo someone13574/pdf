@@ -362,7 +362,16 @@ bool DLINKED_FN(pop_back)(DLINKED_NAME* linked_list, DLINKED_TYPE* out) {
 size_t DLINKED_FN(insert_sorted)(
     DLINKED_NAME* linked_list,
     DLINKED_TYPE element,
+#ifndef DLINKED_SORT_USER_DATA
     bool (*cmp_less_than)(DLINKED_TYPE* lhs, DLINKED_TYPE* rhs),
+#else
+    bool (*cmp_less_than)(
+        DLINKED_TYPE* lhs,
+        DLINKED_TYPE* rhs,
+        DLINKED_SORT_USER_DATA user_data
+    ),
+    DLINKED_SORT_USER_DATA user_data,
+#endif
     bool ascending
 ) {
     RELEASE_ASSERT(linked_list);
@@ -385,7 +394,14 @@ size_t DLINKED_FN(insert_sorted)(
     // Reset cursor to the start of the list if the insertion point is before
     // the cursor
     if (linked_list->cursor
-        && cmp_less_than(&element, &linked_list->cursor->data) == ascending) {
+        && cmp_less_than(
+               &element,
+               &linked_list->cursor->data
+#ifdef DLINKED_SORT_USER_DATA
+               ,
+               user_data
+#endif
+           ) == ascending) {
         linked_list->cursor_idx = 0;
         linked_list->cursor = linked_list->front;
     }
@@ -394,15 +410,30 @@ size_t DLINKED_FN(insert_sorted)(
 
     // Find insertion idx
     while (linked_list->cursor->next
-           && (cmp_less_than(&element, &linked_list->cursor->data) != ascending)
-    ) {
+           && (cmp_less_than(
+                   &element,
+                   &linked_list->cursor->data
+#ifdef DLINKED_SORT_USER_DATA
+                   ,
+                   user_data
+#endif
+               )
+               != ascending)) {
         linked_list->cursor_idx++;
         linked_list->cursor = linked_list->cursor->next;
     }
 
     size_t insert_idx = linked_list->cursor_idx;
     if (linked_list->cursor->next == NULL
-        && (cmp_less_than(&linked_list->cursor->data, &element) == ascending)) {
+        && (cmp_less_than(
+                &linked_list->cursor->data,
+                &element
+#ifdef DLINKED_SORT_USER_DATA
+                ,
+                user_data
+#endif
+            )
+            == ascending)) {
         insert_idx = linked_list->len;
     }
 
@@ -417,7 +448,16 @@ size_t DLINKED_FN(insert_sorted)(
 void DLINKED_FN(merge_sorted)(
     DLINKED_NAME* linked_list,
     DLINKED_NAME* other,
+#ifndef DLINKED_SORT_USER_DATA
     bool (*cmp_less_than)(DLINKED_TYPE* lhs, DLINKED_TYPE* rhs),
+#else
+    bool (*cmp_less_than)(
+        DLINKED_TYPE* lhs,
+        DLINKED_TYPE* rhs,
+        DLINKED_SORT_USER_DATA user_data
+    ),
+    DLINKED_SORT_USER_DATA user_data,
+#endif
     bool ascending
 ) {
     RELEASE_ASSERT(linked_list);
@@ -444,8 +484,14 @@ void DLINKED_FN(merge_sorted)(
     while (other_node) {
         // Find insertion position in linked_list
         while (current_node
-               && cmp_less_than(&current_node->data, &other_node->data)
-                   == ascending) {
+               && cmp_less_than(
+                      &current_node->data,
+                      &other_node->data
+#ifdef DLINKED_SORT_USER_DATA
+                      ,
+                      user_data
+#endif
+                  ) == ascending) {
             current_node = current_node->next;
             current_index++;
         }

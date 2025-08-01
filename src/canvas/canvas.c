@@ -222,7 +222,7 @@ void canvas_draw_line(
     double dy = y2 - y1;
     double dist = sqrt(dx * dx + dy * dy);
 
-    for (int pixel = 1; pixel < (int)(dist); pixel++) {
+    for (int pixel = 1; pixel < (int)dist; pixel++) {
         double t = pixel / dist;
         canvas_draw_circle(canvas, x1 + dx * t, y1 + dy * t, radius, rgba);
     }
