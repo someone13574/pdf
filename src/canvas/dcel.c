@@ -26,17 +26,8 @@
 #define DLINKED_NAME DcelActiveEdges
 #define DLINKED_LOWERCASE_NAME dcel_active_edges
 #define DLINKED_TYPE DcelHalfEdge*
+#define DLINKED_SORT_USER_DATA double
 #include "arena/dlinked_impl.h"
-
-typedef struct {
-    double x;
-    double y;
-} Point;
-
-#define DVEC_NAME PointVec
-#define DVEC_LOWERCASE_NAME point_vec
-#define DVEC_TYPE Point
-#include "arena/dvec_impl.h"
 
 Dcel* dcel_new(Arena* arena) {
     RELEASE_ASSERT(arena);
@@ -58,12 +49,31 @@ static bool priority_queue_cmp(DcelVertex** lhs, DcelVertex** rhs) {
     return (*lhs)->y < (*rhs)->y;
 }
 
-static bool active_edges_cmp(DcelHalfEdge** lhs, DcelHalfEdge** rhs) {
+static double edge_intersect_x(DcelHalfEdge* edge, double sweep_y) {
+    double x1 = edge->origin->x;
+    double y1 = edge->origin->y;
+    double x2 = edge->twin->origin->x;
+    double y2 = edge->twin->origin->y;
+
+    double dy = y2 - y1;
+    if (fabs(dy) < 1e-12) {
+        return fmin(x1, x2);
+    }
+
+    double t = (sweep_y - y1) / dy;
+    return x1 + t * (x2 - x1);
+}
+
+static bool
+active_edges_cmp(DcelHalfEdge** lhs, DcelHalfEdge** rhs, double sweep_y) {
+    double lhs_x = edge_intersect_x(*lhs, sweep_y);
+    double rhs_x = edge_intersect_x(*rhs, sweep_y);
+
     if ((*lhs)->origin == (*rhs)->origin) {
         return (*lhs)->twin->origin->x < (*rhs)->twin->origin->x;
     }
 
-    return (*lhs)->origin->x < (*rhs)->origin->x;
+    return lhs_x < rhs_x;
 }
 
 DcelVertex* dcel_add_vertex(Dcel* dcel, double x, double y) {
@@ -101,15 +111,55 @@ DcelHalfEdge* dcel_add_edge(Dcel* dcel, DcelVertex* a, DcelVertex* b) {
     half_edge_a->twin = half_edge_b;
     half_edge_b->twin = half_edge_a;
 
-    if (!a->incident_edge) {
-        a->incident_edge = half_edge_a;
-    }
-
-    if (!b->incident_edge) {
-        b->incident_edge = half_edge_b;
-    }
+    a->incident_edge = half_edge_a;
+    b->incident_edge = half_edge_b;
 
     return half_edge_a;
+}
+
+DcelVertex* dcel_intersect_edges(
+    Dcel* dcel,
+    DcelHalfEdge* a,
+    DcelHalfEdge* b,
+    double intersection_x,
+    double intersection_y
+) {
+    RELEASE_ASSERT(dcel);
+    RELEASE_ASSERT(a);
+    RELEASE_ASSERT(b);
+
+    DcelVertex* vertex = dcel_add_vertex(dcel, intersection_x, intersection_y);
+    DcelHalfEdge* a_prime = dcel_add_edge(dcel, vertex, a->twin->origin);
+    DcelHalfEdge* b_prime = dcel_add_edge(dcel, vertex, b->twin->origin);
+
+    vertex->incident_edge = a_prime;
+
+    // Set twin origins
+    a->twin->origin = vertex;
+    b->twin->origin = vertex;
+
+    // Outer connections
+    a_prime->next = a->next;
+    a->next->prev = a_prime;
+    a->twin->prev->next = a_prime->twin;
+    a_prime->twin->prev = a->twin->prev;
+
+    b_prime->next = b->next;
+    b->next->prev = b_prime;
+    b->twin->prev->next = b_prime->twin;
+    b_prime->twin->prev = b->twin->prev;
+
+    // Inner connections (CCW)
+    a->next = b_prime;
+    b_prime->prev = a;
+    b->next = a->twin;
+    a->twin->prev = b;
+    a_prime->twin->next = b->twin;
+    b->twin->prev = a_prime->twin;
+    b_prime->twin->next = a_prime;
+    a_prime->prev = b_prime->twin;
+
+    return vertex;
 }
 
 DcelHalfEdge* dcel_next_incident_edge(DcelHalfEdge* half_edge) {
@@ -166,25 +216,16 @@ static bool compute_intersection_point(
 
 static void debug_render(
     Dcel* dcel,
-    Dcel* overlay,
     Arena* arena,
     double event_x,
     double event_y,
-    DcelActiveEdges* active_edges,
-    PointVec* intersections,
-    DcelHalfEdge* highlight_a,
-    DcelHalfEdge* highlight_b
+    DcelActiveEdges* active_edges
 ) {
     RELEASE_ASSERT(dcel);
-    RELEASE_ASSERT(overlay);
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(active_edges);
-    RELEASE_ASSERT(intersections);
 
     Canvas* canvas = canvas_new(arena, 1000, 900, 0xffffffff);
-    dcel_render(dcel, 0x000000ff, canvas);
-    dcel_render(overlay, 0x808080ff, canvas);
-
     for (size_t idx = 0; idx < dcel_active_edges_len(active_edges); idx++) {
         DcelHalfEdge* half_edge;
         RELEASE_ASSERT(dcel_active_edges_get(active_edges, idx, &half_edge));
@@ -200,36 +241,7 @@ static void debug_render(
         );
     }
 
-    for (size_t idx = 0; idx < point_vec_len(intersections); idx++) {
-        Point point;
-        RELEASE_ASSERT(point_vec_get(intersections, idx, &point));
-
-        canvas_draw_circle(canvas, point.x, point.y, 10.0, 0x00ff00ff);
-    }
-
-    if (highlight_a) {
-        canvas_draw_line(
-            canvas,
-            highlight_a->origin->x,
-            highlight_a->origin->y,
-            highlight_a->twin->origin->x,
-            highlight_a->twin->origin->y,
-            5.0,
-            0x00ffffff
-        );
-    }
-
-    if (highlight_b) {
-        canvas_draw_line(
-            canvas,
-            highlight_b->origin->x,
-            highlight_b->origin->y,
-            highlight_b->twin->origin->x,
-            highlight_b->twin->origin->y,
-            5.0,
-            0x00ffffff
-        );
-    }
+    dcel_render(dcel, 0x000000ff, canvas);
 
     canvas_draw_line(
         canvas,
@@ -243,27 +255,17 @@ static void debug_render(
     canvas_draw_circle(canvas, event_x, event_y, 12.0, 0xff0000ff);
 
     canvas_write_file(canvas, "tessellation.bmp");
-    usleep(500000);
+    usleep(100000);
 }
 
-void dcel_overlay(Dcel* dcel, Dcel* overlay) {
+void dcel_overlay(Dcel* dcel) {
     RELEASE_ASSERT(dcel);
-    RELEASE_ASSERT(overlay);
-    RELEASE_ASSERT(dcel->arena == overlay->arena);
-
-    dcel_event_queue_merge_sorted(
-        dcel->event_queue,
-        overlay->event_queue,
-        priority_queue_cmp,
-        true
-    );
 
     Arena* arena = arena_new(1024);
-    DcelEventQueueBlock* event = dcel->event_queue->front;
 
     DcelActiveEdges* active_edges = dcel_active_edges_new(arena);
-    PointVec* intersections = point_vec_new(arena);
 
+    DcelEventQueueBlock* event = dcel->event_queue->front;
     while (event) {
         DcelHalfEdge* incident_edge = event->data->incident_edge;
         do {
@@ -296,18 +298,6 @@ void dcel_overlay(Dcel* dcel, Dcel* overlay) {
 
                     if (prev_edge && next_edge
                         && !half_edges_share_vertex(prev_edge, next_edge)) {
-                        debug_render(
-                            dcel,
-                            overlay,
-                            arena,
-                            event->data->x,
-                            event->data->y,
-                            active_edges,
-                            intersections,
-                            prev_edge,
-                            next_edge
-                        );
-
                         double intersection_x;
                         double intersection_y;
                         if (compute_intersection_point(
@@ -316,10 +306,12 @@ void dcel_overlay(Dcel* dcel, Dcel* overlay) {
                                 &intersection_x,
                                 &intersection_y
                             )) {
-                            point_vec_push(
-                                intersections,
-                                (Point
-                                ) {.x = intersection_x, .y = intersection_y}
+                            dcel_intersect_edges(
+                                dcel,
+                                prev_edge,
+                                next_edge,
+                                intersection_x,
+                                intersection_y
                             );
                         }
                     }
@@ -336,6 +328,7 @@ void dcel_overlay(Dcel* dcel, Dcel* overlay) {
                     active_edges,
                     incident_edge,
                     active_edges_cmp,
+                    event->data->y,
                     true
                 );
 
@@ -357,18 +350,6 @@ void dcel_overlay(Dcel* dcel, Dcel* overlay) {
                 }
 
                 if (prev_edge && !half_edges_share_vertex(edge, prev_edge)) {
-                    debug_render(
-                        dcel,
-                        overlay,
-                        arena,
-                        event->data->x,
-                        event->data->y,
-                        active_edges,
-                        intersections,
-                        edge,
-                        prev_edge
-                    );
-
                     double intersection_x;
                     double intersection_y;
                     if (compute_intersection_point(
@@ -377,26 +358,17 @@ void dcel_overlay(Dcel* dcel, Dcel* overlay) {
                             &intersection_x,
                             &intersection_y
                         )) {
-                        point_vec_push(
-                            intersections,
-                            (Point) {.x = intersection_x, .y = intersection_y}
+                        dcel_intersect_edges(
+                            dcel,
+                            edge,
+                            prev_edge,
+                            intersection_x,
+                            intersection_y
                         );
                     }
                 }
 
                 if (next_edge && !half_edges_share_vertex(edge, next_edge)) {
-                    debug_render(
-                        dcel,
-                        overlay,
-                        arena,
-                        event->data->x,
-                        event->data->y,
-                        active_edges,
-                        intersections,
-                        edge,
-                        next_edge
-                    );
-
                     double intersection_x;
                     double intersection_y;
                     if (compute_intersection_point(
@@ -405,9 +377,12 @@ void dcel_overlay(Dcel* dcel, Dcel* overlay) {
                             &intersection_x,
                             &intersection_y
                         )) {
-                        point_vec_push(
-                            intersections,
-                            (Point) {.x = intersection_x, .y = intersection_y}
+                        dcel_intersect_edges(
+                            dcel,
+                            edge,
+                            next_edge,
+                            intersection_x,
+                            intersection_y
                         );
                     }
                 }
@@ -416,17 +391,7 @@ void dcel_overlay(Dcel* dcel, Dcel* overlay) {
             incident_edge = dcel_next_incident_edge(incident_edge);
         } while (incident_edge && incident_edge != event->data->incident_edge);
 
-        debug_render(
-            dcel,
-            overlay,
-            arena,
-            event->data->x,
-            event->data->y,
-            active_edges,
-            intersections,
-            NULL,
-            NULL
-        );
+        debug_render(dcel, arena, event->data->x, event->data->y, active_edges);
         event = event->next;
     }
 

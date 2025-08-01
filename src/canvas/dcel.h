@@ -49,8 +49,15 @@ Dcel* dcel_new(Arena* arena);
 
 DcelVertex* dcel_add_vertex(Dcel* dcel, double x, double y);
 DcelHalfEdge* dcel_add_edge(Dcel* dcel, DcelVertex* a, DcelVertex* b);
+DcelVertex* dcel_intersect_edges(
+    Dcel* dcel,
+    DcelHalfEdge* a,
+    DcelHalfEdge* b,
+    double intersection_x,
+    double intersection_y
+);
 DcelHalfEdge* dcel_next_incident_edge(DcelHalfEdge* half_edge);
 
-void dcel_overlay(Dcel* dcel, Dcel* overlay);
+void dcel_overlay(Dcel* dcel);
 
 void dcel_render(Dcel* dcel, uint32_t rgba, Canvas* canvas);

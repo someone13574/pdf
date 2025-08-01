@@ -21,6 +21,17 @@ int main(int argc, char* argv[]) {
     path_builder_line_to(builder, 765.0, 480.0);
     path_builder_end_contour(builder);
 
+    path_builder_new_contour(builder, 560.0, 140.0);
+    path_builder_line_to(builder, 600.0, 680.0);
+    path_builder_line_to(builder, 720.0, 720.0);
+    path_builder_end_contour(builder);
+
+    path_builder_new_contour(builder, 300.0, 250.0);
+    path_builder_line_to(builder, 440.0, 380.0);
+    path_builder_line_to(builder, 500.0, 670.0);
+    path_builder_line_to(builder, 760.0, 325.0);
+    path_builder_end_contour(builder);
+
     Canvas* canvas = path_builder_render(builder, 1000, 900);
     canvas_write_file(canvas, "tessellation.bmp");
 

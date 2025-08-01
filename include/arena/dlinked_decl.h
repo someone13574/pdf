@@ -82,7 +82,16 @@ bool DLINKED_FN(pop_back)(DLINKED_NAME* linked_list, DLINKED_TYPE* out);
 size_t DLINKED_FN(insert_sorted)(
     DLINKED_NAME* linked_list,
     DLINKED_TYPE element,
+#ifndef DLINKED_SORT_USER_DATA
     bool (*cmp_less_than)(DLINKED_TYPE* lhs, DLINKED_TYPE* rhs),
+#else
+    bool (*cmp_less_than)(
+        DLINKED_TYPE* lhs,
+        DLINKED_TYPE* rhs,
+        DLINKED_SORT_USER_DATA user_data
+    ),
+    DLINKED_SORT_USER_DATA user_data,
+#endif
     bool ascending
 );
 
@@ -92,7 +101,16 @@ size_t DLINKED_FN(insert_sorted)(
 void DLINKED_FN(merge_sorted)(
     DLINKED_NAME* linked_list,
     DLINKED_NAME* other,
+#ifndef DLINKED_SORT_USER_DATA
     bool (*cmp_less_than)(DLINKED_TYPE* lhs, DLINKED_TYPE* rhs),
+#else
+    bool (*cmp_less_than)(
+        DLINKED_TYPE* lhs,
+        DLINKED_TYPE* rhs,
+        DLINKED_SORT_USER_DATA user_data
+    ),
+    DLINKED_SORT_USER_DATA user_data,
+#endif
     bool ascending
 );
 
