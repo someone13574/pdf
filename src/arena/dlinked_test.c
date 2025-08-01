@@ -249,19 +249,28 @@ TEST_FUNC(test_linked_insert_sorted_ascending) {
     my_test_list_push_back(list, 5);
 
     // Insert at front
-    my_test_list_insert_sorted(list, 0, int_less, true);
+    TEST_ASSERT_EQ(
+        (size_t)0,
+        my_test_list_insert_sorted(list, 0, int_less, true)
+    );
     TEST_ASSERT_EQ((size_t)4, my_test_list_len(list));
     TEST_ASSERT(my_test_list_get(list, 0, &element));
     TEST_ASSERT_EQ(0, element);
 
     // Insert in middle
-    my_test_list_insert_sorted(list, 4, int_less, true);
+    TEST_ASSERT_EQ(
+        (size_t)3,
+        my_test_list_insert_sorted(list, 4, int_less, true)
+    );
     TEST_ASSERT_EQ((size_t)5, my_test_list_len(list));
     TEST_ASSERT(my_test_list_get(list, 3, &element));
     TEST_ASSERT_EQ(4, element);
 
     // Insert at end
-    my_test_list_insert_sorted(list, 6, int_less, true);
+    TEST_ASSERT_EQ(
+        (size_t)5,
+        my_test_list_insert_sorted(list, 6, int_less, true)
+    );
     TEST_ASSERT_EQ((size_t)6, my_test_list_len(list));
     TEST_ASSERT(my_test_list_get(list, 5, &element));
     TEST_ASSERT_EQ(6, element);
@@ -288,19 +297,28 @@ TEST_FUNC(test_linked_insert_sorted_descending) {
     my_test_list_push_back(list, 1);
 
     // Insert at front (largest)
-    my_test_list_insert_sorted(list, 6, int_less, false);
+    TEST_ASSERT_EQ(
+        (size_t)0,
+        my_test_list_insert_sorted(list, 6, int_less, false)
+    );
     TEST_ASSERT_EQ((size_t)4, my_test_list_len(list));
     TEST_ASSERT(my_test_list_get(list, 0, &element));
     TEST_ASSERT_EQ(6, element);
 
     // Insert in middle
-    my_test_list_insert_sorted(list, 4, int_less, false);
+    TEST_ASSERT_EQ(
+        (size_t)2,
+        my_test_list_insert_sorted(list, 4, int_less, false)
+    );
     TEST_ASSERT_EQ((size_t)5, my_test_list_len(list));
     TEST_ASSERT(my_test_list_get(list, 2, &element));
     TEST_ASSERT_EQ(4, element);
 
     // Insert at end (smallest)
-    my_test_list_insert_sorted(list, 0, int_less, false);
+    TEST_ASSERT_EQ(
+        (size_t)5,
+        my_test_list_insert_sorted(list, 0, int_less, false)
+    );
     TEST_ASSERT_EQ((size_t)6, my_test_list_len(list));
     TEST_ASSERT(my_test_list_get(list, 5, &element));
     TEST_ASSERT_EQ(0, element);

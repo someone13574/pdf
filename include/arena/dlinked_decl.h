@@ -78,8 +78,8 @@ bool DLINKED_FN(pop_back)(DLINKED_NAME* linked_list, DLINKED_TYPE* out);
 
 // Inserts an element into a sorted linked list. If the list is not sorted, the
 // behavior is undefined. `cmp_less_than` should return `true` when lhs is less
-// than rhs.
-void DLINKED_FN(insert_sorted)(
+// than rhs. Returns the index which the element was inserted into.
+size_t DLINKED_FN(insert_sorted)(
     DLINKED_NAME* linked_list,
     DLINKED_TYPE element,
     bool (*cmp_less_than)(DLINKED_TYPE* lhs, DLINKED_TYPE* rhs),

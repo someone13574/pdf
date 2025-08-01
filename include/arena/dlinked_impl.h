@@ -358,8 +358,8 @@ bool DLINKED_FN(pop_back)(DLINKED_NAME* linked_list, DLINKED_TYPE* out) {
 
 // Inserts an element into a sorted linked list. If the list is not sorted, the
 // behavior is undefined. `cmp_less_than` should return `true` when lhs is less
-// than rhs.
-void DLINKED_FN(insert_sorted)(
+// than rhs. Returns the index which the element was inserted into.
+size_t DLINKED_FN(insert_sorted)(
     DLINKED_NAME* linked_list,
     DLINKED_TYPE element,
     bool (*cmp_less_than)(DLINKED_TYPE* lhs, DLINKED_TYPE* rhs),
@@ -379,7 +379,7 @@ void DLINKED_FN(insert_sorted)(
     // Handle zero-length
     if (linked_list->len == 0) {
         DLINKED_FN(insert)(linked_list, 0, element);
-        return;
+        return 0;
     }
 
     // Reset cursor to the start of the list if the insertion point is before
@@ -408,6 +408,7 @@ void DLINKED_FN(insert_sorted)(
 
     // Insert
     DLINKED_FN(insert)(linked_list, insert_idx, element);
+    return insert_idx;
 }
 
 // Merges `other` into `linked_list`, such that `linked_list` is sorted,
