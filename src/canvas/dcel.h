@@ -4,6 +4,7 @@
 
 #include "arena/arena.h"
 #include "canvas/canvas.h"
+
 typedef struct DcelVertex DcelVertex;
 typedef struct DcelHalfEdge DcelHalfEdge;
 typedef struct DcelFace DcelFace;
@@ -12,6 +13,7 @@ struct DcelVertex {
     double x;
     double y;
     DcelHalfEdge* incident_edge;
+    bool highlight;
 };
 
 #define DVEC_NAME DcelVertices
@@ -24,12 +26,24 @@ struct DcelHalfEdge {
     DcelHalfEdge* twin;
     DcelHalfEdge* next;
     DcelHalfEdge* prev;
+    DcelFace* face;
+    bool primary;
 };
 
 #define DVEC_NAME DcelHalfEdges
 #define DVEC_LOWERCASE_NAME dcel_half_edges
 #define DVEC_TYPE DcelHalfEdge
 #include "arena/dvec_decl.h"
+
+#define DVEC_NAME DcelFaces
+#define DVEC_LOWERCASE_NAME dcel_faces
+#define DVEC_TYPE DcelFace*
+#include "arena/dvec_decl.h"
+
+struct DcelFace {
+    DcelHalfEdge* outer_edge;
+    DcelFaces* inner_faces;
+};
 
 #define DLINKED_NAME DcelEventQueue
 #define DLINKED_LOWERCASE_NAME dcel_event_queue
@@ -41,14 +55,17 @@ typedef struct {
 
     DcelVertices* vertices;
     DcelHalfEdges* half_edges;
+    DcelFaces* faces;
 
     DcelEventQueue* event_queue;
+    DcelFace* outer_face;
 } Dcel;
 
 Dcel* dcel_new(Arena* arena);
 
 DcelVertex* dcel_add_vertex(Dcel* dcel, double x, double y);
 DcelHalfEdge* dcel_add_edge(Dcel* dcel, DcelVertex* a, DcelVertex* b);
+
 DcelVertex* dcel_intersect_edges(
     Dcel* dcel,
     DcelHalfEdge* a,
@@ -59,5 +76,12 @@ DcelVertex* dcel_intersect_edges(
 DcelHalfEdge* dcel_next_incident_edge(DcelHalfEdge* half_edge);
 
 void dcel_overlay(Dcel* dcel);
+void dcel_assign_faces(Dcel* dcel);
+// void dcel_partition(Dcel* dcel);
 
-void dcel_render(Dcel* dcel, uint32_t rgba, Canvas* canvas);
+void dcel_render(
+    Dcel* dcel,
+    uint32_t rgba,
+    Canvas* canvas,
+    DcelHalfEdge* highlight_edge
+);

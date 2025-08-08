@@ -8,17 +8,17 @@
 
 // Check arguments
 #ifndef DVEC_NAME
-#warning "DVEC_NAME is not defined"
+#error "DVEC_NAME is not defined"
 #define DVEC_NAME PlaceholderVec
 #endif // DVEC_NAME
 
 #ifndef DVEC_LOWERCASE_NAME
-#warning "DVEC_LOWERCASE_NAME is not defined"
+#error "DVEC_LOWERCASE_NAME is not defined"
 #define DVEC_LOWERCASE_NAME placeholder_vec
 #endif // DVEC_LOWERCASE_NAME
 
 #ifndef DVEC_TYPE
-#warning "DVEC_TYPE is not defined"
+#error "DVEC_TYPE is not defined"
 #define DVEC_TYPE int
 #endif // DVEC_TYPE
 

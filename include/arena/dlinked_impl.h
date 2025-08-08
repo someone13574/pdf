@@ -8,17 +8,17 @@
 
 // Check arguments
 #ifndef DLINKED_NAME
-#warning "DLINKED_NAME is not defined"
+#error "DLINKED_NAME is not defined"
 #define DLINKED_NAME PlaceholderArray
 #endif // DLINKED_NAME
 
 #ifndef DLINKED_LOWERCASE_NAME
-#warning "DLINKED_LOWERCASE_NAME is not defined"
+#error "DLINKED_LOWERCASE_NAME is not defined"
 #define DLINKED_LOWERCASE_NAME placeholder_array
 #endif // DLINKED_LOWERCASE_NAME
 
 #ifndef DLINKED_TYPE
-#warning "DLINKED_TYPE is not defined"
+#error "DLINKED_TYPE is not defined"
 #define DLINKED_TYPE int
 #endif // DLINKED_TYPE
 
@@ -554,3 +554,4 @@ size_t DLINKED_FN(len)(DLINKED_NAME* linked_list) {
 #undef STRINGIFY
 #undef DLINKED_FN
 #undef DLINKED_BLOCK_NAME
+#undef DLINKED_SORT_USER_DATA

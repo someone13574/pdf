@@ -17,6 +17,8 @@ struct Canvas {
     uint32_t height;
     uint32_t file_size;
     uint8_t* data;
+
+    double coordinate_scale;
 };
 
 static void write_u16(uint8_t* target, uint16_t value) {
@@ -64,8 +66,15 @@ write_bmp_info_header(uint8_t* target, uint32_t width, uint32_t height) {
     write_u32(target + 20, 0); // image size, can be 0 for BI_RGB
 }
 
-Canvas*
-canvas_new(Arena* arena, uint32_t width, uint32_t height, uint32_t rgba) {
+Canvas* canvas_new(
+    Arena* arena,
+    uint32_t width,
+    uint32_t height,
+    uint32_t rgba,
+    double coordinate_scale
+) {
+    RELEASE_ASSERT(coordinate_scale > 1e-3);
+
     uint32_t file_size =
         BMP_HEADER_LEN + BMP_INFO_HEADER_LEN + width * height * 4;
 
@@ -85,6 +94,8 @@ canvas_new(Arena* arena, uint32_t width, uint32_t height, uint32_t rgba) {
     canvas->file_size = file_size;
     canvas->data = arena_alloc(arena, file_size);
     memset(canvas->data, 0, file_size);
+
+    canvas->coordinate_scale = coordinate_scale;
 
     write_bmp_header(canvas->data, file_size);
     write_bmp_info_header(canvas->data + BMP_HEADER_LEN, width, height);
@@ -183,6 +194,10 @@ void canvas_draw_circle(
 ) {
     RELEASE_ASSERT(canvas);
 
+    x *= canvas->coordinate_scale;
+    y *= canvas->coordinate_scale;
+    radius *= canvas->coordinate_scale;
+
     double min_x = x - radius;
     double min_y = y - radius;
     double max_x = x + radius;
@@ -225,6 +240,34 @@ void canvas_draw_line(
     for (int pixel = 1; pixel < (int)dist; pixel++) {
         double t = pixel / dist;
         canvas_draw_circle(canvas, x1 + dx * t, y1 + dy * t, radius, rgba);
+    }
+}
+
+void canvas_draw_arrow(
+    Canvas* canvas,
+    double x1,
+    double y1,
+    double x2,
+    double y2,
+    double radius,
+    double tip_radius,
+    uint32_t rgba
+) {
+    RELEASE_ASSERT(canvas);
+
+    double dx = x2 - x1;
+    double dy = y2 - y1;
+    double dist = sqrt(dx * dx + dy * dy);
+
+    for (int pixel = 1; pixel < (int)dist; pixel++) {
+        double t = pixel / dist;
+        canvas_draw_circle(
+            canvas,
+            x1 + dx * t,
+            y1 + dy * t,
+            radius * (1.0 - t) + tip_radius * t,
+            rgba
+        );
     }
 }
 

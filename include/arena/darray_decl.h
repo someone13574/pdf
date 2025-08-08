@@ -7,17 +7,17 @@
 
 // Check arguments
 #ifndef DARRAY_NAME
-#warning "DARRAY_NAME is not defined"
+#error "DARRAY_NAME is not defined"
 #define DARRAY_NAME PlaceholderArray
 #endif // DARRAY_NAME
 
 #ifndef DARRAY_LOWERCASE_NAME
-#warning "DARRAY_LOWERCASE_NAME is not defined"
+#error "DARRAY_LOWERCASE_NAME is not defined"
 #define DARRAY_LOWERCASE_NAME placeholder_array
 #endif // DARRAY_LOWERCASE_NAME
 
 #ifndef DARRAY_TYPE
-#warning "DARRAY_TYPE is not defined"
+#error "DARRAY_TYPE is not defined"
 #define DARRAY_TYPE int
 #endif // DARRAY_TYPE
 

@@ -6,8 +6,13 @@
 
 typedef struct Canvas Canvas;
 
-Canvas*
-canvas_new(Arena* arena, uint32_t width, uint32_t height, uint32_t rgba);
+Canvas* canvas_new(
+    Arena* arena,
+    uint32_t width,
+    uint32_t height,
+    uint32_t rgba,
+    double coordinate_scale
+);
 
 uint32_t canvas_width(Canvas* canvas);
 uint32_t canvas_height(Canvas* canvas);
@@ -29,6 +34,16 @@ void canvas_draw_line(
     double x2,
     double y2,
     double radius,
+    uint32_t rgba
+);
+void canvas_draw_arrow(
+    Canvas* canvas,
+    double x1,
+    double y1,
+    double x2,
+    double y2,
+    double radius,
+    double tip_radius,
     uint32_t rgba
 );
 void canvas_draw_bezier(
