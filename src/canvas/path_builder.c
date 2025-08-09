@@ -89,12 +89,19 @@ void path_builder_end_contour(PathBuilder* builder) {
 
 Canvas*
 path_builder_render(PathBuilder* builder, uint32_t width, uint32_t height) {
-    Canvas* canvas =
-        canvas_new(builder->arena, width * 2, height * 2, 0xffffffff, 2.0);
+    uint32_t resolution_multiplier = 2;
+    Canvas* canvas = canvas_new(
+        builder->arena,
+        width * resolution_multiplier,
+        height * resolution_multiplier,
+        0xffffffff,
+        (double)resolution_multiplier
+    );
 
-    dcel_overlay(builder->dcel);
-    dcel_assign_faces(builder->dcel);
-    dcel_render(builder->dcel, 0x000000ff, canvas, NULL);
+    // dcel_overlay(builder->dcel);
+    // dcel_assign_faces(builder->dcel);
+    // dcel_partition(builder->dcel);
+    dcel_render(builder->dcel, canvas);
 
     return canvas;
 }
