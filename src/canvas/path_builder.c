@@ -94,7 +94,8 @@ path_builder_render(PathBuilder* builder, uint32_t width, uint32_t height) {
 
     dcel_overlay(builder->dcel);
     dcel_assign_faces(builder->dcel);
-    dcel_render(builder->dcel, 0x000000ff, canvas, NULL);
+    dcel_partition(builder->dcel);
+    dcel_render(builder->dcel, 0x000000ff, canvas);
 
     return canvas;
 }

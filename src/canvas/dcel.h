@@ -13,7 +13,8 @@ struct DcelVertex {
     double x;
     double y;
     DcelHalfEdge* incident_edge;
-    bool highlight;
+    bool merge;
+    bool split;
 };
 
 #define DVEC_NAME DcelVertices
@@ -73,15 +74,11 @@ DcelVertex* dcel_intersect_edges(
     double intersection_x,
     double intersection_y
 );
+void dcel_connect_vertices(Dcel* dcel, DcelVertex* a, DcelVertex* b);
 DcelHalfEdge* dcel_next_incident_edge(DcelHalfEdge* half_edge);
 
 void dcel_overlay(Dcel* dcel);
 void dcel_assign_faces(Dcel* dcel);
-// void dcel_partition(Dcel* dcel);
+void dcel_partition(Dcel* dcel);
 
-void dcel_render(
-    Dcel* dcel,
-    uint32_t rgba,
-    Canvas* canvas,
-    DcelHalfEdge* highlight_edge
-);
+void dcel_render(Dcel* dcel, uint32_t rgba, Canvas* canvas);

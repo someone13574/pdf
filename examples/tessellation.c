@@ -54,10 +54,10 @@ int main(int argc, char* argv[]) {
     path_builder_line_to(builder, 820.0, 430.0);
     path_builder_end_contour(builder);
 
-    // path_builder_new_contour(builder, 650.0, 120.0);
-    // path_builder_line_to(builder, 660.0, 650.0);
-    // path_builder_line_to(builder, 930.0, 290.0);
-    // path_builder_end_contour(builder);
+    path_builder_new_contour(builder, 650.0, 120.0);
+    path_builder_line_to(builder, 660.0, 650.0);
+    path_builder_line_to(builder, 930.0, 290.0);
+    path_builder_end_contour(builder);
 
     Canvas* canvas = path_builder_render(builder, 1000, 900);
     canvas_write_file(canvas, "tessellation.bmp");
