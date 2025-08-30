@@ -12,7 +12,7 @@ struct Canvas {
         ScalableCanvas* scalable;
     } data;
 
-    enum { CANVAS_TYPE_RASTER, CANVAS_TYPE_SCALABLE } type;
+    enum { CANVAS_TYPE_SCALABLE, CANVAS_TYPE_RASTER } type;
 };
 
 Canvas* canvas_new_raster(
@@ -154,6 +154,25 @@ void canvas_draw_bezier(
                 radius,
                 rgba
             );
+            break;
+        }
+        default: {
+            LOG_PANIC("Unreachable");
+        }
+    }
+}
+
+void canvas_draw_path(Canvas* canvas, PathBuilder* path) {
+    RELEASE_ASSERT(canvas);
+    RELEASE_ASSERT(path);
+
+    switch (canvas->type) {
+        case CANVAS_TYPE_RASTER: {
+            raster_canvas_draw_path(canvas->data.raster, path);
+            break;
+        }
+        case CANVAS_TYPE_SCALABLE: {
+            scalable_canvas_draw_path(canvas->data.scalable, path);
             break;
         }
         default: {

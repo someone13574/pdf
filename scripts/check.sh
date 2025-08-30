@@ -1,0 +1,14 @@
+#!/bin/bash
+
+set -e
+
+scripts/clean.sh
+scripts/gcc-build.sh
+scripts/clean.sh
+scripts/test.sh
+scripts/tidy.sh
+scripts/pdf.sh
+scripts/font.sh
+scripts/tessellation.sh
+
+pre-commit run --all-files

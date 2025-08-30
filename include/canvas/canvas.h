@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
+#include "canvas/path_builder.h"
 
 typedef struct Canvas Canvas;
 
@@ -46,6 +47,8 @@ void canvas_draw_bezier(
     double radius,
     uint32_t rgba
 );
+
+void canvas_draw_path(Canvas* canvas, PathBuilder* path);
 
 /// Writes the canvas to a file. Returns `true` on success.
 bool canvas_write_file(Canvas* canvas, const char* path);

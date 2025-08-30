@@ -72,10 +72,4 @@ typedef struct {
     } data;
 } SfntGlyph;
 
-Canvas* sfnt_glyph_render(
-    Arena* arena,
-    SfntGlyph* glyph,
-    uint32_t resolution,
-    double line_width,
-    double flatness
-);
+Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution);

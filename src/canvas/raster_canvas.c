@@ -344,6 +344,13 @@ void raster_canvas_draw_bezier(
     );
 }
 
+void raster_canvas_draw_path(RasterCanvas* canvas, PathBuilder* path) {
+    RELEASE_ASSERT(canvas);
+    RELEASE_ASSERT(path);
+
+    LOG_TODO();
+}
+
 bool raster_canvas_write_file(RasterCanvas* canvas, const char* path) {
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(path);

@@ -1,6 +1,7 @@
 add_library(canvas
     canvas.c canvas.h "${pdf_SOURCE_DIR}/include/canvas/canvas.h"
-    path_builder.c "${pdf_SOURCE_DIR}/include/canvas/path_builder.h"
+    path_builder.c path_builder.h "${pdf_SOURCE_DIR}/include/canvas/path_builder.h"
+    dcel_builder.c "${pdf_SOURCE_DIR}/include/canvas/dcel_builder.h"
     dcel.c dcel.h
     raster_canvas.c raster_canvas.h
     scalable_canvas.c scalable_canvas.h)

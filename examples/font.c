@@ -66,8 +66,8 @@ int main(int argc, char** argv) {
     PDF_REQUIRE(sfnt_font_new(arena, buffer, buffer_len, &font));
 
     SfntGlyph glyph;
-    PDF_REQUIRE(sfnt_get_glyph(font, '{', &glyph));
-    Canvas* canvas = sfnt_glyph_render(arena, &glyph, 1024, 5.0, 10.0);
+    PDF_REQUIRE(sfnt_get_glyph(font, '%', &glyph));
+    Canvas* canvas = sfnt_glyph_render(arena, &glyph, 64);
     canvas_write_file(canvas, "glyph.svg");
 
     LOG_DIAG(INFO, EXAMPLE, "Finished");

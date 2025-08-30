@@ -6,9 +6,10 @@
 #include "arena/arena.h"
 #include "arena/string.h"
 #include "logger/log.h"
+#include "path_builder.h"
 
-#define DVEC_NAME SvgOperationVec
-#define DVEC_LOWERCASE_NAME svg_operation_vec
+#define DVEC_NAME SvgPartsVec
+#define DVEC_LOWERCASE_NAME svg_parts_vec
 #define DVEC_TYPE ArenaString*
 #include "arena/dvec_impl.h"
 
@@ -18,7 +19,7 @@ struct ScalableCanvas {
     uint32_t width;
     uint32_t height;
 
-    SvgOperationVec* operations;
+    SvgPartsVec* parts;
 };
 
 ScalableCanvas*
@@ -29,7 +30,7 @@ scalable_canvas_new(Arena* arena, uint32_t width, uint32_t height) {
     canvas->arena = arena;
     canvas->width = width;
     canvas->height = height;
-    canvas->operations = svg_operation_vec_new(arena);
+    canvas->parts = svg_parts_vec_new(arena);
 
     return canvas;
 }
@@ -43,8 +44,8 @@ void scalable_canvas_draw_circle(
 ) {
     RELEASE_ASSERT(canvas);
 
-    svg_operation_vec_push(
-        canvas->operations,
+    svg_parts_vec_push(
+        canvas->parts,
         arena_string_new_fmt(
             canvas->arena,
             "<circle cx=\"%f\" cy=\"%f\" r=\"%f\" fill=\"#%08x\" />",
@@ -67,8 +68,8 @@ void scalable_canvas_draw_line(
 ) {
     RELEASE_ASSERT(canvas);
 
-    svg_operation_vec_push(
-        canvas->operations,
+    svg_parts_vec_push(
+        canvas->parts,
         arena_string_new_fmt(
             canvas->arena,
             "<line x1=\"%f\" y1=\"%f\" x2=\"%f\" y2=\"%f\" stroke=\"#%08x\" stroke-width=\"%f\" fill=\"transparent\" />",
@@ -95,8 +96,8 @@ void scalable_canvas_draw_bezier(
 ) {
     RELEASE_ASSERT(canvas);
 
-    svg_operation_vec_push(
-        canvas->operations,
+    svg_parts_vec_push(
+        canvas->parts,
         arena_string_new_fmt(
             canvas->arena,
             "<path d=\"M %f %f Q %f %f %f %f\" stroke=\"#%08x\" stroke-width=\"%f\" fill=\"transparent\" />",
@@ -109,6 +110,84 @@ void scalable_canvas_draw_bezier(
             rgba,
             radius
         )
+    );
+}
+
+void scalable_canvas_draw_path(ScalableCanvas* canvas, PathBuilder* path) {
+    RELEASE_ASSERT(canvas);
+    RELEASE_ASSERT(path);
+
+    svg_parts_vec_push(
+        canvas->parts,
+        arena_string_new_fmt(canvas->arena, "<path d=\"")
+    );
+
+    for (size_t contour_idx = 0;
+         contour_idx < path_contour_vec_len(path->contours);
+         contour_idx++) {
+        PathContour* contour = NULL;
+        RELEASE_ASSERT(
+            path_contour_vec_get(path->contours, contour_idx, &contour)
+        );
+
+        if (contour_idx != 0) {
+            svg_parts_vec_push(
+                canvas->parts,
+                arena_string_new_fmt(canvas->arena, "Z ")
+            );
+        }
+
+        for (size_t segment_idx = 0; segment_idx < path_contour_len(contour);
+             segment_idx++) {
+            PathContourSegment segment;
+            RELEASE_ASSERT(path_contour_get(contour, segment_idx, &segment));
+
+            switch (segment.type) {
+                case PATH_CONTOUR_SEGMENT_TYPE_START: {
+                    svg_parts_vec_push(
+                        canvas->parts,
+                        arena_string_new_fmt(
+                            canvas->arena,
+                            "M %f %f",
+                            segment.data.start.x,
+                            segment.data.start.y
+                        )
+                    );
+                    break;
+                }
+                case PATH_CONTOUR_SEGMENT_TYPE_LINE: {
+                    svg_parts_vec_push(
+                        canvas->parts,
+                        arena_string_new_fmt(
+                            canvas->arena,
+                            "L %f %f",
+                            segment.data.line.x,
+                            segment.data.line.y
+                        )
+                    );
+                    break;
+                }
+                case PATH_CONTOUR_SEGMENT_TYPE_BEZIER: {
+                    svg_parts_vec_push(
+                        canvas->parts,
+                        arena_string_new_fmt(
+                            canvas->arena,
+                            "Q %f %f %f %f",
+                            segment.data.bezier.control.x,
+                            segment.data.bezier.control.y,
+                            segment.data.bezier.end.x,
+                            segment.data.bezier.end.y
+                        )
+                    );
+                    break;
+                }
+            }
+        }
+    }
+
+    svg_parts_vec_push(
+        canvas->parts,
+        arena_string_new_fmt(canvas->arena, "\" fill=\"black\" />")
     );
 }
 
@@ -129,12 +208,9 @@ bool scalable_canvas_write_file(ScalableCanvas* canvas, const char* path) {
         return false;
     }
 
-    for (size_t idx = 0; idx < svg_operation_vec_len(canvas->operations);
-         ++idx) {
+    for (size_t idx = 0; idx < svg_parts_vec_len(canvas->parts); ++idx) {
         ArenaString* operation;
-        RELEASE_ASSERT(
-            svg_operation_vec_get(canvas->operations, idx, &operation)
-        );
+        RELEASE_ASSERT(svg_parts_vec_get(canvas->parts, idx, &operation));
 
         const char* opbuf = arena_string_buffer(operation);
         size_t oplen = strlen(opbuf);

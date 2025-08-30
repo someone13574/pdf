@@ -1,29 +1,25 @@
 #include "canvas/path_builder.h"
 
 #include "arena/arena.h"
-#include "canvas.h"
-#include "canvas/canvas.h"
-#include "dcel.h"
 #include "logger/log.h"
+#include "path_builder.h"
 
-struct PathBuilder {
-    Arena* arena;
-    Dcel* dcel;
+#define DVEC_NAME PathContour
+#define DVEC_LOWERCASE_NAME path_contour
+#define DVEC_TYPE PathContourSegment
+#include "arena/dvec_impl.h"
 
-    DcelVertex* prev_vertex;
-    DcelHalfEdge* first_edge;
-    DcelHalfEdge* prev_edge;
-};
+#define DVEC_NAME PathContourVec
+#define DVEC_LOWERCASE_NAME path_contour_vec
+#define DVEC_TYPE PathContour*
+#include "arena/dvec_impl.h"
 
 PathBuilder* path_builder_new(Arena* arena) {
     RELEASE_ASSERT(arena);
 
     PathBuilder* builder = arena_alloc(arena, sizeof(PathBuilder));
     builder->arena = arena;
-    builder->dcel = dcel_new(arena);
-    builder->prev_vertex = NULL;
-    builder->first_edge = NULL;
-    builder->prev_edge = NULL;
+    builder->contours = path_contour_vec_new(arena);
 
     return builder;
 }
@@ -31,78 +27,58 @@ PathBuilder* path_builder_new(Arena* arena) {
 void path_builder_new_contour(PathBuilder* builder, double x, double y) {
     RELEASE_ASSERT(builder);
 
-    if (builder->prev_vertex) {
-        path_builder_end_contour(builder);
-    }
+    PathContour* contour = path_contour_new(builder->arena);
+    path_contour_push(
+        contour,
+        (PathContourSegment
+        ) {.type = PATH_CONTOUR_SEGMENT_TYPE_START,
+           .data.start = (PathPoint) {.x = x, .y = y}}
+    );
 
-    builder->prev_vertex = dcel_add_vertex(builder->dcel, x, y);
+    path_contour_vec_push(builder->contours, contour);
 }
 
 void path_builder_line_to(PathBuilder* builder, double x, double y) {
     RELEASE_ASSERT(builder);
-    RELEASE_ASSERT(builder->dcel, "No active contour");
 
-    DcelVertex* new_vertex = dcel_add_vertex(builder->dcel, x, y);
-    DcelHalfEdge* half_edge =
-        dcel_add_edge(builder->dcel, builder->prev_vertex, new_vertex);
+    size_t num_contours = path_contour_vec_len(builder->contours);
+    RELEASE_ASSERT(num_contours != 0, "No active contour");
 
-    if (builder->first_edge) {
-        builder->prev_edge->next = half_edge;
-        half_edge->prev = builder->prev_edge;
+    PathContour* contour = NULL;
+    RELEASE_ASSERT(
+        path_contour_vec_get(builder->contours, num_contours - 1, &contour)
+    );
 
-        builder->prev_edge->twin->prev = half_edge->twin;
-        half_edge->twin->next = builder->prev_edge->twin;
-    } else {
-        builder->first_edge = half_edge;
-    }
-
-    builder->prev_vertex = new_vertex;
-    builder->prev_edge = half_edge;
+    path_contour_push(
+        contour,
+        (PathContourSegment
+        ) {.type = PATH_CONTOUR_SEGMENT_TYPE_LINE,
+           .data.line = (PathPoint) {.x = x, .y = y}}
+    );
 }
 
-void path_builder_end_contour(PathBuilder* builder) {
+void path_builder_bezier_to(
+    PathBuilder* builder,
+    double x,
+    double y,
+    double cx,
+    double cy
+) {
     RELEASE_ASSERT(builder);
 
-    if (!builder->dcel) {
-        return;
-    }
+    size_t num_contours = path_contour_vec_len(builder->contours);
+    RELEASE_ASSERT(num_contours != 0, "No active contour");
 
-    DcelHalfEdge* closing_edge = dcel_add_edge(
-        builder->dcel,
-        builder->prev_vertex,
-        builder->first_edge->origin
+    PathContour* contour = NULL;
+    RELEASE_ASSERT(
+        path_contour_vec_get(builder->contours, num_contours - 1, &contour)
     );
 
-    builder->first_edge->prev = closing_edge;
-    builder->prev_edge->next = closing_edge;
-    closing_edge->next = builder->first_edge;
-    closing_edge->prev = builder->prev_edge;
-
-    builder->first_edge->twin->next = closing_edge->twin;
-    builder->prev_edge->twin->prev = closing_edge->twin;
-    closing_edge->twin->next = builder->prev_edge->twin;
-    closing_edge->twin->prev = builder->first_edge->twin;
-
-    builder->prev_vertex = NULL;
-    builder->first_edge = NULL;
-    builder->prev_edge = NULL;
-}
-
-Canvas*
-path_builder_render(PathBuilder* builder, uint32_t width, uint32_t height) {
-    uint32_t resolution_multiplier = 2;
-    RasterCanvas* canvas = raster_canvas_new(
-        builder->arena,
-        width * resolution_multiplier,
-        height * resolution_multiplier,
-        0xffffffff,
-        (double)resolution_multiplier
+    path_contour_push(
+        contour,
+        (PathContourSegment
+        ) {.type = PATH_CONTOUR_SEGMENT_TYPE_BEZIER,
+           .data.bezier = (PathQuadBezier
+           ) {.control.x = cx, .control.y = cy, .end.x = x, .end.y = y}}
     );
-
-    // dcel_overlay(builder->dcel);
-    // dcel_assign_faces(builder->dcel);
-    // dcel_partition(builder->dcel);
-    dcel_render(builder->dcel, canvas);
-
-    return canvas_from_raster(builder->arena, canvas);
 }

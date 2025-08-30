@@ -4,6 +4,7 @@
 
 #include "arena/arena.h"
 #include "canvas/canvas.h"
+#include "canvas/path_builder.h"
 #include "logger/log.h"
 #include "parser.h"
 #include "pdf_error/error.h"
@@ -214,21 +215,13 @@ PdfError* sfnt_parse_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
     LOG_TODO("Compound glyphs");
 }
 
-Canvas* sfnt_glyph_render(
-    Arena* arena,
-    SfntGlyph* glyph,
-    uint32_t resolution,
-    double line_width,
-    double flatness
-) {
+Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(glyph);
     RELEASE_ASSERT(resolution > 0);
 
-    // Canvas* canvas =
-    //     canvas_new_raster(arena, resolution, resolution, 0xffffffff, 1.0);
-
-    Canvas* canvas = canvas_new_scalable(arena, resolution, resolution);
+    Arena* temp_arena = arena_new(4096);
+    PathBuilder* path = path_builder_new(temp_arena);
 
     if (glyph->glyph_type != SFNT_GLYPH_TYPE_SIMPLE) {
         LOG_TODO("Only simple glyphs are supported");
@@ -276,7 +269,7 @@ Canvas* sfnt_glyph_render(
         int32_t contour_start_y = y_coord;
         int32_t contour_end_x = x_coord;
         int32_t contour_end_y = y_coord;
-        double curve_start_x, curve_start_y, curve_control_x, curve_control_y;
+        double curve_control_x, curve_control_y;
 
         for (size_t pass = 0; pass < 2; pass++) {
             x_coord = contour_start_x;
@@ -303,44 +296,26 @@ Canvas* sfnt_glyph_render(
 
                 if (!has_curve_start && point.on_curve) {
                     has_curve_start = true;
-                    curve_start_x = x;
-                    curve_start_y = y;
+                    path_builder_new_contour(path, x, y);
                 } else if (has_curve_start && !has_curve_control && !point.on_curve) {
                     has_curve_control = true;
                     curve_control_x = x;
                     curve_control_y = y;
                 } else if (has_curve_start && !has_curve_control && point.on_curve) {
-                    canvas_draw_line(
-                        canvas,
-                        curve_start_x,
-                        curve_start_y,
-                        x,
-                        y,
-                        line_width,
-                        0x000000ff
-                    );
+                    path_builder_line_to(path, x, y);
 
-                    curve_start_x = x;
-                    curve_start_y = y;
                     if (pass != 0) {
                         break;
                     }
                 } else if (has_curve_start && has_curve_control && point.on_curve) {
-                    canvas_draw_bezier(
-                        canvas,
-                        curve_start_x,
-                        curve_start_y,
+                    path_builder_bezier_to(
+                        path,
                         x,
                         y,
                         curve_control_x,
-                        curve_control_y,
-                        flatness,
-                        line_width,
-                        0x000000ff
+                        curve_control_y
                     );
 
-                    curve_start_x = x;
-                    curve_start_y = y;
                     has_curve_control = false;
                     if (pass != 0) {
                         break;
@@ -349,21 +324,14 @@ Canvas* sfnt_glyph_render(
                     double mid_x = (curve_control_x + x) / 2.0;
                     double mid_y = (curve_control_y + y) / 2.0;
 
-                    canvas_draw_bezier(
-                        canvas,
-                        curve_start_x,
-                        curve_start_y,
+                    path_builder_bezier_to(
+                        path,
                         mid_x,
                         mid_y,
                         curve_control_x,
-                        curve_control_y,
-                        flatness,
-                        line_width,
-                        0x000000ff
+                        curve_control_y
                     );
 
-                    curve_start_x = mid_x;
-                    curve_start_y = mid_y;
                     curve_control_x = x;
                     curve_control_y = y;
                     if (pass != 0) {
@@ -376,6 +344,10 @@ Canvas* sfnt_glyph_render(
         x_coord = contour_end_x;
         y_coord = contour_end_y;
     }
+
+    Canvas* canvas = canvas_new_scalable(arena, resolution, resolution);
+    canvas_draw_path(canvas, path);
+    arena_free(temp_arena);
 
     return canvas;
 }
