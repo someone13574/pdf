@@ -225,7 +225,10 @@ Canvas* sfnt_glyph_render(
     RELEASE_ASSERT(glyph);
     RELEASE_ASSERT(resolution > 0);
 
-    Canvas* canvas = canvas_new(arena, resolution, resolution, 0xffffffff, 1.0);
+    // Canvas* canvas =
+    //     canvas_new_raster(arena, resolution, resolution, 0xffffffff, 1.0);
+
+    Canvas* canvas = canvas_new_scalable(arena, resolution, resolution);
 
     if (glyph->glyph_type != SFNT_GLYPH_TYPE_SIMPLE) {
         LOG_TODO("Only simple glyphs are supported");

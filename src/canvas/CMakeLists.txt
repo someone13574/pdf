@@ -1,7 +1,9 @@
 add_library(canvas
-    canvas.c "${pdf_SOURCE_DIR}/include/canvas/canvas.h"
+    canvas.c canvas.h "${pdf_SOURCE_DIR}/include/canvas/canvas.h"
     path_builder.c "${pdf_SOURCE_DIR}/include/canvas/path_builder.h"
-    dcel.c dcel.h)
+    dcel.c dcel.h
+    raster_canvas.c raster_canvas.h
+    scalable_canvas.c scalable_canvas.h)
 target_include_directories(canvas PUBLIC "${pdf_SOURCE_DIR}/include")
 target_link_libraries(canvas PUBLIC arena)
 target_link_libraries(canvas PRIVATE pdf-logger m)

@@ -1,6 +1,7 @@
 add_library(arena
     arena.c "${pdf_SOURCE_DIR}/include/arena/arena.h"
     common.c "${pdf_SOURCE_DIR}/include/arena/common.h"
+    string.c "${pdf_SOURCE_DIR}/include/arena/string.h"
     "${pdf_SOURCE_DIR}/include/arena/darray_decl.h"
     "${pdf_SOURCE_DIR}/include/arena/darray_impl.h"
     "${pdf_SOURCE_DIR}/include/arena/dvec_decl.h"

@@ -1,188 +1,49 @@
 #include "canvas/canvas.h"
 
-#include <inttypes.h>
-#include <math.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-
 #include "arena/arena.h"
+#include "canvas.h"
 #include "logger/log.h"
-
-#define BMP_HEADER_LEN 14
-#define BMP_INFO_HEADER_LEN 40
+#include "raster_canvas.h"
+#include "scalable_canvas.h"
 
 struct Canvas {
-    uint32_t width;
-    uint32_t height;
-    uint32_t file_size;
-    uint8_t* data;
+    union {
+        RasterCanvas* raster;
+        ScalableCanvas* scalable;
+    } data;
 
-    double coordinate_scale;
+    enum { CANVAS_TYPE_RASTER, CANVAS_TYPE_SCALABLE } type;
 };
 
-static void write_u16(uint8_t* target, uint16_t value) {
-    RELEASE_ASSERT(target);
-
-    target[0] = (uint8_t)((value >> 0) & 0xff);
-    target[1] = (uint8_t)((value >> 8) & 0xff);
-}
-
-static void write_u32(uint8_t* target, uint32_t value) {
-    RELEASE_ASSERT(target);
-
-    target[0] = (uint8_t)((value >> 0) & 0xff);
-    target[1] = (uint8_t)((value >> 8) & 0xff);
-    target[2] = (uint8_t)((value >> 16) & 0xff);
-    target[3] = (uint8_t)((value >> 24) & 0xff);
-}
-
-static void write_bmp_header(uint8_t* target, uint32_t file_size) {
-    RELEASE_ASSERT(target);
-
-    // Header field
-    target[0] = 'B';
-    target[1] = 'M';
-
-    // File size
-    write_u32(target + 2, file_size);
-
-    // Pixel data offset
-    write_u32(target + 10, BMP_HEADER_LEN + BMP_INFO_HEADER_LEN);
-}
-
-static void
-write_bmp_info_header(uint8_t* target, uint32_t width, uint32_t height) {
-    RELEASE_ASSERT(target);
-    RELEASE_ASSERT((int32_t)width >= 0); // the size is technically signed
-    RELEASE_ASSERT((int32_t)height >= 0);
-
-    write_u32(target, 40); // header size
-    write_u32(target + 4, width); // width
-    write_u32(target + 8, height); // height
-    write_u16(target + 12, 1); // color planes
-    write_u16(target + 14, 32); // bits per pixel
-    write_u32(target + 16, 0); // BI_RGB
-    write_u32(target + 20, 0); // image size, can be 0 for BI_RGB
-}
-
-Canvas* canvas_new(
+Canvas* canvas_new_raster(
     Arena* arena,
     uint32_t width,
     uint32_t height,
     uint32_t rgba,
     double coordinate_scale
 ) {
-    RELEASE_ASSERT(coordinate_scale > 1e-3);
-
-    uint32_t file_size =
-        BMP_HEADER_LEN + BMP_INFO_HEADER_LEN + width * height * 4;
-
-    LOG_DIAG(
-        INFO,
-        CANVAS,
-        "Creating new %ux%u (%u bytes) canvas with initial color 0x%08" PRIx32,
-        width,
-        height,
-        file_size,
-        rgba
-    );
-
     Canvas* canvas = arena_alloc(arena, sizeof(Canvas));
-    canvas->width = width;
-    canvas->height = height;
-    canvas->file_size = file_size;
-    canvas->data = arena_alloc(arena, file_size);
-    memset(canvas->data, 0, file_size);
-
-    canvas->coordinate_scale = coordinate_scale;
-
-    write_bmp_header(canvas->data, file_size);
-    write_bmp_info_header(canvas->data + BMP_HEADER_LEN, width, height);
-
-    uint8_t r = (uint8_t)((rgba >> 24) & 0xff);
-    uint8_t g = (uint8_t)((rgba >> 16) & 0xff);
-    uint8_t b = (uint8_t)((rgba >> 8) & 0xff);
-    uint8_t a = (uint8_t)(rgba & 0xff);
-    for (uint32_t idx = 0; idx < width * height; idx++) {
-        canvas->data[BMP_HEADER_LEN + BMP_INFO_HEADER_LEN + idx * 4] = b;
-        canvas->data[BMP_HEADER_LEN + BMP_INFO_HEADER_LEN + idx * 4 + 1] = g;
-        canvas->data[BMP_HEADER_LEN + BMP_INFO_HEADER_LEN + idx * 4 + 2] = r;
-        canvas->data[BMP_HEADER_LEN + BMP_INFO_HEADER_LEN + idx * 4 + 3] = a;
-    }
+    canvas->data.raster =
+        raster_canvas_new(arena, width, height, rgba, coordinate_scale);
+    canvas->type = CANVAS_TYPE_RASTER;
 
     return canvas;
 }
 
-uint32_t canvas_width(Canvas* canvas) {
-    RELEASE_ASSERT(canvas);
-    return canvas->width;
+Canvas* canvas_from_raster(Arena* arena, RasterCanvas* raster_canvas) {
+    Canvas* canvas = arena_alloc(arena, sizeof(Canvas));
+    canvas->data.raster = raster_canvas;
+    canvas->type = CANVAS_TYPE_RASTER;
+
+    return canvas;
 }
 
-uint32_t canvas_height(Canvas* canvas) {
-    RELEASE_ASSERT(canvas);
-    return canvas->height;
-}
+Canvas* canvas_new_scalable(Arena* arena, uint32_t width, uint32_t height) {
+    Canvas* canvas = arena_alloc(arena, sizeof(Canvas));
+    canvas->data.scalable = scalable_canvas_new(arena, width, height);
+    canvas->type = CANVAS_TYPE_SCALABLE;
 
-uint32_t canvas_get_rgba(Canvas* canvas, uint32_t x, uint32_t y) {
-    RELEASE_ASSERT(canvas);
-    RELEASE_ASSERT(x < canvas->width);
-    RELEASE_ASSERT(y < canvas->height);
-
-    uint32_t pixel_offset = BMP_HEADER_LEN + BMP_INFO_HEADER_LEN
-        + ((canvas->height - y - 1) * canvas->width + x) * 4;
-
-    return ((uint32_t)canvas->data[pixel_offset + 2] << 24)
-        | ((uint32_t)canvas->data[pixel_offset + 1] << 16)
-        | ((uint32_t)canvas->data[pixel_offset] << 8)
-        | ((uint32_t)canvas->data[pixel_offset + 3]);
-}
-
-void canvas_set_rgba(Canvas* canvas, uint32_t x, uint32_t y, uint32_t rgba) {
-    RELEASE_ASSERT(canvas);
-    RELEASE_ASSERT(x < canvas->width);
-    RELEASE_ASSERT(y < canvas->height);
-
-    LOG_DIAG(
-        TRACE,
-        CANVAS,
-        "Setting canvas pixel (%u, %u) to 0x%08" PRIx32,
-        x,
-        y,
-        rgba
-    );
-
-    uint32_t pixel_offset = BMP_HEADER_LEN + BMP_INFO_HEADER_LEN
-        + ((canvas->height - y - 1) * canvas->width + x) * 4;
-
-    canvas->data[pixel_offset + 2] = (uint8_t)((rgba >> 24) & 0xff);
-    canvas->data[pixel_offset + 1] = (uint8_t)((rgba >> 16) & 0xff);
-    canvas->data[pixel_offset] = (uint8_t)((rgba >> 8) & 0xff);
-    canvas->data[pixel_offset + 3] = (uint8_t)(rgba & 0xff);
-}
-
-static uint32_t clamp_and_floor(double value, uint32_t max) {
-    if (value < 0) {
-        return 0;
-    }
-
-    if (value > max) {
-        return max;
-    }
-
-    return (uint32_t)value;
-}
-
-static uint32_t clamp_and_ceil(double value, uint32_t max) {
-    if (value < 0) {
-        return 0;
-    }
-
-    if (value > max) {
-        return max;
-    }
-
-    return (uint32_t)ceil(value);
+    return canvas;
 }
 
 void canvas_draw_circle(
@@ -192,32 +53,23 @@ void canvas_draw_circle(
     double radius,
     uint32_t rgba
 ) {
-    RELEASE_ASSERT(canvas);
-
-    x *= canvas->coordinate_scale;
-    y *= canvas->coordinate_scale;
-    radius *= canvas->coordinate_scale;
-
-    double min_x = x - radius;
-    double min_y = y - radius;
-    double max_x = x + radius;
-    double max_y = y + radius;
-
-    for (uint32_t current_y = clamp_and_floor(min_y, canvas->height - 1);
-         current_y < clamp_and_ceil(max_y, canvas->height - 1);
-         current_y++) {
-        for (uint32_t current_x = clamp_and_floor(min_x, canvas->width - 1);
-             current_x < clamp_and_ceil(max_x, canvas->width - 1);
-             current_x++) {
-            if (sqrt(
-                    pow((double)current_x + 0.5 - x, 2.0)
-                    + pow((double)current_y + 0.5 - y, 2.0)
-                )
-                > radius) {
-                continue;
-            }
-
-            canvas_set_rgba(canvas, current_x, current_y, rgba);
+    switch (canvas->type) {
+        case CANVAS_TYPE_RASTER: {
+            raster_canvas_draw_circle(canvas->data.raster, x, y, radius, rgba);
+            break;
+        }
+        case CANVAS_TYPE_SCALABLE: {
+            scalable_canvas_draw_circle(
+                canvas->data.scalable,
+                x,
+                y,
+                radius,
+                rgba
+            );
+            break;
+        }
+        default: {
+            LOG_PANIC("Unreachable");
         }
     }
 }
@@ -231,43 +83,34 @@ void canvas_draw_line(
     double radius,
     uint32_t rgba
 ) {
-    RELEASE_ASSERT(canvas);
-
-    double dx = x2 - x1;
-    double dy = y2 - y1;
-    double dist = sqrt(dx * dx + dy * dy);
-
-    for (int pixel = 1; pixel < (int)dist; pixel++) {
-        double t = pixel / dist;
-        canvas_draw_circle(canvas, x1 + dx * t, y1 + dy * t, radius, rgba);
-    }
-}
-
-void canvas_draw_arrow(
-    Canvas* canvas,
-    double x1,
-    double y1,
-    double x2,
-    double y2,
-    double radius,
-    double tip_radius,
-    uint32_t rgba
-) {
-    RELEASE_ASSERT(canvas);
-
-    double dx = x2 - x1;
-    double dy = y2 - y1;
-    double dist = sqrt(dx * dx + dy * dy);
-
-    for (int pixel = 1; pixel < (int)dist; pixel++) {
-        double t = pixel / dist;
-        canvas_draw_circle(
-            canvas,
-            x1 + dx * t,
-            y1 + dy * t,
-            radius * (1.0 - t) + tip_radius * t,
-            rgba
-        );
+    switch (canvas->type) {
+        case CANVAS_TYPE_RASTER: {
+            raster_canvas_draw_line(
+                canvas->data.raster,
+                x1,
+                y1,
+                x2,
+                y2,
+                radius,
+                rgba
+            );
+            break;
+        }
+        case CANVAS_TYPE_SCALABLE: {
+            scalable_canvas_draw_line(
+                canvas->data.scalable,
+                x1,
+                y1,
+                x2,
+                y2,
+                radius,
+                rgba
+            );
+            break;
+        }
+        default: {
+            LOG_PANIC("Unreachable");
+        }
     }
 }
 
@@ -283,69 +126,52 @@ void canvas_draw_bezier(
     double radius,
     uint32_t rgba
 ) {
-    RELEASE_ASSERT(canvas);
-
-    canvas_draw_circle(canvas, x1, y1, radius * 3.0, rgba);
-    canvas_draw_circle(canvas, x2, y2, radius * 3.0, rgba);
-
-    // Check if line is flat
-    double mid_x = (x1 + x2) / 2.0;
-    double mid_y = (y1 + y2) / 2.0;
-    double flatness_x = cx - mid_x;
-    double flatness_y = cy - mid_y;
-    if (sqrt(flatness_x * flatness_x + flatness_y * flatness_y) < flatness) {
-        canvas_draw_line(canvas, x1, y1, x2, y2, radius, rgba);
-        return;
+    switch (canvas->type) {
+        case CANVAS_TYPE_RASTER: {
+            raster_canvas_draw_bezier(
+                canvas->data.raster,
+                x1,
+                y1,
+                x2,
+                y2,
+                cx,
+                cy,
+                flatness,
+                radius,
+                rgba
+            );
+            break;
+        }
+        case CANVAS_TYPE_SCALABLE: {
+            scalable_canvas_draw_bezier(
+                canvas->data.scalable,
+                x1,
+                y1,
+                x2,
+                y2,
+                cx,
+                cy,
+                radius,
+                rgba
+            );
+            break;
+        }
+        default: {
+            LOG_PANIC("Unreachable");
+        }
     }
-
-    // Recurse
-    double c1x = (x1 + cx) / 2.0;
-    double c1y = (y1 + cy) / 2.0;
-    double c2x = (x2 + cx) / 2.0;
-    double c2y = (y2 + cy) / 2.0;
-
-    double xm = (c1x + c2x) * 0.5;
-    double ym = (c1y + c2y) * 0.5;
-
-    canvas_draw_bezier(
-        canvas,
-        x1,
-        y1,
-        xm,
-        ym,
-        c1x,
-        c1y,
-        flatness,
-        radius,
-        rgba
-    );
-    canvas_draw_bezier(
-        canvas,
-        xm,
-        ym,
-        x2,
-        y2,
-        c2x,
-        c2y,
-        flatness,
-        radius,
-        rgba
-    );
 }
 
 bool canvas_write_file(Canvas* canvas, const char* path) {
-    RELEASE_ASSERT(canvas);
-    RELEASE_ASSERT(path);
-
-    LOG_DIAG(INFO, CANVAS, "Writing canvas to `%s`", path);
-
-    FILE* file = fopen(path, "wb");
-    if (!file) {
-        return false;
+    switch (canvas->type) {
+        case CANVAS_TYPE_RASTER: {
+            return raster_canvas_write_file(canvas->data.raster, path);
+        }
+        case CANVAS_TYPE_SCALABLE: {
+            return scalable_canvas_write_file(canvas->data.scalable, path);
+        }
+        default: {
+            LOG_PANIC("Unreachable");
+        }
     }
-
-    unsigned long written = fwrite(canvas->data, 1, canvas->file_size, file);
-    fclose(file);
-
-    return written == canvas->file_size;
 }

@@ -5,8 +5,8 @@
 #include <unistd.h>
 
 #include "arena/arena.h"
-#include "canvas/canvas.h"
 #include "logger/log.h"
+#include "raster_canvas.h"
 
 #define DVEC_NAME DcelVertices
 #define DVEC_LOWERCASE_NAME dcel_vertices
@@ -600,7 +600,7 @@ static void debug_render(Dcel* dcel, Arena* arena) {
     RELEASE_ASSERT(arena);
 
     uint32_t resolution_multiplier = 2;
-    Canvas* canvas = canvas_new(
+    RasterCanvas* canvas = raster_canvas_new(
         arena,
         1000 * resolution_multiplier,
         900 * resolution_multiplier,
@@ -609,7 +609,7 @@ static void debug_render(Dcel* dcel, Arena* arena) {
     );
 
     dcel_render(dcel, canvas);
-    canvas_write_file(canvas, "tessellation.bmp");
+    raster_canvas_write_file(canvas, "tessellation.bmp");
     usleep(100000);
 }
 
@@ -948,7 +948,7 @@ point_in_polygon(DcelHalfEdge* start_half_edge, double x, double y) {
     return winding % 2 != 0;
 }
 
-void dcel_render(Dcel* dcel, Canvas* canvas) {
+void dcel_render(Dcel* dcel, RasterCanvas* canvas) {
     RELEASE_ASSERT(dcel);
     RELEASE_ASSERT(canvas);
 
@@ -1002,7 +1002,7 @@ void dcel_render(Dcel* dcel, Canvas* canvas) {
             // uint32_t color = face_sign < 0.0 ? 0xff0000ff : 0x00ff00ff;
             uint32_t color = color_from_ptr((void*)curr_half_edge);
 
-            canvas_draw_circle(
+            raster_canvas_draw_circle(
                 canvas,
                 (curr_half_edge->origin->x + curr_half_edge->twin->origin->x)
                         / 2.0
@@ -1014,7 +1014,7 @@ void dcel_render(Dcel* dcel, Canvas* canvas) {
                 (face_sign > 0.0) == in_poly ? 0x00ff00ff : 0xff0000ff
             );
 
-            canvas_draw_circle(
+            raster_canvas_draw_circle(
                 canvas,
                 (curr_half_edge->origin->x + curr_half_edge->twin->origin->x)
                         / 2.0
@@ -1026,7 +1026,7 @@ void dcel_render(Dcel* dcel, Canvas* canvas) {
                 color
             );
 
-            canvas_draw_arrow(
+            raster_canvas_draw_arrow(
                 canvas,
                 curr_half_edge->origin->x + offset_x,
                 curr_half_edge->origin->y + offset_y,

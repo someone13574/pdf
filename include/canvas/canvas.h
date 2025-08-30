@@ -6,7 +6,7 @@
 
 typedef struct Canvas Canvas;
 
-Canvas* canvas_new(
+Canvas* canvas_new_raster(
     Arena* arena,
     uint32_t width,
     uint32_t height,
@@ -14,11 +14,7 @@ Canvas* canvas_new(
     double coordinate_scale
 );
 
-uint32_t canvas_width(Canvas* canvas);
-uint32_t canvas_height(Canvas* canvas);
-
-uint32_t canvas_get_rgba(Canvas* canvas, uint32_t x, uint32_t y);
-void canvas_set_rgba(Canvas* canvas, uint32_t x, uint32_t y, uint32_t rgba);
+Canvas* canvas_new_scalable(Arena* arena, uint32_t width, uint32_t height);
 
 void canvas_draw_circle(
     Canvas* canvas,
@@ -27,6 +23,7 @@ void canvas_draw_circle(
     double radius,
     uint32_t rgba
 );
+
 void canvas_draw_line(
     Canvas* canvas,
     double x1,
@@ -36,16 +33,7 @@ void canvas_draw_line(
     double radius,
     uint32_t rgba
 );
-void canvas_draw_arrow(
-    Canvas* canvas,
-    double x1,
-    double y1,
-    double x2,
-    double y2,
-    double radius,
-    double tip_radius,
-    uint32_t rgba
-);
+
 void canvas_draw_bezier(
     Canvas* canvas,
     double x1,
@@ -59,4 +47,5 @@ void canvas_draw_bezier(
     uint32_t rgba
 );
 
+/// Writes the canvas to a file. Returns `true` on success.
 bool canvas_write_file(Canvas* canvas, const char* path);

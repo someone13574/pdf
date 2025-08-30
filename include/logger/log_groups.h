@@ -5,6 +5,7 @@
     X(EXAMPLE, TRACE, GLOBAL)                                                  \
     X(TEST, TRACE, GLOBAL)                                                     \
     X(ARENA, OFF, GLOBAL)                                                      \
+    X(STRING, INHERIT, ARENA)                                                  \
     X(ARRAY, INHERIT, ARENA)                                                   \
     X(VEC, INHERIT, ARENA)                                                     \
     X(LINKED_LIST, INHERIT, ARENA)                                             \

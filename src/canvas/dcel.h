@@ -1,7 +1,7 @@
 #pragma once
 
 #include "arena/arena.h"
-#include "canvas/canvas.h"
+#include "raster_canvas.h"
 
 typedef struct DcelVertex DcelVertex;
 typedef struct DcelHalfEdge DcelHalfEdge;
@@ -79,4 +79,4 @@ void dcel_overlay(Dcel* dcel);
 void dcel_assign_faces(Dcel* dcel);
 void dcel_partition(Dcel* dcel);
 
-void dcel_render(Dcel* dcel, Canvas* canvas);
+void dcel_render(Dcel* dcel, RasterCanvas* canvas);

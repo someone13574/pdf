@@ -1,6 +1,7 @@
 #include "canvas/path_builder.h"
 
 #include "arena/arena.h"
+#include "canvas.h"
 #include "canvas/canvas.h"
 #include "dcel.h"
 #include "logger/log.h"
@@ -90,7 +91,7 @@ void path_builder_end_contour(PathBuilder* builder) {
 Canvas*
 path_builder_render(PathBuilder* builder, uint32_t width, uint32_t height) {
     uint32_t resolution_multiplier = 2;
-    Canvas* canvas = canvas_new(
+    RasterCanvas* canvas = raster_canvas_new(
         builder->arena,
         width * resolution_multiplier,
         height * resolution_multiplier,
@@ -103,5 +104,5 @@ path_builder_render(PathBuilder* builder, uint32_t width, uint32_t height) {
     // dcel_partition(builder->dcel);
     dcel_render(builder->dcel, canvas);
 
-    return canvas;
+    return canvas_from_raster(builder->arena, canvas);
 }
