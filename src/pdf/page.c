@@ -95,10 +95,7 @@ PdfError* pdf_deserialize_page(
             PdfPage,
             "MediaBox",
             media_box,
-            PDF_OPTIONAL_FIELD(
-                PdfOpArray,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_ARRAY)
-            )
+            PDF_CUSTOM_FIELD(pdf_deserialize_rectangle_wrapper)
         ),
         PDF_FIELD(
             PdfPage,

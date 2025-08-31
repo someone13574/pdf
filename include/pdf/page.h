@@ -3,6 +3,7 @@
 #include "pdf/deserde_types.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
 // Page tree node
 typedef struct {
@@ -29,7 +30,7 @@ typedef struct {
     PdfName type;
     PdfPageTreeNodeRef parent;
     PdfOpDict resources;
-    PdfOpArray media_box;
+    PdfRectangle media_box;
     PdfOpContentsArray contents;
     PdfObject* raw_dict;
 } PdfPage;

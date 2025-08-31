@@ -19,3 +19,21 @@ PdfError* pdf_deserialize_number_wrapper(
     PdfOptionalResolver resolver,
     void* deserialized
 );
+
+PdfReal pdf_number_as_real(PdfNumber number);
+
+typedef struct {
+    PdfNumber lower_left_x;
+    PdfNumber lower_left_y;
+    PdfNumber upper_right_x;
+    PdfNumber upper_right_y;
+} PdfRectangle;
+
+PdfError*
+pdf_deserialize_rectangle(PdfObject* object, PdfRectangle* deserialized);
+PdfError* pdf_deserialize_rectangle_wrapper(
+    PdfObject* object,
+    Arena* arena,
+    PdfOptionalResolver resolver,
+    void* deserialized
+);

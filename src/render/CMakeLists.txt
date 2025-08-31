@@ -1,0 +1,10 @@
+add_library(render
+    render.c "${pdf_SOURCE_DIR}/include/render/render.h"
+    graphics_state.c graphics_state.h
+    text_state.c text_state.h)
+target_include_directories(render PUBLIC "${pdf_SOURCE_DIR}/include")
+target_link_libraries(render PUBLIC arena canvas geom pdf)
+target_link_libraries(render PRIVATE pdf-logger)
+target_compile_features(render PUBLIC c_std_23)
+target_compile_options(render PRIVATE -fsanitize=address)
+target_link_options(render PRIVATE -fsanitize=address)

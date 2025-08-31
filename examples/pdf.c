@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "arena/arena.h"
+#include "canvas/canvas.h"
 #include "logger/log.h"
 #include "pdf/catalog.h"
 #include "pdf/content_stream.h"
@@ -11,6 +12,7 @@
 #include "pdf/page.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
+#include "render/render.h"
 
 static char*
 load_file_to_buffer(Arena* arena, const char* path, size_t* out_size) {
@@ -83,26 +85,30 @@ int main(int argc, char** argv) {
 
         printf("%s\n", pdf_fmt_object(arena, page.raw_dict));
 
-        if (page.contents.discriminant) {
-            for (size_t contents_idx = 0;
-                 contents_idx < pdf_void_vec_len(page.contents.value.elements);
-                 contents_idx++) {
-                void* content_ptr;
-                RELEASE_ASSERT(pdf_void_vec_get(
-                    page.contents.value.elements,
-                    contents_idx,
-                    &content_ptr
-                ));
-                PdfStream* content = content_ptr;
+        Canvas* canvas = render_page(arena, &page);
+        canvas_write_file(canvas, "test.svg");
 
-                printf("%s\n", content->stream_bytes);
+        // if (page.contents.discriminant) {
+        //     for (size_t contents_idx = 0;
+        //          contents_idx <
+        //          pdf_void_vec_len(page.contents.value.elements);
+        //          contents_idx++) {
+        //         void* content_ptr;
+        //         RELEASE_ASSERT(pdf_void_vec_get(
+        //             page.contents.value.elements,
+        //             contents_idx,
+        //             &content_ptr
+        //         ));
+        //         PdfStream* content = content_ptr;
 
-                PdfContentStream stream;
-                PDF_REQUIRE(
-                    pdf_deserialize_content_stream(content, arena, &stream)
-                );
-            }
-        }
+        //         printf("%s\n", content->stream_bytes);
+
+        //         PdfContentStream stream;
+        //         PDF_REQUIRE(
+        //             pdf_deserialize_content_stream(content, arena, &stream)
+        //         );
+        //     }
+        // }
     }
 
     LOG_DIAG(INFO, EXAMPLE, "Finished");
