@@ -14,4 +14,4 @@ typedef struct {
 } GeomMat3;
 
 /// Creates a new 3x3 identity matrix
-GeomMat3 geom_mat3_identity();
+GeomMat3 geom_mat3_identity(void);

@@ -1,6 +1,8 @@
 #ifndef DARRAY_DECL_H
 #define DARRAY_DECL_H
 
+#include <stdbool.h>
+
 #include "arena.h"
 
 #endif // DARRAY_DECL_H
@@ -40,11 +42,8 @@ DARRAY_NAME* DARRAY_FN(new_init)(
 );
 
 // Creates a new arena-backed array from an array initializer list
-DARRAY_NAME* DARRAY_FN(new_from)(
-    Arena* arena,
-    size_t num_elements,
-    DARRAY_TYPE arr[num_elements]
-);
+DARRAY_NAME*
+    DARRAY_FN(new_from)(Arena* arena, size_t num_elements, DARRAY_TYPE* arr);
 
 // Gets the element stored at index `idx` and stores it in `out`. If the index
 // is out of bounds, false is returned and `out` isn't set.

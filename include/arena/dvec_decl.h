@@ -1,6 +1,8 @@
 #ifndef DVEC_DECL_H
 #define DVEC_DECL_H
 
+#include <stdbool.h>
+
 #include "arena/arena.h"
 
 #endif // DVEC_DECL_H

@@ -845,9 +845,7 @@ PdfError* pdf_parse_indirect(
     }
 }
 
-static char* format_alloc(Arena* arena, const char* fmt, ...)
-    __attribute__((format(printf, 2, 3)));
-
+// TODO: Replace with arena-string
 static char* format_alloc(Arena* arena, const char* fmt, ...) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(fmt);
@@ -1052,7 +1050,7 @@ char* pdf_fmt_object(Arena* arena, PdfObject* object) {
     Arena* temp_arena = arena_new(512);
     char* formatted = pdf_fmt_object_indented(temp_arena, object, 0, NULL);
 
-    unsigned long len = strlen(formatted);
+    size_t len = (size_t)strlen(formatted);
     char* allocated = arena_alloc(arena, sizeof(char) * (len + 1));
     strncpy(allocated, formatted, (size_t)len + 1);
     arena_free(temp_arena);
@@ -1353,7 +1351,7 @@ TEST_FUNC(test_object_array) {
     TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 2, &element2));
     TEST_ASSERT(element2);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_BOOLEAN, element2->type);
-    TEST_ASSERT_EQ(false, element2->data.boolean);
+    TEST_ASSERT(!element2->data.boolean);
 
     PdfObject* element3;
     TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 3, &element3));
@@ -1395,7 +1393,7 @@ TEST_FUNC(test_object_array_whitespace) {
     TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 2, &element2));
     TEST_ASSERT(element2);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_BOOLEAN, element2->type);
-    TEST_ASSERT_EQ(false, element2->data.boolean);
+    TEST_ASSERT(!element2->data.boolean);
 
     PdfObject* element3;
     TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 3, &element3));
@@ -1560,7 +1558,7 @@ TEST_FUNC(test_object_dict) {
     TEST_ASSERT_EQ("Item2", sub1.key->data.name);
     TEST_ASSERT(sub1.value);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_BOOLEAN, sub1.value->type);
-    TEST_ASSERT_EQ(true, sub1.value->data.boolean);
+    TEST_ASSERT(sub1.value->data.boolean);
 
     PdfDictEntry sub2;
     TEST_ASSERT(pdf_dict_entry_vec_get(subdict, 2, &sub2));

@@ -2,6 +2,8 @@
 
 #ifdef TEST
 
+#include <stdbool.h>
+
 #include "logger/log.h"
 
 #if defined(SOURCE_PATH_SIZE)
@@ -131,7 +133,8 @@ TestResult __test_assert_ne_str(
         __typeof__(eps) _eps = (eps);                                          \
         _Static_assert(                                                        \
             __builtin_types_compatible_p(__typeof__(_a), __typeof__(_b))       \
-            || (__TEST_TYPE_IS_STR(_a) && __TEST_TYPE_IS_STR(_b))              \
+                || (__TEST_TYPE_IS_STR(_a) && __TEST_TYPE_IS_STR(_b)),         \
+            "lhs and rhs types are not compatible"                             \
         );                                                                     \
         if (__TEST_ASSERT_CMP_FN(_a, eq)(                                      \
                 _a,                                                            \
@@ -157,7 +160,8 @@ TestResult __test_assert_ne_str(
         __typeof__(eps) _eps = eps;                                            \
         _Static_assert(                                                        \
             __builtin_types_compatible_p(__typeof__(_a), __typeof__(_b))       \
-            || (__TEST_TYPE_IS_STR(_a) && __TEST_TYPE_IS_STR(_b))              \
+                || (__TEST_TYPE_IS_STR(_a) && __TEST_TYPE_IS_STR(_b)),         \
+            "lhs and rhs types are not compatible"                             \
         );                                                                     \
         if (__TEST_ASSERT_CMP_FN(_a, ne __VA_OPT__(, ) __VA_ARGS__)(           \
                 _a,                                                            \

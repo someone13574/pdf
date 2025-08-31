@@ -61,7 +61,7 @@ PdfError* pdf_ctx_seek(PdfCtx* ctx, size_t offset) {
     return NULL;
 }
 
-PdfError* pdf_ctx_shift(PdfCtx* ctx, ssize_t relative_offset) {
+PdfError* pdf_ctx_shift(PdfCtx* ctx, int64_t relative_offset) {
     RELEASE_ASSERT(ctx);
     LOG_DIAG(TRACE, CTX, "Shifting offset by %ld", relative_offset);
 

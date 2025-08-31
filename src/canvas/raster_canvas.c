@@ -362,7 +362,8 @@ bool raster_canvas_write_file(RasterCanvas* canvas, const char* path) {
         return false;
     }
 
-    unsigned long written = fwrite(canvas->data, 1, canvas->file_size, file);
+    unsigned long written =
+        (unsigned long)fwrite(canvas->data, 1, canvas->file_size, file);
     fclose(file);
 
     return written == canvas->file_size;

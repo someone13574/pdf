@@ -313,7 +313,7 @@ TestResult __test_assert_ne_str(
 __attribute__((weak)) extern _TestFuncEntry __start_test_registry[];
 __attribute__((weak)) extern _TestFuncEntry __stop_test_registry[];
 
-static void print_line() {
+static void print_line(void) {
     struct winsize w;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) < 0 || w.ws_col == 0) {
         w.ws_col = 80; // fallback
@@ -393,7 +393,7 @@ int test_entry(void) {
             // Save stdout into buffer
             char* buffer = NULL;
             size_t buffer_size = 0;
-            ssize_t bytes_read;
+            int64_t bytes_read;
             char read_buf[4096];
 
             while ((bytes_read = read(pipefd[0], read_buf, sizeof(read_buf)))

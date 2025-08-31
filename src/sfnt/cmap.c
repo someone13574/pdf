@@ -181,8 +181,6 @@ PdfError* sfnt_cmap_get_encoding(
             LOG_TODO("Unimplemented cmap format %d", format);
         }
     }
-
-    return NULL;
 }
 
 uint16_t cmap_format4_map(SfntCmapFormat4* subtable, uint16_t cid) {

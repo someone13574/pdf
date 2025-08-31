@@ -1,5 +1,9 @@
 #pragma once
 
+#include <stdbool.h>
+
+#include "attributes.h"
+
 typedef enum {
     PDF_ERR_INVALID_VERSION,
     PDF_ERR_INVALID_TRAILER,
@@ -42,7 +46,7 @@ typedef enum {
 
 typedef struct PdfError PdfError;
 
-PdfError* pdf_error_new(PdfErrorCode code) __attribute__((returns_nonnull));
+PdfError* pdf_error_new(PdfErrorCode code) RET_NONNULL_ATTR;
 void pdf_error_free(PdfError* error);
 
 PdfError* pdf_error_add_context(
@@ -52,12 +56,12 @@ PdfError* pdf_error_add_context(
     unsigned long line,
     const char* fmt,
     ...
-) __attribute__((returns_nonnull)) __attribute__((format(printf, 5, 6)));
+) RET_NONNULL_ATTR FORMAT_ATTR(5, 6);
 PdfErrorCode pdf_error_code(PdfError* error);
 
 void pdf_error_print(PdfError* error);
 void pdf_error_unwrap(PdfError* error, const char* file, unsigned long line)
-    __attribute__((noreturn));
+    NORETURN_ATTR;
 bool pdf_error_free_is_ok(PdfError* error);
 
 #if defined(SOURCE_PATH_SIZE)

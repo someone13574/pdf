@@ -80,8 +80,14 @@ void arena_free(Arena* arena) {
     free(arena);
 }
 
+#ifdef _MSC_VER
+enum { ALIGN_MAX = alignof(size_t) };
+#else
+enum { ALIGN_MAX = alignof(max_align_t) };
+#endif
+
 void* arena_alloc(Arena* arena, size_t size) {
-    return arena_alloc_align(arena, size, alignof(max_align_t));
+    return arena_alloc_align(arena, size, ALIGN_MAX);
 }
 
 void* arena_alloc_align(Arena* arena, size_t size, size_t align) {
@@ -136,7 +142,7 @@ void* arena_alloc_align(Arena* arena, size_t size, size_t align) {
     arena->num_blocks++;
 
     size_t block_size = arena->next_block_size;
-    while (block_size < size + (align == alignof(max_align_t) ? 0 : align)
+    while (block_size < size + (align == ALIGN_MAX ? 0 : align)
     ) { // Ensure there is enough space
         RELEASE_ASSERT(
             block_size < MAX_BLOCK_SIZE / 2,

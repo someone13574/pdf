@@ -30,11 +30,11 @@ static void process_content_stream(
             pdf_content_op_vec_get(content_stream->operations, idx, &op)
         );
 
-        switch (op.kind) {
-            default: {
-                LOG_TODO("Unimplemented content operation %d", op.kind);
-            }
-        }
+        // switch (op.kind) {
+        //     default: {
+        //         LOG_TODO("Unimplemented content operation %d", op.kind);
+        //     }
+        // }
     }
 }
 

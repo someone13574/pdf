@@ -15,11 +15,11 @@ typedef struct {
     // text_knockout
 } TextState;
 
-TextState text_state_default();
+TextState text_state_default(void);
 
 typedef struct {
     GeomMat3 text_matrix; // T_m
     GeomMat3 text_line_matrix; // T_lm
 } TextObjectState;
 
-TextObjectState text_object_state_default();
+TextObjectState text_object_state_default(void);

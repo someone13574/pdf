@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 
+#include "attributes.h"
 #include "log_groups.h"
 
 typedef enum {
@@ -25,8 +26,7 @@ typedef enum {
 #define LOG_EXPAND_INHERIT(parent) LOG_GROUP_##parent##_VERBOSITY
 
 #define X(group, verbosity, parent)                                            \
-    static const LogDiagVerbosity LOG_GROUP_##group##_VERBOSITY =              \
-        LOG_EXPAND_##verbosity(parent);
+    enum { LOG_GROUP_##group##_VERBOSITY = LOG_EXPAND_##verbosity(parent) };
 
 LOG_GROUPS
 
@@ -46,7 +46,7 @@ void logger_log(
     unsigned long line,
     const char* fmt,
     ...
-) __attribute__((format(printf, 7, 8)));
+) FORMAT_ATTR(7, 8);
 
 #if defined(SOURCE_PATH_SIZE)
 #define RELATIVE_FILE_PATH (&__FILE__[SOURCE_PATH_SIZE])
@@ -56,12 +56,13 @@ void logger_log(
 
 #define LOG_DIAG(verbosity, group, ...)                                        \
     do {                                                                       \
-        if (LOG_DIAG_VERBOSITY_##verbosity >= LOG_GROUP_##group##_VERBOSITY) { \
+        if ((int)LOG_DIAG_VERBOSITY_##verbosity                                \
+            >= (int)LOG_GROUP_##group##_VERBOSITY) {                           \
             logger_log(                                                        \
                 #group,                                                        \
                 LOG_SEVERITY_DIAG,                                             \
                 LOG_DIAG_VERBOSITY_##verbosity,                                \
-                LOG_GROUP_##group##_VERBOSITY,                                 \
+                (LogDiagVerbosity)LOG_GROUP_##group##_VERBOSITY,               \
                 RELATIVE_FILE_PATH,                                            \
                 __LINE__,                                                      \
                 __VA_ARGS__                                                    \

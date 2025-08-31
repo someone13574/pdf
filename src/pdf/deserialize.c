@@ -718,7 +718,7 @@ TEST_FUNC(test_deserialize_objects) {
         &deserialized
     ));
 
-    TEST_ASSERT_EQ(true, deserialized.boolean);
+    TEST_ASSERT(deserialized.boolean);
     TEST_ASSERT_EQ(42, deserialized.integer);
     TEST_ASSERT_EQ(42.5, deserialized.real);
     TEST_ASSERT_EQ("test", deserialized.string);
