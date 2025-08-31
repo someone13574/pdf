@@ -5,27 +5,27 @@
 
 typedef enum {
     // General graphics state
-    PDF_OPERATOR_w, // Set the line width in the graphics state.
-    PDF_OPERATOR_J, // Set the line cap style in the graphics state.
-    PDF_OPERATOR_j, // Set the line join style in the graphics state.
-    PDF_OPERATOR_M, // Set the miter limit in the graphics state.
-    PDF_OPERATOR_d, // Set the line dash pattern in the graphics state.
+    PDF_OPERATOR_w,  // Set the line width in the graphics state.
+    PDF_OPERATOR_J,  // Set the line cap style in the graphics state.
+    PDF_OPERATOR_j,  // Set the line join style in the graphics state.
+    PDF_OPERATOR_M,  // Set the miter limit in the graphics state.
+    PDF_OPERATOR_d,  // Set the line dash pattern in the graphics state.
     PDF_OPERATOR_ri, // Set the colour rendering intent in the graphics state.
-    PDF_OPERATOR_i, // Set the flatness tolerance in the graphics state
-                    // (see 10.6.2, "Flatness Tolerance"). flatness is a number
-                    // in the range 0 to 100; a value of 0 shall specify the
-                    // output device’s default flatness tolerance.
+    PDF_OPERATOR_i,  // Set the flatness tolerance in the graphics state
+                     // (see 10.6.2, "Flatness Tolerance"). flatness is a number
+                     // in the range 0 to 100; a value of 0 shall specify the
+                     // output device’s default flatness tolerance.
     PDF_OPERATOR_gs, // Set the specified parameters in the graphics state.
                      // dictName shall be the name of a graphics state parameter
                      // dictionary in the ExtGState subdictionary of the current
                      // resource dictionary.
 
     // Special graphics state
-    PDF_OPERATOR_q, // Save the current graphics state on the graphics state
-                    // stack.
-    PDF_OPERATOR_Q, // Restore the graphics state by removing the most recently
-                    // saved state from the stack and making it the current
-                    // state.
+    PDF_OPERATOR_q,  // Save the current graphics state on the graphics state
+                     // stack.
+    PDF_OPERATOR_Q,  // Restore the graphics state by removing the most recently
+                     // saved state from the stack and making it the current
+                     // state.
     PDF_OPERATOR_cm, // Modify the current transformation matrix (CTM) by
                      // concatenating the specified matrix (see 8.3.2,
                      // "Coordinate Spaces"). Although the operands specify a
@@ -177,25 +177,25 @@ typedef enum {
                          // coordinate.
 
     // Text showing
-    PDF_OPERATOR_Tj, // Show a text string.
-    PDF_OPERATOR_TJ, // Show one or more text strings, allowing
-                     // individual glyph positioning. Each element of
-                     // array shall be either a string or a number. If
-                     // the element is a string, this operator shall
-                     // show the string. If it is a number, the
-                     // operator shall adjust the text position by
-                     // that amount; that is, it shall translate the
-                     // text matrix, Tm. The number shall be
-                     // expressed in thousandths of a unit of text
-                     // space (see 9.4.4, "Text Space Details"). This
-                     // amount shall be subtracted from the current
-                     // horizontal or vertical coordinate, depending
-                     // on the writing mode. In the default coordinate
-                     // system, a positive adjustment has the effect
-                     // of moving the next glyph painted either to the
-                     // left or down by the given amount. Figure 46
-                     // shows an example of the effect of passing
-                     // offsets to TJ.
+    PDF_OPERATOR_Tj,           // Show a text string.
+    PDF_OPERATOR_TJ,           // Show one or more text strings, allowing
+                               // individual glyph positioning. Each element of
+                               // array shall be either a string or a number. If
+                               // the element is a string, this operator shall
+                               // show the string. If it is a number, the
+                               // operator shall adjust the text position by
+                               // that amount; that is, it shall translate the
+                               // text matrix, Tm. The number shall be
+                               // expressed in thousandths of a unit of text
+                               // space (see 9.4.4, "Text Space Details"). This
+                               // amount shall be subtracted from the current
+                               // horizontal or vertical coordinate, depending
+                               // on the writing mode. In the default coordinate
+                               // system, a positive adjustment has the effect
+                               // of moving the next glyph painted either to the
+                               // left or down by the given amount. Figure 46
+                               // shows an example of the effect of passing
+                               // offsets to TJ.
     PDF_OPERATOR_single_quote, //  Move to the next line and show a text string.
                                //  This
                                // operator shall have the same effect as the
@@ -217,34 +217,34 @@ typedef enum {
     PDF_OPERATOR_d1,
 
     // Color
-    PDF_OPERATOR_CS, // Set the current colour space to use for stroking
-                     // operations.
-    PDF_OPERATOR_cs, // Same as CS but used for nonstroking operations.
-    PDF_OPERATOR_SC, // Set the colour to use for stroking operations in a
-                     // device, CIE- based (other than ICCBased), or Indexed
-                     // colour space. The number of operands required and their
-                     // interpretation depends on the current stroking colour
-                     // space.
+    PDF_OPERATOR_CS,  // Set the current colour space to use for stroking
+                      // operations.
+    PDF_OPERATOR_cs,  // Same as CS but used for nonstroking operations.
+    PDF_OPERATOR_SC,  // Set the colour to use for stroking operations in a
+                      // device, CIE- based (other than ICCBased), or Indexed
+                      // colour space. The number of operands required and their
+                      // interpretation depends on the current stroking colour
+                      // space.
     PDF_OPERATOR_SCN, // Same as SC but also supports Pattern, Separation,
                       // DeviceN and ICCBased colour spaces.
-    PDF_OPERATOR_sc, // Same as SC but used for nonstroking operations.
+    PDF_OPERATOR_sc,  // Same as SC but used for nonstroking operations.
     PDF_OPERATOR_scn, // Same as SCN but used for nonstroking operations.
-    PDF_OPERATOR_G, // Set the stroking colour space to DeviceGray (or the
-                    // DefaultGray colour space; see 8.6.5.6, "Default Colour
-                    // Spaces") and set the gray level to use for stroking
-                    // operations. gray shall be a number between 0.0 (black)
-                    // and 1.0 (white).
-    PDF_OPERATOR_g, // Same as G but used for nonstroking operations.
-    PDF_OPERATOR_RG, // Set the stroking colour space to DeviceRGB (or the
-                     // DefaultRGB colour space; see 8.6.5.6, "Default Colour
-                     // Spaces") and set the colour to use for stroking
-                     // operations. Each operand shall be a number between 0.0
-                     // (minimum intensity) and 1.0 (maximum intensity).
-    PDF_OPERATOR_rg, // Same as RG but used for nonstroking operations.
-    PDF_OPERATOR_K, // Set the stroking colour space to DeviceCMYK (or the
-                    // DefaultCMYK colour space; see 8.6.5.6, "Default Colour
-                    // Spaces") and set the colour to use for stroking
-                    // operations. Each operand shall be a number between 0.0
+    PDF_OPERATOR_G,   // Set the stroking colour space to DeviceGray (or the
+                      // DefaultGray colour space; see 8.6.5.6, "Default Colour
+                      // Spaces") and set the gray level to use for stroking
+                      // operations. gray shall be a number between 0.0 (black)
+                      // and 1.0 (white).
+    PDF_OPERATOR_g,   // Same as G but used for nonstroking operations.
+    PDF_OPERATOR_RG,  // Set the stroking colour space to DeviceRGB (or the
+                      // DefaultRGB colour space; see 8.6.5.6, "Default Colour
+                      // Spaces") and set the colour to use for stroking
+                      // operations. Each operand shall be a number between 0.0
+                      // (minimum intensity) and 1.0 (maximum intensity).
+    PDF_OPERATOR_rg,  // Same as RG but used for nonstroking operations.
+    PDF_OPERATOR_K,   // Set the stroking colour space to DeviceCMYK (or the
+                      // DefaultCMYK colour space; see 8.6.5.6, "Default Colour
+                      // Spaces") and set the colour to use for stroking
+                      // operations. Each operand shall be a number between 0.0
                     // (zero concentration) and 1.0 (maximum concentration). The
                     // behaviour of this operator is affected by the overprint
                     // mode (see 8.6.7, "Overprint Control").
@@ -302,9 +302,9 @@ typedef enum {
     PDF_OPERATOR_BX, // Begin a compatibility section. Unrecognized operators
                      // (along with their operands) shall be ignored without
                      // error until the balancing EX operator is encountered.
-    PDF_OPERATOR_EX // End a compatibility section begun by a balancing BX
-                    // operator. Ignore any unrecognized operands and operators
-                    // from previous matching BX onward.
+    PDF_OPERATOR_EX  // End a compatibility section begun by a balancing BX
+                     // operator. Ignore any unrecognized operands and operators
+                     // from previous matching BX onward.
 } PdfOperator;
 
 PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator);

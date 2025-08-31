@@ -61,7 +61,8 @@ PdfError* deserialize_field(
     PdfObject resolved_object;
 
     bool is_ref_field = field_info.kind == PDF_FIELD_KIND_REF;
-    bool is_indirect_obj_field = field_info.kind == PDF_FIELD_KIND_OBJECT
+    bool is_indirect_obj_field =
+        field_info.kind == PDF_FIELD_KIND_OBJECT
         && (field_info.data.object.type == PDF_OBJECT_TYPE_INDIRECT_REF
             || field_info.data.object.type == PDF_OBJECT_TYPE_INDIRECT_OBJECT);
     if (is_ref_field || is_indirect_obj_field) {
@@ -461,7 +462,8 @@ PdfError* pdf_deserialize_object(
             field->info.kind
         );
 
-        for (size_t entry_idx = 0; entry_idx
+        for (size_t entry_idx = 0;
+             entry_idx
              < pdf_dict_entry_vec_len(resolved_object.data.dict.entries);
              entry_idx++) {
             PdfDictEntry entry;

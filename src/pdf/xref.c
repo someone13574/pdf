@@ -258,7 +258,7 @@ PdfError* pdf_xref_get_entry(
 
         if (object_id < subsection->first_object
             || object_id
-                >= subsection->first_object + subsection->num_entries) {
+                   >= subsection->first_object + subsection->num_entries) {
             continue;
         }
 

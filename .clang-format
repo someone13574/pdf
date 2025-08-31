@@ -1,95 +1,35 @@
-AccessModifierOffset: -2
+---
+BasedOnStyle: InheritParentConfig
 AlignAfterOpenBracket: BlockIndent
-AlignConsecutiveMacros: false
-AlignConsecutiveAssignments: false
-AlignConsecutiveDeclarations: false
+AlignArrayOfStructures: Right
+AlignConsecutiveAssignments: {}
+AlignConsecutiveBitFields: {}
 AlignEscapedNewlines: Right
-AlignOperands: false
-AlignTrailingComments: false
-AllowAllArgumentsOnNextLine: false
-AllowAllConstructorInitializersOnNextLine: false
-AllowAllParametersOfDeclarationOnNextLine: false
-AllowShortBlocksOnASingleLine: Empty
-AllowShortCaseLabelsOnASingleLine: false
-AllowShortFunctionsOnASingleLine: Empty
-AllowShortIfStatementsOnASingleLine: Never
-AllowShortLambdasOnASingleLine: All
-AllowShortLoopsOnASingleLine: false
-AlwaysBreakAfterReturnType: None
-AlwaysBreakBeforeMultilineStrings: true
-AlwaysBreakTemplateDeclarations: Yes
-BinPackArguments: false
-BinPackParameters: false
-BreakAfterAttributes: Always
-BreakBeforeBinaryOperators: NonAssignment
-BreakBeforeBraces: Attach
-BreakBeforeTernaryOperators: true
-BreakConstructorInitializers: AfterColon
-BreakInheritanceList: AfterColon
-BreakStringLiterals: false
-ColumnLimit: 80
-CompactNamespaces: false
-ConstructorInitializerAllOnOneLineOrOnePerLine: true
-ConstructorInitializerIndentWidth: 4
-ContinuationIndentWidth: 4
-Cpp11BracedListStyle: true
-DerivePointerAlignment: false
-EmptyLineAfterAccessModifier: Never
-EmptyLineBeforeAccessModifier: Always
-FixNamespaceComments: true
-IncludeBlocks: Regroup
-IncludeCategories:
-  - Regex:           '^<ext/.*\.h>'
-    Priority:        2
-    SortPriority:    0
-    CaseSensitive:   false
-  - Regex:           '^<.*\.h>'
-    Priority:        1
-    SortPriority:    0
-    CaseSensitive:   false
-  - Regex:           '^<.*'
-    Priority:        2
-    SortPriority:    0
-    CaseSensitive:   false
-  - Regex:           '.*'
-    Priority:        3
-    SortPriority:    0
-    CaseSensitive:   false
-IncludeIsMainRegex: '([-_](test|unittest))?$'
-IndentCaseLabels: true
-IndentPPDirectives: None
+UseTab: Never
 IndentWidth: 4
-IndentWrappedFunctionNames: false
+ColumnLimit: 80
+IncludeBlocks: Regroup
+AllowAllArgumentsOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+BinPackParameters: false
+BinPackArguments: false
+IndentCaseLabels: true
 InsertBraces: true
 InsertNewlineAtEOF: true
-KeepEmptyLinesAtTheStartOfBlocks: false
 LineEnding: LF
-MaxEmptyLinesToKeep: 1
-NamespaceIndentation: Inner
-PointerAlignment: Left
-QualifierAlignment: Left
-ReferenceAlignment: Left
 ReflowComments: true
-RemoveSemicolon: true
-SeparateDefinitionBlocks: Always
-SortIncludes: true
-SortUsingDeclarations: true
-SpaceAfterCStyleCast: false
-SpaceAfterLogicalNot: false
-SpaceAfterTemplateKeyword: false
-SpaceBeforeAssignmentOperators: true
+PointerAlignment: Left
+AlignOperands: AlignAfterOperator
+BreakBeforeBinaryOperators: NonAssignment
+IncludeCategories:
+  - Regex: ^<.*\.h>
+    Priority: 1
+    CaseSensitive: false
+    SortPriority: 0
+  - Regex: .*
+    Priority: 2
+    CaseSensitive: false
+    SortPriority: 0
+IncludeIsMainRegex: ""
+BreakStringLiterals: false
 SpaceBeforeCpp11BracedList: true
-SpaceBeforeCtorInitializerColon: true
-SpaceBeforeInheritanceColon: false
-SpaceBeforeParens: ControlStatements
-SpaceBeforeRangeBasedForLoopColon: true
-SpaceInEmptyParentheses: false
-SpacesBeforeTrailingComments: 1
-SpacesInAngles: false
-SpacesInCStyleCastParentheses: false
-SpacesInContainerLiterals: false
-SpacesInParentheses: false
-SpacesInSquareBrackets: false
-Standard: Cpp11
-TabWidth: 4
-UseTab: Never

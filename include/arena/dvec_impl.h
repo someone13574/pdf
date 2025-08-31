@@ -21,9 +21,7 @@ static int clzll(unsigned long long x) {
     return 64;
 }
 #else
-static int clzll(unsigned long long x) {
-    return __builtin_clzll(x);
-}
+static int clzll(unsigned long long x) { return __builtin_clzll(x); }
 #endif
 
 #endif // DVEC_IMPL_H

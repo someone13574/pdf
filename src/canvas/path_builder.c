@@ -30,9 +30,10 @@ void path_builder_new_contour(PathBuilder* builder, double x, double y) {
     PathContour* contour = path_contour_new(builder->arena);
     path_contour_push(
         contour,
-        (PathContourSegment
-        ) {.type = PATH_CONTOUR_SEGMENT_TYPE_START,
-           .data.start = (PathPoint) {.x = x, .y = y}}
+        (PathContourSegment) {
+            .type = PATH_CONTOUR_SEGMENT_TYPE_START,
+            .data.start = (PathPoint) {.x = x, .y = y}
+    }
     );
 
     path_contour_vec_push(builder->contours, contour);
@@ -51,9 +52,10 @@ void path_builder_line_to(PathBuilder* builder, double x, double y) {
 
     path_contour_push(
         contour,
-        (PathContourSegment
-        ) {.type = PATH_CONTOUR_SEGMENT_TYPE_LINE,
-           .data.line = (PathPoint) {.x = x, .y = y}}
+        (PathContourSegment) {
+            .type = PATH_CONTOUR_SEGMENT_TYPE_LINE,
+            .data.line = (PathPoint) {.x = x, .y = y}
+    }
     );
 }
 
@@ -76,9 +78,10 @@ void path_builder_bezier_to(
 
     path_contour_push(
         contour,
-        (PathContourSegment
-        ) {.type = PATH_CONTOUR_SEGMENT_TYPE_BEZIER,
-           .data.bezier = (PathQuadBezier
-           ) {.control.x = cx, .control.y = cy, .end.x = x, .end.y = y}}
+        (PathContourSegment) {
+            .type = PATH_CONTOUR_SEGMENT_TYPE_BEZIER,
+            .data.bezier = (PathQuadBezier
+            ) {.control.x = cx, .control.y = cy, .end.x = x, .end.y = y}
+    }
     );
 }

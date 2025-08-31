@@ -57,13 +57,13 @@ write_bmp_info_header(uint8_t* target, uint32_t width, uint32_t height) {
     RELEASE_ASSERT((int32_t)width >= 0); // the size is technically signed
     RELEASE_ASSERT((int32_t)height >= 0);
 
-    write_u32(target, 40); // header size
-    write_u32(target + 4, width); // width
+    write_u32(target, 40);         // header size
+    write_u32(target + 4, width);  // width
     write_u32(target + 8, height); // height
-    write_u16(target + 12, 1); // color planes
-    write_u16(target + 14, 32); // bits per pixel
-    write_u32(target + 16, 0); // BI_RGB
-    write_u32(target + 20, 0); // image size, can be 0 for BI_RGB
+    write_u16(target + 12, 1);     // color planes
+    write_u16(target + 14, 32);    // bits per pixel
+    write_u32(target + 16, 0);     // BI_RGB
+    write_u32(target + 20, 0);     // image size, can be 0 for BI_RGB
 }
 
 RasterCanvas* raster_canvas_new(
@@ -130,12 +130,12 @@ uint32_t raster_canvas_get_rgba(RasterCanvas* canvas, uint32_t x, uint32_t y) {
     RELEASE_ASSERT(y < canvas->height);
 
     uint32_t pixel_offset = BMP_HEADER_LEN + BMP_INFO_HEADER_LEN
-        + ((canvas->height - y - 1) * canvas->width + x) * 4;
+                          + ((canvas->height - y - 1) * canvas->width + x) * 4;
 
     return ((uint32_t)canvas->data[pixel_offset + 2] << 24)
-        | ((uint32_t)canvas->data[pixel_offset + 1] << 16)
-        | ((uint32_t)canvas->data[pixel_offset] << 8)
-        | ((uint32_t)canvas->data[pixel_offset + 3]);
+         | ((uint32_t)canvas->data[pixel_offset + 1] << 16)
+         | ((uint32_t)canvas->data[pixel_offset] << 8)
+         | ((uint32_t)canvas->data[pixel_offset + 3]);
 }
 
 void raster_canvas_set_rgba(
@@ -158,7 +158,7 @@ void raster_canvas_set_rgba(
     );
 
     uint32_t pixel_offset = BMP_HEADER_LEN + BMP_INFO_HEADER_LEN
-        + ((canvas->height - y - 1) * canvas->width + x) * 4;
+                          + ((canvas->height - y - 1) * canvas->width + x) * 4;
 
     canvas->data[pixel_offset + 2] = (uint8_t)((rgba >> 24) & 0xff);
     canvas->data[pixel_offset + 1] = (uint8_t)((rgba >> 16) & 0xff);

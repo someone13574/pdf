@@ -4,10 +4,10 @@
 #include "pdf/object.h"
 
 typedef struct {
-    PdfReal character_spacing; // T_c
-    PdfReal word_spacing; // T_w
+    PdfReal character_spacing;  // T_c
+    PdfReal word_spacing;       // T_w
     PdfReal horizontal_spacing; // T_h
-    PdfReal leading; // T_l
+    PdfReal leading;            // T_l
     // text_font T_f
     // text_font_size T_fs
     // text_mode T_mode
@@ -18,7 +18,7 @@ typedef struct {
 TextState text_state_default(void);
 
 typedef struct {
-    GeomMat3 text_matrix; // T_m
+    GeomMat3 text_matrix;      // T_m
     GeomMat3 text_line_matrix; // T_lm
 } TextObjectState;
 

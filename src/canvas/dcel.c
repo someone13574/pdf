@@ -624,7 +624,7 @@ static double signed_cycle_area(DcelHalfEdge* start_half_edge) {
     // https://en.wikipedia.org/wiki/Shoelace_formula
     do {
         signed_area += prev_point->x * half_edge->origin->y
-            - prev_point->y * half_edge->origin->x;
+                     - prev_point->y * half_edge->origin->x;
 
         prev_point = half_edge->origin;
         half_edge = half_edge->next;
@@ -903,7 +903,7 @@ static uint32_t color_from_ptr(void* ptr) {
     uint8_t a = 0xff;
 
     return ((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8)
-        | ((uint32_t)a << 0);
+         | ((uint32_t)a << 0);
 }
 
 static double point_left_of_segment(
@@ -913,7 +913,7 @@ static double point_left_of_segment(
     double y
 ) {
     return (vertex_b->x - vertex_a->x) * (y - vertex_a->y)
-        - (x - vertex_a->x) * (vertex_b->y - vertex_a->y);
+         - (x - vertex_a->x) * (vertex_b->y - vertex_a->y);
 }
 
 static bool

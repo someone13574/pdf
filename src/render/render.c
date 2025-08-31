@@ -43,9 +43,9 @@ Canvas* render_page(Arena* arena, PdfPage* page) {
     RELEASE_ASSERT(page);
 
     PdfReal width = pdf_number_as_real(page->media_box.upper_right_x)
-        - pdf_number_as_real(page->media_box.lower_left_x);
+                  - pdf_number_as_real(page->media_box.lower_left_x);
     PdfReal height = pdf_number_as_real(page->media_box.upper_right_y)
-        - pdf_number_as_real(page->media_box.lower_left_y);
+                   - pdf_number_as_real(page->media_box.lower_left_y);
 
     Canvas* canvas =
         canvas_new_scalable(arena, (uint32_t)width, (uint32_t)height);

@@ -170,10 +170,10 @@ TEST_FUNC(test_linked_mixed_operations) {
     int v;
 
     // mix: push_back, push_front, insert
-    my_test_list_push_back(list, 1); // [1]
+    my_test_list_push_back(list, 1);  // [1]
     my_test_list_push_front(list, 0); // [0,1]
-    my_test_list_insert(list, 2, 3); // [0,1,3]
-    my_test_list_insert(list, 2, 2); // [0,1,2,3]
+    my_test_list_insert(list, 2, 3);  // [0,1,3]
+    my_test_list_insert(list, 2, 2);  // [0,1,2,3]
     TEST_ASSERT_EQ((size_t)4, my_test_list_len(list));
 
     for (size_t idx = 0; idx < 4; idx++) {
@@ -234,9 +234,7 @@ TEST_FUNC(test_linked_clear) {
     return TEST_RESULT_PASS;
 }
 
-static bool int_less(int* lhs, int* rhs) {
-    return *lhs < *rhs;
-}
+static bool int_less(int* lhs, int* rhs) { return *lhs < *rhs; }
 
 TEST_FUNC(test_linked_insert_sorted_ascending) {
     Arena* arena = arena_new(1024);

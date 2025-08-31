@@ -50,9 +50,9 @@ PdfError* sfnt_subparser_new(
 
         if (byte_offset + 4 <= len) {
             sum += ((uint32_t)parent->buffer[offset + byte_offset] << 24)
-                | ((uint32_t)parent->buffer[offset + byte_offset + 1] << 16)
-                | ((uint32_t)parent->buffer[offset + byte_offset + 2] << 8)
-                | (uint32_t)parent->buffer[offset + byte_offset + 3];
+                 | ((uint32_t)parent->buffer[offset + byte_offset + 1] << 16)
+                 | ((uint32_t)parent->buffer[offset + byte_offset + 2] << 8)
+                 | (uint32_t)parent->buffer[offset + byte_offset + 3];
         } else {
             uint32_t word = 0;
 
@@ -133,7 +133,7 @@ PdfError* sfnt_parser_read_uint16(SfntParser* parser, uint16_t* out) {
     }
 
     uint32_t parsed = ((uint32_t)parser->buffer[parser->offset] << 8)
-        | (uint32_t)parser->buffer[parser->offset + 1];
+                    | (uint32_t)parser->buffer[parser->offset + 1];
     *out = (uint16_t)parsed;
     parser->offset += 2;
 
@@ -159,9 +159,9 @@ PdfError* sfnt_parser_read_uint32(SfntParser* parser, uint32_t* out) {
     }
 
     *out = ((uint32_t)parser->buffer[parser->offset] << 24)
-        | ((uint32_t)parser->buffer[parser->offset + 1] << 16)
-        | ((uint32_t)parser->buffer[parser->offset + 2] << 8)
-        | (uint32_t)parser->buffer[parser->offset + 3];
+         | ((uint32_t)parser->buffer[parser->offset + 1] << 16)
+         | ((uint32_t)parser->buffer[parser->offset + 2] << 8)
+         | (uint32_t)parser->buffer[parser->offset + 3];
     parser->offset += 4;
 
     return NULL;
@@ -186,13 +186,13 @@ PdfError* sfnt_parser_read_uint64(SfntParser* parser, uint64_t* out) {
     }
 
     *out = ((uint64_t)parser->buffer[parser->offset] << 56)
-        | ((uint64_t)parser->buffer[parser->offset + 1] << 48)
-        | ((uint64_t)parser->buffer[parser->offset + 2] << 40)
-        | ((uint64_t)parser->buffer[parser->offset + 3] << 32)
-        | ((uint64_t)parser->buffer[parser->offset + 4] << 24)
-        | ((uint64_t)parser->buffer[parser->offset + 5] << 16)
-        | ((uint64_t)parser->buffer[parser->offset + 6] << 8)
-        | (uint64_t)parser->buffer[parser->offset + 7];
+         | ((uint64_t)parser->buffer[parser->offset + 1] << 48)
+         | ((uint64_t)parser->buffer[parser->offset + 2] << 40)
+         | ((uint64_t)parser->buffer[parser->offset + 3] << 32)
+         | ((uint64_t)parser->buffer[parser->offset + 4] << 24)
+         | ((uint64_t)parser->buffer[parser->offset + 5] << 16)
+         | ((uint64_t)parser->buffer[parser->offset + 6] << 8)
+         | (uint64_t)parser->buffer[parser->offset + 7];
     parser->offset += 8;
 
     return NULL;

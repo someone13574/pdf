@@ -234,8 +234,8 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
     int32_t max_range = x_range > y_range ? x_range : y_range;
 
     double scale = (max_range > 0)
-        ? ((double)(resolution - 1) / (double)max_range) / 2.0
-        : 1.0;
+                     ? ((double)(resolution - 1) / (double)max_range) / 2.0
+                     : 1.0;
     double offset_x = ((double)resolution - 1.0 - x_range * scale) * 0.5;
     double offset_y = ((double)resolution - 1.0 - y_range * scale) * 0.5;
 
