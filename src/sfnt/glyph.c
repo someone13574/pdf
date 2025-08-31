@@ -269,7 +269,7 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
         int32_t contour_start_y = y_coord;
         int32_t contour_end_x = x_coord;
         int32_t contour_end_y = y_coord;
-        double curve_control_x, curve_control_y;
+        double curve_control_x = 0.0, curve_control_y = 0.0;
 
         for (size_t pass = 0; pass < 2; pass++) {
             x_coord = contour_start_x;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "arena/arena.h"
+#include "attributes.h"
 
 /// An arena-backed string
 typedef struct ArenaString ArenaString;
@@ -10,7 +11,7 @@ ArenaString* arena_string_new(Arena* arena, size_t capacity);
 
 /// Creates a new arena-backed string by preforming a format.
 ArenaString* arena_string_new_fmt(Arena* arena, const char* fmt, ...)
-    __attribute__((format(printf, 2, 3)));
+    FORMAT_ATTR(2, 3);
 
 /// Gets the underlying null-terminated string
 const char* arena_string_buffer(ArenaString* string);

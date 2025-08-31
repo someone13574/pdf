@@ -15,7 +15,7 @@ size_t pdf_ctx_buffer_len(PdfCtx* ctx);
 size_t pdf_ctx_offset(PdfCtx* ctx);
 
 PdfError* pdf_ctx_seek(PdfCtx* ctx, size_t offset);
-PdfError* pdf_ctx_shift(PdfCtx* ctx, ssize_t relative_offset);
+PdfError* pdf_ctx_shift(PdfCtx* ctx, int64_t relative_offset);
 PdfError* pdf_ctx_peek_and_advance(PdfCtx* ctx, char* out);
 
 PdfError* pdf_ctx_peek(PdfCtx* ctx, char* out);

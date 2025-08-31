@@ -1,8 +1,8 @@
 #include "dcel.h"
 
+#define _USE_MATH_DEFINES
 #include <math.h>
 #include <stdint.h>
-#include <unistd.h>
 
 #include "arena/arena.h"
 #include "logger/log.h"
@@ -610,7 +610,6 @@ static void debug_render(Dcel* dcel, Arena* arena) {
 
     dcel_render(dcel, canvas);
     raster_canvas_write_file(canvas, "tessellation.bmp");
-    usleep(100000);
 }
 
 static double signed_cycle_area(DcelHalfEdge* start_half_edge) {

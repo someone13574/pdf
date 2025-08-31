@@ -3,6 +3,7 @@
 #ifdef TEST
 
 #include "logger/log.h"
+#include <stdbool.h>
 
 #if defined(SOURCE_PATH_SIZE)
 #define RELATIVE_FILE_PATH (&__FILE__[SOURCE_PATH_SIZE])

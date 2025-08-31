@@ -845,9 +845,7 @@ PdfError* pdf_parse_indirect(
     }
 }
 
-static char* format_alloc(Arena* arena, const char* fmt, ...)
-    __attribute__((format(printf, 2, 3)));
-
+// TODO: Replace with arena-string
 static char* format_alloc(Arena* arena, const char* fmt, ...) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(fmt);
@@ -1052,7 +1050,7 @@ char* pdf_fmt_object(Arena* arena, PdfObject* object) {
     Arena* temp_arena = arena_new(512);
     char* formatted = pdf_fmt_object_indented(temp_arena, object, 0, NULL);
 
-    unsigned long len = strlen(formatted);
+    size_t len = (size_t)strlen(formatted);
     char* allocated = arena_alloc(arena, sizeof(char) * (len + 1));
     strncpy(allocated, formatted, (size_t)len + 1);
     arena_free(temp_arena);

@@ -84,7 +84,7 @@ DARRAY_NAME* DARRAY_FN(new_init)(
 DARRAY_NAME* DARRAY_FN(new_from)(
     Arena* arena,
     size_t num_elements,
-    DARRAY_TYPE arr[num_elements]
+    DARRAY_TYPE* arr
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(arr);

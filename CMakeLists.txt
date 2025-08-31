@@ -8,26 +8,36 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     string(LENGTH "${CMAKE_SOURCE_DIR}/" SOURCE_PATH_SIZE)
     add_definitions("-DSOURCE_PATH_SIZE=${SOURCE_PATH_SIZE}")
 
-    add_compile_options(
-        -Wall
-        -Wdeprecated
-        -Wextra
-        -Wpedantic
-        -pedantic
-        -Wcast-align
-        -Wdouble-promotion
-        -Wimplicit-fallthrough
-        -Wmisleading-indentation
-        -Wshadow
-        -Wconversion
-        -Wmissing-field-initializers
-        -Werror
-        -Wno-gnu-zero-variadic-macro-arguments
-        -Wno-error=unused-function
-        -Wno-error=unused-parameter
-        -Wno-error=unused-variable
-        -Wno-error=unreachable-code
-    )
+    if (MSVC)
+        add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+        add_compile_options(
+            /W4
+            /permissive-
+            /WX
+            /wd4127 # constant conditionals are used for log levels
+        )
+    else()
+        add_compile_options(
+            -Wall
+            -Wdeprecated
+            -Wextra
+            -Wpedantic
+            -pedantic
+            -Wcast-align
+            -Wdouble-promotion
+            -Wimplicit-fallthrough
+            -Wmisleading-indentation
+            -Wshadow
+            -Wconversion
+            -Wmissing-field-initializers
+            -Werror
+            -Wno-gnu-zero-variadic-macro-arguments
+            -Wno-error=unused-function
+            -Wno-error=unused-parameter
+            -Wno-error=unused-variable
+            -Wno-error=unreachable-code
+        )
+    endif()
 endif()
 
 add_subdirectory(src)

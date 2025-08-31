@@ -393,7 +393,7 @@ int test_entry(void) {
             // Save stdout into buffer
             char* buffer = NULL;
             size_t buffer_size = 0;
-            ssize_t bytes_read;
+            int64_t bytes_read;
             char read_buf[4096];
 
             while ((bytes_read = read(pipefd[0], read_buf, sizeof(read_buf)))

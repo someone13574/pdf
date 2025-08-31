@@ -2,6 +2,7 @@
 #define DARRAY_DECL_H
 
 #include "arena.h"
+#include <stdbool.h>
 
 #endif // DARRAY_DECL_H
 
@@ -43,7 +44,7 @@ DARRAY_NAME* DARRAY_FN(new_init)(
 DARRAY_NAME* DARRAY_FN(new_from)(
     Arena* arena,
     size_t num_elements,
-    DARRAY_TYPE arr[num_elements]
+    DARRAY_TYPE* arr
 );
 
 // Gets the element stored at index `idx` and stores it in `out`. If the index

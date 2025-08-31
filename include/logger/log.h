@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 
+#include "attributes.h"
 #include "log_groups.h"
 
 typedef enum {
@@ -25,8 +26,7 @@ typedef enum {
 #define LOG_EXPAND_INHERIT(parent) LOG_GROUP_##parent##_VERBOSITY
 
 #define X(group, verbosity, parent)                                            \
-    static const LogDiagVerbosity LOG_GROUP_##group##_VERBOSITY =              \
-        LOG_EXPAND_##verbosity(parent);
+    enum { LOG_GROUP_##group##_VERBOSITY = LOG_EXPAND_##verbosity(parent) };
 
 LOG_GROUPS
 
@@ -46,7 +46,7 @@ void logger_log(
     unsigned long line,
     const char* fmt,
     ...
-) __attribute__((format(printf, 7, 8)));
+) FORMAT_ATTR(7, 8);
 
 #if defined(SOURCE_PATH_SIZE)
 #define RELATIVE_FILE_PATH (&__FILE__[SOURCE_PATH_SIZE])
@@ -116,8 +116,9 @@ void logger_log(
 #define RELEASE_ASSERT(cond, ...)                                              \
     do {                                                                       \
         if (!(cond)) {                                                         \
-            LOG_PANIC("Assertion failed: RELEASE_ASSERT(" #cond                \
-                      ")" __VA_ARGS__);                                        \
+            LOG_PANIC(                                                         \
+                "Assertion failed: RELEASE_ASSERT(" #cond ")" __VA_ARGS__      \
+            );                                                                 \
         }                                                                      \
     } while (0)
 
