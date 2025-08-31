@@ -81,11 +81,8 @@ DARRAY_NAME* DARRAY_FN(new_init)(
 }
 
 // Creates a new arena-backed array from an array initializer list
-DARRAY_NAME* DARRAY_FN(new_from)(
-    Arena* arena,
-    size_t num_elements,
-    DARRAY_TYPE* arr
-) {
+DARRAY_NAME*
+DARRAY_FN(new_from)(Arena* arena, size_t num_elements, DARRAY_TYPE* arr) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(arr);
 

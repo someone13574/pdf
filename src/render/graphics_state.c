@@ -3,7 +3,7 @@
 
 #include "text_state.h"
 
-GraphicsState graphics_state_default() {
+GraphicsState graphics_state_default(void) {
     return (GraphicsState
     ) {.text_state = text_state_default(),
        .line_width = 1.0,

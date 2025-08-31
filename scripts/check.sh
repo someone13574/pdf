@@ -2,6 +2,7 @@
 
 set -e
 
+scripts/format.sh
 scripts/clean.sh
 scripts/gcc-build.sh
 scripts/clean.sh

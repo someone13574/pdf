@@ -313,7 +313,7 @@ TestResult __test_assert_ne_str(
 __attribute__((weak)) extern _TestFuncEntry __start_test_registry[];
 __attribute__((weak)) extern _TestFuncEntry __stop_test_registry[];
 
-static void print_line() {
+static void print_line(void) {
     struct winsize w;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) < 0 || w.ws_col == 0) {
         w.ws_col = 80; // fallback

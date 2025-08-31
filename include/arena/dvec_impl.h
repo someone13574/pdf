@@ -9,6 +9,7 @@
 #ifdef _MSC_VER
 #include <intrin.h>
 #pragma intrinsic(_BitScanReverse64)
+
 static int clzll(unsigned long long x) {
     unsigned long index;
     unsigned char is_nonzero = _BitScanReverse64(&index, x);
@@ -92,8 +93,7 @@ DVEC_TYPE* DVEC_FN(push)(DVEC_NAME* vec, DVEC_TYPE element) {
         "Pushing " STRINGIFY(DVEC_TYPE) " to " STRINGIFY(DVEC_NAME) " vec"
     );
 
-    size_t block_idx =
-        8 * sizeof(size_t) - 1 - (size_t)clzll(vec->len + 1);
+    size_t block_idx = 8 * sizeof(size_t) - 1 - (size_t)clzll(vec->len + 1);
     RELEASE_ASSERT(block_idx < DVEC_MAX_BLOCKS, "Vector max length reached");
 
     if (block_idx >= vec->allocated_blocks) {
@@ -140,8 +140,7 @@ bool DVEC_FN(get)(DVEC_NAME* vec, size_t idx, DVEC_TYPE* out) {
         return false;
     }
 
-    size_t block_idx =
-        8 * sizeof(size_t) - 1 - (size_t)clzll(idx + 1);
+    size_t block_idx = 8 * sizeof(size_t) - 1 - (size_t)clzll(idx + 1);
     size_t offset = idx - (((size_t)1 << block_idx) - 1);
     LOG_DIAG(
         TRACE,
@@ -174,8 +173,7 @@ bool DVEC_FN(get_ptr)(DVEC_NAME* vec, size_t idx, DVEC_TYPE** out) {
         return false;
     }
 
-    size_t block_idx =
-        8 * sizeof(size_t) - 1 - (size_t)clzll(idx + 1);
+    size_t block_idx = 8 * sizeof(size_t) - 1 - (size_t)clzll(idx + 1);
     size_t offset = idx - (((size_t)1 << block_idx) - 1);
     LOG_DIAG(
         TRACE,

@@ -80,7 +80,11 @@ void arena_free(Arena* arena) {
     free(arena);
 }
 
+#ifdef _MSC_VER
 enum { ALIGN_MAX = alignof(size_t) };
+#else
+enum { ALIGN_MAX = alignof(max_align_t) };
+#endif
 
 void* arena_alloc(Arena* arena, size_t size) {
     return arena_alloc_align(arena, size, ALIGN_MAX);

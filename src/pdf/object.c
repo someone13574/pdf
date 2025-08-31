@@ -1351,7 +1351,7 @@ TEST_FUNC(test_object_array) {
     TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 2, &element2));
     TEST_ASSERT(element2);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_BOOLEAN, element2->type);
-    TEST_ASSERT_EQ(false, element2->data.boolean);
+    TEST_ASSERT(!element2->data.boolean);
 
     PdfObject* element3;
     TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 3, &element3));
@@ -1393,7 +1393,7 @@ TEST_FUNC(test_object_array_whitespace) {
     TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 2, &element2));
     TEST_ASSERT(element2);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_BOOLEAN, element2->type);
-    TEST_ASSERT_EQ(false, element2->data.boolean);
+    TEST_ASSERT(!element2->data.boolean);
 
     PdfObject* element3;
     TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 3, &element3));
@@ -1558,7 +1558,7 @@ TEST_FUNC(test_object_dict) {
     TEST_ASSERT_EQ("Item2", sub1.key->data.name);
     TEST_ASSERT(sub1.value);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_BOOLEAN, sub1.value->type);
-    TEST_ASSERT_EQ(true, sub1.value->data.boolean);
+    TEST_ASSERT(sub1.value->data.boolean);
 
     PdfDictEntry sub2;
     TEST_ASSERT(pdf_dict_entry_vec_get(subdict, 2, &sub2));

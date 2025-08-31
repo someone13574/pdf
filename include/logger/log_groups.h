@@ -13,8 +13,8 @@
     X(DCEL, TRACE, CANVAS)                                                     \
     X(PDF, INHERIT, GLOBAL)                                                    \
     X(DOC, TRACE, PDF)                                                         \
-    X(XREF, TRACE, PDF)                                                      \
-    X(CTX, TRACE, PDF)                                                          \
+    X(XREF, INHERIT, PDF)                                                      \
+    X(CTX, INFO, PDF)                                                          \
     X(OBJECT, OFF, PDF)                                                        \
     X(DESERDE, INHERIT, PDF)                                                   \
     X(SFNT, INHERIT, GLOBAL)                                                   \

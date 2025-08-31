@@ -1,7 +1,8 @@
 #pragma once
 
-#include "attributes.h"
 #include <stdbool.h>
+
+#include "attributes.h"
 
 typedef enum {
     PDF_ERR_INVALID_VERSION,

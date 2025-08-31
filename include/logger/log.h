@@ -56,12 +56,13 @@ void logger_log(
 
 #define LOG_DIAG(verbosity, group, ...)                                        \
     do {                                                                       \
-        if (LOG_DIAG_VERBOSITY_##verbosity >= LOG_GROUP_##group##_VERBOSITY) { \
+        if ((int)LOG_DIAG_VERBOSITY_##verbosity                                \
+            >= (int)LOG_GROUP_##group##_VERBOSITY) {                           \
             logger_log(                                                        \
                 #group,                                                        \
                 LOG_SEVERITY_DIAG,                                             \
                 LOG_DIAG_VERBOSITY_##verbosity,                                \
-                LOG_GROUP_##group##_VERBOSITY,                                 \
+                (LogDiagVerbosity)LOG_GROUP_##group##_VERBOSITY,               \
                 RELATIVE_FILE_PATH,                                            \
                 __LINE__,                                                      \
                 __VA_ARGS__                                                    \
@@ -116,9 +117,8 @@ void logger_log(
 #define RELEASE_ASSERT(cond, ...)                                              \
     do {                                                                       \
         if (!(cond)) {                                                         \
-            LOG_PANIC(                                                         \
-                "Assertion failed: RELEASE_ASSERT(" #cond ")" __VA_ARGS__      \
-            );                                                                 \
+            LOG_PANIC("Assertion failed: RELEASE_ASSERT(" #cond                \
+                      ")" __VA_ARGS__);                                        \
         }                                                                      \
     } while (0)
 

@@ -51,4 +51,4 @@ typedef struct {
     PdfReal smoothness;
 } GraphicsState;
 
-GraphicsState graphics_state_default();
+GraphicsState graphics_state_default(void);
