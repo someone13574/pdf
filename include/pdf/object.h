@@ -23,6 +23,7 @@ typedef struct {
 } PdfArray;
 
 typedef struct {
+    // TODO: Replace key type with PdfName
     PdfObject* key;
     PdfObject* value;
 } PdfDictEntry;
@@ -35,6 +36,8 @@ typedef struct {
 typedef struct {
     PdfDictEntryVec* entries;
 } PdfDict;
+
+PdfObject* pdf_dict_get(PdfDict* dict, PdfName key);
 
 typedef struct {
     PdfObject* stream_dict;

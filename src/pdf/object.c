@@ -23,6 +23,23 @@
 #define DVEC_TYPE PdfDictEntry
 #include "arena/dvec_impl.h"
 
+PdfObject* pdf_dict_get(PdfDict* dict, PdfName key) {
+    for (size_t idx = 0; idx < pdf_dict_entry_vec_len(dict->entries); idx++) {
+        PdfDictEntry entry;
+        RELEASE_ASSERT(pdf_dict_entry_vec_get(dict->entries, idx, &entry));
+
+        if (entry.key->type != PDF_OBJECT_TYPE_NAME) {
+            continue;
+        }
+
+        if (strcmp(key, entry.key->data.name) == 0) {
+            return entry.value;
+        }
+    }
+
+    return NULL;
+}
+
 PdfError* pdf_parse_true(PdfCtx* ctx, PdfObject* object);
 PdfError* pdf_parse_false(PdfCtx* ctx, PdfObject* object);
 PdfError* pdf_parse_null(PdfCtx* ctx, PdfObject* object);

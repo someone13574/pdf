@@ -11,6 +11,7 @@ ColumnLimit: 80
 IncludeBlocks: Regroup
 AllowAllArgumentsOnNextLine: false
 AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortFunctionsOnASingleLine: Empty
 BinPackParameters: false
 BinPackArguments: false
 IndentCaseLabels: true

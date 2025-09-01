@@ -234,7 +234,9 @@ TEST_FUNC(test_linked_clear) {
     return TEST_RESULT_PASS;
 }
 
-static bool int_less(int* lhs, int* rhs) { return *lhs < *rhs; }
+static bool int_less(int* lhs, int* rhs) {
+    return *lhs < *rhs;
+}
 
 TEST_FUNC(test_linked_insert_sorted_ascending) {
     Arena* arena = arena_new(1024);

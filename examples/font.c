@@ -4,6 +4,7 @@
 
 #include "arena/arena.h"
 #include "canvas/canvas.h"
+#include "geom/mat3.h"
 #include "logger/log.h"
 #include "pdf_error/error.h"
 #include "sfnt/glyph.h"
@@ -67,7 +68,11 @@ int main(int argc, char** argv) {
 
     SfntGlyph glyph;
     PDF_REQUIRE(sfnt_get_glyph(font, '%', &glyph));
-    Canvas* canvas = sfnt_glyph_render(arena, &glyph, 64);
+
+    Canvas* canvas = canvas_new_scalable(arena, 2000, 2000);
+    GeomMat3 transform =
+        geom_mat3_new(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 500.0, 1500.0, 1.0);
+    sfnt_glyph_render(canvas, &glyph, transform);
     canvas_write_file(canvas, "glyph.svg");
 
     LOG_DIAG(INFO, EXAMPLE, "Finished");

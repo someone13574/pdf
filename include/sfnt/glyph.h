@@ -2,9 +2,9 @@
 
 #include <stdint.h>
 
-#include "arena/arena.h"
 #include "arena/common.h"
 #include "canvas/canvas.h"
+#include "geom/mat3.h"
 #include "types.h"
 
 typedef enum {
@@ -72,4 +72,4 @@ typedef struct {
     } data;
 } SfntGlyph;
 
-Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution);
+void sfnt_glyph_render(Canvas* canvas, SfntGlyph* glyph, GeomMat3 transform);

@@ -1,11 +1,13 @@
 
 #include "graphics_state.h"
 
+#include "geom/mat3.h"
 #include "text_state.h"
 
 GraphicsState graphics_state_default(void) {
     return (GraphicsState
-    ) {.text_state = text_state_default(),
+    ) {.ctm = geom_mat3_identity(),
+       .text_state = text_state_default(),
        .line_width = 1.0,
        .line_cap = LINE_CAP_STYLE_BUTT,
        .line_join = LINE_JOIN_STYLE_MITER,

@@ -2,16 +2,27 @@
 
 /// A 3x3 matrix
 typedef struct {
-    double m00;
-    double m01;
-    double m02;
-    double m10;
-    double m11;
-    double m12;
-    double m20;
-    double m21;
-    double m22;
+    double mat[3][3];
 } GeomMat3;
+
+/// Creates a new 3x3 matrix
+GeomMat3 geom_mat3_new(
+    double m00,
+    double m01,
+    double m02,
+    double m10,
+    double m11,
+    double m12,
+    double m20,
+    double m21,
+    double m22
+);
 
 /// Creates a new 3x3 identity matrix
 GeomMat3 geom_mat3_identity(void);
+
+/// Creates a translation matrix
+GeomMat3 geom_mat3_translate(double x, double y);
+
+/// Multiply two 3x3 matrices
+GeomMat3 geom_mat3_mul(GeomMat3 lhs, GeomMat3 rhs);

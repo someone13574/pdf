@@ -3,5 +3,12 @@
 #include "arena/arena.h"
 #include "canvas/canvas.h"
 #include "pdf/page.h"
+#include "pdf/resolver.h"
+#include "pdf_error/error.h"
 
-Canvas* render_page(Arena* arena, PdfPage* page);
+PdfError* render_page(
+    Arena* arena,
+    PdfOptionalResolver resolver,
+    PdfPage* page,
+    Canvas** canvas
+);

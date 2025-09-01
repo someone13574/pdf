@@ -514,7 +514,9 @@ bool is_pdf_regular(char c) {
     return !is_pdf_whitespace(c) && !is_pdf_delimiter(c);
 }
 
-bool is_pdf_non_regular(char c) { return !is_pdf_regular(c); }
+bool is_pdf_non_regular(char c) {
+    return !is_pdf_regular(c);
+}
 
 #ifdef TEST
 #include "test/test.h"

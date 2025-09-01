@@ -1,20 +1,21 @@
 #pragma once
 
-#include "pdf/catalog.h"
+#include "arena/arena.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
 
 typedef struct {
-    PdfInteger size;
-    PdfCatalogRef root;
+    PdfName type;
+    PdfName subtype;
+    PdfName base_font;
 
     PdfObject* raw_dict;
-} PdfTrailer;
+} PdfFont;
 
-PdfError* pdf_deserialize_trailer(
+PdfError* pdf_deserialize_font(
     PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
-    PdfTrailer* deserialized
+    PdfFont* deserialized
 );

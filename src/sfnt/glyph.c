@@ -5,6 +5,7 @@
 #include "arena/arena.h"
 #include "canvas/canvas.h"
 #include "canvas/path_builder.h"
+#include "geom/vec3.h"
 #include "logger/log.h"
 #include "parser.h"
 #include "pdf_error/error.h"
@@ -215,10 +216,9 @@ PdfError* sfnt_parse_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
     LOG_TODO("Compound glyphs");
 }
 
-Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
-    RELEASE_ASSERT(arena);
+void sfnt_glyph_render(Canvas* canvas, SfntGlyph* glyph, GeomMat3 transform) {
+    RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(glyph);
-    RELEASE_ASSERT(resolution > 0);
 
     Arena* temp_arena = arena_new(4096);
     PathBuilder* path = path_builder_new(temp_arena);
@@ -228,16 +228,6 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
     }
 
     SfntSimpleGlyph data = glyph->data.simple;
-
-    int32_t x_range = glyph->x_max - glyph->x_min;
-    int32_t y_range = glyph->y_max - glyph->y_min;
-    int32_t max_range = x_range > y_range ? x_range : y_range;
-
-    double scale = (max_range > 0)
-                     ? ((double)(resolution - 1) / (double)max_range) / 2.0
-                     : 1.0;
-    double offset_x = ((double)resolution - 1.0 - x_range * scale) * 0.5;
-    double offset_y = ((double)resolution - 1.0 - y_range * scale) * 0.5;
 
     int32_t x_coord = 0;
     int32_t y_coord = 0;
@@ -290,19 +280,20 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
                     contour_end_y = y_coord;
                 }
 
-                double x = (x_coord - glyph->x_min) * scale + offset_x;
-                double y = (y_coord - glyph->y_min) * scale + offset_y;
-                y = (double)(resolution - 1) - y;
+                GeomVec3 position = geom_vec3_transform(
+                    geom_vec3_new((double)x_coord, (double)y_coord, 1.0),
+                    transform
+                );
 
                 if (!has_curve_start && point.on_curve) {
                     has_curve_start = true;
-                    path_builder_new_contour(path, x, y);
+                    path_builder_new_contour(path, position.x, position.y);
                 } else if (has_curve_start && !has_curve_control && !point.on_curve) {
                     has_curve_control = true;
-                    curve_control_x = x;
-                    curve_control_y = y;
+                    curve_control_x = position.x;
+                    curve_control_y = position.y;
                 } else if (has_curve_start && !has_curve_control && point.on_curve) {
-                    path_builder_line_to(path, x, y);
+                    path_builder_line_to(path, position.x, position.y);
 
                     if (pass != 0) {
                         break;
@@ -310,8 +301,8 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
                 } else if (has_curve_start && has_curve_control && point.on_curve) {
                     path_builder_bezier_to(
                         path,
-                        x,
-                        y,
+                        position.x,
+                        position.y,
                         curve_control_x,
                         curve_control_y
                     );
@@ -321,8 +312,8 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
                         break;
                     }
                 } else if (has_curve_start && has_curve_control && !point.on_curve) {
-                    double mid_x = (curve_control_x + x) / 2.0;
-                    double mid_y = (curve_control_y + y) / 2.0;
+                    double mid_x = (curve_control_x + position.x) / 2.0;
+                    double mid_y = (curve_control_y + position.y) / 2.0;
 
                     path_builder_bezier_to(
                         path,
@@ -332,8 +323,8 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
                         curve_control_y
                     );
 
-                    curve_control_x = x;
-                    curve_control_y = y;
+                    curve_control_x = position.x;
+                    curve_control_y = position.y;
                     if (pass != 0) {
                         break;
                     }
@@ -345,9 +336,6 @@ Canvas* sfnt_glyph_render(Arena* arena, SfntGlyph* glyph, uint32_t resolution) {
         y_coord = contour_end_y;
     }
 
-    Canvas* canvas = canvas_new_scalable(arena, resolution, resolution);
     canvas_draw_path(canvas, path);
     arena_free(temp_arena);
-
-    return canvas;
 }

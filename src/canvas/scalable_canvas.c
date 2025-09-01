@@ -148,7 +148,7 @@ void scalable_canvas_draw_path(ScalableCanvas* canvas, PathBuilder* path) {
                         canvas->parts,
                         arena_string_new_fmt(
                             canvas->arena,
-                            "M %f %f",
+                            "M %f %f ",
                             segment.data.start.x,
                             segment.data.start.y
                         )
@@ -160,7 +160,7 @@ void scalable_canvas_draw_path(ScalableCanvas* canvas, PathBuilder* path) {
                         canvas->parts,
                         arena_string_new_fmt(
                             canvas->arena,
-                            "L %f %f",
+                            "L %f %f ",
                             segment.data.line.x,
                             segment.data.line.y
                         )
@@ -172,7 +172,7 @@ void scalable_canvas_draw_path(ScalableCanvas* canvas, PathBuilder* path) {
                         canvas->parts,
                         arena_string_new_fmt(
                             canvas->arena,
-                            "Q %f %f %f %f",
+                            "Q %f %f %f %f ",
                             segment.data.bezier.control.x,
                             segment.data.bezier.control.y,
                             segment.data.bezier.end.x,

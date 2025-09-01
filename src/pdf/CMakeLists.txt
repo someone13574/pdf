@@ -3,6 +3,8 @@ add_library(pdf
     content_stream/op.c content_stream/op.h
     "${pdf_SOURCE_DIR}/include/pdf/content_op.h"
     content_stream/stream.c "${pdf_SOURCE_DIR}/include/pdf/content_stream.h"
+    resources/resources.c "${pdf_SOURCE_DIR}/include/pdf/resources/resources.h"
+    resources/font.c "${pdf_SOURCE_DIR}/include/pdf/resources/font.h"
     deserde_types.c "${pdf_SOURCE_DIR}/include/pdf/deserde_types.h"
     object.c "${pdf_SOURCE_DIR}/include/pdf/object.h"
     page.c "${pdf_SOURCE_DIR}/include/pdf/page.h"

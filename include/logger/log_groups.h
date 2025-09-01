@@ -17,5 +17,6 @@
     X(CTX, INFO, PDF)                                                          \
     X(OBJECT, OFF, PDF)                                                        \
     X(DESERDE, INHERIT, PDF)                                                   \
+    X(RENDER, INHERIT, GLOBAL)                                                 \
     X(SFNT, INHERIT, GLOBAL)                                                   \
     X(SFNT_PARSE, INHERIT, SFNT)

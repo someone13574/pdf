@@ -7,7 +7,6 @@
 #include "canvas/canvas.h"
 #include "logger/log.h"
 #include "pdf/catalog.h"
-#include "pdf/content_stream.h"
 #include "pdf/object.h"
 #include "pdf/page.h"
 #include "pdf/resolver.h"
@@ -85,7 +84,10 @@ int main(int argc, char** argv) {
 
         printf("%s\n", pdf_fmt_object(arena, page.raw_dict));
 
-        Canvas* canvas = render_page(arena, &page);
+        Canvas* canvas = NULL;
+        PDF_REQUIRE(
+            render_page(arena, pdf_op_resolver_some(resolver), &page, &canvas)
+        );
         canvas_write_file(canvas, "test.svg");
 
         // if (page.contents.discriminant) {

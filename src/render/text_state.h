@@ -1,17 +1,33 @@
 #pragma once
 
+#include "canvas/canvas.h"
 #include "geom/mat3.h"
 #include "pdf/object.h"
+#include "pdf/resources/font.h"
+#include "pdf_error/error.h"
+
+typedef enum {
+    TEXT_RENDERING_MODE_FILL,
+    TEXT_RENDERING_MODE_STROKE,
+    TEXT_RENDERING_MODE_FILL_STROKE,
+    TEXT_RENDERING_MODE_INVISIBLE,
+    TEXT_RENDERING_MODE_FILL_CLIP,
+    TEXT_RENDERING_MODE_STROKE_CLIP,
+    TEXT_RENDERING_MODE_FILL_STROKE_CLIP,
+    TEXT_RENDERING_MODE_CLIP
+} TextRenderingMode;
 
 typedef struct {
-    PdfReal character_spacing;  // T_c
-    PdfReal word_spacing;       // T_w
-    PdfReal horizontal_spacing; // T_h
-    PdfReal leading;            // T_l
-    // text_font T_f
-    // text_font_size T_fs
-    // text_mode T_mode
-    PdfReal text_rise; // T_rise
+    bool font_set;
+
+    PdfReal character_spacing;   // T_c
+    PdfReal word_spacing;        // T_w
+    PdfReal horizontal_spacing;  // T_h
+    PdfReal leading;             // T_l
+    PdfFont text_font;           // T_f
+    PdfReal text_font_size;      // T_fs
+    TextRenderingMode text_mode; // T_mode
+    PdfReal text_rise;           // T_rise
     // text_knockout
 } TextState;
 
@@ -23,3 +39,12 @@ typedef struct {
 } TextObjectState;
 
 TextObjectState text_object_state_default(void);
+
+PdfError* text_state_render(
+    Arena* arena,
+    Canvas* canvas,
+    GeomMat3 ctm,
+    TextState* state,
+    TextObjectState* object_state,
+    const char* data
+);

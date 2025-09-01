@@ -4,6 +4,7 @@
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/resources/resources.h"
 #include "pdf_error/error.h"
 
 PDF_DESERIALIZABLE_REF_IMPL(
@@ -89,7 +90,10 @@ PdfError* pdf_deserialize_page(
             PdfPage,
             "Resources",
             resources,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+            PDF_OPTIONAL_FIELD(
+                PdfOpResources,
+                PDF_CUSTOM_FIELD(pdf_deserialize_resources_wrapper)
+            )
         ),
         PDF_FIELD(
             PdfPage,
