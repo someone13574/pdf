@@ -76,7 +76,7 @@ PdfError* text_state_render(
     size_t buffer_len;
     uint8_t* buffer = load_file_to_buffer(
         arena,
-        "test-files/LiberationMono-Regular.ttf",
+        "assets/fonts-urw-base35/fonts/NimbusRoman-Regular.ttf",
         &buffer_len
     );
 
@@ -94,7 +94,7 @@ PdfError* text_state_render(
                     0.0,
                     0.0,
                     0.0,
-                    -state->text_font_size * 0.001,
+                    state->text_font_size * 0.001,
                     0.0,
                     0.0,
                     state->text_rise,

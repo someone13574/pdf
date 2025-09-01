@@ -3,6 +3,8 @@
 #include "arena/arena.h"
 #include "canvas/canvas.h"
 #include "geom/mat3.h"
+#include "geom/rect.h"
+#include "geom/vec2.h"
 #include "graphics_state.h"
 #include "logger/log.h"
 #include "pdf/content_op.h"
@@ -13,6 +15,8 @@
 #include "pdf/types.h"
 #include "pdf_error/error.h"
 #include "text_state.h"
+
+#define SCALE (25.4 / 72.0) // TODO: Load user-space units for conversion factor
 
 typedef struct {
     GraphicsState graphics_state;
@@ -138,19 +142,45 @@ PdfError* render_page(
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(!*canvas);
 
-    PdfReal width = pdf_number_as_real(page->media_box.upper_right_x)
-                  - pdf_number_as_real(page->media_box.lower_left_x);
-    PdfReal height = pdf_number_as_real(page->media_box.upper_right_y)
-                   - pdf_number_as_real(page->media_box.lower_left_y);
+    GeomRect rect = geom_rect_new(
+        geom_vec2_new(
+            pdf_number_as_real(page->media_box.upper_right_x),
+            pdf_number_as_real(page->media_box.upper_right_y)
+        ),
+        geom_vec2_new(
+            pdf_number_as_real(page->media_box.lower_left_x),
+            pdf_number_as_real(page->media_box.lower_left_y)
+        )
+    );
 
-    *canvas = canvas_new_scalable(arena, (uint32_t)width, (uint32_t)height);
+    RenderState state = {
+        .graphics_state = graphics_state_default(),
+        .text_object_state = text_object_state_default()
+    };
+
+    state.graphics_state.ctm = geom_mat3_mul(
+        geom_mat3_translate(-rect.min.x * SCALE, -rect.min.y * SCALE),
+        geom_mat3_new(
+            SCALE,
+            0.0,
+            0.0,
+            0.0,
+            -SCALE,
+            0.0,
+            -rect.min.x * SCALE,
+            rect.max.y * SCALE,
+            1.0
+        )
+    );
+
+    *canvas = canvas_new_scalable(
+        arena,
+        (uint32_t)geom_rect_size(rect).x,
+        (uint32_t)geom_rect_size(rect).y,
+        0xffffffff
+    );
 
     if (page->contents.discriminant) {
-        RenderState state = {
-            .graphics_state = graphics_state_default(),
-            .text_object_state = text_object_state_default()
-        };
-
         for (size_t contents_idx = 0;
              contents_idx < pdf_void_vec_len(page->contents.value.elements);
              contents_idx++) {

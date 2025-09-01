@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
     size_t buffer_len;
     uint8_t* buffer = load_file_to_buffer(
         arena,
-        "test-files/LiberationMono-Regular.ttf",
+        "assets/fonts-urw-base35/fonts/NimbusSans-Regular.ttf",
         &buffer_len
     );
 
@@ -69,7 +69,7 @@ int main(int argc, char** argv) {
     SfntGlyph glyph;
     PDF_REQUIRE(sfnt_get_glyph(font, '%', &glyph));
 
-    Canvas* canvas = canvas_new_scalable(arena, 2000, 2000);
+    Canvas* canvas = canvas_new_scalable(arena, 2000, 2000, 0xffffffff);
     GeomMat3 transform =
         geom_mat3_new(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 500.0, 1500.0, 1.0);
     sfnt_glyph_render(canvas, &glyph, transform);

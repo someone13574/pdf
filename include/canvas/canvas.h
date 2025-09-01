@@ -16,7 +16,12 @@ Canvas* canvas_new_raster(
     double coordinate_scale
 );
 
-Canvas* canvas_new_scalable(Arena* arena, uint32_t width, uint32_t height);
+Canvas* canvas_new_scalable(
+    Arena* arena,
+    uint32_t width,
+    uint32_t height,
+    uint32_t rgba
+);
 
 void canvas_draw_circle(
     Canvas* canvas,

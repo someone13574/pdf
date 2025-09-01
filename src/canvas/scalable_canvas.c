@@ -22,8 +22,12 @@ struct ScalableCanvas {
     SvgPartsVec* parts;
 };
 
-ScalableCanvas*
-scalable_canvas_new(Arena* arena, uint32_t width, uint32_t height) {
+ScalableCanvas* scalable_canvas_new(
+    Arena* arena,
+    uint32_t width,
+    uint32_t height,
+    uint32_t rgba
+) {
     RELEASE_ASSERT(arena);
 
     ScalableCanvas* canvas = arena_alloc(arena, sizeof(ScalableCanvas));
@@ -31,6 +35,17 @@ scalable_canvas_new(Arena* arena, uint32_t width, uint32_t height) {
     canvas->width = width;
     canvas->height = height;
     canvas->parts = svg_parts_vec_new(arena);
+
+    svg_parts_vec_push(
+        canvas->parts,
+        arena_string_new_fmt(
+            arena,
+            "<rect width=\"%u\" height=\"%u\" fill=\"#%08x\" />",
+            width,
+            height,
+            rgba
+        )
+    );
 
     return canvas;
 }

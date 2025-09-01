@@ -8,8 +8,12 @@
 
 typedef struct ScalableCanvas ScalableCanvas;
 
-ScalableCanvas*
-scalable_canvas_new(Arena* arena, uint32_t width, uint32_t height);
+ScalableCanvas* scalable_canvas_new(
+    Arena* arena,
+    uint32_t width,
+    uint32_t height,
+    uint32_t rgba
+);
 
 void scalable_canvas_draw_circle(
     ScalableCanvas* canvas,

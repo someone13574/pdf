@@ -1,6 +1,5 @@
 /build
 /.cache
-/test-files
 /pdf-1.7-spec.pdf
 /*.bmp
 /*.svg

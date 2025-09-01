@@ -38,9 +38,14 @@ Canvas* canvas_from_raster(Arena* arena, RasterCanvas* raster_canvas) {
     return canvas;
 }
 
-Canvas* canvas_new_scalable(Arena* arena, uint32_t width, uint32_t height) {
+Canvas* canvas_new_scalable(
+    Arena* arena,
+    uint32_t width,
+    uint32_t height,
+    uint32_t rgba
+) {
     Canvas* canvas = arena_alloc(arena, sizeof(Canvas));
-    canvas->data.scalable = scalable_canvas_new(arena, width, height);
+    canvas->data.scalable = scalable_canvas_new(arena, width, height, rgba);
     canvas->type = CANVAS_TYPE_SCALABLE;
 
     return canvas;
