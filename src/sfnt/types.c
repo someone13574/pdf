@@ -1,5 +1,10 @@
 #include "sfnt/types.h"
 
+#define DARRAY_NAME SfntFWordArray
+#define DARRAY_LOWERCASE_NAME sfnt_fword_array
+#define DARRAY_TYPE SfntFWord
+#include "arena/darray_impl.h"
+
 double from_sfnt_short_frac(SfntShortFrac x) {
     return (double)x / (double)(1 << 14);
 }

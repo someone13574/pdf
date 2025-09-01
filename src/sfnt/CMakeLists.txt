@@ -7,6 +7,8 @@ add_library(sfnt
     head.c head.h
     loca.c loca.h
     maxp.c maxp.h
+    hmtx.c hmtx.h
+    hhea.c hhea.h
     parser.c parser.h)
 target_include_directories(sfnt PUBLIC "${pdf_SOURCE_DIR}/include")
 target_link_libraries(sfnt PUBLIC arena canvas geom)

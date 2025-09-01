@@ -107,10 +107,13 @@ PdfError* text_state_render(
 
         sfnt_glyph_render(canvas, &glyph, render_matrix);
 
-        // TODO: support vertical fonts, proper advance width
+        // TODO: support vertical fonts
+        double t_x = ((double)glyph.advance_width * state->text_font_size
+                      + state->character_spacing + state->word_spacing)
+                   * state->horizontal_spacing * 0.001;
         object_state->text_matrix = geom_mat3_mul(
             object_state->text_matrix,
-            geom_mat3_translate(100.0, 0.0)
+            geom_mat3_translate(t_x, 0.0)
         );
     }
 

@@ -146,7 +146,7 @@ parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data) {
 
     if (reserved_pad != 0) {
         return PDF_ERROR(
-            PDF_ERR_CMAP_RESERVED_PAD,
+            PDF_ERR_SFNT_RESERVED,
             "The cmap format4 reserved pad word wasn't zero"
         );
     }

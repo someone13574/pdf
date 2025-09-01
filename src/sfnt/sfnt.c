@@ -5,6 +5,8 @@
 #include "directory.h"
 #include "glyph.h"
 #include "head.h"
+#include "hhea.h"
+#include "hmtx.h"
 #include "loca.h"
 #include "logger/log.h"
 #include "maxp.h"
@@ -21,6 +23,7 @@ struct SfntFont {
     SfntMaxp maxp;
     SfntLoca loca;
     SfntCmap cmap;
+    SfntHmtx hmtx;
 };
 
 PdfError* new_table_parser(SfntFont* font, uint32_t tag, SfntParser* parser) {
@@ -99,6 +102,21 @@ PdfError* sfnt_font_new(
         &(*font)->loca
     ));
 
+    SfntParser hhea_parser;
+    SfntHhea hhea;
+    PDF_PROPAGATE(new_table_parser(*font, 0x68686561, &hhea_parser));
+    PDF_PROPAGATE(sfnt_parse_hhea(&hhea_parser, &hhea));
+
+    SfntParser hmtx_parser;
+    PDF_PROPAGATE(new_table_parser(*font, 0x686d7478, &hmtx_parser));
+    PDF_PROPAGATE(sfnt_parse_hmtx(
+        arena,
+        &hmtx_parser,
+        &(*font)->maxp,
+        &hhea,
+        &(*font)->hmtx
+    ));
+
     PDF_PROPAGATE(new_table_parser(*font, 0x676c7966, &(*font)->glyf_parser));
 
     return NULL;
@@ -116,6 +134,14 @@ PdfError* sfnt_get_glyph(SfntFont* font, uint32_t cid, SfntGlyph* glyph) {
 
     PDF_PROPAGATE(sfnt_parser_seek(&font->glyf_parser, (size_t)offset));
     PDF_PROPAGATE(sfnt_parse_glyph(font->arena, &font->glyf_parser, glyph));
+
+    // TODO: Make metrics optional, since hhea.num_of_long_for_metrics isn't
+    // always the number of glyphs
+    SfntLongHorMetric metrics;
+    RELEASE_ASSERT(sfnt_hmetrics_array_get(font->hmtx.h_metrics, gid, &metrics)
+    );
+    glyph->advance_width = metrics.advance_width;
+    glyph->left_side_bearing = metrics.left_side_bearing;
 
     return NULL;
 }

@@ -66,6 +66,9 @@ typedef struct {
     SfntFWord y_max;
     SfntGlyphType glyph_type;
 
+    uint16_t advance_width;
+    int16_t left_side_bearing;
+
     union {
         SfntSimpleGlyph simple;
         SfntComponentGlyphPart compound;
