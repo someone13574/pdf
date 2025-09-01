@@ -1,5 +1,8 @@
 add_library(pdf
     catalog.c "${pdf_SOURCE_DIR}/include/pdf/catalog.h"
+    stream/stream_dict.c stream/stream_dict.h
+    stream/filters.c stream/filters.h
+    stream/ascii.c
     content_stream/op.c content_stream/op.h
     "${pdf_SOURCE_DIR}/include/pdf/content_op.h"
     content_stream/stream.c "${pdf_SOURCE_DIR}/include/pdf/content_stream.h"
