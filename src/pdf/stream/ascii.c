@@ -64,7 +64,7 @@ PdfError* pdf_filter_ascii_hex_decode(
             (*decoded)[*decoded_len] = (uint8_t)(hex << 4);
             upper = false;
         } else {
-            (*decoded)[*decoded_len] |= hex;
+            (*decoded)[*decoded_len] |= (uint8_t)hex;
             *decoded_len += 1;
             upper = true;
         }
