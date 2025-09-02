@@ -82,6 +82,17 @@ PdfError* bitstream_read_n(BitStream* bitstream, size_t n_bits, uint32_t* out) {
     return NULL;
 }
 
+void bitstream_align_byte(BitStream* bitstream) {
+    RELEASE_ASSERT(bitstream);
+
+    size_t byte_offset = bitstream->offset >> 3;
+    size_t bit_offset = bitstream->offset & 0x7;
+
+    if (bit_offset != 0) {
+        bitstream->offset = (byte_offset + 1) << 3;
+    }
+}
+
 #ifdef TEST
 
 #include "test/test.h"
