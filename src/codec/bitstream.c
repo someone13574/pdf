@@ -216,4 +216,37 @@ TEST_FUNC(test_bitstream_read_n_eod) {
     return TEST_RESULT_PASS;
 }
 
+TEST_FUNC(test_bitstream_align_byte) {
+    uint8_t data[] = {0xd7, 0xa9, 0x42, 0x0d, 0xf0};
+    BitStream bitstream = bitstream_new(data, 5);
+
+    uint32_t out;
+    TEST_PDF_REQUIRE(bitstream_read_n(&bitstream, 13, &out));
+
+    bitstream_align_byte(&bitstream);
+    TEST_ASSERT_EQ((size_t)16, bitstream.offset);
+
+    bitstream_align_byte(&bitstream);
+    TEST_ASSERT_EQ((size_t)16, bitstream.offset);
+
+    TEST_PDF_REQUIRE(bitstream_next(&bitstream, &out));
+    bitstream_align_byte(&bitstream);
+    TEST_ASSERT_EQ((size_t)24, bitstream.offset);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_bitstream_remaining_bits) {
+    uint8_t data[] = {0xd7, 0xa9, 0x42, 0x0d, 0xf0};
+    BitStream bitstream = bitstream_new(data, 5);
+
+    TEST_ASSERT_EQ((size_t)40, bitstream_remaining_bits(&bitstream));
+
+    uint32_t out;
+    TEST_PDF_REQUIRE(bitstream_read_n(&bitstream, 13, &out));
+    TEST_ASSERT_EQ((size_t)27, bitstream_remaining_bits(&bitstream));
+
+    return TEST_RESULT_PASS;
+}
+
 #endif // TEST
