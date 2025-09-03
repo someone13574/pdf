@@ -2,6 +2,11 @@
 
 #include <stdint.h>
 
+#define DVEC_NAME Uint8Vec
+#define DVEC_LOWERCASE_NAME uint8_vec
+#define DVEC_TYPE uint8_t
+#include "arena/dvec_decl.h"
+
 #define DARRAY_NAME Uint8Array
 #define DARRAY_LOWERCASE_NAME uint8_array
 #define DARRAY_TYPE uint8_t

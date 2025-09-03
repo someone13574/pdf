@@ -23,3 +23,6 @@ PdfError* bitstream_read_n(BitStream* bitstream, size_t n_bits, uint32_t* out);
 
 /// Skips remaining bits in the current byte if it is partially consumed
 void bitstream_align_byte(BitStream* bitstream);
+
+/// Get the remaining bits in the bitstream
+size_t bitstream_remaining_bits(BitStream* bitstream);

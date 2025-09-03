@@ -2,7 +2,7 @@ add_library(codec
     deflate.c "${pdf_SOURCE_DIR}/include/codec/deflate.h"
     bitstream.c bitstream.h)
 target_include_directories(codec PUBLIC "${pdf_SOURCE_DIR}/include")
-target_link_libraries(codec PUBLIC pdf-error)
+target_link_libraries(codec PUBLIC arena pdf-error)
 target_link_libraries(codec PRIVATE pdf-logger pdf-test)
 target_compile_features(codec PUBLIC c_std_11)
 if (NOT MSVC)

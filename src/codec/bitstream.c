@@ -93,6 +93,12 @@ void bitstream_align_byte(BitStream* bitstream) {
     }
 }
 
+size_t bitstream_remaining_bits(BitStream* bitstream) {
+    RELEASE_ASSERT(bitstream);
+
+    return (bitstream->length_bytes << 3) - bitstream->offset;
+}
+
 #ifdef TEST
 
 #include "test/test.h"
