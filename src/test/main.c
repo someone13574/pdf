@@ -1,9 +1,6 @@
 #include "test/test.h"
 
-int main(int argc, char* argv[]) {
-    (void)argc;
-    (void)argv;
-
+int main(void) {
 #ifdef TEST
     return test_entry();
 #else // TEST

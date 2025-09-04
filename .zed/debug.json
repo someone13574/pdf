@@ -31,5 +31,19 @@
     "program": "$ZED_WORKTREE_ROOT/build/examples/tessellation-example",
     "request": "launch",
     "adapter": "CodeLLDB"
+  },
+  {
+    "label": "Debug test",
+    "build": {
+      "command": "scripts/dev-build.sh",
+      "args": [],
+      "cwd": "$ZED_WORKTREE_ROOT",
+      "env": {
+        "DEBUG_TEST_FUNCTION": "test_deserialize_objects"
+      }
+    },
+    "program": "$ZED_WORKTREE_ROOT/build/src/test/pdf-test-main",
+    "request": "launch",
+    "adapter": "CodeLLDB"
   }
 ]

@@ -1,4 +1,8 @@
-add_library(pdf-test test.c "${pdf_SOURCE_DIR}/include/test/test.h")
+if (NOT "$ENV{DEBUG_TEST_FUNCTION}" STREQUAL "")
+    add_compile_definitions(DEBUG_TEST_FUNCTION=$ENV{DEBUG_TEST_FUNCTION})
+endif()
+
+add_library(pdf-test test.c test_assertions.c "${pdf_SOURCE_DIR}/include/test/test.h")
 target_include_directories(pdf-test PUBLIC "${pdf_SOURCE_DIR}/include")
 target_link_libraries(pdf-test PRIVATE pdf-logger)
 target_compile_features(pdf-test PUBLIC c_std_11)
