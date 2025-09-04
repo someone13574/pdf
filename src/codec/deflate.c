@@ -33,14 +33,29 @@ deflate_parse_block_header(BitStream* bitstream, DeflateBlockHeader* header) {
     switch (read) {
         case 0: {
             header->type = DEFLATE_BLOCK_COMPRESSION_NONE;
+            LOG_DIAG(
+                DEBUG,
+                CODEC,
+                "Deflate block type: DEFLATE_BLOCK_COMPRESSION_NONE"
+            );
             break;
         }
         case 1: {
             header->type = DEFLATE_BLOCK_COMPRESSION_FIXED;
+            LOG_DIAG(
+                DEBUG,
+                CODEC,
+                "Deflate block type: DEFLATE_BLOCK_COMPRESSION_FIXED"
+            );
             break;
         }
         case 2: {
             header->type = DEFLATE_BLOCK_COMPRESSION_DYN;
+            LOG_DIAG(
+                DEBUG,
+                CODEC,
+                "Deflate block type: DEFLATE_BLOCK_COMPRESSION_DYN"
+            );
             break;
         }
         default: {
@@ -63,19 +78,16 @@ typedef struct {
         length_lut; /// Mapping from reversed (lsb) codes to code bit lengths
 } DeflateHuffmanLut;
 
-static uint32_t reverse_bits(uint32_t x, int len) {
-    uint32_t reversed = 0;
-    while (len--) {
-        reversed = (reversed << 1) | (x & 1);
-        x >>= 1;
-    }
-
-    return reversed;
-}
-
 static DeflateHuffmanLut
 build_deflate_huffman_lut(Arena* arena, uint8_t* bit_lens, size_t num_symbols) {
     RELEASE_ASSERT(bit_lens);
+
+    LOG_DIAG(
+        DEBUG,
+        CODEC,
+        "Building deflate huffman lut with %zu symbols",
+        num_symbols
+    );
 
     // Count the number of codes for each code length
     size_t len_counts[16];
@@ -132,34 +144,31 @@ build_deflate_huffman_lut(Arena* arena, uint8_t* bit_lens, size_t num_symbols) {
         }
 
         uint32_t code = next_code[bits];
-        uint32_t reversed_code = reverse_bits(code, (int)max_bit_len);
 
-        RELEASE_ASSERT(reversed_code < lut.lut_length);
+        RELEASE_ASSERT(code < lut.lut_length);
+        RELEASE_ASSERT(lut.length_lut[code] == 0);
 
-        lut.symbol_lut[reversed_code] = (uint32_t)symbol_idx;
-        lut.length_lut[reversed_code] = bits;
+        lut.symbol_lut[code] = (uint32_t)symbol_idx;
+        lut.length_lut[code] = bits;
         next_code[bits]++;
     }
 
-    // Fill out empty entries
-    for (uint32_t reversed_code = 0; reversed_code < lut.lut_length;
-         reversed_code++) {
-        if (lut.length_lut[reversed_code] != 0) {
+    // Fill out empty entries with prefix codes
+    for (uint32_t code = 0; code < lut.lut_length; code++) {
+        if (lut.length_lut[code] != 0) {
             continue;
         }
 
         // Find shortest valid code
         for (size_t bits = min_bit_len; bits < max_bit_len; bits++) {
-            uint32_t mask = (uint32_t)(1 << (max_bit_len - bits)) - 1;
-            uint32_t masked_reversed_code = reversed_code & ~mask;
+            uint32_t mask = (uint32_t)(1 << bits) - 1;
+            uint32_t masked_code = code & mask;
 
-            RELEASE_ASSERT(masked_reversed_code < lut.lut_length);
+            RELEASE_ASSERT(masked_code < lut.lut_length);
 
-            if (lut.length_lut[masked_reversed_code] == (uint32_t)bits) {
-                lut.symbol_lut[reversed_code] =
-                    lut.symbol_lut[masked_reversed_code];
-                lut.length_lut[reversed_code] =
-                    lut.length_lut[masked_reversed_code];
+            if (lut.length_lut[masked_code] == (uint32_t)bits) {
+                lut.symbol_lut[code] = lut.symbol_lut[masked_code];
+                lut.length_lut[code] = lut.length_lut[masked_code];
                 break;
             }
         }
@@ -184,6 +193,14 @@ static PdfError* deflate_huffman_decode(
             bitstream_read_n(bitstream, lut->max_bit_len, &encoded_symbol)
         );
 
+        LOG_DIAG(
+            TRACE,
+            CODEC,
+            "Decoded huffman symbol=%u, length=%u",
+            (unsigned int)lut->symbol_lut[encoded_symbol],
+            (unsigned int)lut->length_lut[encoded_symbol]
+        );
+
         uint8_t symbol_len = lut->length_lut[encoded_symbol];
         bitstream->offset -= lut->max_bit_len - symbol_len;
         if (symbol_len == 0) {
@@ -198,6 +215,8 @@ static PdfError* deflate_huffman_decode(
     // bitstream eod)
     size_t bits = lut->min_bit_len;
 
+    LOG_DIAG(TRACE, CODEC, "Iteratively decoding bitstream");
+
     uint32_t buffer;
     PDF_PROPAGATE(bitstream_read_n(bitstream, bits, &buffer));
 
@@ -205,7 +224,18 @@ static PdfError* deflate_huffman_decode(
         uint32_t symbol = lut->symbol_lut[buffer];
         uint32_t symbol_len = lut->length_lut[buffer];
 
+        LOG_DIAG(
+            TRACE,
+            CODEC,
+            "Attempted decoded huffman key=0x%x, out_symbol=%u, length=%u",
+            (unsigned int)buffer,
+            (unsigned int)symbol,
+            (unsigned int)symbol_len
+        );
+
         if (symbol_len == bits) {
+            LOG_DIAG(TRACE, CODEC, "Decode successful");
+
             *symbol_out = symbol;
             return NULL;
         }
@@ -333,6 +363,8 @@ static DeflateHuffmanLut get_fixed_huffman_lut(void) {
     static DeflateHuffmanLut lut;
 
     if (!initialized) {
+        LOG_DIAG(DEBUG, CODEC, "Initializing fixed deflate huffman lut");
+
         initialized = true;
 
         size_t offset = 0;
@@ -348,6 +380,17 @@ static DeflateHuffmanLut get_fixed_huffman_lut(void) {
 
         Arena* persistent_arena = arena_new(1); // this leaks, and that's ok
         lut = build_deflate_huffman_lut(persistent_arena, bit_lens, 288);
+
+        for (size_t idx = 0; idx < lut.lut_length; idx++) {
+            LOG_DIAG(
+                TRACE,
+                CODEC,
+                "       key=0x%03x  symbol=%-3u  bits=%u",
+                (unsigned int)idx,
+                (unsigned int)lut.symbol_lut[idx],
+                (unsigned int)lut.length_lut[idx]
+            );
+        }
     }
 
     return lut;
@@ -436,6 +479,8 @@ PdfError* decode_deflate_data(
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(data);
     RELEASE_ASSERT(decoded_bytes);
+
+    LOG_DIAG(INFO, CODEC, "Decoding %zu byte deflate stream", data_len);
 
     Arena* block_arena = arena_new(1024);
     Arena* decode_arena = arena_new(1024);
@@ -564,23 +609,29 @@ TEST_FUNC(test_deflate_huffman) {
     TEST_ASSERT_EQ((size_t)2, lut.min_bit_len);
     TEST_ASSERT_EQ((size_t)4, lut.max_bit_len);
 
-    // -1 in expected_symbols means there is no valid truncated form
-    uint8_t expected_len[16] = {2, 2, 3, 2, 3, 3, 3, 4, 0, 0, 3, 3, 3, 3, 0, 4};
-    int expected_symbols[16] =
-        {5, 5, 2, 5, 0, 0, 4, 6, -1, -1, 3, 3, 1, 1, -1, 7};
-
-    for (size_t idx = 0; idx < 16; idx++) {
-        TEST_ASSERT_EQ(
-            expected_len[idx],
-            lut.length_lut[idx],
-            "Length mismatch for reverse code idx %zu",
-            idx
+    for (size_t idx = 0; idx < lut.lut_length; idx++) {
+        LOG_DIAG(
+            TRACE,
+            CODEC,
+            "       key=%04b (%x)  symbol=%-3u  bits=%u",
+            (unsigned int)idx,
+            (unsigned int)idx,
+            (unsigned int)lut.symbol_lut[idx],
+            (unsigned int)lut.length_lut[idx]
         );
+    }
 
+    uint8_t test_data[] = {0x1a, 0x6b};
+    BitStream bitstream = bitstream_new(test_data, 4);
+
+    uint32_t expected_symbols[] = {0, 1, 2, 3, 4};
+    for (size_t idx = 0; idx < 5; idx++) {
+        uint32_t symbol;
+        TEST_PDF_REQUIRE(deflate_huffman_decode(&bitstream, &lut, &symbol));
         TEST_ASSERT_EQ(
             expected_symbols[idx],
-            lut.length_lut[idx] == 0 ? -1 : (int)lut.symbol_lut[idx],
-            "Symbol mismatch for reverse code idx %zu",
+            symbol,
+            "Symbol at idx %zu didn't match",
             idx
         );
     }
@@ -588,5 +639,77 @@ TEST_FUNC(test_deflate_huffman) {
     arena_free(lut_arena);
     return TEST_RESULT_PASS;
 }
+
+// TEST_FUNC(test_deflate_uncompressed_multiple_blocks) {
+//     uint8_t stream[] = {
+//         0x00, // header
+//         0x03, // length (little-endian)
+//         0x00, // length
+//         0xfc, // length one's compliment
+//         0xff, // length one's compliment
+//         'a',
+//         'b',
+//         'c',
+//         0x01, // header
+//         0x02, // length (little-endian)
+//         0x00, // length
+//         0xfd, // length one's compliment
+//         0xff, // length one's compliment
+//         'd',
+//         'e'
+//     };
+
+//     Arena* arena = arena_new(1024);
+//     Uint8Array* out = NULL;
+//     TEST_PDF_REQUIRE(decode_deflate_data(
+//         arena,
+//         stream,
+//         sizeof(stream) / sizeof(uint8_t),
+//         &out
+//     ));
+
+//     TEST_ASSERT_EQ((size_t)5, uint8_array_len(out));
+
+//     uint8_t expected[] = {'a', 'b', 'c', 'd', 'e'};
+//     for (size_t idx = 0; idx < 5; idx++) {
+//         uint8_t value;
+//         TEST_ASSERT(uint8_array_get(out, idx, &value));
+//         TEST_ASSERT_EQ(
+//             expected[idx],
+//             value,
+//             "Decoded value at idx %zu was incorrect",
+//             idx
+//         );
+//     }
+
+//     return TEST_RESULT_PASS;
+// }
+
+// TEST_FUNC(test_deflate_overlap) {
+//     uint8_t stream[] = {0x73, 0x74, 0xc4, 0x04, 0x00};
+
+//     Arena* arena = arena_new(1024);
+//     Uint8Array* out = NULL;
+//     TEST_PDF_REQUIRE(decode_deflate_data(
+//         arena,
+//         stream,
+//         sizeof(stream) / sizeof(uint8_t),
+//         &out
+//     ));
+
+//     TEST_ASSERT_EQ((size_t)20, uint8_array_len(out));
+//     for (size_t idx = 0; idx < 20; idx++) {
+//         uint8_t value;
+//         TEST_ASSERT(uint8_array_get(out, idx, &value));
+//         TEST_ASSERT_EQ(
+//             (uint8_t)'A',
+//             value,
+//             "Decoded value at idx %zu was incorrect",
+//             idx
+//         );
+//     }
+
+//     return TEST_RESULT_PASS;
+// }
 
 #endif

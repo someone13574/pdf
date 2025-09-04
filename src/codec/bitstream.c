@@ -27,6 +27,13 @@ PdfError* bitstream_next(BitStream* bitstream, uint32_t* out) {
     *out = (bitstream->data[byte_offset] >> bit_offset) & 0x1;
     bitstream->offset++;
 
+    LOG_DIAG(
+        TRACE,
+        CODEC,
+        "Read one bit from bitstream: %u",
+        (unsigned int)*out
+    );
+
     return NULL;
 }
 
@@ -78,6 +85,14 @@ PdfError* bitstream_read_n(BitStream* bitstream, size_t n_bits, uint32_t* out) {
     }
 
     bitstream->offset += write_offset;
+    LOG_DIAG(
+        TRACE,
+        CODEC,
+        "Read %zu bits from bitstream: 0x%x (%u)",
+        write_offset,
+        *out,
+        (unsigned int)*out
+    );
 
     return NULL;
 }
