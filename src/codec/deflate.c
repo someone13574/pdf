@@ -185,6 +185,17 @@ build_deflate_huffman_lut(Arena* arena, uint8_t* bit_lens, size_t num_symbols) {
         }
     }
 
+    for (size_t idx = 0; idx < lut.lut_length; idx++) {
+        LOG_DIAG(
+            TRACE,
+            CODEC,
+            "       key=0x%03x  symbol=%-3u  bits=%u",
+            (unsigned int)idx,
+            (unsigned int)lut.symbol_lut[idx],
+            (unsigned int)lut.length_lut[idx]
+        );
+    }
+
     return lut;
 }
 
@@ -199,6 +210,8 @@ static PdfError* deflate_huffman_decode(
 
     // Fast path when max bit len is available
     if (bitstream_remaining_bits(bitstream) >= lut->max_bit_len) {
+        LOG_DIAG(TRACE, CODEC, "Fast-path decoding stream");
+
         uint32_t encoded_symbol;
         PDF_PROPAGATE(
             bitstream_read_n(bitstream, lut->max_bit_len, &encoded_symbol)
@@ -238,8 +251,9 @@ static PdfError* deflate_huffman_decode(
         LOG_DIAG(
             TRACE,
             CODEC,
-            "Attempted decoded huffman key=0x%x, out_symbol=%u, length=%u",
+            "Attempted decoded huffman key=0x%x (len=%u), out_symbol=%u, length=%u",
             (unsigned int)buffer,
+            (unsigned int)bits,
             (unsigned int)symbol,
             (unsigned int)symbol_len
         );
@@ -273,6 +287,8 @@ static PdfError* decode_dyn_huffman_table_luts(
     RELEASE_ASSERT(lit_lut_ptr);
     RELEASE_ASSERT(dist_lut_ptr);
 
+    LOG_DIAG(DEBUG, CODEC, "Reading dyn block header...");
+
     uint32_t num_lit_code_lens;
     PDF_PROPAGATE(bitstream_read_n(bitstream, 5, &num_lit_code_lens));
     num_lit_code_lens += 257;
@@ -284,6 +300,20 @@ static PdfError* decode_dyn_huffman_table_luts(
     uint32_t num_code_len_symbols;
     PDF_PROPAGATE(bitstream_read_n(bitstream, 4, &num_code_len_symbols));
     num_code_len_symbols += 4;
+
+    LOG_DIAG(
+        DEBUG,
+        CODEC,
+        "Dyn block header: HLIT: %u + 257 = %u     HDIST: %u + 1 = %u     HCLEN: %u + 4 = %u",
+        (unsigned int)(num_lit_code_lens - 257),
+        (unsigned int)num_lit_code_lens,
+        (unsigned int)(num_dist_code_lens - 1),
+        (unsigned int)num_dist_code_lens,
+        (unsigned int)(num_code_len_symbols - 4),
+        (unsigned int)num_code_len_symbols
+    );
+
+    LOG_DIAG(DEBUG, CODEC, "Reading code length bit lengths");
 
     // Build code length lut
     uint8_t code_length_bit_lens[19];
@@ -378,30 +408,23 @@ static DeflateHuffmanLut get_fixed_huffman_lut(void) {
 
         initialized = true;
 
-        size_t offset = 0;
         uint8_t bit_lens[288];
 
-        uint8_t region_vals[] = {8, 9, 7, 8};
-        uint32_t region_lens[] = {144, 112, 24, 8};
-        for (size_t region_idx = 0; region_idx < 4; region_idx++) {
-            for (size_t idx = 0; idx < region_lens[region_idx]; idx++) {
-                bit_lens[offset++] = region_vals[region_idx];
-            }
+        for (size_t i = 0; i < 144; i++) {
+            bit_lens[i] = 8;
+        }
+        for (size_t i = 144; i < 256; i++) {
+            bit_lens[i] = 9;
+        }
+        for (size_t i = 256; i < 280; i++) {
+            bit_lens[i] = 7;
+        }
+        for (size_t i = 280; i < 288; i++) {
+            bit_lens[i] = 8;
         }
 
         Arena* persistent_arena = arena_new(1); // this leaks, and that's ok
         lut = build_deflate_huffman_lut(persistent_arena, bit_lens, 288);
-
-        for (size_t idx = 0; idx < lut.lut_length; idx++) {
-            LOG_DIAG(
-                TRACE,
-                CODEC,
-                "       key=0x%03x  symbol=%-3u  bits=%u",
-                (unsigned int)idx,
-                (unsigned int)lut.symbol_lut[idx],
-                (unsigned int)lut.length_lut[idx]
-            );
-        }
     }
 
     return lut;
@@ -415,6 +438,8 @@ static PdfError* deflate_decode_length_code(
     RELEASE_ASSERT(bitstream);
     RELEASE_ASSERT(lit_symbol >= 257 && lit_symbol <= 285);
     RELEASE_ASSERT(length);
+
+    LOG_DIAG(DEBUG, CODEC, "Reading length code...");
 
     uint32_t length_offsets[] = {3,  4,  5,  6,   7,   8,   9,   10,  11, 13,
                                  15, 17, 19, 23,  27,  31,  35,  43,  51, 59,
@@ -431,6 +456,8 @@ static PdfError* deflate_decode_length_code(
         *length += extra;
     }
 
+    LOG_DIAG(TRACE, CODEC, "Backref length: %u", (unsigned int)*length);
+
     return NULL;
 }
 
@@ -442,6 +469,8 @@ static PdfError* deflate_decode_distance_code(
     RELEASE_ASSERT(bitstream);
     RELEASE_ASSERT(distance);
 
+    LOG_DIAG(DEBUG, CODEC, "Reading distance code...");
+
     // Get distance symbol
     uint32_t dist_symbol = 0;
     if (dist_lut) {
@@ -449,6 +478,7 @@ static PdfError* deflate_decode_distance_code(
         );
     } else {
         PDF_PROPAGATE(bitstream_read_n(bitstream, 5, &dist_symbol));
+        dist_symbol = reverse_bits(dist_symbol, 5);
     }
 
     // Lookup details
@@ -477,6 +507,8 @@ static PdfError* deflate_decode_distance_code(
         );
         *distance += extra;
     }
+
+    LOG_DIAG(TRACE, CODEC, "Backref distance: %u", (unsigned int)*distance);
 
     return NULL;
 }
@@ -586,6 +618,13 @@ PdfError* decode_deflate_data(
                         uint8_vec_push(output_stream, byte);
                     }
                 }
+
+                LOG_DIAG(
+                    TRACE,
+                    CODEC,
+                    "Output stream is now %zu byes",
+                    uint8_vec_len(output_stream)
+                );
             } while (true);
         }
 
@@ -608,6 +647,9 @@ PdfError* decode_deflate_data(
 #ifdef TEST
 
 #include "test/test.h"
+
+// Test cases taken from:
+// https://github.com/nayuki/Simple-DEFLATE-decompressor/blob/master/java/test/DecompressorTest.java
 
 TEST_FUNC(test_deflate_huffman) {
     uint8_t bit_lengths[] = {3, 3, 3, 3, 3, 2, 4, 4};
@@ -639,25 +681,8 @@ TEST_FUNC(test_deflate_huffman) {
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_deflate_uncompressed_multiple_blocks) {
-    uint8_t stream[] = {
-        0x00, // header
-        0x03, // length (little-endian)
-        0x00, // length
-        0xfc, // length one's compliment
-        0xff, // length one's compliment
-        'a',
-        'b',
-        'c',
-        0x01, // header
-        0x02, // length (little-endian)
-        0x00, // length
-        0xfd, // length one's compliment
-        0xff, // length one's compliment
-        'd',
-        'e'
-    };
-
+TEST_FUNC(test_deflate_uncompressed_empty) {
+    uint8_t stream[] = {0x01, 0x00, 0x00, 0xff, 0xff};
     Arena* arena = arena_new(1024);
     Uint8Array* out = NULL;
     TEST_PDF_REQUIRE(decode_deflate_data(
@@ -667,10 +692,30 @@ TEST_FUNC(test_deflate_uncompressed_multiple_blocks) {
         &out
     ));
 
-    TEST_ASSERT_EQ((size_t)5, uint8_array_len(out));
+    TEST_ASSERT_EQ((size_t)0, uint8_array_len(out));
 
-    uint8_t expected[] = {'a', 'b', 'c', 'd', 'e'};
-    for (size_t idx = 0; idx < 5; idx++) {
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_deflate_uncompressed_multibyte) {
+    uint8_t stream[] = {0x01, 0x03, 0x00, 0xfc, 0xff, 0x05, 0x14, 0x23};
+    Arena* arena = arena_new(1024);
+    Uint8Array* out = NULL;
+    TEST_PDF_REQUIRE(decode_deflate_data(
+        arena,
+        stream,
+        sizeof(stream) / sizeof(uint8_t),
+        &out
+    ));
+
+    uint8_t expected[] = {0x05, 0x14, 0x23};
+    TEST_ASSERT_EQ(
+        (size_t)(sizeof(expected) / sizeof(uint8_t)),
+        uint8_array_len(out)
+    );
+
+    for (size_t idx = 0; idx < sizeof(expected) / sizeof(uint8_t); idx++) {
         uint8_t value;
         TEST_ASSERT(uint8_array_get(out, idx, &value));
         TEST_ASSERT_EQ(
@@ -681,12 +726,26 @@ TEST_FUNC(test_deflate_uncompressed_multiple_blocks) {
         );
     }
 
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_deflate_overlap) {
-    uint8_t stream[] = {0x73, 0x74, 0xc4, 0x04, 0x00};
-
+TEST_FUNC(test_deflate_uncompressed_multiblock) {
+    uint8_t stream[] = {
+        0x00,
+        0x02,
+        0x00,
+        0xfd,
+        0xff,
+        0x05,
+        0x14,
+        0x01,
+        0x01,
+        0x00,
+        0xfe,
+        0xff,
+        0x23
+    };
     Arena* arena = arena_new(1024);
     Uint8Array* out = NULL;
     TEST_PDF_REQUIRE(decode_deflate_data(
@@ -696,18 +755,202 @@ TEST_FUNC(test_deflate_overlap) {
         &out
     ));
 
-    TEST_ASSERT_EQ((size_t)20, uint8_array_len(out));
-    for (size_t idx = 0; idx < 20; idx++) {
+    uint8_t expected[] = {0x05, 0x14, 0x23};
+    TEST_ASSERT_EQ(
+        (size_t)(sizeof(expected) / sizeof(uint8_t)),
+        uint8_array_len(out)
+    );
+
+    for (size_t idx = 0; idx < sizeof(expected) / sizeof(uint8_t); idx++) {
         uint8_t value;
         TEST_ASSERT(uint8_array_get(out, idx, &value));
         TEST_ASSERT_EQ(
-            (uint8_t)'A',
+            expected[idx],
             value,
             "Decoded value at idx %zu was incorrect",
             idx
         );
     }
 
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_deflate_uncompressed_no_discard) {
+    uint8_t stream[] =
+        {0x9a, 0xb0, 0xf0, 0x3f, 0x20, 0x02, 0x00, 0xfd, 0xff, 0xab, 0xcd};
+    Arena* arena = arena_new(1024);
+    Uint8Array* out = NULL;
+    TEST_PDF_REQUIRE(decode_deflate_data(
+        arena,
+        stream,
+        sizeof(stream) / sizeof(uint8_t),
+        &out
+    ));
+
+    uint8_t expected[] = {0x90, 0xa1, 0xff, 0xab, 0xcd};
+    TEST_ASSERT_EQ(
+        (size_t)(sizeof(expected) / sizeof(uint8_t)),
+        uint8_array_len(out)
+    );
+
+    for (size_t idx = 0; idx < sizeof(expected) / sizeof(uint8_t); idx++) {
+        uint8_t value;
+        TEST_ASSERT(uint8_array_get(out, idx, &value));
+        TEST_ASSERT_EQ(
+            expected[idx],
+            value,
+            "Decoded value at idx %zu was incorrect",
+            idx
+        );
+    }
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_deflate_fixed_empty) {
+    uint8_t stream[] = {0x03, 0x00};
+    Arena* arena = arena_new(1024);
+    Uint8Array* out = NULL;
+    TEST_PDF_REQUIRE(decode_deflate_data(
+        arena,
+        stream,
+        sizeof(stream) / sizeof(uint8_t),
+        &out
+    ));
+
+    TEST_ASSERT_EQ((size_t)0, uint8_array_len(out));
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_deflate_fixed_literals) {
+    uint8_t stream[] = {0x63, 0x68, 0xe8, 0x9f, 0x70, 0xe0, 0x3f, 0x00};
+    Arena* arena = arena_new(1024);
+    Uint8Array* out = NULL;
+    TEST_PDF_REQUIRE(decode_deflate_data(
+        arena,
+        stream,
+        sizeof(stream) / sizeof(uint8_t),
+        &out
+    ));
+
+    uint8_t expected[] = {0x00, 0x80, 0x8f, 0x90, 0xc0, 0xff};
+    TEST_ASSERT_EQ(
+        (size_t)(sizeof(expected) / sizeof(uint8_t)),
+        uint8_array_len(out)
+    );
+
+    for (size_t idx = 0; idx < sizeof(expected) / sizeof(uint8_t); idx++) {
+        uint8_t value;
+        TEST_ASSERT(uint8_array_get(out, idx, &value));
+        TEST_ASSERT_EQ(
+            expected[idx],
+            value,
+            "Decoded value at idx %zu was incorrect",
+            idx
+        );
+    }
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_deflate_fixed_non_overlapping) {
+    uint8_t stream[] = {0x63, 0x60, 0x64, 0x02, 0x22, 0x00};
+    Arena* arena = arena_new(1024);
+    Uint8Array* out = NULL;
+    TEST_PDF_REQUIRE(decode_deflate_data(
+        arena,
+        stream,
+        sizeof(stream) / sizeof(uint8_t),
+        &out
+    ));
+
+    uint8_t expected[] = {0x00, 0x01, 0x02, 0x00, 0x01, 0x02};
+    TEST_ASSERT_EQ(
+        (size_t)(sizeof(expected) / sizeof(uint8_t)),
+        uint8_array_len(out)
+    );
+
+    for (size_t idx = 0; idx < sizeof(expected) / sizeof(uint8_t); idx++) {
+        uint8_t value;
+        TEST_ASSERT(uint8_array_get(out, idx, &value));
+        TEST_ASSERT_EQ(
+            expected[idx],
+            value,
+            "Decoded value at idx %zu was incorrect",
+            idx
+        );
+    }
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_deflate_fixed_overlapping) {
+    uint8_t stream[] = {0x63, 0x04, 0x01, 0x00};
+    Arena* arena = arena_new(1024);
+    Uint8Array* out = NULL;
+    TEST_PDF_REQUIRE(decode_deflate_data(
+        arena,
+        stream,
+        sizeof(stream) / sizeof(uint8_t),
+        &out
+    ));
+
+    uint8_t expected[] = {0x01, 0x01, 0x01, 0x01, 0x01};
+    TEST_ASSERT_EQ(
+        (size_t)(sizeof(expected) / sizeof(uint8_t)),
+        uint8_array_len(out)
+    );
+
+    for (size_t idx = 0; idx < sizeof(expected) / sizeof(uint8_t); idx++) {
+        uint8_t value;
+        TEST_ASSERT(uint8_array_get(out, idx, &value));
+        TEST_ASSERT_EQ(
+            expected[idx],
+            value,
+            "Decoded value at idx %zu was incorrect",
+            idx
+        );
+    }
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_deflate_fixed_overlapping_alt) {
+    uint8_t stream[] = {0xeb, 0xeb, 0x07, 0x43, 0x00};
+    Arena* arena = arena_new(1024);
+    Uint8Array* out = NULL;
+    TEST_PDF_REQUIRE(decode_deflate_data(
+        arena,
+        stream,
+        sizeof(stream) / sizeof(uint8_t),
+        &out
+    ));
+
+    uint8_t expected[] = {0x8e, 0x8f, 0x8e, 0x8f, 0x8e, 0x8f, 0x8e};
+    TEST_ASSERT_EQ(
+        (size_t)(sizeof(expected) / sizeof(uint8_t)),
+        uint8_array_len(out)
+    );
+
+    for (size_t idx = 0; idx < sizeof(expected) / sizeof(uint8_t); idx++) {
+        uint8_t value;
+        TEST_ASSERT(uint8_array_get(out, idx, &value));
+        TEST_ASSERT_EQ(
+            expected[idx],
+            value,
+            "Decoded value at idx %zu was incorrect",
+            idx
+        );
+    }
+
+    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 

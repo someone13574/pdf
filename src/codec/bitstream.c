@@ -30,7 +30,7 @@ PdfError* bitstream_next(BitStream* bitstream, uint32_t* out) {
     LOG_DIAG(
         TRACE,
         CODEC,
-        "Read one bit from bitstream: %u",
+        "Read 1 bit from bitstream:  0x%x",
         (unsigned int)*out
     );
 
@@ -53,7 +53,7 @@ PdfError* bitstream_read_n(BitStream* bitstream, size_t n_bits, uint32_t* out) {
         if (byte_offset >= bitstream->length_bytes) {
             return PDF_ERROR(
                 PDF_ERR_CODEC_BITSTREAM_EOD,
-                "Bitstream reached end-of-data during %zu byte read",
+                "Bitstream reached end-of-data during %zu bit read",
                 n_bits + write_offset
             );
         }
