@@ -220,7 +220,7 @@ static PdfError* deflate_huffman_decode(
         LOG_DIAG(
             TRACE,
             CODEC,
-            "Decoded huffman symbol=%u, length=%u",
+            "Decoded huffman symbol=%u, length=%u\n",
             (unsigned int)lut->symbol_lut[encoded_symbol],
             (unsigned int)lut->length_lut[encoded_symbol]
         );
@@ -259,7 +259,13 @@ static PdfError* deflate_huffman_decode(
         );
 
         if (symbol_len == bits) {
-            LOG_DIAG(TRACE, CODEC, "Decode successful");
+            LOG_DIAG(
+                TRACE,
+                CODEC,
+                "Decode successful symbol=%u, length=%u\n",
+                (unsigned int)symbol,
+                (unsigned int)symbol_len
+            );
 
             *symbol_out = symbol;
             return NULL;
@@ -291,6 +297,12 @@ static PdfError* decode_dyn_huffman_table_luts(
 
     uint32_t num_lit_code_lens;
     PDF_PROPAGATE(bitstream_read_n(bitstream, 5, &num_lit_code_lens));
+    if (num_lit_code_lens >= 30) {
+        LOG_WARN(
+            CODEC,
+            "HLIT should be in the range 257 - 286, though higher values are representable"
+        );
+    }
     num_lit_code_lens += 257;
 
     uint32_t num_dist_code_lens;
@@ -337,6 +349,13 @@ static PdfError* decode_dyn_huffman_table_luts(
     uint8_t bit_lens[num_lit_code_lens + num_dist_code_lens];
     size_t bit_len_offset = 0;
 
+    LOG_DIAG(
+        DEBUG,
+        CODEC,
+        "Getting %zu bit lens",
+        (size_t)(num_lit_code_lens + num_dist_code_lens)
+    );
+
     while (bit_len_offset < num_lit_code_lens + num_dist_code_lens) {
         uint32_t symbol;
         PDF_PROPAGATE(deflate_huffman_decode(bitstream, &code_len_lut, &symbol)
@@ -344,6 +363,12 @@ static PdfError* decode_dyn_huffman_table_luts(
 
         if (symbol <= 15) {
             bit_lens[bit_len_offset++] = (uint8_t)symbol;
+            LOG_DIAG(
+                TRACE,
+                CODEC,
+                "Got literal bit length %u",
+                (unsigned int)symbol
+            );
         } else {
             uint8_t repeat_val = 0;
             uint8_t repeat_count_offset = 0;
@@ -372,6 +397,13 @@ static PdfError* decode_dyn_huffman_table_luts(
                 bitstream_read_n(bitstream, repeat_count_bits, &repeat_count)
             );
             repeat_count += repeat_count_offset;
+            LOG_DIAG(
+                TRACE,
+                CODEC,
+                "Repeating bit_length=%u, %u times",
+                (unsigned int)repeat_val,
+                (unsigned int)repeat_count
+            );
 
             if (bit_len_offset + repeat_count
                 > num_lit_code_lens + num_dist_code_lens) {
@@ -454,6 +486,13 @@ static PdfError* deflate_decode_length_code(
             bitstream_read_n(bitstream, length_bits[lit_symbol - 257], &extra)
         );
         *length += extra;
+
+        if (*length == 258 && lit_symbol == 284) {
+            LOG_WARN(
+                CODEC,
+                "RFC 1951 specifies that length code 284 encodes from 227-257, though 258 is representable"
+            );
+        }
     }
 
     LOG_DIAG(TRACE, CODEC, "Backref length: %u", (unsigned int)*length);
@@ -934,6 +973,91 @@ TEST_FUNC(test_deflate_fixed_overlapping_alt) {
     ));
 
     uint8_t expected[] = {0x8e, 0x8f, 0x8e, 0x8f, 0x8e, 0x8f, 0x8e};
+    TEST_ASSERT_EQ(
+        (size_t)(sizeof(expected) / sizeof(uint8_t)),
+        uint8_array_len(out)
+    );
+
+    for (size_t idx = 0; idx < sizeof(expected) / sizeof(uint8_t); idx++) {
+        uint8_t value;
+        TEST_ASSERT(uint8_array_get(out, idx, &value));
+        TEST_ASSERT_EQ(
+            expected[idx],
+            value,
+            "Decoded value at idx %zu was incorrect",
+            idx
+        );
+    }
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_deflate_dyn_empty) {
+    uint8_t stream[] =
+        {0x05, 0xe1, 0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0xf8, 0xaf, 0x46
+        };
+    Arena* arena = arena_new(1024);
+    Uint8Array* out = NULL;
+    TEST_PDF_REQUIRE(decode_deflate_data(
+        arena,
+        stream,
+        sizeof(stream) / sizeof(uint8_t),
+        &out
+    ));
+
+    TEST_ASSERT_EQ((size_t)0, uint8_array_len(out));
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_deflate_dyn_empty_no_dist) {
+    uint8_t stream[] =
+        {0x05, 0xc0, 0x81, 0x08, 0x00, 0x00, 0x00, 0x00, 0x20, 0x7f, 0xea, 0x2f
+        };
+    Arena* arena = arena_new(1024);
+    Uint8Array* out = NULL;
+    TEST_PDF_REQUIRE(decode_deflate_data(
+        arena,
+        stream,
+        sizeof(stream) / sizeof(uint8_t),
+        &out
+    ));
+
+    TEST_ASSERT_EQ((size_t)0, uint8_array_len(out));
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_deflate_dyn_one_dist) {
+    uint8_t stream[] = {
+        0x0d,
+        0xc0,
+        0x01,
+        0x09,
+        0x00,
+        0x00,
+        0x00,
+        0x80,
+        0x20,
+        0xfa,
+        0x7f,
+        0xda,
+        0x6c,
+        0x00
+    };
+    Arena* arena = arena_new(1024);
+    Uint8Array* out = NULL;
+    TEST_PDF_REQUIRE(decode_deflate_data(
+        arena,
+        stream,
+        sizeof(stream) / sizeof(uint8_t),
+        &out
+    ));
+
+    uint8_t expected[] = {0x01, 0x01, 0x01, 0x01};
     TEST_ASSERT_EQ(
         (size_t)(sizeof(expected) / sizeof(uint8_t)),
         uint8_array_len(out)
