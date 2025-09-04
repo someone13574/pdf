@@ -78,6 +78,16 @@ typedef struct {
         length_lut; /// Mapping from reversed (lsb) codes to code bit lengths
 } DeflateHuffmanLut;
 
+static uint32_t reverse_bits(uint32_t x, int len) {
+    uint32_t reversed = 0;
+    while (len--) {
+        reversed = (reversed << 1) | (x & 1);
+        x >>= 1;
+    }
+
+    return reversed;
+}
+
 static DeflateHuffmanLut
 build_deflate_huffman_lut(Arena* arena, uint8_t* bit_lens, size_t num_symbols) {
     RELEASE_ASSERT(bit_lens);
@@ -144,12 +154,13 @@ build_deflate_huffman_lut(Arena* arena, uint8_t* bit_lens, size_t num_symbols) {
         }
 
         uint32_t code = next_code[bits];
+        uint32_t reversed_code = reverse_bits(code, (int)bits);
 
-        RELEASE_ASSERT(code < lut.lut_length);
-        RELEASE_ASSERT(lut.length_lut[code] == 0);
+        RELEASE_ASSERT(reversed_code < lut.lut_length);
+        RELEASE_ASSERT(lut.length_lut[reversed_code] == 0);
 
-        lut.symbol_lut[code] = (uint32_t)symbol_idx;
-        lut.length_lut[code] = bits;
+        lut.symbol_lut[reversed_code] = (uint32_t)symbol_idx;
+        lut.length_lut[reversed_code] = bits;
         next_code[bits]++;
     }
 
@@ -159,8 +170,8 @@ build_deflate_huffman_lut(Arena* arena, uint8_t* bit_lens, size_t num_symbols) {
             continue;
         }
 
-        // Find shortest valid code
-        for (size_t bits = min_bit_len; bits < max_bit_len; bits++) {
+        // Find longest valid code
+        for (int bits = (int)max_bit_len; bits >= (int)min_bit_len; bits--) {
             uint32_t mask = (uint32_t)(1 << bits) - 1;
             uint32_t masked_code = code & mask;
 
@@ -609,23 +620,11 @@ TEST_FUNC(test_deflate_huffman) {
     TEST_ASSERT_EQ((size_t)2, lut.min_bit_len);
     TEST_ASSERT_EQ((size_t)4, lut.max_bit_len);
 
-    for (size_t idx = 0; idx < lut.lut_length; idx++) {
-        LOG_DIAG(
-            TRACE,
-            CODEC,
-            "       key=%04b (%x)  symbol=%-3u  bits=%u",
-            (unsigned int)idx,
-            (unsigned int)idx,
-            (unsigned int)lut.symbol_lut[idx],
-            (unsigned int)lut.length_lut[idx]
-        );
-    }
+    uint8_t test_data[] = {0x72, 0x3a, 0xee, 0x8f, 0x35, 0x16};
+    BitStream bitstream = bitstream_new(test_data, 6);
 
-    uint8_t test_data[] = {0x1a, 0x6b};
-    BitStream bitstream = bitstream_new(test_data, 4);
-
-    uint32_t expected_symbols[] = {0, 1, 2, 3, 4};
-    for (size_t idx = 0; idx < 5; idx++) {
+    uint32_t expected_symbols[] = {0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1, 0};
+    for (size_t idx = 0; idx < 15; idx++) {
         uint32_t symbol;
         TEST_PDF_REQUIRE(deflate_huffman_decode(&bitstream, &lut, &symbol));
         TEST_ASSERT_EQ(
@@ -640,76 +639,76 @@ TEST_FUNC(test_deflate_huffman) {
     return TEST_RESULT_PASS;
 }
 
-// TEST_FUNC(test_deflate_uncompressed_multiple_blocks) {
-//     uint8_t stream[] = {
-//         0x00, // header
-//         0x03, // length (little-endian)
-//         0x00, // length
-//         0xfc, // length one's compliment
-//         0xff, // length one's compliment
-//         'a',
-//         'b',
-//         'c',
-//         0x01, // header
-//         0x02, // length (little-endian)
-//         0x00, // length
-//         0xfd, // length one's compliment
-//         0xff, // length one's compliment
-//         'd',
-//         'e'
-//     };
+TEST_FUNC(test_deflate_uncompressed_multiple_blocks) {
+    uint8_t stream[] = {
+        0x00, // header
+        0x03, // length (little-endian)
+        0x00, // length
+        0xfc, // length one's compliment
+        0xff, // length one's compliment
+        'a',
+        'b',
+        'c',
+        0x01, // header
+        0x02, // length (little-endian)
+        0x00, // length
+        0xfd, // length one's compliment
+        0xff, // length one's compliment
+        'd',
+        'e'
+    };
 
-//     Arena* arena = arena_new(1024);
-//     Uint8Array* out = NULL;
-//     TEST_PDF_REQUIRE(decode_deflate_data(
-//         arena,
-//         stream,
-//         sizeof(stream) / sizeof(uint8_t),
-//         &out
-//     ));
+    Arena* arena = arena_new(1024);
+    Uint8Array* out = NULL;
+    TEST_PDF_REQUIRE(decode_deflate_data(
+        arena,
+        stream,
+        sizeof(stream) / sizeof(uint8_t),
+        &out
+    ));
 
-//     TEST_ASSERT_EQ((size_t)5, uint8_array_len(out));
+    TEST_ASSERT_EQ((size_t)5, uint8_array_len(out));
 
-//     uint8_t expected[] = {'a', 'b', 'c', 'd', 'e'};
-//     for (size_t idx = 0; idx < 5; idx++) {
-//         uint8_t value;
-//         TEST_ASSERT(uint8_array_get(out, idx, &value));
-//         TEST_ASSERT_EQ(
-//             expected[idx],
-//             value,
-//             "Decoded value at idx %zu was incorrect",
-//             idx
-//         );
-//     }
+    uint8_t expected[] = {'a', 'b', 'c', 'd', 'e'};
+    for (size_t idx = 0; idx < 5; idx++) {
+        uint8_t value;
+        TEST_ASSERT(uint8_array_get(out, idx, &value));
+        TEST_ASSERT_EQ(
+            expected[idx],
+            value,
+            "Decoded value at idx %zu was incorrect",
+            idx
+        );
+    }
 
-//     return TEST_RESULT_PASS;
-// }
+    return TEST_RESULT_PASS;
+}
 
-// TEST_FUNC(test_deflate_overlap) {
-//     uint8_t stream[] = {0x73, 0x74, 0xc4, 0x04, 0x00};
+TEST_FUNC(test_deflate_overlap) {
+    uint8_t stream[] = {0x73, 0x74, 0xc4, 0x04, 0x00};
 
-//     Arena* arena = arena_new(1024);
-//     Uint8Array* out = NULL;
-//     TEST_PDF_REQUIRE(decode_deflate_data(
-//         arena,
-//         stream,
-//         sizeof(stream) / sizeof(uint8_t),
-//         &out
-//     ));
+    Arena* arena = arena_new(1024);
+    Uint8Array* out = NULL;
+    TEST_PDF_REQUIRE(decode_deflate_data(
+        arena,
+        stream,
+        sizeof(stream) / sizeof(uint8_t),
+        &out
+    ));
 
-//     TEST_ASSERT_EQ((size_t)20, uint8_array_len(out));
-//     for (size_t idx = 0; idx < 20; idx++) {
-//         uint8_t value;
-//         TEST_ASSERT(uint8_array_get(out, idx, &value));
-//         TEST_ASSERT_EQ(
-//             (uint8_t)'A',
-//             value,
-//             "Decoded value at idx %zu was incorrect",
-//             idx
-//         );
-//     }
+    TEST_ASSERT_EQ((size_t)20, uint8_array_len(out));
+    for (size_t idx = 0; idx < 20; idx++) {
+        uint8_t value;
+        TEST_ASSERT(uint8_array_get(out, idx, &value));
+        TEST_ASSERT_EQ(
+            (uint8_t)'A',
+            value,
+            "Decoded value at idx %zu was incorrect",
+            idx
+        );
+    }
 
-//     return TEST_RESULT_PASS;
-// }
+    return TEST_RESULT_PASS;
+}
 
 #endif
