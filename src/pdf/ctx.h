@@ -11,18 +11,21 @@ typedef struct PdfCtx PdfCtx;
 // Creates a new context from a buffer. The buffer *must* be writable.
 PdfCtx* pdf_ctx_new(Arena* arena, char* buffer, size_t buffer_size);
 
-size_t pdf_ctx_buffer_len(PdfCtx* ctx);
-size_t pdf_ctx_offset(PdfCtx* ctx);
+size_t pdf_ctx_buffer_len(const PdfCtx* ctx);
+size_t pdf_ctx_offset(const PdfCtx* ctx);
 
 PdfError* pdf_ctx_seek(PdfCtx* ctx, size_t offset);
 PdfError* pdf_ctx_shift(PdfCtx* ctx, int64_t relative_offset);
 PdfError* pdf_ctx_peek_and_advance(PdfCtx* ctx, char* out);
 
-PdfError* pdf_ctx_peek(PdfCtx* ctx, char* out);
+PdfError* pdf_ctx_peek(const PdfCtx* ctx, char* out);
 PdfError* pdf_ctx_peek_next(PdfCtx* ctx, char* out);
 PdfError* pdf_ctx_expect(PdfCtx* ctx, const char* text);
-PdfError*
-pdf_ctx_require_char_type(PdfCtx* ctx, bool permit_eof, bool (*eval)(char));
+PdfError* pdf_ctx_require_char_type(
+    const PdfCtx* ctx,
+    bool permit_eof,
+    bool (*eval)(char)
+);
 PdfError* pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit);
 PdfError* pdf_ctx_seek_line_start(PdfCtx* ctx);
 PdfError* pdf_ctx_seek_next_line(PdfCtx* ctx);

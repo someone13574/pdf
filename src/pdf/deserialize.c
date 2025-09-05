@@ -11,7 +11,7 @@
 
 PdfError* pdf_resolve_object(
     PdfOptionalResolver resolver,
-    PdfObject* object,
+    const PdfObject* object,
     PdfObject* resolved
 ) {
     RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
@@ -49,7 +49,7 @@ PdfError* pdf_resolve_object(
 
 PdfError* deserialize_field(
     void* field_ptr,
-    PdfObject* object,
+    const PdfObject* object,
     PdfFieldInfo field_info,
     Arena* arena,
     PdfOptionalResolver resolver
@@ -138,7 +138,7 @@ PdfError* deserialize_field(
 
 PdfError* pdf_deserialize_object_field(
     void* field_ptr,
-    PdfObject* object,
+    const PdfObject* object,
     PdfObjectFieldData field_data
 ) {
     RELEASE_ASSERT(field_ptr);
@@ -206,7 +206,7 @@ PdfError* pdf_deserialize_object_field(
 
 PdfError* pdf_deserialize_ref_field(
     void* field_ptr,
-    PdfObject* object,
+    const PdfObject* object,
     PdfRefFieldData field_data
 ) {
     RELEASE_ASSERT(field_ptr);
@@ -230,7 +230,7 @@ PdfError* pdf_deserialize_ref_field(
 
 PdfError* pdf_deserialize_custom_field(
     void* field_ptr,
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfDeserializerFn deserializer,
     PdfOptionalResolver resolver
@@ -244,7 +244,7 @@ PdfError* pdf_deserialize_custom_field(
 }
 
 PdfError* deserialize_array_element(
-    PdfObject* element,
+    const PdfObject* element,
     PdfArrayFieldData field_data,
     Arena* arena,
     PdfOptionalResolver resolver,
@@ -268,7 +268,7 @@ PdfError* deserialize_array_element(
 
 PdfError* pdf_deserialize_array_field(
     void* field_ptr,
-    PdfObject* object,
+    const PdfObject* object,
     PdfArrayFieldData field_data,
     Arena* arena,
     PdfOptionalResolver resolver
@@ -323,7 +323,7 @@ PdfError* pdf_deserialize_array_field(
 
 PdfError* pdf_deserialize_as_array_field(
     void* field_ptr,
-    PdfObject* object,
+    const PdfObject* object,
     PdfArrayFieldData field_data,
     Arena* arena,
     PdfOptionalResolver resolver
@@ -365,7 +365,7 @@ PdfError* pdf_deserialize_as_array_field(
 
 PdfError* pdf_deserialize_optional_field(
     void* field_ptr,
-    PdfObject* object,
+    const PdfObject* object,
     PdfOptionalFieldData field_data,
     Arena* arena,
     PdfOptionalResolver resolver
@@ -390,8 +390,8 @@ PdfError* pdf_deserialize_optional_field(
 
 PdfError* pdf_deserialize_object(
     void* target,
-    PdfObject* object,
-    PdfFieldDescriptor* fields,
+    const PdfObject* object,
+    const PdfFieldDescriptor* fields,
     size_t num_fields,
     Arena* arena,
     PdfOptionalResolver resolver
@@ -451,7 +451,7 @@ PdfError* pdf_deserialize_object(
     // Deserialize fields
     for (size_t field_idx = 0; field_idx < num_fields; field_idx++) {
         bool found = false;
-        PdfFieldDescriptor* field = &fields[field_idx];
+        const PdfFieldDescriptor* field = &fields[field_idx];
         LOG_DIAG(
             DEBUG,
             DESERDE,
@@ -504,9 +504,9 @@ PdfError* pdf_deserialize_object(
 
 PdfError* pdf_deserialize_operands(
     void* target,
-    PdfOperandDescriptor* descriptors,
+    const PdfOperandDescriptor* descriptors,
     size_t num_descriptors,
-    PdfObjectVec* operands,
+    const PdfObjectVec* operands,
     Arena* arena
 ) {
     RELEASE_ASSERT(target);
@@ -631,7 +631,7 @@ typedef struct {
     PdfDict dict;
     PdfStream stream;
     PdfIndirectRef indirect_ref;
-    PdfObject* raw_dict;
+    const PdfObject* raw_dict;
 } TestDeserializeObjectsStruct;
 
 PdfError* deserialize_test_objects_struct(
@@ -774,11 +774,11 @@ TEST_FUNC(test_deserialize_objects) {
 typedef struct {
     PdfName hello;
     PdfInteger world;
-    PdfObject* raw_dict;
+    const PdfObject* raw_dict;
 } TestDeserializeInnerStruct;
 
 PdfError* deserialize_test_inner_struct(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     TestDeserializeInnerStruct* deserialized
@@ -819,7 +819,7 @@ PDF_DESERIALIZABLE_REF_IMPL(
 
 typedef struct {
     TestDeserializeInnerStructRef reference;
-    PdfObject* raw_dict;
+    const PdfObject* raw_dict;
 } TestDeserializeRefStruct;
 
 PdfError* deserialize_test_ref_struct(
@@ -873,7 +873,7 @@ TEST_FUNC(test_deserialize_ref) {
 
 typedef struct {
     TestDeserializeInnerStruct inner;
-    PdfObject* raw_dict;
+    const PdfObject* raw_dict;
 } TestDeserializeInlineStruct;
 
 PdfError* deserialize_test_inline_struct(
@@ -934,7 +934,7 @@ DESERIALIZABLE_OPTIONAL_TYPE(
 
 typedef struct {
     TestDeserializeInnerOptional inner;
-    PdfObject* raw_dict;
+    const PdfObject* raw_dict;
 } TestDeserializeInlineOptional;
 
 PdfError* deserialize_test_inline_optional(
@@ -989,7 +989,7 @@ DESERIALIZABLE_ARRAY_TYPE(DeserializeTestIntegerArray)
 typedef struct {
     DeserializeTestStringArray strings;
     DeserializeTestIntegerArray integers;
-    PdfObject* raw_dict;
+    const PdfObject* raw_dict;
 } TestDeserializePrimitiveArrays;
 
 PdfError* deserialize_test_primitive_arrays(
@@ -1069,7 +1069,7 @@ DESERIALIZABLE_ARRAY_TYPE(DeserializeTestStructArray)
 
 typedef struct {
     DeserializeTestStructArray inners;
-    PdfObject* raw_dict;
+    const PdfObject* raw_dict;
 } TestDeserializeTestComplexArray;
 
 PdfError* deserialize_test_complex_array(

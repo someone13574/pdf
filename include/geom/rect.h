@@ -1,7 +1,8 @@
 #pragma once
 
-/// A rectangle
 #include "geom/vec2.h"
+
+/// A rectangle
 typedef struct {
     GeomVec2 min;
     GeomVec2 max;

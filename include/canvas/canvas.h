@@ -54,7 +54,7 @@ void canvas_draw_bezier(
     uint32_t rgba
 );
 
-void canvas_draw_path(Canvas* canvas, PathBuilder* path);
+void canvas_draw_path(Canvas* canvas, const PathBuilder* path);
 
 /// Writes the canvas to a file. Returns `true` on success.
 bool canvas_write_file(Canvas* canvas, const char* path);

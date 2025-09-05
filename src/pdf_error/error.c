@@ -150,13 +150,13 @@ PdfError* pdf_error_add_context(
     return error;
 }
 
-PdfErrorCode pdf_error_code(PdfError* error) {
+PdfErrorCode pdf_error_code(const PdfError* error) {
     RELEASE_ASSERT(error);
 
     return error->code;
 }
 
-void pdf_error_print(PdfError* error) {
+void pdf_error_print(const PdfError* error) {
     RELEASE_ASSERT(error);
 
     if (error->ctx_chain) {

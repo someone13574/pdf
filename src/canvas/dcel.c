@@ -319,7 +319,7 @@ void dcel_connect_vertices(Dcel* dcel, DcelVertex* a, DcelVertex* b) {
     arena_free(local_arena);
 }
 
-DcelHalfEdge* dcel_next_incident_edge(DcelHalfEdge* half_edge) {
+DcelHalfEdge* dcel_next_incident_edge(const DcelHalfEdge* half_edge) {
     RELEASE_ASSERT(half_edge);
 
     return half_edge->twin->next;
@@ -947,7 +947,7 @@ point_in_polygon(DcelHalfEdge* start_half_edge, double x, double y) {
     return winding % 2 != 0;
 }
 
-void dcel_render(Dcel* dcel, RasterCanvas* canvas) {
+void dcel_render(const Dcel* dcel, RasterCanvas* canvas) {
     RELEASE_ASSERT(dcel);
     RELEASE_ASSERT(canvas);
 

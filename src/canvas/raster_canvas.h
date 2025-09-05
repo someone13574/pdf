@@ -16,10 +16,11 @@ RasterCanvas* raster_canvas_new(
     double coordinate_scale
 );
 
-uint32_t raster_canvas_width(RasterCanvas* canvas);
-uint32_t raster_canvas_height(RasterCanvas* canvas);
+uint32_t raster_canvas_width(const RasterCanvas* canvas);
+uint32_t raster_canvas_height(const RasterCanvas* canvas);
 
-uint32_t raster_canvas_get_rgba(RasterCanvas* canvas, uint32_t x, uint32_t y);
+uint32_t
+raster_canvas_get_rgba(const RasterCanvas* canvas, uint32_t x, uint32_t y);
 
 void raster_canvas_set_rgba(
     RasterCanvas* canvas,
@@ -70,6 +71,6 @@ void raster_canvas_draw_bezier(
     uint32_t rgba
 );
 
-void raster_canvas_draw_path(RasterCanvas* canvas, PathBuilder* path);
+void raster_canvas_draw_path(RasterCanvas* canvas, const PathBuilder* path);
 
 bool raster_canvas_write_file(RasterCanvas* canvas, const char* path);

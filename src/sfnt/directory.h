@@ -12,7 +12,7 @@ PdfError* sfnt_parse_directory(
 );
 
 PdfError* sfnt_directory_get_entry(
-    SfntFontDirectory* directory,
+    const SfntFontDirectory* directory,
     uint32_t tag,
     SfntDirectoryEntry** entry
 );

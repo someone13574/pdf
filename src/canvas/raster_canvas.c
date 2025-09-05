@@ -114,17 +114,18 @@ RasterCanvas* raster_canvas_new(
     return canvas;
 }
 
-uint32_t raster_canvas_width(RasterCanvas* canvas) {
+uint32_t raster_canvas_width(const RasterCanvas* canvas) {
     RELEASE_ASSERT(canvas);
     return canvas->width;
 }
 
-uint32_t raster_canvas_height(RasterCanvas* canvas) {
+uint32_t raster_canvas_height(const RasterCanvas* canvas) {
     RELEASE_ASSERT(canvas);
     return canvas->height;
 }
 
-uint32_t raster_canvas_get_rgba(RasterCanvas* canvas, uint32_t x, uint32_t y) {
+uint32_t
+raster_canvas_get_rgba(const RasterCanvas* canvas, uint32_t x, uint32_t y) {
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(x < canvas->width);
     RELEASE_ASSERT(y < canvas->height);
@@ -344,7 +345,7 @@ void raster_canvas_draw_bezier(
     );
 }
 
-void raster_canvas_draw_path(RasterCanvas* canvas, PathBuilder* path) {
+void raster_canvas_draw_path(RasterCanvas* canvas, const PathBuilder* path) {
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(path);
 

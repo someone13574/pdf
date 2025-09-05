@@ -25,7 +25,7 @@
 #define DVEC_TYPE PdfDictEntry
 #include "arena/dvec_impl.h"
 
-PdfObject* pdf_dict_get(PdfDict* dict, PdfName key) {
+PdfObject* pdf_dict_get(const PdfDict* dict, PdfName key) {
     for (size_t idx = 0; idx < pdf_dict_entry_vec_len(dict->entries); idx++) {
         PdfDictEntry entry;
         RELEASE_ASSERT(pdf_dict_entry_vec_get(dict->entries, idx, &entry));
@@ -893,7 +893,7 @@ static char* format_alloc(Arena* arena, const char* fmt, ...) {
 
 char* pdf_fmt_object_indented(
     Arena* arena,
-    PdfObject* object,
+    const PdfObject* object,
     int indent,
     bool* force_indent_parent
 ) {
@@ -1071,7 +1071,7 @@ char* pdf_fmt_object_indented(
     return format_alloc(arena, "unreachable");
 }
 
-char* pdf_fmt_object(Arena* arena, PdfObject* object) {
+char* pdf_fmt_object(Arena* arena, const PdfObject* object) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(object);
 

@@ -10,11 +10,11 @@
 typedef struct {
     PdfName type;
     PdfPageTreeNodeRef pages;
-    PdfObject* raw_dict;
+    const PdfObject* raw_dict;
 } PdfCatalog;
 
 PdfError* pdf_deserialize_catalog(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     PdfCatalog* deserialized

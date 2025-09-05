@@ -6,7 +6,7 @@
 #include "pdf/resolver.h"
 
 PdfError* pdf_deserialize_stream_dict(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfStreamDict* deserialized
 ) {

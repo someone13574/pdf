@@ -44,4 +44,4 @@ typedef struct {
 } SfntCmap;
 
 PdfError* sfnt_parse_cmap(Arena* arena, SfntParser* parser, SfntCmap* cmap);
-uint32_t sfnt_cmap_map_cid(SfntCmapSubtable* subtable, uint32_t cid);
+uint32_t sfnt_cmap_map_cid(const SfntCmapSubtable* subtable, uint32_t cid);

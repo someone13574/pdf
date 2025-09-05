@@ -539,7 +539,7 @@ void DLINKED_FN(clear)(DLINKED_NAME* linked_list) {
 }
 
 // Gets the length of the linked list
-size_t DLINKED_FN(len)(DLINKED_NAME* linked_list) {
+size_t DLINKED_FN(len)(const DLINKED_NAME* linked_list) {
     RELEASE_ASSERT(linked_list);
     return linked_list->len;
 }

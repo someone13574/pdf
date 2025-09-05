@@ -6,7 +6,7 @@
 #include "pdf/resolver.h"
 
 PdfError* pdf_deserialize_resources(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     PdfResources* deserialized

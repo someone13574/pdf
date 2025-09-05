@@ -7,7 +7,7 @@
 #include "pdf_error/error.h"
 
 PdfError* pdf_deserialize_font(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     PdfFont* deserialized

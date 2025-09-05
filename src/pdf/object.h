@@ -8,7 +8,7 @@
 PdfError* pdf_parse_object(
     Arena* arena,
     PdfCtx* ctx,
-    PdfObject* object,
+    PdfObject* object_out,
     bool in_indirect_obj
 );
 

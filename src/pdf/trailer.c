@@ -9,7 +9,7 @@
 #include "pdf_error/error.h"
 
 PdfError* pdf_deserialize_trailer(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     PdfTrailer* deserialized

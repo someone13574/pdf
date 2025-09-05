@@ -46,7 +46,7 @@ TEST_FUNC(test_array_new_init) {
 TEST_FUNC(test_array_new_from) {
     Arena* arena = arena_new(1024);
     int elements[5] = {4, 3, 2, 1, 0};
-    MyTestArray* array = my_test_array_new_from(arena, 5, elements);
+    MyTestArray* array = my_test_array_new_from(arena, elements, 5);
     TEST_ASSERT(arena);
 
     int x;

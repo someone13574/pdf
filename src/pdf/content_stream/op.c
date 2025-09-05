@@ -22,7 +22,7 @@ new_queue_op(PdfContentOpVec* operation_queue, PdfContentOpKind op) {
 }
 
 PdfError* pdf_deserialize_set_font_op(
-    PdfObjectVec* operands,
+    const PdfObjectVec* operands,
     Arena* arena,
     PdfContentOpSetFont* deserialized
 ) {
@@ -52,7 +52,7 @@ PdfError* pdf_deserialize_set_font_op(
 }
 
 PdfError* pdf_deserialize_next_line_op(
-    PdfObjectVec* operands,
+    const PdfObjectVec* operands,
     Arena* arena,
     PdfContentOpNextLine* deserialized
 ) {
@@ -82,7 +82,7 @@ PdfError* pdf_deserialize_next_line_op(
 }
 
 PdfError* pdf_deserialize_show_text_op(
-    PdfObjectVec* operands,
+    const PdfObjectVec* operands,
     Arena* arena,
     PdfContentOpShowText* deserialized
 ) {
@@ -106,7 +106,7 @@ PdfError* pdf_deserialize_show_text_op(
 
 PdfError* pdf_deserialize_content_op(
     PdfOperator op,
-    PdfObjectVec* operands,
+    const PdfObjectVec* operands,
     Arena* arena,
     PdfContentOpVec* operation_queue
 ) {

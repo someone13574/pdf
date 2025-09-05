@@ -8,7 +8,7 @@
 #include "pdf_error/error.h"
 
 PdfError* pdf_deserialize_catalog(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     PdfCatalog* deserialized

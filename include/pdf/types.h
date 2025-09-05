@@ -12,9 +12,11 @@ typedef struct {
     } value;
 } PdfNumber;
 
-PdfError* pdf_deserialize_number(PdfObject* object, PdfNumber* deserialized);
+PdfError*
+pdf_deserialize_number(const PdfObject* object, PdfNumber* deserialized);
+
 PdfError* pdf_deserialize_number_wrapper(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     void* deserialized
@@ -30,9 +32,10 @@ typedef struct {
 } PdfRectangle;
 
 PdfError*
-pdf_deserialize_rectangle(PdfObject* object, PdfRectangle* deserialized);
+pdf_deserialize_rectangle(const PdfObject* object, PdfRectangle* deserialized);
+
 PdfError* pdf_deserialize_rectangle_wrapper(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     void* deserialized

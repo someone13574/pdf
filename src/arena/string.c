@@ -62,13 +62,13 @@ ArenaString* arena_string_new_fmt(Arena* arena, const char* fmt, ...) {
     return string;
 }
 
-const char* arena_string_buffer(ArenaString* string) {
+const char* arena_string_buffer(const ArenaString* string) {
     RELEASE_ASSERT(string);
 
     return string->buffer;
 }
 
-size_t arena_string_len(ArenaString* string) {
+size_t arena_string_len(const ArenaString* string) {
     RELEASE_ASSERT(string);
 
     return strlen(string->buffer);

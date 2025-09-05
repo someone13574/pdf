@@ -64,7 +64,7 @@ static PdfError* zlib_decode_flg(BitStream* bitstream, ZlibFLG* flg_out) {
 
 PdfError* decode_zlib_data(
     Arena* arena,
-    uint8_t* data,
+    const uint8_t* data,
     size_t data_len,
     Uint8Array** decoded_bytes
 ) {

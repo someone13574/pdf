@@ -9,18 +9,18 @@
 typedef struct {
     PdfOpDict font;
 
-    PdfObject* raw_dict;
+    const PdfObject* raw_dict;
 } PdfResources;
 
 PdfError* pdf_deserialize_resources(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     PdfResources* deserialized
 );
 
 PdfError* pdf_deserialize_resources_wrapper(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     void* deserialized

@@ -6,7 +6,7 @@
 #include "logger/log.h"
 #include "pdf_error/error.h"
 
-BitStream bitstream_new(uint8_t* data, size_t n_bytes) {
+BitStream bitstream_new(const uint8_t* data, size_t n_bytes) {
     return (BitStream) {.data = data, .length_bytes = n_bytes, .offset = 0};
 }
 
@@ -113,7 +113,7 @@ void bitstream_align_byte(BitStream* bitstream) {
     }
 }
 
-size_t bitstream_remaining_bits(BitStream* bitstream) {
+size_t bitstream_remaining_bits(const BitStream* bitstream) {
     RELEASE_ASSERT(bitstream);
 
     return (bitstream->length_bytes << 3) - bitstream->offset;

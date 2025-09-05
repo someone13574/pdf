@@ -27,7 +27,7 @@ static PdfError* process_content_stream(
     Arena* arena,
     RenderState* state,
     PdfContentStream* content_stream,
-    PdfOpResources* resources,
+    const PdfOpResources* resources,
     PdfOptionalResolver resolver,
     Canvas* canvas
 ) {
@@ -133,7 +133,7 @@ static PdfError* process_content_stream(
 PdfError* render_page(
     Arena* arena,
     PdfOptionalResolver resolver,
-    PdfPage* page,
+    const PdfPage* page,
     Canvas** canvas
 ) {
     RELEASE_ASSERT(arena);

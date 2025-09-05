@@ -12,11 +12,11 @@ typedef struct {
     PdfInteger length;
     PdfOpNameArray filter;
 
-    PdfObject* raw_dict;
+    const PdfObject* raw_dict;
 } PdfStreamDict;
 
 PdfError* pdf_deserialize_stream_dict(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfStreamDict* deserialized
 );

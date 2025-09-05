@@ -4,7 +4,8 @@
 #include "pdf/object.h"
 #include "pdf_error/error.h"
 
-PdfError* pdf_deserialize_number(PdfObject* object, PdfNumber* deserialized) {
+PdfError*
+pdf_deserialize_number(const PdfObject* object, PdfNumber* deserialized) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(deserialized);
 
@@ -31,7 +32,7 @@ PdfError* pdf_deserialize_number(PdfObject* object, PdfNumber* deserialized) {
 }
 
 PdfError* pdf_deserialize_number_wrapper(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     void* deserialized
@@ -57,7 +58,7 @@ PdfReal pdf_number_as_real(PdfNumber number) {
 }
 
 PdfError*
-pdf_deserialize_rectangle(PdfObject* object, PdfRectangle* deserialized) {
+pdf_deserialize_rectangle(const PdfObject* object, PdfRectangle* deserialized) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(deserialized);
 
@@ -115,7 +116,7 @@ pdf_deserialize_rectangle(PdfObject* object, PdfRectangle* deserialized) {
 }
 
 PdfError* pdf_deserialize_rectangle_wrapper(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     void* deserialized

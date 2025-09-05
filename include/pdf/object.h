@@ -37,7 +37,8 @@ typedef struct {
     PdfDictEntryVec* entries;
 } PdfDict;
 
-PdfObject* pdf_dict_get(PdfDict* dict, PdfName key);
+// TODO: remove duplicate of `pdf_object_dict_get`
+PdfObject* pdf_dict_get(const PdfDict* dict, PdfName key);
 
 typedef struct {
     PdfObject* stream_dict;
@@ -109,8 +110,8 @@ struct PdfObject {
 
 // Gets the value associated with a given key in a dictionary object
 PdfError*
-pdf_object_dict_get(PdfObject* dict, const char* key, PdfObject* object);
+pdf_object_dict_get(const PdfObject* dict, const char* key, PdfObject* object);
 
 // Generates a pretty-printed PdfObject string. If no arena is passed, you must
 // free the string manually.
-char* pdf_fmt_object(Arena* arena, PdfObject* object);
+char* pdf_fmt_object(Arena* arena, const PdfObject* object);

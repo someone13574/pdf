@@ -10,11 +10,11 @@ typedef struct {
     PdfName subtype;
     PdfName base_font;
 
-    PdfObject* raw_dict;
+    const PdfObject* raw_dict;
 } PdfFont;
 
 PdfError* pdf_deserialize_font(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     PdfFont* deserialized

@@ -88,8 +88,11 @@ void dcel_builder_end_contour(DcelBuilder* builder) {
     builder->prev_edge = NULL;
 }
 
-Canvas*
-dcel_builder_render(DcelBuilder* builder, uint32_t width, uint32_t height) {
+Canvas* dcel_builder_render(
+    const DcelBuilder* builder,
+    uint32_t width,
+    uint32_t height
+) {
     uint32_t resolution_multiplier = 2;
     RasterCanvas* canvas = raster_canvas_new(
         builder->arena,

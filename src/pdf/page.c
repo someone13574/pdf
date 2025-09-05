@@ -14,7 +14,7 @@ PDF_DESERIALIZABLE_REF_IMPL(
 )
 
 PdfError* pdf_deserialize_page_tree_node(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     PdfPageTreeNode* deserialized
@@ -68,7 +68,7 @@ PdfError* pdf_deserialize_page_tree_node(
 }
 
 PdfError* pdf_deserialize_page(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     PdfPage* deserialized

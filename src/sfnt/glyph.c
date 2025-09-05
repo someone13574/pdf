@@ -216,7 +216,11 @@ PdfError* sfnt_parse_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
     LOG_TODO("Compound glyphs");
 }
 
-void sfnt_glyph_render(Canvas* canvas, SfntGlyph* glyph, GeomMat3 transform) {
+void sfnt_glyph_render(
+    Canvas* canvas,
+    const SfntGlyph* glyph,
+    GeomMat3 transform
+) {
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(glyph);
 

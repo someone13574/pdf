@@ -70,9 +70,9 @@ PdfError* pdf_error_add_context(
     const char* fmt,
     ...
 ) RET_NONNULL_ATTR FORMAT_ATTR(5, 6);
-PdfErrorCode pdf_error_code(PdfError* error);
+PdfErrorCode pdf_error_code(const PdfError* error);
 
-void pdf_error_print(PdfError* error);
+void pdf_error_print(const PdfError* error);
 void pdf_error_unwrap(PdfError* error, const char* file, unsigned long line)
     NORETURN_ATTR;
 bool pdf_error_free_is_ok(PdfError* error);

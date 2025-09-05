@@ -7,7 +7,7 @@
 
 PdfError* pdf_deserialize_content_op(
     PdfOperator op,
-    PdfObjectVec* operands,
+    const PdfObjectVec* operands,
     Arena* arena,
     PdfContentOpVec* operation_queue
 );

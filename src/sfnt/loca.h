@@ -13,10 +13,10 @@ typedef struct {
 PdfError* sfnt_parse_loca(
     Arena* arena,
     SfntParser* parser,
-    SfntHead* head,
-    SfntMaxp* maxp,
+    const SfntHead* head,
+    const SfntMaxp* maxp,
     SfntLoca* loca
 );
 
 PdfError*
-sfnt_loca_glyph_offset(SfntLoca* loca, uint32_t gid, uint32_t* offset);
+sfnt_loca_glyph_offset(const SfntLoca* loca, uint32_t gid, uint32_t* offset);

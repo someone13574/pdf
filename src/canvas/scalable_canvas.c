@@ -128,7 +128,10 @@ void scalable_canvas_draw_bezier(
     );
 }
 
-void scalable_canvas_draw_path(ScalableCanvas* canvas, PathBuilder* path) {
+void scalable_canvas_draw_path(
+    ScalableCanvas* canvas,
+    const PathBuilder* path
+) {
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(path);
 

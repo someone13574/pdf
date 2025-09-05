@@ -39,12 +39,12 @@ PdfCtx* pdf_ctx_new(Arena* arena, char* buffer, size_t buffer_size) {
     return ctx;
 }
 
-size_t pdf_ctx_buffer_len(PdfCtx* ctx) {
+size_t pdf_ctx_buffer_len(const PdfCtx* ctx) {
     RELEASE_ASSERT(ctx);
     return ctx->buffer_len;
 }
 
-size_t pdf_ctx_offset(PdfCtx* ctx) {
+size_t pdf_ctx_offset(const PdfCtx* ctx) {
     RELEASE_ASSERT(ctx);
     return ctx->offset;
 }
@@ -116,7 +116,7 @@ PdfError* pdf_ctx_peek_and_advance(PdfCtx* ctx, char* peeked) {
     return pdf_ctx_seek(ctx, ctx->offset + 1);
 }
 
-PdfError* pdf_ctx_peek(PdfCtx* ctx, char* peeked) {
+PdfError* pdf_ctx_peek(const PdfCtx* ctx, char* peeked) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(peeked);
 
@@ -187,8 +187,11 @@ PdfError* pdf_ctx_expect(PdfCtx* ctx, const char* text) {
     return NULL;
 }
 
-PdfError*
-pdf_ctx_require_char_type(PdfCtx* ctx, bool permit_eof, bool (*eval)(char)) {
+PdfError* pdf_ctx_require_char_type(
+    const PdfCtx* ctx,
+    bool permit_eof,
+    bool (*eval)(char)
+) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(eval);
 

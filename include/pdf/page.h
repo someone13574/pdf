@@ -12,11 +12,12 @@ typedef struct {
     PdfOpDict parent;
     PdfVoidVec* kids;
     PdfInteger count;
-    PdfObject* raw_dict;
+
+    const PdfObject* raw_dict;
 } PdfPageTreeNode;
 
 PdfError* pdf_deserialize_page_tree_node(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     PdfPageTreeNode* deserialized
@@ -33,11 +34,12 @@ typedef struct {
     PdfOpResources resources;
     PdfRectangle media_box;
     PdfOpContentsArray contents;
-    PdfObject* raw_dict;
+
+    const PdfObject* raw_dict;
 } PdfPage;
 
 PdfError* pdf_deserialize_page(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     PdfPage* deserialized

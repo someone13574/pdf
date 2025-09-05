@@ -9,11 +9,11 @@ typedef struct {
     PdfInteger size;
     PdfCatalogRef root;
 
-    PdfObject* raw_dict;
+    const PdfObject* raw_dict;
 } PdfTrailer;
 
 PdfError* pdf_deserialize_trailer(
-    PdfObject* object,
+    const PdfObject* object,
     Arena* arena,
     PdfOptionalResolver resolver,
     PdfTrailer* deserialized

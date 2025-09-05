@@ -1,7 +1,8 @@
 #pragma once
 
-/// A three element vector
 #include "geom/mat3.h"
+
+/// A three element vector
 typedef struct {
     double x;
     double y;

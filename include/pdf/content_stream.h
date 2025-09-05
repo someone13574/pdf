@@ -10,7 +10,7 @@ typedef struct {
 } PdfContentStream;
 
 PdfError* pdf_deserialize_content_stream(
-    PdfStream* stream,
+    const PdfStream* stream,
     Arena* arena,
     PdfContentStream* deserialized
 );

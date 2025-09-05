@@ -14,10 +14,10 @@ ArenaString* arena_string_new_fmt(Arena* arena, const char* fmt, ...)
     FORMAT_ATTR(2, 3);
 
 /// Gets the underlying null-terminated string
-const char* arena_string_buffer(ArenaString* string);
+const char* arena_string_buffer(const ArenaString* string);
 
 /// Gets the length of the string, excluding the null-terminator
-size_t arena_string_len(ArenaString* string);
+size_t arena_string_len(const ArenaString* string);
 
 /// Appends a string to the end of this string
 void arena_string_append(ArenaString* string, const char* to_append);

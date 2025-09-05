@@ -73,10 +73,10 @@ DcelVertex* dcel_intersect_edges(
     double intersection_y
 );
 void dcel_connect_vertices(Dcel* dcel, DcelVertex* a, DcelVertex* b);
-DcelHalfEdge* dcel_next_incident_edge(DcelHalfEdge* half_edge);
+DcelHalfEdge* dcel_next_incident_edge(const DcelHalfEdge* half_edge);
 
 void dcel_overlay(Dcel* dcel);
 void dcel_assign_faces(Dcel* dcel);
 void dcel_partition(Dcel* dcel);
 
-void dcel_render(Dcel* dcel, RasterCanvas* canvas);
+void dcel_render(const Dcel* dcel, RasterCanvas* canvas);

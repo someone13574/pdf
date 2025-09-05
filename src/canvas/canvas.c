@@ -167,7 +167,7 @@ void canvas_draw_bezier(
     }
 }
 
-void canvas_draw_path(Canvas* canvas, PathBuilder* path) {
+void canvas_draw_path(Canvas* canvas, const PathBuilder* path) {
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(path);
 

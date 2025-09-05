@@ -28,7 +28,7 @@ typedef struct {
 PdfError* sfnt_parse_hmtx(
     Arena* arena,
     SfntParser* parser,
-    SfntMaxp* maxp,
-    SfntHhea* hhea,
+    const SfntMaxp* maxp,
+    const SfntHhea* hhea,
     SfntHmtx* hmtx
 );

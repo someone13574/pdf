@@ -39,11 +39,11 @@ DVEC_TYPE* DVEC_FN(push)(DVEC_NAME* vec, DVEC_TYPE element);
 
 // Gets the element stored at index `idx`, storing the element in `out` and
 // returning a bool indicating whether the operation was successful.
-bool DVEC_FN(get)(DVEC_NAME* vec, size_t idx, DVEC_TYPE* out);
+bool DVEC_FN(get)(const DVEC_NAME* vec, size_t idx, DVEC_TYPE* out);
 
 // Gets the element stored at index `idx`, storing a pointer to the element in
 // `out` and returning a bool indicating whether the operation was successful.
-bool DVEC_FN(get_ptr)(DVEC_NAME* vec, size_t idx, DVEC_TYPE** out);
+bool DVEC_FN(get_ptr)(const DVEC_NAME* vec, size_t idx, DVEC_TYPE** out);
 
 // Pops an element from the vector, storing the pop'ed element in `out` and
 // returning a bool indicating whether the operation was successful.
@@ -53,7 +53,7 @@ bool DVEC_FN(pop)(DVEC_NAME* vec, DVEC_TYPE* out);
 void DVEC_FN(clear)(DVEC_NAME* vec);
 
 // Returns the length of the vector.
-size_t DVEC_FN(len)(DVEC_NAME* vec);
+size_t DVEC_FN(len)(const DVEC_NAME* vec);
 
 // Undefines
 #undef DVEC_NAME

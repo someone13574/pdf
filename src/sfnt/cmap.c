@@ -183,7 +183,7 @@ PdfError* sfnt_cmap_get_encoding(
     }
 }
 
-uint16_t cmap_format4_map(SfntCmapFormat4* subtable, uint16_t cid) {
+uint16_t cmap_format4_map(const SfntCmapFormat4* subtable, uint16_t cid) {
     RELEASE_ASSERT(subtable);
 
     uint16_t seg_count = subtable->seg_count_x2 / 2;
@@ -240,7 +240,7 @@ uint16_t cmap_format4_map(SfntCmapFormat4* subtable, uint16_t cid) {
     return (uint16_t)(uncorrected_gid + id_delta);
 }
 
-uint32_t sfnt_cmap_map_cid(SfntCmapSubtable* subtable, uint32_t cid) {
+uint32_t sfnt_cmap_map_cid(const SfntCmapSubtable* subtable, uint32_t cid) {
     RELEASE_ASSERT(subtable);
 
     switch (subtable->format) {
@@ -262,18 +262,18 @@ TEST_FUNC(test_cmap_format4_mapping) {
         .seg_count_x2 = 8,
         .end_code = uint16_array_new_from(
             arena,
-            4,
-            (uint16_t[4]) {20, 90, 153, 0xffff}
+            (uint16_t[4]) {20, 90, 153, 0xffff},
+            4
         ),
         .start_code = uint16_array_new_from(
             arena,
-            4,
-            (uint16_t[4]) {10, 30, 100, 0xffff}
+            (uint16_t[4]) {10, 30, 100, 0xffff},
+            4
         ),
         .id_delta = uint16_array_new_from(
             arena,
-            4,
-            (uint16_t[4]) {(uint16_t)-9, (uint16_t)-18, (uint16_t)-27, 1}
+            (uint16_t[4]) {(uint16_t)-9, (uint16_t)-18, (uint16_t)-27, 1},
+            4
         ),
         .id_range_offset = uint16_array_new_init(arena, 4, 0)
     };

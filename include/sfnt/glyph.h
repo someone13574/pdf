@@ -75,4 +75,8 @@ typedef struct {
     } data;
 } SfntGlyph;
 
-void sfnt_glyph_render(Canvas* canvas, SfntGlyph* glyph, GeomMat3 transform);
+void sfnt_glyph_render(
+    Canvas* canvas,
+    const SfntGlyph* glyph,
+    GeomMat3 transform
+);
