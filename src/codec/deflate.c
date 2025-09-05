@@ -434,6 +434,7 @@ static PdfError* decode_dyn_huffman_table_luts(
 static DeflateHuffmanLut get_fixed_huffman_lut(void) {
     static bool initialized = false;
     static DeflateHuffmanLut lut;
+    static uint8_t arena_backing[4096];
 
     if (!initialized) {
         LOG_DIAG(DEBUG, CODEC, "Initializing fixed deflate huffman lut");
@@ -455,8 +456,11 @@ static DeflateHuffmanLut get_fixed_huffman_lut(void) {
             bit_lens[i] = 8;
         }
 
-        Arena* persistent_arena = arena_new(1);
-        lut = build_deflate_huffman_lut(persistent_arena, bit_lens, 288);
+        Arena* arena = arena_new_in_buffer(
+            arena_backing,
+            sizeof(arena_backing) / sizeof(uint8_t)
+        );
+        lut = build_deflate_huffman_lut(arena, bit_lens, 288);
     }
 
     return lut;
