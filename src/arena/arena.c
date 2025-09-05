@@ -1,6 +1,7 @@
 #include "arena/arena.h"
 
 #include <stdalign.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -51,6 +52,7 @@ struct Arena {
     ArenaBlock* blocks;
     size_t num_blocks;
 
+    bool dynamic_arena;
     size_t next_block_size;
 };
 
@@ -63,13 +65,40 @@ Arena* arena_new(size_t block_size) {
     RELEASE_ASSERT(arena, "Malloc failed");
     arena->blocks = blocks;
     arena->num_blocks = 1;
+    arena->dynamic_arena = true;
     arena->next_block_size = block_size;
+
+    return arena;
+}
+
+Arena* arena_new_in_buffer(void* buffer, size_t buffer_len) {
+    RELEASE_ASSERT(buffer);
+    RELEASE_ASSERT(
+        buffer_len >= sizeof(ArenaBlock),
+        "Arena must be large enough to store itself"
+    );
+
+    size_t self_size = sizeof(Arena) + sizeof(ArenaBlock);
+
+    // Create a single arena-block
+    ArenaBlock* block = buffer;
+    block->start = (uintptr_t)buffer + self_size;
+    block->end = (uintptr_t)buffer + buffer_len;
+    block->ptr = block->end;
+
+    // Create the arena
+    Arena* arena = (void*)((uint8_t*)buffer + sizeof(ArenaBlock));
+    arena->blocks = block;
+    arena->num_blocks = 1;
+    arena->dynamic_arena = false;
+    arena->next_block_size = 0;
 
     return arena;
 }
 
 void arena_free(Arena* arena) {
     RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(arena->dynamic_arena);
 
     LOG_DIAG(INFO, ARENA, "Freeing arena");
 
@@ -129,6 +158,10 @@ void* arena_alloc_align(Arena* arena, size_t size, size_t align) {
         );
 
         return (void*)aligned_ptr;
+    }
+
+    if (!arena->dynamic_arena) {
+        LOG_PANIC("Allocation failed on non-dynamic arena: not enough space");
     }
 
     // Create new block

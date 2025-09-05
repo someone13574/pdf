@@ -12,6 +12,8 @@
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf_error/error.h"
+#include "stream/filters.h"
+#include "stream/stream_dict.h"
 
 #define DVEC_NAME PdfObjectVec
 #define DVEC_LOWERCASE_NAME pdf_object_vec
@@ -64,7 +66,8 @@ PdfError* pdf_parse_stream(
     Arena* arena,
     PdfCtx* ctx,
     char** stream_bytes,
-    PdfDictEntryVec* stream_dict
+    size_t* decoded_len,
+    PdfObject* stream_dict
 );
 
 PdfError* pdf_parse_object(
@@ -480,7 +483,7 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     return NULL;
 }
 
-bool char_to_hex(char c, int* out) {
+static bool char_to_hex(char c, int* out) {
     if (c >= '0' && c <= '9') {
         *out = c - '0';
         return true;
@@ -570,7 +573,7 @@ PdfError* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
                     );
                 }
 
-                hex_code |= value;
+                hex_code |= (uint8_t)value;
                 name[write_offset++] = (char)hex_code;
                 escape = 0;
                 break;
@@ -682,9 +685,14 @@ PdfError* pdf_parse_dict(
         }
 
         char* stream_bytes;
-        if (!pdf_error_free_is_ok(
-                pdf_parse_stream(arena, ctx, &stream_bytes, entries)
-            )
+        size_t decoded_len;
+        if (!pdf_error_free_is_ok(pdf_parse_stream(
+                arena,
+                ctx,
+                &stream_bytes,
+                &decoded_len,
+                object
+            ))
             || !stream_bytes) {
             // Not a stream
             pdf_error_free_is_ok(pdf_ctx_seek(ctx, restore_offset));
@@ -700,6 +708,7 @@ PdfError* pdf_parse_dict(
         object->type = PDF_OBJECT_TYPE_STREAM;
         object->data.stream.stream_dict = stream_dict;
         object->data.stream.stream_bytes = stream_bytes;
+        object->data.stream.decoded_stream_len = decoded_len;
 
         return NULL;
     }
@@ -711,12 +720,14 @@ PdfError* pdf_parse_stream(
     Arena* arena,
     PdfCtx* ctx,
     char** stream_body,
-    PdfDictEntryVec* stream_dict
+    size_t* decoded_len,
+    PdfObject* stream_dict_obj
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(stream_body);
-    RELEASE_ASSERT(stream_dict);
+    RELEASE_ASSERT(decoded_len);
+    RELEASE_ASSERT(stream_dict_obj);
 
     // Parse start
     PDF_PROPAGATE(pdf_ctx_expect(ctx, "stream"));
@@ -734,22 +745,17 @@ PdfError* pdf_parse_stream(
         );
     }
 
-    // Get length
-    int32_t length = -1;
-    for (size_t entry_idx = 0; entry_idx < pdf_dict_entry_vec_len(stream_dict);
-         entry_idx++) {
-        PdfDictEntry entry;
-        RELEASE_ASSERT(pdf_dict_entry_vec_get(stream_dict, entry_idx, &entry));
-        if (!entry.key || !entry.value
-            || entry.value->type != PDF_OBJECT_TYPE_INTEGER
-            || strcmp("Length", entry.key->data.name) != 0) {
-            continue;
-        }
+    // TODO: Do not allow fallback to single number parsing past this point.
+    // Doing so only masks the problem, and can leave the ctx in a weird state
+    // if an error occurs during stream decoding (due to a borrowed substr)
 
-        length = entry.value->data.integer;
-    }
+    // Deserialize stream dict
+    PdfStreamDict stream_dict;
+    PDF_PROPAGATE(
+        pdf_deserialize_stream_dict(stream_dict_obj, arena, &stream_dict)
+    );
 
-    if (length < 0) {
+    if (stream_dict.length < 0) {
         return PDF_ERROR(PDF_ERR_STREAM_INVALID_LENGTH);
     }
 
@@ -758,18 +764,23 @@ PdfError* pdf_parse_stream(
     PDF_PROPAGATE(pdf_ctx_borrow_substr(
         ctx,
         pdf_ctx_offset(ctx),
-        (size_t)length,
+        (size_t)stream_dict.length,
         &borrowed
     ));
 
-    *stream_body = arena_alloc(arena, sizeof(char) * (size_t)(length + 1));
-    strncpy(*stream_body, borrowed, (size_t)length);
-    (*stream_body)[length] = '\0';
+    PDF_REQUIRE(pdf_decode_filtered_stream(
+        arena,
+        borrowed,
+        (size_t)stream_dict.length,
+        stream_dict.filter,
+        stream_body,
+        decoded_len
+    ));
 
     PDF_PROPAGATE(pdf_ctx_release_substr(ctx));
 
     // Parse end
-    PDF_PROPAGATE(pdf_ctx_shift(ctx, length));
+    PDF_PROPAGATE(pdf_ctx_shift(ctx, stream_dict.length));
     if (!pdf_error_free_is_ok(pdf_ctx_expect(ctx, "\nendstream"))
         && !pdf_error_free_is_ok(pdf_ctx_expect(ctx, "\r\nendstream"))
         && !pdf_error_free_is_ok(pdf_ctx_expect(ctx, "\rendstream"))) {

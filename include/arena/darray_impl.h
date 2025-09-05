@@ -1,6 +1,7 @@
 #ifndef DARRAY_IMPL_H
 #define DARRAY_IMPL_H
 
+#include <stdbool.h>
 #include <string.h>
 
 #include "arena/arena.h"
@@ -149,6 +150,14 @@ size_t DARRAY_FN(len)(DARRAY_NAME* array) {
     RELEASE_ASSERT(array);
 
     return array->len;
+}
+
+DARRAY_TYPE* DARRAY_FN(get_raw)(DARRAY_NAME* array, size_t* len_out) {
+    RELEASE_ASSERT(array);
+    RELEASE_ASSERT(len_out);
+
+    *len_out = array->len;
+    return array->elements;
 }
 
 // Undefines

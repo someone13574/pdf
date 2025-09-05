@@ -39,7 +39,7 @@
       "args": [],
       "cwd": "$ZED_WORKTREE_ROOT",
       "env": {
-        "DEBUG_TEST_FUNCTION": "test_deserialize_objects"
+        "DEBUG_TEST_FUNCTION": "test_deflate_dynamic"
       }
     },
     "program": "$ZED_WORKTREE_ROOT/build/src/test/pdf-test-main",

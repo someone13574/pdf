@@ -9,13 +9,14 @@
     X(ARRAY, INHERIT, ARENA)                                                   \
     X(VEC, INHERIT, ARENA)                                                     \
     X(LINKED_LIST, INHERIT, ARENA)                                             \
+    X(CODEC, TRACE, GLOBAL)                                                    \
     X(CANVAS, OFF, GLOBAL)                                                     \
     X(DCEL, TRACE, CANVAS)                                                     \
     X(PDF, INHERIT, GLOBAL)                                                    \
     X(DOC, TRACE, PDF)                                                         \
     X(XREF, INHERIT, PDF)                                                      \
     X(CTX, INFO, PDF)                                                          \
-    X(OBJECT, OFF, PDF)                                                        \
+    X(OBJECT, TRACE, PDF)                                                      \
     X(DESERDE, INHERIT, PDF)                                                   \
     X(RENDER, INHERIT, GLOBAL)                                                 \
     X(SFNT, INHERIT, GLOBAL)                                                   \
