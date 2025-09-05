@@ -72,6 +72,7 @@ PdfError* pdf_decode_filtered_stream(
     } else {
         *decoded = arena_alloc(arena, sizeof(char) * (size_t)(length + 1));
         strcpy(*decoded, (char*)encoded);
+        *decoded_len = length;
 
         return NULL;
     }

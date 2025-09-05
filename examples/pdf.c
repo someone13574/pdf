@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
 
     size_t buffer_size;
     char* buffer =
-        load_file_to_buffer(arena, "test-files/compressed.pdf", &buffer_size);
+        load_file_to_buffer(arena, "test-files/test.pdf", &buffer_size);
 
     PdfResolver* resolver;
     PDF_REQUIRE(pdf_resolver_new(arena, buffer, buffer_size, &resolver));
