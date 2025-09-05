@@ -106,10 +106,7 @@ PdfError* pdf_ctx_peek_and_advance(PdfCtx* ctx, char* peeked) {
     RELEASE_ASSERT(ctx);
 
     if (ctx->borrowed_substr) {
-        return PDF_ERROR(
-            PDF_ERR_CTX_BORROWED,
-            "Context already has a borrowed substr"
-        );
+        return PDF_ERROR(PDF_ERR_CTX_BORROWED, "Context has a borrowed substr");
     }
 
     if (peeked) {
@@ -124,10 +121,7 @@ PdfError* pdf_ctx_peek(PdfCtx* ctx, char* peeked) {
     RELEASE_ASSERT(peeked);
 
     if (ctx->borrowed_substr) {
-        return PDF_ERROR(
-            PDF_ERR_CTX_BORROWED,
-            "Context already has a borrowed substr"
-        );
+        return PDF_ERROR(PDF_ERR_CTX_BORROWED, "Context has a borrowed substr");
     }
 
     if (ctx->offset >= ctx->buffer_len) {
@@ -164,10 +158,7 @@ PdfError* pdf_ctx_expect(PdfCtx* ctx, const char* text) {
     LOG_DIAG(DEBUG, CTX, "Expecting text \"%s\"", text);
 
     if (ctx->borrowed_substr) {
-        return PDF_ERROR(
-            PDF_ERR_CTX_BORROWED,
-            "Context already has a borrowed substr"
-        );
+        return PDF_ERROR(PDF_ERR_CTX_BORROWED, "Context has a borrowed substr");
     }
 
     size_t restore_offset = ctx->offset;
@@ -237,10 +228,7 @@ PdfError* pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit) {
     );
 
     if (ctx->borrowed_substr) {
-        return PDF_ERROR(
-            PDF_ERR_CTX_BORROWED,
-            "Context already has a borrowed substr"
-        );
+        return PDF_ERROR(PDF_ERR_CTX_BORROWED, "Context has a borrowed substr");
     }
 
     size_t offset = ctx->offset;
@@ -281,10 +269,7 @@ PdfError* pdf_ctx_seek_line_start(PdfCtx* ctx) {
     LOG_DIAG(DEBUG, CTX, "Finding line start");
 
     if (ctx->borrowed_substr) {
-        return PDF_ERROR(
-            PDF_ERR_CTX_BORROWED,
-            "Context already has a borrowed substr"
-        );
+        return PDF_ERROR(PDF_ERR_CTX_BORROWED, "Context has a borrowed substr");
     }
 
     size_t restore_offset = ctx->offset;
@@ -335,10 +320,7 @@ PdfError* pdf_ctx_seek_next_line(PdfCtx* ctx) {
     LOG_DIAG(DEBUG, CTX, "Finding next line");
 
     if (ctx->borrowed_substr) {
-        return PDF_ERROR(
-            PDF_ERR_CTX_BORROWED,
-            "Context already has a borrowed substr"
-        );
+        return PDF_ERROR(PDF_ERR_CTX_BORROWED, "Context has a borrowed substr");
     }
 
     size_t restore_offset = ctx->offset;

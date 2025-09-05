@@ -7,8 +7,8 @@
 #include "arena/common.h"
 #include "pdf_error/error.h"
 
-/// Decodes data compressed in DEFLATE
-PdfError* decode_deflate_data(
+/// Decodes data compressed in a zlib stream
+PdfError* decode_zlib_data(
     Arena* arena,
     uint8_t* data,
     size_t data_len,

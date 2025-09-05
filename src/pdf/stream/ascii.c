@@ -7,7 +7,7 @@
 #include "logger/log.h"
 #include "pdf_error/error.h"
 
-static bool char_to_hex(char c, int* out) {
+static bool char_to_hex(uint8_t c, int* out) {
     if (c >= '0' && c <= '9') {
         *out = c - '0';
         return true;
@@ -24,7 +24,7 @@ static bool char_to_hex(char c, int* out) {
 
 PdfError* pdf_filter_ascii_hex_decode(
     Arena* arena,
-    const char* stream,
+    const uint8_t* stream,
     size_t stream_len,
     uint8_t** decoded,
     size_t* decoded_len
@@ -38,8 +38,8 @@ PdfError* pdf_filter_ascii_hex_decode(
     *decoded_len = 0;
     bool upper = true;
     for (size_t offset = 0; offset < stream_len; offset++) {
-        char c = stream[offset];
-        if (is_pdf_whitespace(c)) {
+        uint8_t c = stream[offset];
+        if (is_pdf_whitespace((char)c)) {
             continue;
         }
 
@@ -85,7 +85,7 @@ TEST_FUNC(test_ascii_hex_decode_basic) {
     size_t decoded_len;
     TEST_PDF_REQUIRE(pdf_filter_ascii_hex_decode(
         arena,
-        encoded,
+        (uint8_t*)encoded,
         strlen(encoded),
         &decoded,
         &decoded_len
@@ -109,7 +109,7 @@ TEST_FUNC(test_ascii_hex_decode_spaces) {
     size_t decoded_len;
     TEST_PDF_REQUIRE(pdf_filter_ascii_hex_decode(
         arena,
-        encoded,
+        (uint8_t*)encoded,
         strlen(encoded),
         &decoded,
         &decoded_len
@@ -133,7 +133,7 @@ TEST_FUNC(test_ascii_hex_decode_even_eod) {
     size_t decoded_len;
     TEST_PDF_REQUIRE(pdf_filter_ascii_hex_decode(
         arena,
-        encoded,
+        (uint8_t*)encoded,
         strlen(encoded),
         &decoded,
         &decoded_len
@@ -157,7 +157,7 @@ TEST_FUNC(test_ascii_hex_decode_odd_eod) {
     size_t decoded_len;
     TEST_PDF_REQUIRE(pdf_filter_ascii_hex_decode(
         arena,
-        encoded,
+        (uint8_t*)encoded,
         strlen(encoded),
         &decoded,
         &decoded_len
@@ -182,7 +182,7 @@ TEST_FUNC(test_ascii_hex_decode_err) {
     TEST_PDF_REQUIRE_ERR(
         pdf_filter_ascii_hex_decode(
             arena,
-            encoded,
+            (uint8_t*)encoded,
             strlen(encoded),
             &decoded,
             &decoded_len

@@ -42,6 +42,7 @@ PdfObject* pdf_dict_get(PdfDict* dict, PdfName key);
 typedef struct {
     PdfObject* stream_dict;
     char* stream_bytes;
+    size_t decoded_stream_len;
 } PdfStream;
 
 typedef struct {

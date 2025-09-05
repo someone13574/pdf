@@ -1,5 +1,7 @@
 add_library(codec
-    deflate.c "${pdf_SOURCE_DIR}/include/codec/deflate.h"
+    zlib.c "${pdf_SOURCE_DIR}/include/codec/zlib.h"
+    deflate.c deflate.h
+    adler32.c adler32.h
     bitstream.c bitstream.h)
 target_include_directories(codec PUBLIC "${pdf_SOURCE_DIR}/include")
 target_link_libraries(codec PUBLIC arena pdf-error)

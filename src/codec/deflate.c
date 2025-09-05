@@ -1,4 +1,4 @@
-#include "codec/deflate.h"
+#include "deflate.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -455,7 +455,7 @@ static DeflateHuffmanLut get_fixed_huffman_lut(void) {
             bit_lens[i] = 8;
         }
 
-        Arena* persistent_arena = arena_new(1); // this leaks, and that's ok
+        Arena* persistent_arena = arena_new(1);
         lut = build_deflate_huffman_lut(persistent_arena, bit_lens, 288);
     }
 
@@ -554,33 +554,31 @@ static PdfError* deflate_decode_distance_code(
 
 PdfError* decode_deflate_data(
     Arena* arena,
-    uint8_t* data,
-    size_t data_len,
+    BitStream* bitstream,
     Uint8Array** decoded_bytes
 ) {
     RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(data);
+    RELEASE_ASSERT(bitstream);
     RELEASE_ASSERT(decoded_bytes);
 
-    LOG_DIAG(INFO, CODEC, "Decoding %zu byte deflate stream", data_len);
+    LOG_DIAG(INFO, CODEC, "Decoding deflate stream");
 
     Arena* block_arena = arena_new(1024);
     Arena* decode_arena = arena_new(1024);
 
-    BitStream bitstream = bitstream_new(data, data_len);
     Uint8Vec* output_stream = uint8_vec_new(decode_arena);
 
     DeflateBlockHeader header;
     do {
-        PDF_PROPAGATE(deflate_parse_block_header(&bitstream, &header));
+        PDF_PROPAGATE(deflate_parse_block_header(bitstream, &header));
 
         if (header.type == DEFLATE_BLOCK_COMPRESSION_NONE) {
-            bitstream_align_byte(&bitstream);
+            bitstream_align_byte(bitstream);
 
             uint32_t len;
             uint32_t n_len;
-            PDF_PROPAGATE(bitstream_read_n(&bitstream, 16, &len));
-            PDF_PROPAGATE(bitstream_read_n(&bitstream, 16, &n_len));
+            PDF_PROPAGATE(bitstream_read_n(bitstream, 16, &len));
+            PDF_PROPAGATE(bitstream_read_n(bitstream, 16, &n_len));
 
             if ((uint16_t)len != (uint16_t)~n_len) {
                 return PDF_ERROR(
@@ -589,9 +587,16 @@ PdfError* decode_deflate_data(
                 );
             }
 
+            LOG_DIAG(
+                DEBUG,
+                CODEC,
+                "Reading %u uncompressed bytes",
+                (unsigned int)len
+            );
+
             for (size_t idx = 0; idx < len; idx++) {
                 uint32_t byte;
-                PDF_PROPAGATE(bitstream_read_n(&bitstream, 8, &byte));
+                PDF_PROPAGATE(bitstream_read_n(bitstream, 8, &byte));
 
                 uint8_vec_push(output_stream, (uint8_t)byte);
             }
@@ -602,7 +607,7 @@ PdfError* decode_deflate_data(
             if (header.type == DEFLATE_BLOCK_COMPRESSION_DYN) {
                 PDF_PROPAGATE(decode_dyn_huffman_table_luts(
                     block_arena,
-                    &bitstream,
+                    bitstream,
                     &lit_lut,
                     &dist_lut
                 ));
@@ -613,7 +618,7 @@ PdfError* decode_deflate_data(
             do {
                 uint32_t lit_symbol;
                 PDF_PROPAGATE(
-                    deflate_huffman_decode(&bitstream, &lit_lut, &lit_symbol)
+                    deflate_huffman_decode(bitstream, &lit_lut, &lit_symbol)
                 );
 
                 if (lit_symbol < 256) {
@@ -623,14 +628,14 @@ PdfError* decode_deflate_data(
                 } else {
                     uint32_t length;
                     PDF_PROPAGATE(deflate_decode_length_code(
-                        &bitstream,
+                        bitstream,
                         lit_symbol,
                         &length
                     ));
 
                     uint32_t distance;
                     PDF_PROPAGATE(deflate_decode_distance_code(
-                        &bitstream,
+                        bitstream,
                         header.type == DEFLATE_BLOCK_COMPRESSION_FIXED
                             ? NULL
                             : &dist_lut,
@@ -722,14 +727,12 @@ TEST_FUNC(test_deflate_huffman) {
 
 TEST_FUNC(test_deflate_uncompressed_empty) {
     uint8_t stream[] = {0x01, 0x00, 0x00, 0xff, 0xff};
+    BitStream bitstream =
+        bitstream_new(stream, sizeof(stream) / sizeof(uint8_t));
+
     Arena* arena = arena_new(1024);
     Uint8Array* out = NULL;
-    TEST_PDF_REQUIRE(decode_deflate_data(
-        arena,
-        stream,
-        sizeof(stream) / sizeof(uint8_t),
-        &out
-    ));
+    TEST_PDF_REQUIRE(decode_deflate_data(arena, &bitstream, &out));
 
     TEST_ASSERT_EQ((size_t)0, uint8_array_len(out));
 
@@ -739,14 +742,12 @@ TEST_FUNC(test_deflate_uncompressed_empty) {
 
 TEST_FUNC(test_deflate_uncompressed_multibyte) {
     uint8_t stream[] = {0x01, 0x03, 0x00, 0xfc, 0xff, 0x05, 0x14, 0x23};
+    BitStream bitstream =
+        bitstream_new(stream, sizeof(stream) / sizeof(uint8_t));
+
     Arena* arena = arena_new(1024);
     Uint8Array* out = NULL;
-    TEST_PDF_REQUIRE(decode_deflate_data(
-        arena,
-        stream,
-        sizeof(stream) / sizeof(uint8_t),
-        &out
-    ));
+    TEST_PDF_REQUIRE(decode_deflate_data(arena, &bitstream, &out));
 
     uint8_t expected[] = {0x05, 0x14, 0x23};
     TEST_ASSERT_EQ(
@@ -785,14 +786,12 @@ TEST_FUNC(test_deflate_uncompressed_multiblock) {
         0xff,
         0x23
     };
+    BitStream bitstream =
+        bitstream_new(stream, sizeof(stream) / sizeof(uint8_t));
+
     Arena* arena = arena_new(1024);
     Uint8Array* out = NULL;
-    TEST_PDF_REQUIRE(decode_deflate_data(
-        arena,
-        stream,
-        sizeof(stream) / sizeof(uint8_t),
-        &out
-    ));
+    TEST_PDF_REQUIRE(decode_deflate_data(arena, &bitstream, &out));
 
     uint8_t expected[] = {0x05, 0x14, 0x23};
     TEST_ASSERT_EQ(
@@ -818,14 +817,12 @@ TEST_FUNC(test_deflate_uncompressed_multiblock) {
 TEST_FUNC(test_deflate_uncompressed_no_discard) {
     uint8_t stream[] =
         {0x9a, 0xb0, 0xf0, 0x3f, 0x20, 0x02, 0x00, 0xfd, 0xff, 0xab, 0xcd};
+    BitStream bitstream =
+        bitstream_new(stream, sizeof(stream) / sizeof(uint8_t));
+
     Arena* arena = arena_new(1024);
     Uint8Array* out = NULL;
-    TEST_PDF_REQUIRE(decode_deflate_data(
-        arena,
-        stream,
-        sizeof(stream) / sizeof(uint8_t),
-        &out
-    ));
+    TEST_PDF_REQUIRE(decode_deflate_data(arena, &bitstream, &out));
 
     uint8_t expected[] = {0x90, 0xa1, 0xff, 0xab, 0xcd};
     TEST_ASSERT_EQ(
@@ -850,14 +847,12 @@ TEST_FUNC(test_deflate_uncompressed_no_discard) {
 
 TEST_FUNC(test_deflate_fixed_empty) {
     uint8_t stream[] = {0x03, 0x00};
+    BitStream bitstream =
+        bitstream_new(stream, sizeof(stream) / sizeof(uint8_t));
+
     Arena* arena = arena_new(1024);
     Uint8Array* out = NULL;
-    TEST_PDF_REQUIRE(decode_deflate_data(
-        arena,
-        stream,
-        sizeof(stream) / sizeof(uint8_t),
-        &out
-    ));
+    TEST_PDF_REQUIRE(decode_deflate_data(arena, &bitstream, &out));
 
     TEST_ASSERT_EQ((size_t)0, uint8_array_len(out));
 
@@ -867,14 +862,12 @@ TEST_FUNC(test_deflate_fixed_empty) {
 
 TEST_FUNC(test_deflate_fixed_literals) {
     uint8_t stream[] = {0x63, 0x68, 0xe8, 0x9f, 0x70, 0xe0, 0x3f, 0x00};
+    BitStream bitstream =
+        bitstream_new(stream, sizeof(stream) / sizeof(uint8_t));
+
     Arena* arena = arena_new(1024);
     Uint8Array* out = NULL;
-    TEST_PDF_REQUIRE(decode_deflate_data(
-        arena,
-        stream,
-        sizeof(stream) / sizeof(uint8_t),
-        &out
-    ));
+    TEST_PDF_REQUIRE(decode_deflate_data(arena, &bitstream, &out));
 
     uint8_t expected[] = {0x00, 0x80, 0x8f, 0x90, 0xc0, 0xff};
     TEST_ASSERT_EQ(
@@ -899,14 +892,12 @@ TEST_FUNC(test_deflate_fixed_literals) {
 
 TEST_FUNC(test_deflate_fixed_non_overlapping) {
     uint8_t stream[] = {0x63, 0x60, 0x64, 0x02, 0x22, 0x00};
+    BitStream bitstream =
+        bitstream_new(stream, sizeof(stream) / sizeof(uint8_t));
+
     Arena* arena = arena_new(1024);
     Uint8Array* out = NULL;
-    TEST_PDF_REQUIRE(decode_deflate_data(
-        arena,
-        stream,
-        sizeof(stream) / sizeof(uint8_t),
-        &out
-    ));
+    TEST_PDF_REQUIRE(decode_deflate_data(arena, &bitstream, &out));
 
     uint8_t expected[] = {0x00, 0x01, 0x02, 0x00, 0x01, 0x02};
     TEST_ASSERT_EQ(
@@ -931,14 +922,12 @@ TEST_FUNC(test_deflate_fixed_non_overlapping) {
 
 TEST_FUNC(test_deflate_fixed_overlapping) {
     uint8_t stream[] = {0x63, 0x04, 0x01, 0x00};
+    BitStream bitstream =
+        bitstream_new(stream, sizeof(stream) / sizeof(uint8_t));
+
     Arena* arena = arena_new(1024);
     Uint8Array* out = NULL;
-    TEST_PDF_REQUIRE(decode_deflate_data(
-        arena,
-        stream,
-        sizeof(stream) / sizeof(uint8_t),
-        &out
-    ));
+    TEST_PDF_REQUIRE(decode_deflate_data(arena, &bitstream, &out));
 
     uint8_t expected[] = {0x01, 0x01, 0x01, 0x01, 0x01};
     TEST_ASSERT_EQ(
@@ -963,14 +952,12 @@ TEST_FUNC(test_deflate_fixed_overlapping) {
 
 TEST_FUNC(test_deflate_fixed_overlapping_alt) {
     uint8_t stream[] = {0xeb, 0xeb, 0x07, 0x43, 0x00};
+    BitStream bitstream =
+        bitstream_new(stream, sizeof(stream) / sizeof(uint8_t));
+
     Arena* arena = arena_new(1024);
     Uint8Array* out = NULL;
-    TEST_PDF_REQUIRE(decode_deflate_data(
-        arena,
-        stream,
-        sizeof(stream) / sizeof(uint8_t),
-        &out
-    ));
+    TEST_PDF_REQUIRE(decode_deflate_data(arena, &bitstream, &out));
 
     uint8_t expected[] = {0x8e, 0x8f, 0x8e, 0x8f, 0x8e, 0x8f, 0x8e};
     TEST_ASSERT_EQ(
@@ -997,14 +984,12 @@ TEST_FUNC(test_deflate_dyn_empty) {
     uint8_t stream[] =
         {0x05, 0xe1, 0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0xf8, 0xaf, 0x46
         };
+    BitStream bitstream =
+        bitstream_new(stream, sizeof(stream) / sizeof(uint8_t));
+
     Arena* arena = arena_new(1024);
     Uint8Array* out = NULL;
-    TEST_PDF_REQUIRE(decode_deflate_data(
-        arena,
-        stream,
-        sizeof(stream) / sizeof(uint8_t),
-        &out
-    ));
+    TEST_PDF_REQUIRE(decode_deflate_data(arena, &bitstream, &out));
 
     TEST_ASSERT_EQ((size_t)0, uint8_array_len(out));
 
@@ -1016,14 +1001,12 @@ TEST_FUNC(test_deflate_dyn_empty_no_dist) {
     uint8_t stream[] =
         {0x05, 0xc0, 0x81, 0x08, 0x00, 0x00, 0x00, 0x00, 0x20, 0x7f, 0xea, 0x2f
         };
+    BitStream bitstream =
+        bitstream_new(stream, sizeof(stream) / sizeof(uint8_t));
+
     Arena* arena = arena_new(1024);
     Uint8Array* out = NULL;
-    TEST_PDF_REQUIRE(decode_deflate_data(
-        arena,
-        stream,
-        sizeof(stream) / sizeof(uint8_t),
-        &out
-    ));
+    TEST_PDF_REQUIRE(decode_deflate_data(arena, &bitstream, &out));
 
     TEST_ASSERT_EQ((size_t)0, uint8_array_len(out));
 
@@ -1048,14 +1031,12 @@ TEST_FUNC(test_deflate_dyn_one_dist) {
         0x6c,
         0x00
     };
+    BitStream bitstream =
+        bitstream_new(stream, sizeof(stream) / sizeof(uint8_t));
+
     Arena* arena = arena_new(1024);
     Uint8Array* out = NULL;
-    TEST_PDF_REQUIRE(decode_deflate_data(
-        arena,
-        stream,
-        sizeof(stream) / sizeof(uint8_t),
-        &out
-    ));
+    TEST_PDF_REQUIRE(decode_deflate_data(arena, &bitstream, &out));
 
     uint8_t expected[] = {0x01, 0x01, 0x01, 0x01};
     TEST_ASSERT_EQ(
@@ -1115,14 +1096,12 @@ TEST_FUNC(test_deflate_dynamic) {
         0x7e, 0xf8, 0xe1, 0x87, 0x1f, 0x7e, 0xf8, 0xe1, 0x87, 0x1f, 0x7e, 0xf8,
         0xe1, 0x87, 0x1f, 0x7e, 0xf8, 0xe1, 0x87, 0x7f, 0xd7, 0xfc, 0x3b
     };
+    BitStream bitstream =
+        bitstream_new(stream, sizeof(stream) / sizeof(uint8_t));
+
     Arena* arena = arena_new(1024);
     Uint8Array* out = NULL;
-    TEST_PDF_REQUIRE(decode_deflate_data(
-        arena,
-        stream,
-        sizeof(stream) / sizeof(uint8_t),
-        &out
-    ));
+    TEST_PDF_REQUIRE(decode_deflate_data(arena, &bitstream, &out));
 
     uint8_t expected[base_len * repeats];
     for (size_t idx = 0; idx < base_len; idx++) {

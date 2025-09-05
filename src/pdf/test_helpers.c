@@ -44,6 +44,7 @@ char* pdf_construct_deserde_test_doc(
 
         char* indirect_obj =
             format_alloc(arena, "%zu 0 obj %s endobj\n", idx + 1, objects[idx]);
+        RELEASE_ASSERT(indirect_obj);
         cursor += strlen(indirect_obj);
 
         doc = format_alloc(arena, "%s%s", doc, indirect_obj);

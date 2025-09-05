@@ -21,7 +21,7 @@ PdfError* pdf_deserialize_content_stream(
     RELEASE_ASSERT(deserialized);
 
     PdfCtx* ctx =
-        pdf_ctx_new(arena, stream->stream_bytes, strlen(stream->stream_bytes));
+        pdf_ctx_new(arena, stream->stream_bytes, stream->decoded_stream_len);
     PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
     PdfObjectVec* operands = pdf_object_vec_new(arena);

@@ -56,8 +56,11 @@ bool DARRAY_FN(get_ptr)(DARRAY_NAME* array, size_t idx, DARRAY_TYPE** out);
 // Sets the element stored at index `idx`, which must be in bounds.
 void DARRAY_FN(set)(DARRAY_NAME* array, size_t idx, DARRAY_TYPE value);
 
-// Gets the length of the array
+// Gets the length of the array.
 size_t DARRAY_FN(len)(DARRAY_NAME* array);
+
+// Gets the raw array and its length.
+DARRAY_TYPE* DARRAY_FN(get_raw)(DARRAY_NAME* array, size_t* len_out);
 
 // Undefines
 #undef DARRAY_NAME

@@ -12,6 +12,7 @@
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf_error/error.h"
+#include "stream/filters.h"
 #include "stream/stream_dict.h"
 
 #define DVEC_NAME PdfObjectVec
@@ -65,6 +66,7 @@ PdfError* pdf_parse_stream(
     Arena* arena,
     PdfCtx* ctx,
     char** stream_bytes,
+    size_t* decoded_len,
     PdfObject* stream_dict
 );
 
@@ -683,9 +685,14 @@ PdfError* pdf_parse_dict(
         }
 
         char* stream_bytes;
-        if (!pdf_error_free_is_ok(
-                pdf_parse_stream(arena, ctx, &stream_bytes, object)
-            )
+        size_t decoded_len;
+        if (!pdf_error_free_is_ok(pdf_parse_stream(
+                arena,
+                ctx,
+                &stream_bytes,
+                &decoded_len,
+                object
+            ))
             || !stream_bytes) {
             // Not a stream
             pdf_error_free_is_ok(pdf_ctx_seek(ctx, restore_offset));
@@ -701,6 +708,7 @@ PdfError* pdf_parse_dict(
         object->type = PDF_OBJECT_TYPE_STREAM;
         object->data.stream.stream_dict = stream_dict;
         object->data.stream.stream_bytes = stream_bytes;
+        object->data.stream.decoded_stream_len = decoded_len;
 
         return NULL;
     }
@@ -712,11 +720,13 @@ PdfError* pdf_parse_stream(
     Arena* arena,
     PdfCtx* ctx,
     char** stream_body,
+    size_t* decoded_len,
     PdfObject* stream_dict_obj
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(stream_body);
+    RELEASE_ASSERT(decoded_len);
     RELEASE_ASSERT(stream_dict_obj);
 
     // Parse start
@@ -734,6 +744,10 @@ PdfError* pdf_parse_stream(
             "There must be a newline following the `stream` keyword"
         );
     }
+
+    // TODO: Do not allow fallback to single number parsing past this point.
+    // Doing so only masks the problem, and can leave the ctx in a weird state
+    // if an error occurs during stream decoding (due to a borrowed substr)
 
     // Deserialize stream dict
     PdfStreamDict stream_dict;
@@ -754,10 +768,14 @@ PdfError* pdf_parse_stream(
         &borrowed
     ));
 
-    *stream_body =
-        arena_alloc(arena, sizeof(char) * (size_t)(stream_dict.length + 1));
-    strncpy(*stream_body, borrowed, (size_t)stream_dict.length);
-    (*stream_body)[stream_dict.length] = '\0';
+    PDF_REQUIRE(pdf_decode_filtered_stream(
+        arena,
+        borrowed,
+        (size_t)stream_dict.length,
+        stream_dict.filter,
+        stream_body,
+        decoded_len
+    ));
 
     PDF_PROPAGATE(pdf_ctx_release_substr(ctx));
 
