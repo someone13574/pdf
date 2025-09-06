@@ -1,5 +1,6 @@
 #include "deserialize.h"
 
+#include <stdint.h>
 #include <string.h>
 
 #include "arena/arena.h"
@@ -388,6 +389,14 @@ PdfError* pdf_deserialize_optional_field(
     );
 }
 
+static void
+pdf_optional_field_none(void* field_ptr, PdfOptionalFieldData field_data) {
+    RELEASE_ASSERT(field_ptr);
+
+    void* discriminant_ptr = (char*)field_ptr + field_data.discriminant_offset;
+    *(bool*)discriminant_ptr = false;
+}
+
 PdfError* pdf_deserialize_object(
     void* target,
     const PdfObject* object,
@@ -488,12 +497,19 @@ PdfError* pdf_deserialize_object(
             break;
         }
 
-        if (!found && field->info.kind != PDF_FIELD_KIND_OPTIONAL) {
-            return PDF_ERROR(
-                PDF_ERR_MISSING_DICT_KEY,
-                "Missing key `%s`",
-                field->key
-            );
+        if (!found) {
+            if (field->info.kind == PDF_FIELD_KIND_OPTIONAL) {
+                pdf_optional_field_none(
+                    (char*)target + field->offset,
+                    field->info.data.optional
+                );
+            } else {
+                return PDF_ERROR(
+                    PDF_ERR_MISSING_DICT_KEY,
+                    "Missing key `%s`",
+                    field->key
+                );
+            }
         }
     }
 
@@ -988,6 +1004,28 @@ TEST_FUNC(test_deserialize_inline_optional) {
     TEST_ASSERT(deserialized.inner.discriminant);
     TEST_ASSERT_EQ("There", deserialized.inner.value.hello);
     TEST_ASSERT_EQ(42, deserialized.inner.value.world);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_deserialize_inline_optional_none) {
+    Arena* arena = arena_new(1024);
+    const char* objects[] = {"<< >>"};
+
+    char* buffer =
+        pdf_construct_deserde_test_doc(objects, 1, "<< /Size 2 >>", arena);
+
+    DESERIALIZER_TEST_HELPER();
+
+    TestDeserializeInlineOptional deserialized = {.inner.discriminant = true};
+    TEST_PDF_REQUIRE(deserialize_test_inline_optional(
+        &object,
+        arena,
+        pdf_op_resolver_some(resolver),
+        &deserialized
+    ));
+
+    TEST_ASSERT(!deserialized.inner.discriminant);
 
     return TEST_RESULT_PASS;
 }
