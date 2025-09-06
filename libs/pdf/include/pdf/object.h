@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "pdf_error/error.h"
 
@@ -10,8 +11,12 @@ typedef struct PdfObject PdfObject;
 typedef bool PdfBoolean;
 typedef int32_t PdfInteger;
 typedef double PdfReal;
-typedef char* PdfString;
 typedef char* PdfName;
+
+typedef struct {
+    uint8_t* data;
+    size_t len;
+} PdfString;
 
 #define DVEC_NAME PdfObjectVec
 #define DVEC_LOWERCASE_NAME pdf_object_vec

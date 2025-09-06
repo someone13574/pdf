@@ -14,3 +14,5 @@ PdfError* pdf_parse_object(
 
 PdfError*
 pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object);
+
+char* pdf_string_as_cstr(PdfString pdf_string, Arena* arena);

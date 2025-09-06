@@ -122,7 +122,6 @@ void* arena_alloc(Arena* arena, size_t size) {
 void* arena_alloc_align(Arena* arena, size_t size, size_t align) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(arena->blocks);
-    RELEASE_ASSERT(size > 0);
     RELEASE_ASSERT(align > 0);
     RELEASE_ASSERT((align & (align - 1)) == 0);
 

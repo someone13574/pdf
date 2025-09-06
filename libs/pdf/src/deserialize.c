@@ -607,6 +607,7 @@ PdfError* pdf_deserialize_operands(
 
 #ifdef TEST
 
+#include "object.h"
 #include "pdf/deserde_types.h"
 #include "test/test.h"
 #include "test_helpers.h"
@@ -739,7 +740,7 @@ TEST_FUNC(test_deserialize_objects) {
     TEST_ASSERT(deserialized.boolean);
     TEST_ASSERT_EQ(42, deserialized.integer);
     TEST_ASSERT_EQ(42.5, deserialized.real);
-    TEST_ASSERT_EQ("test", deserialized.string);
+    TEST_ASSERT_EQ("test", pdf_string_as_cstr(deserialized.string, arena));
     TEST_ASSERT_EQ("Hello", deserialized.name);
 
     TEST_ASSERT(deserialized.array.elements);
@@ -1095,9 +1096,9 @@ TEST_FUNC(test_deserialize_primitive_arrays) {
 
     void* out;
     TEST_ASSERT(pdf_void_vec_get(deserialized.strings.elements, 0, &out));
-    TEST_ASSERT_EQ("Hello", *(PdfString*)out);
+    TEST_ASSERT_EQ("Hello", pdf_string_as_cstr(*(PdfString*)out, arena));
     TEST_ASSERT(pdf_void_vec_get(deserialized.strings.elements, 1, &out));
-    TEST_ASSERT_EQ("World", *(PdfString*)out);
+    TEST_ASSERT_EQ("World", pdf_string_as_cstr(*(PdfString*)out, arena));
 
     TEST_ASSERT(deserialized.integers.elements);
     TEST_ASSERT_EQ((size_t)3, pdf_void_vec_len(deserialized.integers.elements));
