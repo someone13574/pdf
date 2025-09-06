@@ -13,7 +13,7 @@
 #define DVEC_TYPE PdfContentOp
 #include "arena/dvec_impl.h"
 
-PdfContentOp*
+static PdfContentOp*
 new_queue_op(PdfContentOpVec* operation_queue, PdfContentOpKind op) {
     return pdf_content_op_vec_push(
         operation_queue,
@@ -21,7 +21,57 @@ new_queue_op(PdfContentOpVec* operation_queue, PdfContentOpKind op) {
     );
 }
 
-PdfError* pdf_deserialize_set_font_op(
+static PdfError* pdf_deserialize_set_matrix_op(
+    const PdfObjectVec* operands,
+    Arena* arena,
+    PdfContentOpSetMatrix* deserialized
+) {
+    RELEASE_ASSERT(operands);
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(deserialized);
+
+    PdfOperandDescriptor descriptors[] = {
+        PDF_OPERAND(
+            PdfContentOpSetMatrix,
+            a,
+            PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+        ),
+        PDF_OPERAND(
+            PdfContentOpSetMatrix,
+            b,
+            PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+        ),
+        PDF_OPERAND(
+            PdfContentOpSetMatrix,
+            c,
+            PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+        ),
+        PDF_OPERAND(
+            PdfContentOpSetMatrix,
+            d,
+            PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+        ),
+        PDF_OPERAND(
+            PdfContentOpSetMatrix,
+            e,
+            PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+        ),
+        PDF_OPERAND(
+            PdfContentOpSetMatrix,
+            f,
+            PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+        )
+    };
+    return pdf_deserialize_operands(
+        deserialized,
+        descriptors,
+        sizeof(descriptors) / sizeof(PdfOperandDescriptor),
+        operands,
+        arena
+    );
+}
+
+static PdfError* pdf_deserialize_set_font_op(
     const PdfObjectVec* operands,
     Arena* arena,
     PdfContentOpSetFont* deserialized
@@ -51,7 +101,7 @@ PdfError* pdf_deserialize_set_font_op(
     );
 }
 
-PdfError* pdf_deserialize_next_line_op(
+static PdfError* pdf_deserialize_next_line_op(
     const PdfObjectVec* operands,
     Arena* arena,
     PdfContentOpNextLine* deserialized
@@ -81,7 +131,7 @@ PdfError* pdf_deserialize_next_line_op(
     );
 }
 
-PdfError* pdf_deserialize_show_text_op(
+static PdfError* pdf_deserialize_show_text_op(
     const PdfObjectVec* operands,
     Arena* arena,
     PdfContentOpShowText* deserialized
@@ -104,6 +154,29 @@ PdfError* pdf_deserialize_show_text_op(
     );
 }
 
+static PdfError* pdf_deserialize_set_gray_op(
+    const PdfObjectVec* operands,
+    Arena* arena,
+    PdfContentOpSetGray* deserialized
+) {
+    RELEASE_ASSERT(operands);
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(deserialized);
+
+    PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
+        PdfContentOpSetGray,
+        gray,
+        PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+    )};
+    return pdf_deserialize_operands(
+        deserialized,
+        descriptors,
+        sizeof(descriptors) / sizeof(PdfOperandDescriptor),
+        operands,
+        arena
+    );
+}
+
 PdfError* pdf_deserialize_content_op(
     PdfOperator op,
     const PdfObjectVec* operands,
@@ -115,6 +188,15 @@ PdfError* pdf_deserialize_content_op(
     RELEASE_ASSERT(operation_queue);
 
     switch (op) {
+        case PDF_OPERATOR_cm: {
+            PdfContentOp* new_op =
+                new_queue_op(operation_queue, PDF_CONTENT_OP_SET_CTM);
+            return pdf_deserialize_set_matrix_op(
+                operands,
+                arena,
+                &new_op->data.set_matrix
+            );
+        }
         case PDF_OPERATOR_BT: {
             new_queue_op(operation_queue, PDF_CONTENT_OP_BEGIN_TEXT);
             return NULL;
@@ -141,6 +223,15 @@ PdfError* pdf_deserialize_content_op(
                 &new_op->data.next_line
             );
         }
+        case PDF_OPERATOR_Tm: {
+            PdfContentOp* new_op =
+                new_queue_op(operation_queue, PDF_CONTENT_OP_SET_TM);
+            return pdf_deserialize_set_matrix_op(
+                operands,
+                arena,
+                &new_op->data.set_matrix
+            );
+        }
         case PDF_OPERATOR_Tj: {
             PdfContentOp* new_op =
                 new_queue_op(operation_queue, PDF_CONTENT_OP_SHOW_TEXT);
@@ -148,6 +239,16 @@ PdfError* pdf_deserialize_content_op(
                 operands,
                 arena,
                 &new_op->data.show_text
+            );
+        }
+        case PDF_OPERATOR_g: {
+            PdfContentOp* new_op =
+                new_queue_op(operation_queue, PDF_CONTENT_OP_SET_GRAY);
+            new_op->data.set_gray.stroking = false;
+            return pdf_deserialize_set_gray_op(
+                operands,
+                arena,
+                &new_op->data.set_gray
             );
         }
         default: {
