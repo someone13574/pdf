@@ -34,6 +34,7 @@ typedef struct {
     PdfOpResources resources;
     PdfRectangle media_box;
     PdfOpContentsArray contents;
+    PdfOpInteger rotate;
 
     const PdfObject* raw_dict;
 } PdfPage;
