@@ -48,6 +48,7 @@ PdfError* pdf_parse_null(PdfCtx* ctx, PdfObject* object);
 PdfError* pdf_parse_number(PdfCtx* ctx, PdfObject* object);
 PdfError*
 pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object);
+PdfError* pdf_parse_hex_string(Arena* arena, PdfCtx* ctx, PdfObject* object);
 PdfError* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object);
 PdfError* pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfObject* object);
 PdfError* pdf_parse_dict(
@@ -123,7 +124,7 @@ PdfError* pdf_parse_object(
     } else if (peeked == '(') {
         return pdf_parse_string_literal(arena, ctx, object);
     } else if (peeked == '<' && peeked_next != '<') {
-        LOG_TODO("Hexadecimal strings");
+        return pdf_parse_hex_string(arena, ctx, object);
     } else if (peeked == '/') {
         return pdf_parse_name(arena, ctx, object);
     } else if (peeked == '[') {
@@ -173,7 +174,7 @@ pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     } else if (peeked == '(') {
         return pdf_parse_string_literal(arena, ctx, object);
     } else if (peeked == '<' && peeked_next != '<') {
-        LOG_TODO("Hexadecimal strings");
+        return pdf_parse_hex_string(arena, ctx, object);
     } else if (peeked == '/') {
         return pdf_parse_name(arena, ctx, object);
     } else if (peeked == '[') {
@@ -475,7 +476,7 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     return NULL;
 }
 
-static bool char_to_hex(char c, int* out) {
+static bool char_to_hex(uint8_t c, int* out) {
     if (c >= '0' && c <= '9') {
         *out = c - '0';
         return true;
@@ -488,6 +489,78 @@ static bool char_to_hex(char c, int* out) {
     } else {
         return false;
     }
+}
+
+PdfError* pdf_parse_hex_string(Arena* arena, PdfCtx* ctx, PdfObject* object) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(object);
+
+    PDF_PROPAGATE(pdf_ctx_expect(ctx, "<"));
+
+    bool upper = true;
+    size_t decoded_len = 0;
+
+    size_t allocated_len = 64;
+    uint8_t* decoded = malloc(sizeof(uint8_t) * allocated_len);
+
+    while (true) {
+        uint8_t peeked;
+        PdfError* next_err = pdf_ctx_peek_and_advance(ctx, &peeked);
+        if (next_err) {
+            free(decoded);
+            PDF_PROPAGATE(next_err);
+        }
+
+        if (is_pdf_whitespace(peeked)) {
+            continue;
+        }
+
+        if (peeked == '>') {
+            if (!upper) {
+                decoded_len += 1;
+            }
+
+            break;
+        }
+
+        int hex;
+        if (!char_to_hex(peeked, &hex)) {
+            free(decoded);
+            return PDF_ERROR(
+                PDF_ERR_ASCII_HEX_INVALID,
+                "Invalid character in hex string"
+            );
+        }
+
+        if (upper) {
+            if (decoded_len == allocated_len) {
+                allocated_len <<= 2;
+                uint8_t* realloced_decoded =
+                    realloc(decoded, sizeof(uint8_t) * allocated_len);
+                RELEASE_ASSERT(realloced_decoded);
+                decoded = realloced_decoded;
+            }
+
+            decoded[decoded_len] = (uint8_t)(hex << 4);
+            upper = false;
+        } else {
+            decoded[decoded_len] |= (uint8_t)hex;
+            decoded_len += 1;
+            upper = true;
+        }
+    }
+
+    object->type = PDF_OBJECT_TYPE_STRING;
+    object->data.string.data = arena_alloc(arena, decoded_len);
+    memcpy(object->data.string.data, decoded, sizeof(uint8_t) * decoded_len);
+    object->data.string.len = decoded_len;
+
+    free(decoded);
+
+    PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular));
+
+    return NULL;
 }
 
 PdfError* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
@@ -530,21 +603,21 @@ PdfError* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     int hex_code = 0;
 
     for (size_t read_offset = 0; read_offset < length; read_offset++) {
-        char c = (char)raw[read_offset];
+        uint8_t byte = raw[read_offset];
 
         switch (escape) {
             case 0: {
-                if (c == '#') {
+                if (byte == '#') {
                     escape = 1;
                     continue;
                 }
 
-                name[write_offset++] = c;
+                name[write_offset++] = (char)byte;
                 break;
             }
             case 1: {
                 int value;
-                if (!char_to_hex(c, &value)) {
+                if (!char_to_hex(byte, &value)) {
                     return PDF_ERROR(
                         PDF_ERR_NAME_BAD_CHAR_CODE,
                         "Expected a hex value following a number sign in a name object"
@@ -557,7 +630,7 @@ PdfError* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
             }
             case 2: {
                 int value;
-                if (!char_to_hex(c, &value)) {
+                if (!char_to_hex(byte, &value)) {
                     return PDF_ERROR(
                         PDF_ERR_NAME_BAD_CHAR_CODE,
                         "Expected two hex values following a number sign in a name object"
@@ -1302,6 +1375,53 @@ TEST_FUNC(test_object_literal_str_escapes) {
 
 TEST_FUNC(test_object_literal_str_unbalanced) {
     SETUP_INVALID_PARSE_OBJECT("(", PDF_ERR_UNBALANCED_STR);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_hex_string) {
+    SETUP_VALID_PARSE_OBJECT(
+        "<68656C6C6F20776F726C64>",
+        PDF_OBJECT_TYPE_STRING
+    );
+    TEST_ASSERT_EQ(
+        "hello world",
+        pdf_string_as_cstr(object.data.string, arena)
+    );
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_hex_string_spaces) {
+    SETUP_VALID_PARSE_OBJECT(
+        "< 686  56  \r\fC6C6F\n207\t76F 726C6 4>",
+        PDF_OBJECT_TYPE_STRING
+    );
+    TEST_ASSERT_EQ(
+        "hello world",
+        pdf_string_as_cstr(object.data.string, arena)
+    );
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_hex_string_even_len) {
+    SETUP_VALID_PARSE_OBJECT("<901fa3>", PDF_OBJECT_TYPE_STRING);
+    TEST_ASSERT_EQ(
+        "\x90\x1f\xa3",
+        pdf_string_as_cstr(object.data.string, arena)
+    );
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_hex_string_odd_len) {
+    SETUP_VALID_PARSE_OBJECT("<901fa>", PDF_OBJECT_TYPE_STRING);
+    TEST_ASSERT_EQ(
+        "\x90\x1f\xa0",
+        pdf_string_as_cstr(object.data.string, arena)
+    );
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_hex_string_unterminated) {
+    SETUP_INVALID_PARSE_OBJECT("<68656C6C6F20776F726C64", PDF_ERR_CTX_EOF);
     return TEST_RESULT_PASS;
 }
 

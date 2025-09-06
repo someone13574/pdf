@@ -54,7 +54,7 @@ PdfError* pdf_filter_ascii_hex_decode(
         int hex;
         if (!char_to_hex(c, &hex)) {
             return PDF_ERROR(
-                PDF_ERR_FILTER_ASCII_HEX_INVALID,
+                PDF_ERR_ASCII_HEX_INVALID,
                 "Unexpected character `%c` in ASCIIHexDecode filter stream",
                 c
             );
@@ -103,7 +103,7 @@ TEST_FUNC(test_ascii_hex_decode_basic) {
 TEST_FUNC(test_ascii_hex_decode_spaces) {
     Arena* arena = arena_new(1024);
 
-    const char* encoded = " 686  56  C6C6F 207 76F 726C6 4";
+    const char* encoded = " 686  56  \r\fC6C6F\n207\t76F 726C6 4";
 
     uint8_t* decoded = NULL;
     size_t decoded_len;
@@ -187,7 +187,7 @@ TEST_FUNC(test_ascii_hex_decode_err) {
             &decoded,
             &decoded_len
         ),
-        PDF_ERR_FILTER_ASCII_HEX_INVALID
+        PDF_ERR_ASCII_HEX_INVALID
     );
 
     arena_free(arena);
