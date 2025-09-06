@@ -62,6 +62,9 @@ typedef struct PdfError PdfError;
 PdfError* pdf_error_new(PdfErrorCode code) RET_NONNULL_ATTR;
 void pdf_error_free(PdfError* error);
 
+PdfError*
+pdf_error_conditional_context(PdfError* error, PdfError* context_error);
+
 PdfError* pdf_error_add_context(
     PdfError* error,
     const char* func,

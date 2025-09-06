@@ -5,7 +5,7 @@
 #include "logger/log.h"
 #include "pdf_error/error.h"
 
-PdfError* two_byte_operator(
+static PdfError* two_byte_operator(
     PdfCtx* ctx,
     PdfOperator
     operator,
@@ -26,7 +26,7 @@ PdfError* two_byte_operator(
     return NULL;
 }
 
-PdfError* select_one_or_two_byte_operator(
+static PdfError* select_one_or_two_byte_operator(
     PdfCtx* ctx,
     PdfOperator single_byte_operator,
     PdfOperator two_byte_operator,
@@ -56,7 +56,7 @@ PdfError* select_one_or_two_byte_operator(
     return PDF_ERROR(PDF_ERR_UNKNOWN_OPERATOR);
 }
 
-PdfError*
+static PdfError*
 is_single_byte_operator(PdfCtx* ctx, bool* is_single_char, uint8_t* next_byte) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(is_single_char);
@@ -448,7 +448,11 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
             }
         }
         default: {
-            return PDF_ERROR(PDF_ERR_UNKNOWN_OPERATOR);
+            return PDF_ERROR(
+                PDF_ERR_UNKNOWN_OPERATOR,
+                "First byte: %c",
+                peeked
+            );
         }
     }
 }

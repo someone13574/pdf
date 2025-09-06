@@ -187,7 +187,8 @@ pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object) {
 
     return PDF_ERROR(
         PDF_ERR_INVALID_OBJECT,
-        "There wasn't a valid signaler for the object"
+        "There wasn't a valid signaler for the object. peeked=`%c`",
+        peeked
     );
 }
 
@@ -558,8 +559,6 @@ PdfError* pdf_parse_hex_string(Arena* arena, PdfCtx* ctx, PdfObject* object) {
 
     free(decoded);
 
-    PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular));
-
     return NULL;
 }
 
@@ -590,7 +589,6 @@ PdfError* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
         length++;
     }
 
-    LOG_DIAG(DEBUG, OBJECT, "Length %zu", length);
     PDF_PROPAGATE(pdf_ctx_seek(ctx, start_offset + length));
     PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular));
 
@@ -677,8 +675,6 @@ PdfError* pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     while (pdf_error_free_is_ok(pdf_ctx_peek(ctx, &peeked)) && peeked != ']') {
         PdfObject element;
         PDF_PROPAGATE(pdf_parse_object(arena, ctx, &element, false));
-        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, false, is_pdf_non_regular)
-        );
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
         PdfObject* allocated = arena_alloc(arena, sizeof(PdfObject));
@@ -687,7 +683,6 @@ PdfError* pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     }
 
     PDF_PROPAGATE(pdf_ctx_expect(ctx, "]"));
-    PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, is_pdf_non_regular));
 
     object->type = PDF_OBJECT_TYPE_ARRAY;
     object->data.array.elements = elements;
@@ -714,14 +709,10 @@ PdfError* pdf_parse_dict(
     while (pdf_error_free_is_ok(pdf_ctx_peek(ctx, &peeked)) && peeked != '>') {
         PdfObject* key = arena_alloc(arena, sizeof(PdfObject));
         PDF_PROPAGATE(pdf_parse_name(arena, ctx, key));
-        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, false, is_pdf_non_regular)
-        );
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
         PdfObject* value = arena_alloc(arena, sizeof(PdfObject));
         PDF_PROPAGATE(pdf_parse_object(arena, ctx, value, false));
-        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, false, is_pdf_non_regular)
-        );
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
         pdf_dict_entry_vec_push(
@@ -731,7 +722,6 @@ PdfError* pdf_parse_dict(
     }
 
     PDF_PROPAGATE(pdf_ctx_expect(ctx, ">>"));
-    PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, is_pdf_non_regular));
 
     object->type = PDF_OBJECT_TYPE_DICT;
     object->data.dict.entries = entries;
@@ -763,8 +753,6 @@ PdfError* pdf_parse_dict(
         }
 
         // Type is a stream
-        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, is_pdf_non_regular));
-
         PdfObject* stream_dict = arena_alloc(arena, sizeof(PdfObject));
         *stream_dict = *object;
 
@@ -910,8 +898,6 @@ PdfError* pdf_parse_indirect(
         PdfObject* inner = arena_alloc(arena, sizeof(PdfObject));
         PDF_PROPAGATE(pdf_parse_object(arena, ctx, inner, true));
 
-        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, false, &is_pdf_non_regular)
-        );
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
         PDF_PROPAGATE(pdf_ctx_expect(ctx, "endobj"));
         PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular)

@@ -16,7 +16,7 @@
     X(DOC, TRACE, PDF)                                                         \
     X(XREF, INHERIT, PDF)                                                      \
     X(CTX, INFO, PDF)                                                          \
-    X(OBJECT, TRACE, PDF)                                                      \
+    X(OBJECT, INHERIT, PDF)                                                    \
     X(DESERDE, INHERIT, PDF)                                                   \
     X(RENDER, INHERIT, GLOBAL)                                                 \
     X(SFNT, INHERIT, GLOBAL)                                                   \
