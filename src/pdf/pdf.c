@@ -31,7 +31,7 @@ PdfError* pdf_parse_startxref(PdfCtx* ctx, size_t* startxref);
 
 PdfError* pdf_resolver_new(
     Arena* arena,
-    char* buffer,
+    const uint8_t* buffer,
     size_t buffer_size,
     PdfResolver** resolver
 ) {
@@ -184,18 +184,18 @@ PdfError* pdf_parse_header(PdfCtx* ctx, uint8_t* version) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(version);
 
-    char version_char;
+    uint8_t version_byte;
     PDF_PROPAGATE(pdf_ctx_expect(ctx, "%PDF-1."));
-    PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &version_char));
+    PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &version_byte));
 
-    if (version_char < '0' || version_char > '7') {
+    if (version_byte < '0' || version_byte > '7') {
         *version = 0;
         return PDF_ERROR(
             PDF_ERR_INVALID_VERSION,
             "Only PDF versions 1.0 to 1.7 supported"
         );
     } else {
-        *version = (uint8_t)(version_char - '0');
+        *version = (uint8_t)(version_byte - '0');
     }
 
     return NULL;
@@ -251,10 +251,11 @@ PdfError* pdf_parse_startxref(PdfCtx* ctx, size_t* startxref) {
 #include "test/test.h"
 
 TEST_FUNC(test_header_valid) {
-    char buffer[] = "%PDF-1.5";
+    uint8_t buffer[] = "%PDF-1.5";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     uint8_t version = 0;
@@ -266,10 +267,11 @@ TEST_FUNC(test_header_valid) {
 }
 
 TEST_FUNC(test_header_invalid) {
-    char buffer[] = "hello";
+    uint8_t buffer[] = "hello";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     uint8_t version;
@@ -280,10 +282,11 @@ TEST_FUNC(test_header_invalid) {
 }
 
 TEST_FUNC(test_header_invalid_version) {
-    char buffer[] = "%PDF-1.f";
+    uint8_t buffer[] = "%PDF-1.f";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     uint8_t version;
@@ -297,10 +300,11 @@ TEST_FUNC(test_header_invalid_version) {
 }
 
 TEST_FUNC(test_startxref) {
-    char buffer[] = "startxref\n4325\n%%EOF";
+    uint8_t buffer[] = "startxref\n4325\n%%EOF";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     size_t startxref;
@@ -312,10 +316,11 @@ TEST_FUNC(test_startxref) {
 }
 
 TEST_FUNC(test_startxref_invalid) {
-    char buffer[] = "startxref\n\n%%EOF";
+    uint8_t buffer[] = "startxref\n\n%%EOF";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     size_t startxref;
@@ -329,10 +334,11 @@ TEST_FUNC(test_startxref_invalid) {
 }
 
 TEST_FUNC(test_startxref_invalid2) {
-    char buffer[] = "startxref\n+435\n%%EOF";
+    uint8_t buffer[] = "startxref\n+435\n%%EOF";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     size_t startxref;
@@ -346,10 +352,11 @@ TEST_FUNC(test_startxref_invalid2) {
 }
 
 TEST_FUNC(test_startxref_invalid3) {
-    char buffer[] = "notstartxref\n4325\n%%EOF";
+    uint8_t buffer[] = "notstartxref\n4325\n%%EOF";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     size_t startxref;

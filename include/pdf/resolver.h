@@ -14,7 +14,7 @@ typedef struct {
 
 PdfError* pdf_resolver_new(
     Arena* arena,
-    char* buffer,
+    const uint8_t* buffer,
     size_t buffer_size,
     PdfResolver** resolver
 );

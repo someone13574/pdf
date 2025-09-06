@@ -1,5 +1,6 @@
 #include "pdf/pdf.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -64,7 +65,9 @@ int main(int argc, char** argv) {
         load_file_to_buffer(arena, "test-files/test.pdf", &buffer_size);
 
     PdfResolver* resolver;
-    PDF_REQUIRE(pdf_resolver_new(arena, buffer, buffer_size, &resolver));
+    PDF_REQUIRE(
+        pdf_resolver_new(arena, (uint8_t*)buffer, buffer_size, &resolver)
+    );
 
     PdfCatalog catalog;
     PDF_REQUIRE(pdf_get_catalog(resolver, &catalog));

@@ -612,7 +612,7 @@ PdfError* pdf_deserialize_operands(
 #define DESERIALIZER_TEST_HELPER()                                             \
     PdfResolver* resolver;                                                     \
     TEST_PDF_REQUIRE(                                                          \
-        pdf_resolver_new(arena, buffer, strlen(buffer), &resolver)             \
+        pdf_resolver_new(arena, (uint8_t*)buffer, strlen(buffer), &resolver)   \
     );                                                                         \
     PdfObject object;                                                          \
     TEST_PDF_REQUIRE(pdf_resolve_ref(                                          \
@@ -763,7 +763,15 @@ TEST_FUNC(test_deserialize_objects) {
 
     TEST_ASSERT(deserialized.stream.stream_dict);
     TEST_ASSERT(deserialized.stream.stream_bytes);
-    TEST_ASSERT_EQ("01234567", deserialized.stream.stream_bytes);
+    TEST_ASSERT_EQ((size_t)8, deserialized.stream.decoded_stream_len);
+    TEST_ASSERT(
+        memcmp(
+            "01234567",
+            deserialized.stream.stream_bytes,
+            deserialized.stream.decoded_stream_len
+        )
+        == 0
+    );
 
     TEST_ASSERT_EQ((size_t)1, deserialized.indirect_ref.object_id);
     TEST_ASSERT_EQ((size_t)0, deserialized.indirect_ref.generation);
@@ -903,7 +911,8 @@ TEST_FUNC(test_deserialize_inline_struct) {
         pdf_construct_deserde_test_doc(objects, 2, "<< /Size 3 >>", arena);
 
     PdfResolver* resolver;
-    TEST_PDF_REQUIRE(pdf_resolver_new(arena, buffer, strlen(buffer), &resolver)
+    TEST_PDF_REQUIRE(
+        pdf_resolver_new(arena, (uint8_t*)buffer, strlen(buffer), &resolver)
     );
 
     PdfObject object;

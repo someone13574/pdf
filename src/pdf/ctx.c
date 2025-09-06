@@ -12,16 +12,12 @@
 #include "pdf_error/error.h"
 
 struct PdfCtx {
-    char* buffer;
+    const uint8_t* buffer;
     size_t buffer_len;
     size_t offset;
-
-    char borrow_term_replaced;
-    size_t borrow_term_offset;
-    char** borrowed_substr;
 };
 
-PdfCtx* pdf_ctx_new(Arena* arena, char* buffer, size_t buffer_size) {
+PdfCtx* pdf_ctx_new(Arena* arena, const uint8_t* buffer, size_t buffer_size) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(buffer, "Invalid buffer");
     RELEASE_ASSERT(buffer_size > 0, "Empty buffer");
@@ -32,9 +28,6 @@ PdfCtx* pdf_ctx_new(Arena* arena, char* buffer, size_t buffer_size) {
     ctx->buffer = buffer;
     ctx->buffer_len = buffer_size;
     ctx->offset = 0;
-    ctx->borrow_term_replaced = '\0';
-    ctx->borrow_term_offset = 0;
-    ctx->borrowed_substr = NULL;
 
     return ctx;
 }
@@ -102,46 +95,38 @@ PdfError* pdf_ctx_shift(PdfCtx* ctx, int64_t relative_offset) {
     return NULL;
 }
 
-PdfError* pdf_ctx_peek_and_advance(PdfCtx* ctx, char* peeked) {
+PdfError* pdf_ctx_peek_and_advance(PdfCtx* ctx, uint8_t* out) {
     RELEASE_ASSERT(ctx);
 
-    if (ctx->borrowed_substr) {
-        return PDF_ERROR(PDF_ERR_CTX_BORROWED, "Context has a borrowed substr");
-    }
-
-    if (peeked) {
-        PDF_PROPAGATE(pdf_ctx_peek(ctx, peeked));
+    if (out) {
+        PDF_PROPAGATE(pdf_ctx_peek(ctx, out));
     }
 
     return pdf_ctx_seek(ctx, ctx->offset + 1);
 }
 
-PdfError* pdf_ctx_peek(const PdfCtx* ctx, char* peeked) {
+PdfError* pdf_ctx_peek(const PdfCtx* ctx, uint8_t* out) {
     RELEASE_ASSERT(ctx);
-    RELEASE_ASSERT(peeked);
-
-    if (ctx->borrowed_substr) {
-        return PDF_ERROR(PDF_ERR_CTX_BORROWED, "Context has a borrowed substr");
-    }
+    RELEASE_ASSERT(out);
 
     if (ctx->offset >= ctx->buffer_len) {
         return PDF_ERROR(PDF_ERR_CTX_EOF, "Cannot peek end-of-file");
     }
 
-    *peeked = ctx->buffer[ctx->offset];
-    LOG_DIAG(TRACE, CTX, "Ctx char at offset %zu: '%c'", ctx->offset, *peeked);
+    *out = ctx->buffer[ctx->offset];
+    LOG_DIAG(TRACE, CTX, "Ctx char at offset %zu: '%c'", ctx->offset, *out);
 
     return NULL;
 }
 
-PdfError* pdf_ctx_peek_next(PdfCtx* ctx, char* peeked) {
+PdfError* pdf_ctx_peek_next(PdfCtx* ctx, uint8_t* out) {
     RELEASE_ASSERT(ctx);
-    RELEASE_ASSERT(peeked);
+    RELEASE_ASSERT(out);
 
     size_t offset = ctx->offset;
     PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, NULL));
 
-    PdfError* peek_error = (pdf_ctx_peek(ctx, peeked));
+    PdfError* peek_error = (pdf_ctx_peek(ctx, out));
     pdf_error_free_is_ok(pdf_ctx_seek(ctx, offset));
 
     if (peek_error) {
@@ -157,20 +142,16 @@ PdfError* pdf_ctx_expect(PdfCtx* ctx, const char* text) {
 
     LOG_DIAG(DEBUG, CTX, "Expecting text \"%s\"", text);
 
-    if (ctx->borrowed_substr) {
-        return PDF_ERROR(PDF_ERR_CTX_BORROWED, "Context has a borrowed substr");
-    }
-
     size_t restore_offset = ctx->offset;
     while (*text != 0) {
-        char peeked;
+        uint8_t peeked;
         PdfError* peek_error = pdf_ctx_peek(ctx, &peeked);
         if (peek_error) {
             pdf_error_free_is_ok(pdf_ctx_seek(ctx, restore_offset));
             return peek_error;
         }
 
-        if (*text != peeked) {
+        if ((uint8_t)*text != peeked) {
             pdf_error_free_is_ok(pdf_ctx_seek(ctx, restore_offset));
             return PDF_ERROR(PDF_ERR_CTX_EXPECT, "Unexpected character");
         }
@@ -187,17 +168,17 @@ PdfError* pdf_ctx_expect(PdfCtx* ctx, const char* text) {
     return NULL;
 }
 
-PdfError* pdf_ctx_require_char_type(
+PdfError* pdf_ctx_require_byte_type(
     const PdfCtx* ctx,
     bool permit_eof,
-    bool (*eval)(char)
+    bool (*eval)(uint8_t)
 ) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(eval);
 
     LOG_DIAG(TRACE, CTX, "Expecting character type at offset %zu", ctx->offset);
 
-    char peeked;
+    uint8_t peeked;
     PdfError* peek_error = (pdf_ctx_peek(ctx, &peeked));
     if (peek_error) {
         if (permit_eof) {
@@ -225,14 +206,10 @@ PdfError* pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit) {
     LOG_DIAG(
         DEBUG,
         CTX,
-        "Backscanning for text \"%s\" with char limit %zu (0=none)",
+        "Backscanning for text \"%s\" with byte limit %zu (0=none)",
         text,
         limit
     );
-
-    if (ctx->borrowed_substr) {
-        return PDF_ERROR(PDF_ERR_CTX_BORROWED, "Context has a borrowed substr");
-    }
 
     size_t offset = ctx->offset;
     size_t restore_offset = ctx->offset;
@@ -271,17 +248,13 @@ PdfError* pdf_ctx_seek_line_start(PdfCtx* ctx) {
 
     LOG_DIAG(DEBUG, CTX, "Finding line start");
 
-    if (ctx->borrowed_substr) {
-        return PDF_ERROR(PDF_ERR_CTX_BORROWED, "Context has a borrowed substr");
-    }
-
     size_t restore_offset = ctx->offset;
     if (restore_offset == ctx->buffer_len) {
         PDF_PROPAGATE(pdf_ctx_shift(ctx, -1));
     }
 
-    char peeked;
-    char prev_char;
+    uint8_t peeked;
+    uint8_t prev_byte;
     PDF_PROPAGATE(pdf_ctx_peek(ctx, &peeked));
 
     do {
@@ -299,14 +272,14 @@ PdfError* pdf_ctx_seek_line_start(PdfCtx* ctx) {
             return seek_error;
         }
 
-        prev_char = peeked;
+        prev_byte = peeked;
         PdfError* peek_error = pdf_ctx_peek(ctx, &peeked);
         if (peek_error) {
             pdf_error_free_is_ok(pdf_ctx_seek(ctx, restore_offset));
             return peek_error;
         }
     } while ((peeked != '\n' && peeked != '\r')
-             || (prev_char == '\n' && peeked == '\r'));
+             || (prev_byte == '\n' && peeked == '\r'));
 
     PdfError* advance_error = pdf_ctx_peek_and_advance(ctx, NULL);
     if (advance_error) {
@@ -322,13 +295,9 @@ PdfError* pdf_ctx_seek_next_line(PdfCtx* ctx) {
 
     LOG_DIAG(DEBUG, CTX, "Finding next line");
 
-    if (ctx->borrowed_substr) {
-        return PDF_ERROR(PDF_ERR_CTX_BORROWED, "Context has a borrowed substr");
-    }
-
     size_t restore_offset = ctx->offset;
 
-    char peeked;
+    uint8_t peeked;
     do {
         PdfError* error = pdf_ctx_peek_and_advance(ctx, &peeked);
         if (error) {
@@ -358,7 +327,7 @@ PdfError* pdf_ctx_consume_whitespace(PdfCtx* ctx) {
 
     LOG_DIAG(DEBUG, CTX, "Consuming whitespace");
 
-    char peeked = ' ';
+    uint8_t peeked = ' ';
     while (pdf_error_free_is_ok(pdf_ctx_peek(ctx, &peeked))
            && is_pdf_whitespace(peeked)) {
         pdf_error_free_is_ok(pdf_ctx_peek_and_advance(ctx, NULL));
@@ -367,67 +336,9 @@ PdfError* pdf_ctx_consume_whitespace(PdfCtx* ctx) {
     return NULL;
 }
 
-PdfError* pdf_ctx_borrow_substr(
-    PdfCtx* ctx,
-    size_t offset,
-    size_t length,
-    char** substr
-) {
+const uint8_t* pdf_ctx_get_raw(const PdfCtx* ctx) {
     RELEASE_ASSERT(ctx);
-    RELEASE_ASSERT(substr);
-
-    LOG_DIAG(
-        DEBUG,
-        CTX,
-        "Borrowing substring starting at %zu with length %zu",
-        offset,
-        length
-    );
-
-    if (ctx->borrowed_substr) {
-        return PDF_ERROR(
-            PDF_ERR_CTX_BORROWED,
-            "Context already has a borrowed substr"
-        );
-    }
-
-    ctx->borrow_term_offset = offset + length;
-    if (ctx->borrow_term_offset > ctx->buffer_len) {
-        return PDF_ERROR(
-            PDF_ERR_CTX_EOF,
-            "Cannot borrow substring past the end-of-file"
-        );
-    }
-
-    ctx->borrowed_substr = substr;
-    *substr = ctx->buffer + offset;
-
-    ctx->borrow_term_replaced = ctx->buffer[ctx->borrow_term_offset];
-    ctx->buffer[ctx->borrow_term_offset] = '\0';
-    LOG_DIAG(TRACE, CTX, "Borrowed substr: \"%s\"", *substr);
-
-    return NULL;
-}
-
-PdfError* pdf_ctx_release_substr(PdfCtx* ctx) {
-    RELEASE_ASSERT(ctx);
-
-    LOG_DIAG(DEBUG, CTX, "Releasing substr");
-
-    if (!ctx->borrowed_substr) {
-        return PDF_ERROR(
-            PDF_ERR_CTX_NOT_BORROWED,
-            "Cannot release substring when no substrings are borrowed"
-        );
-    }
-
-    ctx->buffer[ctx->borrow_term_offset] = ctx->borrow_term_replaced;
-    ctx->borrow_term_offset = 0;
-    ctx->borrow_term_replaced = '\0';
-    *ctx->borrowed_substr = NULL;
-    ctx->borrowed_substr = NULL;
-
-    return NULL;
+    return ctx->buffer;
 }
 
 PdfError* pdf_ctx_parse_int(
@@ -443,7 +354,7 @@ PdfError* pdf_ctx_parse_int(
 
     size_t start_offset = ctx->offset;
 
-    char peeked;
+    uint8_t peeked;
     PdfError* error;
 
     uint64_t acc = 0;
@@ -485,21 +396,21 @@ PdfError* pdf_ctx_parse_int(
     return NULL;
 }
 
-bool is_pdf_whitespace(char c) {
+bool is_pdf_whitespace(uint8_t c) {
     return c == '\0' || c == '\t' || c == '\n' || c == '\f' || c == '\r'
         || c == ' ';
 }
 
-bool is_pdf_delimiter(char c) {
+bool is_pdf_delimiter(uint8_t c) {
     return c == '(' || c == ')' || c == '<' || c == '>' || c == '[' || c == ']'
         || c == '{' || c == '}' || c == '/' || c == '%';
 }
 
-bool is_pdf_regular(char c) {
+bool is_pdf_regular(uint8_t c) {
     return !is_pdf_whitespace(c) && !is_pdf_delimiter(c);
 }
 
-bool is_pdf_non_regular(char c) {
+bool is_pdf_non_regular(uint8_t c) {
     return !is_pdf_regular(c);
 }
 
@@ -507,20 +418,21 @@ bool is_pdf_non_regular(char c) {
 #include "test/test.h"
 
 TEST_FUNC(test_ctx_expect_and_peek) {
-    char buffer[] = "testing";
+    uint8_t buffer[] = "testing";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     // Check peek
-    char peeked;
+    uint8_t peeked;
     TEST_PDF_REQUIRE(pdf_ctx_peek(ctx, &peeked));
-    TEST_ASSERT_EQ((char)'t', peeked);
+    TEST_ASSERT_EQ((uint8_t)'t', peeked);
 
     // Check next
     TEST_PDF_REQUIRE(pdf_ctx_peek_and_advance(ctx, &peeked));
-    TEST_ASSERT_EQ((char)'t', peeked);
+    TEST_ASSERT_EQ((uint8_t)'t', peeked);
 
     // Check offset after partial match and invalid peek
     TEST_PDF_REQUIRE(pdf_ctx_expect(ctx, "est"));
@@ -541,44 +453,46 @@ TEST_FUNC(test_ctx_expect_and_peek) {
 }
 
 TEST_FUNC(text_ctx_require_char_type) {
-    char buffer[] = "the quick brown fox\t jumped( over the lazy dog";
+    uint8_t buffer[] = "the quick brown fox\t jumped( over the lazy dog";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     TEST_PDF_REQUIRE(pdf_ctx_seek(ctx, 19));
-    TEST_PDF_REQUIRE(pdf_ctx_require_char_type(ctx, false, &is_pdf_whitespace));
+    TEST_PDF_REQUIRE(pdf_ctx_require_byte_type(ctx, false, &is_pdf_whitespace));
 
     TEST_PDF_REQUIRE(pdf_ctx_seek(ctx, 27));
-    TEST_PDF_REQUIRE(pdf_ctx_require_char_type(ctx, false, &is_pdf_delimiter));
+    TEST_PDF_REQUIRE(pdf_ctx_require_byte_type(ctx, false, &is_pdf_delimiter));
 
     TEST_PDF_REQUIRE(pdf_ctx_seek(ctx, 6));
-    TEST_PDF_REQUIRE(pdf_ctx_require_char_type(ctx, false, &is_pdf_regular));
+    TEST_PDF_REQUIRE(pdf_ctx_require_byte_type(ctx, false, &is_pdf_regular));
 
     TEST_PDF_REQUIRE(pdf_ctx_seek(ctx, 6));
     TEST_PDF_REQUIRE_ERR(
-        pdf_ctx_require_char_type(ctx, false, &is_pdf_whitespace),
+        pdf_ctx_require_byte_type(ctx, false, &is_pdf_whitespace),
         PDF_ERR_CTX_EXPECT
     );
 
     TEST_PDF_REQUIRE(pdf_ctx_seek(ctx, 46));
     TEST_PDF_REQUIRE_ERR(
-        pdf_ctx_require_char_type(ctx, false, &is_pdf_whitespace),
+        pdf_ctx_require_byte_type(ctx, false, &is_pdf_whitespace),
         PDF_ERR_CTX_EOF
     );
 
     TEST_PDF_REQUIRE(pdf_ctx_seek(ctx, 46));
-    TEST_PDF_REQUIRE(pdf_ctx_require_char_type(ctx, true, &is_pdf_whitespace));
+    TEST_PDF_REQUIRE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_whitespace));
 
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_ctx_backscan) {
-    char buffer[] = "the quick brown fox jumped over the lazy dog";
+    uint8_t buffer[] = "the quick brown fox jumped over the lazy dog";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     TEST_PDF_REQUIRE(pdf_ctx_seek(ctx, pdf_ctx_buffer_len(ctx)));
@@ -588,10 +502,11 @@ TEST_FUNC(test_ctx_backscan) {
 }
 
 TEST_FUNC(test_ctx_backscan_missing) {
-    char buffer[] = "the quick brown fox jumped over the lazy dog";
+    uint8_t buffer[] = "the quick brown fox jumped over the lazy dog";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
     TEST_PDF_REQUIRE(pdf_ctx_seek(ctx, pdf_ctx_buffer_len(ctx)));
 
@@ -602,10 +517,11 @@ TEST_FUNC(test_ctx_backscan_missing) {
 }
 
 TEST_FUNC(test_ctx_backscan_limit) {
-    char buffer[] = "the quick brown fox jumped over the lazy dog";
+    uint8_t buffer[] = "the quick brown fox jumped over the lazy dog";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
     TEST_PDF_REQUIRE(pdf_ctx_seek(ctx, pdf_ctx_buffer_len(ctx)));
 
@@ -623,10 +539,11 @@ TEST_FUNC(test_ctx_backscan_limit) {
 }
 
 TEST_FUNC(test_ctx_seek_line_start) {
-    char buffer[] = "line1\nline2\rline3\r\nline4\nline5";
+    uint8_t buffer[] = "line1\nline2\rline3\r\nline4\nline5";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     TEST_PDF_REQUIRE(pdf_ctx_seek_line_start(ctx));
@@ -653,10 +570,11 @@ TEST_FUNC(test_ctx_seek_line_start) {
 }
 
 TEST_FUNC(test_ctx_seek_next_line) {
-    char buffer[] = "line1\nline2\rline3\r\nline4\nline5";
+    uint8_t buffer[] = "line1\nline2\rline3\r\nline4\nline5";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     TEST_PDF_REQUIRE(pdf_ctx_seek_next_line(ctx));
@@ -681,10 +599,11 @@ TEST_FUNC(test_ctx_seek_next_line) {
 }
 
 TEST_FUNC(test_ctx_consume_whitespace) {
-    char buffer[] = "there is a lot of whitespace             before this";
+    uint8_t buffer[] = "there is a lot of whitespace             before this";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     TEST_PDF_REQUIRE(pdf_ctx_seek(ctx, 28));
@@ -699,73 +618,12 @@ TEST_FUNC(test_ctx_consume_whitespace) {
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_ctx_borrow_substr) {
-    char buffer[] = "the quick brown fox jumped over the lazy dog";
-    Arena* arena = arena_new(128);
-
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
-    TEST_ASSERT(ctx);
-
-    // Borrow
-    char* substr;
-    TEST_PDF_REQUIRE(pdf_ctx_borrow_substr(ctx, 16, 3, &substr));
-    TEST_ASSERT_EQ("fox", substr);
-
-    // Try double borrow
-    char* substr2;
-    TEST_PDF_REQUIRE_ERR(
-        pdf_ctx_borrow_substr(ctx, 4, 5, &substr2),
-        PDF_ERR_CTX_BORROWED
-    );
-
-    // Free original borrow
-    TEST_PDF_REQUIRE(pdf_ctx_release_substr(ctx));
-    TEST_ASSERT(!substr);
-
-    arena_free(arena);
-    return TEST_RESULT_PASS;
-}
-
-TEST_FUNC(test_ctx_borrow_full) {
-    char buffer[] = "this is the whole string";
-    Arena* arena = arena_new(128);
-
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
-    TEST_ASSERT(ctx);
-
-    char* substr;
-    TEST_PDF_REQUIRE(pdf_ctx_borrow_substr(ctx, 0, strlen(buffer), &substr));
-    TEST_ASSERT_EQ("this is the whole string", substr);
-
-    TEST_PDF_REQUIRE(pdf_ctx_release_substr(ctx));
-    TEST_ASSERT(!substr);
-
-    arena_free(arena);
-    return TEST_RESULT_PASS;
-}
-
-TEST_FUNC(test_ctx_borrow_eof) {
-    char buffer[] = "this is the whole string";
-    Arena* arena = arena_new(128);
-
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
-    TEST_ASSERT(ctx);
-
-    char* substr;
-    TEST_PDF_REQUIRE_ERR(
-        pdf_ctx_borrow_substr(ctx, 0, strlen(buffer) + 1, &substr),
-        PDF_ERR_CTX_EOF
-    );
-
-    arena_free(arena);
-    return TEST_RESULT_PASS;
-}
-
 TEST_FUNC(test_ctx_parse_int) {
-    char buffer[] = "John has +120 apples. I have 42";
+    uint8_t buffer[] = "John has +120 apples. I have 42";
     Arena* arena = arena_new(128);
 
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     uint64_t value;

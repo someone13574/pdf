@@ -1,22 +1,24 @@
 #include "operator.h"
 
+#include <stdint.h>
+
 #include "logger/log.h"
 #include "pdf_error/error.h"
 
-PdfError* two_char_operator(
+PdfError* two_byte_operator(
     PdfCtx* ctx,
     PdfOperator
     operator,
-    char second_char,
+    uint8_t second_byte,
     PdfOperator* selected
 ) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(selected);
 
-    char peeked;
+    uint8_t peeked;
     PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &peeked));
 
-    if (peeked != second_char) {
+    if (peeked != second_byte) {
         return PDF_ERROR(PDF_ERR_UNKNOWN_OPERATOR);
     }
 
@@ -24,30 +26,30 @@ PdfError* two_char_operator(
     return NULL;
 }
 
-PdfError* select_one_or_two_char_operator(
+PdfError* select_one_or_two_byte_operator(
     PdfCtx* ctx,
-    PdfOperator single_char_operator,
-    PdfOperator two_char_operator,
-    char second_char,
+    PdfOperator single_byte_operator,
+    PdfOperator two_byte_operator,
+    uint8_t second_byte,
     PdfOperator* selected
 ) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(selected);
 
-    char peeked;
+    uint8_t peeked;
     PdfError* error = pdf_ctx_peek(ctx, &peeked);
 
     if ((error && pdf_error_code(error) == PDF_ERR_CTX_EOF)
         || (!error && is_pdf_non_regular(peeked))) {
-        *selected = single_char_operator;
+        *selected = single_byte_operator;
         if (error) {
             pdf_error_free(error);
         }
         return NULL;
     }
 
-    if (pdf_error_free_is_ok(error) && peeked == second_char) {
-        *selected = two_char_operator;
+    if (pdf_error_free_is_ok(error) && peeked == second_byte) {
+        *selected = two_byte_operator;
         return NULL;
     }
 
@@ -55,14 +57,14 @@ PdfError* select_one_or_two_char_operator(
 }
 
 PdfError*
-is_single_char_operator(PdfCtx* ctx, bool* is_single_char, char* next_char) {
+is_single_byte_operator(PdfCtx* ctx, bool* is_single_char, uint8_t* next_byte) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(is_single_char);
-    RELEASE_ASSERT(next_char);
+    RELEASE_ASSERT(next_byte);
 
-    PdfError* error = pdf_ctx_peek(ctx, next_char);
+    PdfError* error = pdf_ctx_peek(ctx, next_byte);
     if ((error && pdf_error_code(error) == PDF_ERR_CTX_EOF)
-        || (!error && is_pdf_non_regular(*next_char))) {
+        || (!error && is_pdf_non_regular(*next_byte))) {
         *is_single_char = true;
         if (error) {
             pdf_error_free(error);
@@ -83,7 +85,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(operator);
 
-    char peeked;
+    uint8_t peeked;
     PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &peeked));
 
     switch (peeked) {
@@ -100,21 +102,21 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
             return NULL;
         }
         case 'M': {
-            return select_one_or_two_char_operator(ctx, PDF_OPERATOR_M, PDF_OPERATOR_MP, 'P', operator);
+            return select_one_or_two_byte_operator(ctx, PDF_OPERATOR_M, PDF_OPERATOR_MP, 'P', operator);
         }
         case 'd': {
-            bool is_single_char;
-            char next_char;
+            bool is_single_byte;
+            uint8_t next_byte;
             PDF_PROPAGATE(
-                is_single_char_operator(ctx, &is_single_char, &next_char)
+                is_single_byte_operator(ctx, &is_single_byte, &next_byte)
             );
 
-            if (is_single_char) {
+            if (is_single_byte) {
                 *operator= PDF_OPERATOR_d;
                 return NULL;
             }
 
-            switch (next_char) {
+            switch (next_byte) {
                 case '0': {
                     *operator= PDF_OPERATOR_d0;
                     return NULL;
@@ -129,10 +131,10 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
             }
         }
         case 'r': {
-            char next_char;
-            PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &next_char));
+            uint8_t next_byte;
+            PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &next_byte));
 
-            switch (next_char) {
+            switch (next_byte) {
                 case 'i': {
                     *operator= PDF_OPERATOR_ri;
                     return NULL;
@@ -155,7 +157,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
             return NULL;
         }
         case 'g': {
-            return select_one_or_two_char_operator(ctx, PDF_OPERATOR_g, PDF_OPERATOR_gs, 's', operator);
+            return select_one_or_two_byte_operator(ctx, PDF_OPERATOR_g, PDF_OPERATOR_gs, 's', operator);
         }
         case 'q': {
             *operator= PDF_OPERATOR_q;
@@ -166,18 +168,18 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
             return NULL;
         }
         case 'c': {
-            bool is_single_char;
-            char next_char;
+            bool is_single_byte;
+            uint8_t next_byte;
             PDF_PROPAGATE(
-                is_single_char_operator(ctx, &is_single_char, &next_char)
+                is_single_byte_operator(ctx, &is_single_byte, &next_byte)
             );
 
-            if (is_single_char) {
+            if (is_single_byte) {
                 *operator= PDF_OPERATOR_c;
                 return NULL;
             }
 
-            switch (next_char) {
+            switch (next_byte) {
                 case 'm': {
                     *operator= PDF_OPERATOR_cm;
                     return NULL;
@@ -212,38 +214,38 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
             return NULL;
         }
         case 'S': {
-            bool is_single_char;
-            char next_char;
+            bool is_single_byte;
+            uint8_t next_byte;
             PDF_PROPAGATE(
-                is_single_char_operator(ctx, &is_single_char, &next_char)
+                is_single_byte_operator(ctx, &is_single_byte, &next_byte)
             );
 
-            if (is_single_char) {
+            if (is_single_byte) {
                 *operator= PDF_OPERATOR_S;
                 return NULL;
             }
 
-            if (next_char != 'C') {
+            if (next_byte != 'C') {
                 return PDF_ERROR(PDF_ERR_UNKNOWN_OPERATOR);
             }
 
-            return select_one_or_two_char_operator(ctx, PDF_OPERATOR_SC, PDF_OPERATOR_SCN, 'N', operator);
+            return select_one_or_two_byte_operator(ctx, PDF_OPERATOR_SC, PDF_OPERATOR_SCN, 'N', operator);
         }
         case 's': {
-            bool is_single_char;
-            char next_char;
+            bool is_single_byte;
+            uint8_t next_byte;
             PDF_PROPAGATE(
-                is_single_char_operator(ctx, &is_single_char, &next_char)
+                is_single_byte_operator(ctx, &is_single_byte, &next_byte)
             );
 
-            if (is_single_char) {
+            if (is_single_byte) {
                 *operator= PDF_OPERATOR_S;
                 return NULL;
             }
 
-            switch (next_char) {
+            switch (next_byte) {
                 case 'c': {
-                    return select_one_or_two_char_operator(ctx, PDF_OPERATOR_sc, PDF_OPERATOR_scn, 'n', operator);
+                    return select_one_or_two_byte_operator(ctx, PDF_OPERATOR_sc, PDF_OPERATOR_scn, 'n', operator);
                 }
                 case 'h': {
                     *operator= PDF_OPERATOR_sh;
@@ -255,25 +257,25 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
             }
         }
         case 'f': {
-            return select_one_or_two_char_operator(ctx, PDF_OPERATOR_f, PDF_OPERATOR_f_star, '*', operator);
+            return select_one_or_two_byte_operator(ctx, PDF_OPERATOR_f, PDF_OPERATOR_f_star, '*', operator);
         }
         case 'F': {
             *operator= PDF_OPERATOR_F;
             return NULL;
         }
         case 'B': {
-            char next_char;
-            bool is_single_char;
+            bool is_single_byte;
+            uint8_t next_byte;
             PDF_PROPAGATE(
-                is_single_char_operator(ctx, &is_single_char, &next_char)
+                is_single_byte_operator(ctx, &is_single_byte, &next_byte)
             );
 
-            if (is_single_char) {
+            if (is_single_byte) {
                 *operator= PDF_OPERATOR_B;
                 return NULL;
             }
 
-            switch (next_char) {
+            switch (next_byte) {
                 case '*': {
                     *operator= PDF_OPERATOR_B_star;
                     return NULL;
@@ -287,10 +289,10 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
                     return NULL;
                 }
                 case 'M': {
-                    return two_char_operator(ctx, PDF_OPERATOR_BMC, 'C', operator);
+                    return two_byte_operator(ctx, PDF_OPERATOR_BMC, 'C', operator);
                 }
                 case 'D': {
-                    return two_char_operator(ctx, PDF_OPERATOR_BDC, 'D', operator);
+                    return two_byte_operator(ctx, PDF_OPERATOR_BDC, 'D', operator);
                 }
                 case 'X': {
                     *operator= PDF_OPERATOR_BX;
@@ -302,20 +304,20 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
             }
         }
         case 'b': {
-            return select_one_or_two_char_operator(ctx, PDF_OPERATOR_b, PDF_OPERATOR_b_star, '*', operator);
+            return select_one_or_two_byte_operator(ctx, PDF_OPERATOR_b, PDF_OPERATOR_b_star, '*', operator);
         }
         case 'n': {
             *operator= PDF_OPERATOR_n;
             return NULL;
         }
         case 'W': {
-            return select_one_or_two_char_operator(ctx, PDF_OPERATOR_W, PDF_OPERATOR_W_star, '*', operator);
+            return select_one_or_two_byte_operator(ctx, PDF_OPERATOR_W, PDF_OPERATOR_W_star, '*', operator);
         }
         case 'E': {
-            char next_char;
-            PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &next_char));
+            uint8_t next_byte;
+            PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &next_byte));
 
-            switch (next_char) {
+            switch (next_byte) {
                 case 'T': {
                     *operator= PDF_OPERATOR_ET;
                     return NULL;
@@ -325,7 +327,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
                     return NULL;
                 }
                 case 'M': {
-                    return two_char_operator(ctx, PDF_OPERATOR_EMC, 'C', operator);
+                    return two_byte_operator(ctx, PDF_OPERATOR_EMC, 'C', operator);
                 }
                 case 'X': {
                     *operator= PDF_OPERATOR_EX;
@@ -337,10 +339,10 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
             }
         }
         case 'T': {
-            char next_char;
-            PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &next_char));
+            uint8_t next_byte;
+            PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &next_byte));
 
-            switch (next_char) {
+            switch (next_byte) {
                 case 'c': {
                     *operator= PDF_OPERATOR_Tc;
                     return NULL;
@@ -407,14 +409,14 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
             return NULL;
         }
         case 'C': {
-            return two_char_operator(ctx, PDF_OPERATOR_CS, 'S', operator);
+            return two_byte_operator(ctx, PDF_OPERATOR_CS, 'S', operator);
         }
         case 'G': {
             *operator= PDF_OPERATOR_G;
             return NULL;
         }
         case 'R': {
-            return two_char_operator(ctx, PDF_OPERATOR_RG, 'G', operator);
+            return two_byte_operator(ctx, PDF_OPERATOR_RG, 'G', operator);
         }
         case 'K': {
             *operator= PDF_OPERATOR_K;
@@ -425,13 +427,13 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
             return NULL;
         }
         case 'I': {
-            return two_char_operator(ctx, PDF_OPERATOR_ID, 'D', operator);
+            return two_byte_operator(ctx, PDF_OPERATOR_ID, 'D', operator);
         }
         case 'D': {
-            char next_char;
-            PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &next_char));
+            uint8_t next_byte;
+            PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &next_byte));
 
-            switch (next_char) {
+            switch (next_byte) {
                 case 'o': {
                     *operator= PDF_OPERATOR_Do;
                     return NULL;

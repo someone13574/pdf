@@ -10,10 +10,10 @@
 
 PdfError* pdf_decode_filtered_stream(
     Arena* arena,
-    const char* encoded,
+    const uint8_t* encoded,
     size_t length,
     PdfOpNameArray filters,
-    char** decoded,
+    uint8_t** decoded,
     size_t* decoded_len
 ) {
     RELEASE_ASSERT(arena);
@@ -70,8 +70,8 @@ PdfError* pdf_decode_filtered_stream(
 
         return NULL;
     } else {
-        *decoded = arena_alloc(arena, sizeof(char) * (size_t)(length + 1));
-        strcpy(*decoded, (char*)encoded);
+        *decoded = arena_alloc(arena, length);
+        memcpy(*decoded, encoded, length);
         *decoded_len = length;
 
         return NULL;

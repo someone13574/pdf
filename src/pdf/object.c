@@ -65,7 +65,7 @@ PdfError* pdf_parse_indirect(
 PdfError* pdf_parse_stream(
     Arena* arena,
     PdfCtx* ctx,
-    char** stream_bytes,
+    uint8_t** stream_bytes,
     size_t* decoded_len,
     PdfObject* stream_dict
 );
@@ -82,7 +82,7 @@ PdfError* pdf_parse_object(
 
     LOG_DIAG(INFO, OBJECT, "Parsing object at offset %zu", pdf_ctx_offset(ctx));
 
-    char peeked, peeked_next;
+    uint8_t peeked, peeked_next;
     PDF_PROPAGATE(pdf_ctx_peek(ctx, &peeked));
 
     PdfError* peeked_next_error = pdf_ctx_peek_next(ctx, &peeked_next);
@@ -152,7 +152,7 @@ pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object) {
         pdf_ctx_offset(ctx)
     );
 
-    char peeked, peeked_next;
+    uint8_t peeked, peeked_next;
     PDF_PROPAGATE(pdf_ctx_peek(ctx, &peeked));
 
     PdfError* peeked_next_error = pdf_ctx_peek_next(ctx, &peeked_next);
@@ -195,7 +195,7 @@ PdfError* pdf_parse_true(PdfCtx* ctx, PdfObject* object) {
     RELEASE_ASSERT(object);
 
     PDF_PROPAGATE(pdf_ctx_expect(ctx, "true"));
-    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+    PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular));
 
     object->type = PDF_OBJECT_TYPE_BOOLEAN;
     object->data.boolean = true;
@@ -208,7 +208,7 @@ PdfError* pdf_parse_false(PdfCtx* ctx, PdfObject* object) {
     RELEASE_ASSERT(object);
 
     PDF_PROPAGATE(pdf_ctx_expect(ctx, "false"));
-    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+    PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular));
 
     object->type = PDF_OBJECT_TYPE_BOOLEAN;
     object->data.boolean = false;
@@ -221,7 +221,7 @@ PdfError* pdf_parse_null(PdfCtx* ctx, PdfObject* object) {
     RELEASE_ASSERT(object);
 
     PDF_PROPAGATE(pdf_ctx_expect(ctx, "null"));
-    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+    PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular));
 
     object->type = PDF_OBJECT_TYPE_NULL;
 
@@ -240,26 +240,26 @@ PdfError* pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
     );
 
     // Parse sign
-    char sign_char;
+    uint8_t sign_byte;
     int32_t sign = 1;
-    PDF_PROPAGATE(pdf_ctx_peek(ctx, &sign_char));
-    if (sign_char == '+' || sign_char == '-') {
+    PDF_PROPAGATE(pdf_ctx_peek(ctx, &sign_byte));
+    if (sign_byte == '+' || sign_byte == '-') {
         PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, NULL));
 
-        if (sign_char == '-') {
+        if (sign_byte == '-') {
             sign = -1;
         }
     }
 
     // Parse leading digits
-    char digit_char;
+    uint8_t digit_byte;
     int64_t leading_acc = 0;
     bool has_leading = false;
 
-    while (pdf_error_free_is_ok(pdf_ctx_peek(ctx, &digit_char))
-           && isdigit(digit_char)) {
+    while (pdf_error_free_is_ok(pdf_ctx_peek(ctx, &digit_byte))
+           && isdigit(digit_byte)) {
         has_leading = true;
-        int64_t digit = digit_char - '0';
+        int64_t digit = digit_byte - '0';
 
         if (leading_acc <= (INT64_MAX - digit) / 10) {
             leading_acc *= 10;
@@ -272,10 +272,10 @@ PdfError* pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
     }
 
     // Parse decimal point
-    char decimal_char;
-    PdfError* decimal_peek_error = pdf_ctx_peek(ctx, &decimal_char);
+    uint8_t decimal_byte;
+    PdfError* decimal_peek_error = pdf_ctx_peek(ctx, &decimal_byte);
 
-    if ((!decimal_peek_error && decimal_char != '.')
+    if ((!decimal_peek_error && decimal_byte != '.')
         || (decimal_peek_error
             && pdf_error_code(decimal_peek_error) == PDF_ERR_CTX_EOF)) {
         if (decimal_peek_error) {
@@ -283,7 +283,7 @@ PdfError* pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
         }
 
         LOG_DIAG(TRACE, OBJECT, "Number is integer");
-        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular)
+        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular)
         );
 
         if (!has_leading) {
@@ -316,17 +316,17 @@ PdfError* pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
     double trailing_weight = 0.1;
     bool has_trailing = false;
 
-    while (pdf_error_free_is_ok(pdf_ctx_peek(ctx, &digit_char))
-           && isdigit(digit_char)) {
+    while (pdf_error_free_is_ok(pdf_ctx_peek(ctx, &digit_byte))
+           && isdigit(digit_byte)) {
         has_trailing = true;
 
-        trailing_acc += (double)(digit_char - '0') * trailing_weight;
+        trailing_acc += (double)(digit_byte - '0') * trailing_weight;
         trailing_weight *= 0.1;
 
         PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, NULL));
     }
 
-    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+    PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular));
 
     double value = ((double)leading_acc + trailing_acc) * (double)sign;
     const double PDF_REAL_MAX = 3.403e38;
@@ -360,29 +360,30 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     PDF_PROPAGATE(pdf_ctx_expect(ctx, "("));
 
     // Find length upper bound
-    char peeked_char;
+    uint8_t peeked;
     int escape = 0;
     int open_parenthesis = 1;
     unsigned long length = 0;
     size_t start_offset = pdf_ctx_offset(ctx);
 
     while (open_parenthesis > 0
-           && pdf_error_free_is_ok(pdf_ctx_peek_and_advance(ctx, &peeked_char))
-    ) {
+           && pdf_error_free_is_ok(pdf_ctx_peek_and_advance(ctx, &peeked))) {
         length++;
 
-        if (peeked_char == '(' && escape == 0) {
+        if (peeked == '(' && escape == 0) {
             open_parenthesis++;
-        } else if (peeked_char == ')' && escape == 0) {
+        } else if (peeked == ')' && escape == 0) {
             open_parenthesis--;
         }
 
-        if (peeked_char == '\\' && escape == 0) {
+        if (peeked == '\\' && escape == 0) {
             escape = 1;
         } else {
             escape = 0;
         }
     }
+
+    length--;
 
     if (open_parenthesis != 0) {
         return PDF_ERROR(
@@ -391,37 +392,30 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
         );
     }
 
-    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+    PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular));
 
     // Parse
-    char* raw;
-    PDF_PROPAGATE(pdf_ctx_borrow_substr(
-        ctx,
-        start_offset,
-        pdf_ctx_offset(ctx) - start_offset - 1,
-        &raw
-    ));
-
+    const uint8_t* raw = pdf_ctx_get_raw(ctx) + start_offset;
     char* parsed = arena_alloc(arena, sizeof(char) * (length + 1));
 
     escape = 0;
     size_t write_offset = 0;
 
     for (size_t read_offset = 0; read_offset < length; read_offset++) {
-        char read_char = raw[read_offset];
+        uint8_t read_byte = raw[read_offset];
 
         switch (escape) {
             case 0: {
-                if (read_char == '\\') {
+                if (read_byte == '\\') {
                     escape = 1;
                     break;
                 }
 
-                parsed[write_offset++] = read_char;
+                parsed[write_offset++] = (char)read_byte;
                 break;
             }
             case 1: {
-                switch (read_char) {
+                switch (read_byte) {
                     case 'n': {
                         parsed[write_offset++] = '\n';
                         escape = 0;
@@ -474,7 +468,6 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
         }
     }
 
-    PDF_PROPAGATE(pdf_ctx_release_substr(ctx));
     parsed[write_offset] = '\0';
 
     object->type = PDF_OBJECT_TYPE_STRING;
@@ -508,7 +501,7 @@ PdfError* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     // Find max length
     size_t start_offset = pdf_ctx_offset(ctx);
     size_t length = 0;
-    char peeked;
+    uint8_t peeked;
 
     while (pdf_error_free_is_ok(pdf_ctx_peek_and_advance(ctx, &peeked))) {
         if (!is_pdf_regular(peeked)) {
@@ -527,19 +520,18 @@ PdfError* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
 
     LOG_DIAG(DEBUG, OBJECT, "Length %zu", length);
     PDF_PROPAGATE(pdf_ctx_seek(ctx, start_offset + length));
-    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular));
+    PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular));
 
     // Parse name
     char* name = arena_alloc(arena, sizeof(char) * (length + 1));
-    char* raw;
-    PDF_PROPAGATE(pdf_ctx_borrow_substr(ctx, start_offset, length, &raw));
+    const uint8_t* raw = pdf_ctx_get_raw(ctx) + start_offset;
 
     size_t write_offset = 0;
     int escape = 0;
     int hex_code = 0;
 
     for (size_t read_offset = 0; read_offset < length; read_offset++) {
-        char c = raw[read_offset];
+        char c = (char)raw[read_offset];
 
         switch (escape) {
             case 0: {
@@ -591,7 +583,6 @@ PdfError* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
         );
     }
 
-    PDF_PROPAGATE(pdf_ctx_release_substr(ctx));
     name[write_offset] = '\0';
 
     object->type = PDF_OBJECT_TYPE_NAME;
@@ -610,11 +601,11 @@ PdfError* pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfObject* object) {
 
     PdfObjectVec* elements = pdf_object_vec_new(arena);
 
-    char peeked;
+    uint8_t peeked;
     while (pdf_error_free_is_ok(pdf_ctx_peek(ctx, &peeked)) && peeked != ']') {
         PdfObject element;
         PDF_PROPAGATE(pdf_parse_object(arena, ctx, &element, false));
-        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, false, is_pdf_non_regular)
+        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, false, is_pdf_non_regular)
         );
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
@@ -624,7 +615,7 @@ PdfError* pdf_parse_array(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     }
 
     PDF_PROPAGATE(pdf_ctx_expect(ctx, "]"));
-    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, is_pdf_non_regular));
+    PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, is_pdf_non_regular));
 
     object->type = PDF_OBJECT_TYPE_ARRAY;
     object->data.array.elements = elements;
@@ -647,17 +638,17 @@ PdfError* pdf_parse_dict(
 
     PdfDictEntryVec* entries = pdf_dict_entry_vec_new(arena);
 
-    char peeked;
+    uint8_t peeked;
     while (pdf_error_free_is_ok(pdf_ctx_peek(ctx, &peeked)) && peeked != '>') {
         PdfObject* key = arena_alloc(arena, sizeof(PdfObject));
         PDF_PROPAGATE(pdf_parse_name(arena, ctx, key));
-        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, false, is_pdf_non_regular)
+        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, false, is_pdf_non_regular)
         );
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
         PdfObject* value = arena_alloc(arena, sizeof(PdfObject));
         PDF_PROPAGATE(pdf_parse_object(arena, ctx, value, false));
-        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, false, is_pdf_non_regular)
+        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, false, is_pdf_non_regular)
         );
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
@@ -668,7 +659,7 @@ PdfError* pdf_parse_dict(
     }
 
     PDF_PROPAGATE(pdf_ctx_expect(ctx, ">>"));
-    PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, is_pdf_non_regular));
+    PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, is_pdf_non_regular));
 
     object->type = PDF_OBJECT_TYPE_DICT;
     object->data.dict.entries = entries;
@@ -684,7 +675,7 @@ PdfError* pdf_parse_dict(
             return NULL;
         }
 
-        char* stream_bytes;
+        uint8_t* stream_bytes;
         size_t decoded_len;
         if (!pdf_error_free_is_ok(pdf_parse_stream(
                 arena,
@@ -700,7 +691,7 @@ PdfError* pdf_parse_dict(
         }
 
         // Type is a stream
-        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, is_pdf_non_regular));
+        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, is_pdf_non_regular));
 
         PdfObject* stream_dict = arena_alloc(arena, sizeof(PdfObject));
         *stream_dict = *object;
@@ -719,7 +710,7 @@ PdfError* pdf_parse_dict(
 PdfError* pdf_parse_stream(
     Arena* arena,
     PdfCtx* ctx,
-    char** stream_body,
+    uint8_t** stream_body,
     size_t* decoded_len,
     PdfObject* stream_dict_obj
 ) {
@@ -732,7 +723,7 @@ PdfError* pdf_parse_stream(
     // Parse start
     PDF_PROPAGATE(pdf_ctx_expect(ctx, "stream"));
 
-    char peeked_newline;
+    uint8_t peeked_newline;
     PDF_PROPAGATE(pdf_ctx_peek(ctx, &peeked_newline));
     if (peeked_newline == '\n') {
         PDF_PROPAGATE(pdf_ctx_shift(ctx, 1));
@@ -759,25 +750,15 @@ PdfError* pdf_parse_stream(
         return PDF_ERROR(PDF_ERR_STREAM_INVALID_LENGTH);
     }
 
-    // Copy stream body
-    char* borrowed;
-    PDF_PROPAGATE(pdf_ctx_borrow_substr(
-        ctx,
-        pdf_ctx_offset(ctx),
-        (size_t)stream_dict.length,
-        &borrowed
-    ));
-
+    // Decode stream body
     PDF_REQUIRE(pdf_decode_filtered_stream(
         arena,
-        borrowed,
+        pdf_ctx_get_raw(ctx) + pdf_ctx_offset(ctx),
         (size_t)stream_dict.length,
         stream_dict.filter,
         stream_body,
         decoded_len
     ));
-
-    PDF_PROPAGATE(pdf_ctx_release_substr(ctx));
 
     // Parse end
     PDF_PROPAGATE(pdf_ctx_shift(ctx, stream_dict.length));
@@ -832,7 +813,7 @@ PdfError* pdf_parse_indirect(
     PDF_PROPAGATE(pdf_ctx_expect(ctx, " "));
 
     // Determine if indirect object or reference
-    char peeked;
+    uint8_t peeked;
     PDF_PROPAGATE(pdf_ctx_peek(ctx, &peeked));
 
     if (peeked == 'R') {
@@ -849,7 +830,7 @@ PdfError* pdf_parse_indirect(
         LOG_DIAG(DEBUG, OBJECT, "Parsed indirect object");
 
         PDF_PROPAGATE(pdf_ctx_expect(ctx, "obj"));
-        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, false, &is_pdf_non_regular)
+        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, false, &is_pdf_non_regular)
         );
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
         *number_fallback = false;
@@ -857,11 +838,11 @@ PdfError* pdf_parse_indirect(
         PdfObject* inner = arena_alloc(arena, sizeof(PdfObject));
         PDF_PROPAGATE(pdf_parse_object(arena, ctx, inner, true));
 
-        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, false, &is_pdf_non_regular)
+        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, false, &is_pdf_non_regular)
         );
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
         PDF_PROPAGATE(pdf_ctx_expect(ctx, "endobj"));
-        PDF_PROPAGATE(pdf_ctx_require_char_type(ctx, true, &is_pdf_non_regular)
+        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular)
         );
 
         object->type = PDF_OBJECT_TYPE_INDIRECT_OBJECT;
@@ -1097,8 +1078,9 @@ char* pdf_fmt_object(Arena* arena, const PdfObject* object) {
     expected_offset                                                            \
 )                                                                              \
     Arena* arena = arena_new(128);                                             \
-    char buffer[] = buf;                                                       \
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));                  \
+    uint8_t buffer[] = buf;                                                    \
+    PdfCtx* ctx =                                                              \
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);      \
     PdfObject object;                                                          \
     TEST_PDF_REQUIRE(pdf_parse_object(arena, ctx, &object, false));            \
     TEST_ASSERT_EQ(                                                            \
@@ -1117,8 +1099,9 @@ char* pdf_fmt_object(Arena* arena, const PdfObject* object) {
 
 #define SETUP_INVALID_PARSE_OBJECT(buf, err)                                   \
     Arena* arena = arena_new(128);                                             \
-    char buffer[] = buf;                                                       \
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));                  \
+    uint8_t buffer[] = buf;                                                    \
+    PdfCtx* ctx =                                                              \
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);      \
                                                                                \
     PdfObject object;                                                          \
     TEST_PDF_REQUIRE_ERR(pdf_parse_object(arena, ctx, &object, false), (err));
@@ -1741,7 +1724,10 @@ TEST_FUNC(test_object_stream) {
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STREAM, stream_object->type);
     PdfStream stream = stream_object->data.stream;
     TEST_ASSERT(stream.stream_dict);
-    TEST_ASSERT_EQ("01234567", stream.stream_bytes);
+    TEST_ASSERT_EQ((size_t)8, stream.decoded_stream_len);
+    TEST_ASSERT(
+        memcmp("01234567", stream.stream_bytes, stream.decoded_stream_len) == 0
+    );
 
     return TEST_RESULT_PASS;
 }
@@ -1756,7 +1742,10 @@ TEST_FUNC(test_object_stream_crlf) {
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STREAM, stream_object->type);
     PdfStream stream = stream_object->data.stream;
     TEST_ASSERT(stream.stream_dict);
-    TEST_ASSERT_EQ("01234567", stream.stream_bytes);
+    TEST_ASSERT_EQ((size_t)8, stream.decoded_stream_len);
+    TEST_ASSERT(
+        memcmp("01234567", stream.stream_bytes, stream.decoded_stream_len) == 0
+    );
 
     return TEST_RESULT_PASS;
 }

@@ -39,7 +39,7 @@ PdfError* pdf_filter_ascii_hex_decode(
     bool upper = true;
     for (size_t offset = 0; offset < stream_len; offset++) {
         uint8_t c = stream[offset];
-        if (is_pdf_whitespace((char)c)) {
+        if (is_pdf_whitespace(c)) {
             continue;
         }
 

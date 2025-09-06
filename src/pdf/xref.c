@@ -296,10 +296,11 @@ PdfError* pdf_xref_get_entry(
 #include "test/test.h"
 
 TEST_FUNC(test_xref_create) {
-    char buffer[] =
+    uint8_t buffer[] =
         "xref\n0 2\n0000000000 65536 f \n0000000042 00000 n \n2 1\n0000000542 00002 n ";
     Arena* arena = arena_new(128);
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     XRefTable* xref;
@@ -325,10 +326,11 @@ TEST_FUNC(test_xref_create) {
 }
 
 TEST_FUNC(test_xref_get_entries_ok) {
-    char buffer[] =
+    uint8_t buffer[] =
         "xref\n0 2\n0000000000 65536 f \n0000000042 00000 n \n2 1\n0000000542 00002 n ";
     Arena* arena = arena_new(128);
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     XRefTable* xref;
@@ -349,10 +351,11 @@ TEST_FUNC(test_xref_get_entries_ok) {
 }
 
 TEST_FUNC(test_xref_out_of_bound_entry) {
-    char buffer[] =
+    uint8_t buffer[] =
         "xref\n0 2\n0000000000 65536 f \n0000000042 00000 n \n2 1\n0000000542 00002 n ";
     Arena* arena = arena_new(128);
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     XRefTable* xref;
@@ -369,10 +372,11 @@ TEST_FUNC(test_xref_out_of_bound_entry) {
 }
 
 TEST_FUNC(test_xref_generation_mismatch) {
-    char buffer[] =
+    uint8_t buffer[] =
         "xref\n0 2\n0000000000 65536 f \n0000000042 00000 n \n2 1\n0000000542 00002 n ";
     Arena* arena = arena_new(128);
-    PdfCtx* ctx = pdf_ctx_new(arena, buffer, strlen(buffer));
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
     TEST_ASSERT(ctx);
 
     XRefTable* xref;

@@ -8,10 +8,10 @@
 
 PdfError* pdf_decode_filtered_stream(
     Arena* arena,
-    const char* encoded,
+    const uint8_t* encoded,
     size_t length,
     PdfOpNameArray filters,
-    char** decoded,
+    uint8_t** decoded,
     size_t* decoded_len
 );
 
