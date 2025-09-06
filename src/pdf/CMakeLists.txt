@@ -1,25 +1,23 @@
 add_library(pdf
-    catalog.c "${pdf_SOURCE_DIR}/include/pdf/catalog.h"
-    stream/stream_dict.c stream/stream_dict.h
-    stream/filters.c stream/filters.h
+    catalog.c
+    stream/stream_dict.c
+    stream/filters.c
     stream/ascii.c
-    content_stream/op.c content_stream/op.h
-    "${pdf_SOURCE_DIR}/include/pdf/content_op.h"
-    content_stream/stream.c "${pdf_SOURCE_DIR}/include/pdf/content_stream.h"
-    resources/resources.c "${pdf_SOURCE_DIR}/include/pdf/resources/resources.h"
-    resources/font.c "${pdf_SOURCE_DIR}/include/pdf/resources/font.h"
-    deserde_types.c "${pdf_SOURCE_DIR}/include/pdf/deserde_types.h"
-    object.c "${pdf_SOURCE_DIR}/include/pdf/object.h"
-    page.c "${pdf_SOURCE_DIR}/include/pdf/page.h"
+    content_stream/op.c
+    content_stream/stream.c
+    content_stream/operator.c
+    resources/resources.c
+    resources/font.c
+    deserde_types.c
+    object.c
+    page.c
     pdf.c
-    "${pdf_SOURCE_DIR}/include/pdf/resolver.h" "${pdf_SOURCE_DIR}/include/pdf/pdf.h"
-    trailer.c "${pdf_SOURCE_DIR}/include/pdf/trailer.h"
-    types.c "${pdf_SOURCE_DIR}/include/pdf/types.h"
-    content_stream/operator.c content_stream/operator.h
-    ctx.c ctx.h
-    deserialize.c deserialize.h
-    test_helpers.c test_helpers.h
-    xref.c xref.h)
+    trailer.c
+    types.c
+    ctx.c
+    deserialize.c
+    test_helpers.c
+    xref.c)
 target_include_directories(pdf PUBLIC "${pdf_SOURCE_DIR}/include")
 target_link_libraries(pdf PUBLIC arena pdf-error)
 target_link_libraries(pdf PRIVATE codec pdf-logger pdf-test)

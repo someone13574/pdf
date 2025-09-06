@@ -1,13 +1,7 @@
 add_library(arena
-    arena.c "${pdf_SOURCE_DIR}/include/arena/arena.h"
-    common.c "${pdf_SOURCE_DIR}/include/arena/common.h"
-    string.c "${pdf_SOURCE_DIR}/include/arena/string.h"
-    "${pdf_SOURCE_DIR}/include/arena/darray_decl.h"
-    "${pdf_SOURCE_DIR}/include/arena/darray_impl.h"
-    "${pdf_SOURCE_DIR}/include/arena/dvec_decl.h"
-    "${pdf_SOURCE_DIR}/include/arena/dvec_impl.h"
-    "${pdf_SOURCE_DIR}/include/arena/dlinked_decl.h"
-    "${pdf_SOURCE_DIR}/include/arena/dlinked_impl.h"
+    arena.c
+    common.c
+    string.c
     darray_test.c dvec_test.c dlinked_test.c)
 target_include_directories(arena PUBLIC "${pdf_SOURCE_DIR}/include")
 target_link_libraries(arena PRIVATE pdf-logger pdf-test)

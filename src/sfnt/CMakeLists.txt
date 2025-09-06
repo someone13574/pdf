@@ -1,15 +1,15 @@
 add_library(sfnt
-    glyph.c glyph.h "${pdf_SOURCE_DIR}/include/sfnt/glyph.h"
-    sfnt.c "${pdf_SOURCE_DIR}/include/sfnt/sfnt.h"
-    types.c "${pdf_SOURCE_DIR}/include/sfnt/types.h"
-    cmap.c cmap.h
-    directory.c directory.h
-    head.c head.h
-    loca.c loca.h
-    maxp.c maxp.h
-    hmtx.c hmtx.h
-    hhea.c hhea.h
-    parser.c parser.h)
+    glyph.c
+    sfnt.c
+    types.c
+    cmap.c
+    directory.c
+    head.c
+    loca.c
+    maxp.c
+    hmtx.c
+    hhea.c
+    parser.c)
 target_include_directories(sfnt PUBLIC "${pdf_SOURCE_DIR}/include")
 target_link_libraries(sfnt PUBLIC arena canvas geom)
 target_link_libraries(sfnt PRIVATE pdf-error pdf-logger pdf-test)

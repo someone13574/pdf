@@ -1,7 +1,7 @@
 add_library(render
-    render.c "${pdf_SOURCE_DIR}/include/render/render.h"
-    graphics_state.c graphics_state.h
-    text_state.c text_state.h)
+    render.c
+    graphics_state.c
+    text_state.c)
 target_include_directories(render PUBLIC "${pdf_SOURCE_DIR}/include")
 target_link_libraries(render PUBLIC arena canvas pdf)
 target_link_libraries(render PRIVATE geom pdf-logger sfnt)
