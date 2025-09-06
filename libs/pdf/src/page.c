@@ -113,6 +113,15 @@ PdfError* pdf_deserialize_page(
                     PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STREAM)
                 )
             )
+        ),
+        PDF_FIELD(
+            PdfPage,
+            "Rotate",
+            rotate,
+            PDF_OPTIONAL_FIELD(
+                PdfOpInteger,
+                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+            )
         )
     };
 
