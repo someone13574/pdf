@@ -5,6 +5,7 @@
 
 #include "geom/mat3.h"
 #include "logger/log.h"
+#include "pdf/object.h"
 #include "sfnt/sfnt.h"
 
 TextState text_state_default(void) {
@@ -67,11 +68,11 @@ PdfError* text_state_render(
     GeomMat3 ctm,
     TextState* state,
     TextObjectState* object_state,
-    const char* data
+    PdfString text
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(state);
-    RELEASE_ASSERT(data);
+    RELEASE_ASSERT(text.data);
 
     size_t buffer_len;
     uint8_t* buffer = load_file_to_buffer(
@@ -83,9 +84,10 @@ PdfError* text_state_render(
     SfntFont* font;
     PDF_REQUIRE(sfnt_font_new(arena, buffer, buffer_len, &font));
 
-    for (size_t cid_idx = 0; cid_idx < strlen(data); cid_idx++) {
+    for (size_t cid_idx = 0; cid_idx < text.len; cid_idx++) {
         SfntGlyph glyph;
-        PDF_PROPAGATE(sfnt_get_glyph(font, (uint32_t)data[cid_idx], &glyph));
+        PDF_PROPAGATE(sfnt_get_glyph(font, (uint32_t)text.data[cid_idx], &glyph)
+        );
 
         GeomMat3 render_matrix = geom_mat3_mul(
             geom_mat3_mul(

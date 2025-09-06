@@ -103,13 +103,6 @@ static PdfError* process_content_stream(
                 break;
             }
             case PDF_CONTENT_OP_SHOW_TEXT: {
-                LOG_DIAG(
-                    INFO,
-                    RENDER,
-                    "Showing text: `%s`",
-                    op.data.show_text.text
-                );
-
                 PDF_PROPAGATE(text_state_render(
                     arena,
                     canvas,

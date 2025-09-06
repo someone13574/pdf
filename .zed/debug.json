@@ -39,10 +39,10 @@
       "args": [],
       "cwd": "$ZED_WORKTREE_ROOT",
       "env": {
-        "DEBUG_TEST_FUNCTION": "test_object_literal_str"
+        "DEBUG_TEST_FUNCTION": "test_object_indirect_nested"
       }
     },
-    "program": "$ZED_WORKTREE_ROOT/build/src/test/pdf-test-main",
+    "program": "$ZED_WORKTREE_ROOT/build/libs/test/pdf-test-main",
     "request": "launch",
     "adapter": "CodeLLDB"
   }

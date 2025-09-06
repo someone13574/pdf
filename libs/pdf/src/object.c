@@ -1,13 +1,13 @@
 #include "object.h"
 
 #include <ctype.h>
-#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "arena/arena.h"
+#include "arena/string.h"
 #include "ctx.h"
 #include "logger/log.h"
 #include "pdf/object.h"
@@ -396,7 +396,7 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
 
     // Parse
     const uint8_t* raw = pdf_ctx_get_raw(ctx) + start_offset;
-    char* parsed = arena_alloc(arena, sizeof(char) * (length + 1));
+    uint8_t* parsed = arena_alloc(arena, sizeof(uint8_t) * length);
 
     escape = 0;
     size_t write_offset = 0;
@@ -411,7 +411,7 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
                     break;
                 }
 
-                parsed[write_offset++] = (char)read_byte;
+                parsed[write_offset++] = read_byte;
                 break;
             }
             case 1: {
@@ -468,10 +468,9 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
         }
     }
 
-    parsed[write_offset] = '\0';
-
     object->type = PDF_OBJECT_TYPE_STRING;
-    object->data.string = parsed;
+    object->data.string.data = parsed;
+    object->data.string.len = write_offset;
 
     return NULL;
 }
@@ -854,25 +853,7 @@ PdfError* pdf_parse_indirect(
     }
 }
 
-// TODO: Replace with arena-string
-static char* format_alloc(Arena* arena, const char* fmt, ...) {
-    RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(fmt);
-
-    va_list args;
-    va_start(args, fmt);
-    va_list args_copy;
-    va_copy(args_copy, args);
-    int needed = vsnprintf(NULL, 0, fmt, args_copy);
-    va_end(args_copy);
-    char* buffer = arena_alloc(arena, (size_t)needed + 1);
-    vsprintf(buffer, fmt, args);
-    va_end(args);
-
-    return buffer;
-}
-
-char* pdf_fmt_object_indented(
+ArenaString* pdf_fmt_object_indented(
     Arena* arena,
     const PdfObject* object,
     int indent,
@@ -884,32 +865,37 @@ char* pdf_fmt_object_indented(
     switch (object->type) {
         case PDF_OBJECT_TYPE_BOOLEAN: {
             if (object->data.boolean) {
-                return format_alloc(arena, "true");
+                return arena_string_new_fmt(arena, "true");
             } else {
-                return format_alloc(arena, "false");
+                return arena_string_new_fmt(arena, "false");
             }
         }
         case PDF_OBJECT_TYPE_INTEGER: {
-            return format_alloc(arena, "%d", object->data.integer);
+            return arena_string_new_fmt(arena, "%d", object->data.integer);
         }
         case PDF_OBJECT_TYPE_REAL: {
-            return format_alloc(arena, "%g", object->data.real);
+            return arena_string_new_fmt(arena, "%g", object->data.real);
         }
         case PDF_OBJECT_TYPE_STRING: {
-            return format_alloc(arena, "(%s)", object->data.string);
+            return arena_string_new_fmt(
+                arena,
+                "(%s)",
+                pdf_string_as_cstr(object->data.string, arena)
+            );
         }
         case PDF_OBJECT_TYPE_NAME: {
-            return format_alloc(arena, "/%s", object->data.name);
+            return arena_string_new_fmt(arena, "/%s", object->data.name);
         }
         case PDF_OBJECT_TYPE_ARRAY: {
             PdfObjectVec* items = object->data.array.elements;
             size_t num_items = pdf_object_vec_len(items);
             if (num_items == 0) {
-                return format_alloc(arena, "[]");
+                return arena_string_new_fmt(arena, "[]");
             }
 
             int length = indent;
-            char** item_strs = arena_alloc(arena, sizeof(char*) * num_items);
+            ArenaString** item_strs =
+                arena_alloc(arena, sizeof(ArenaString*) * num_items);
             bool array_contains_indirect = false;
             for (size_t idx = 0; idx < num_items; idx++) {
                 PdfObject* element;
@@ -921,19 +907,19 @@ char* pdf_fmt_object_indented(
                     indent + 2,
                     &array_contains_indirect
                 );
-                length += (int)strlen(item_strs[idx]);
+                length += (int)arena_string_len(item_strs[idx]);
             }
 
             if (length > 80 || array_contains_indirect) {
-                char* buffer = format_alloc(arena, "[");
+                ArenaString* buffer = arena_string_new_fmt(arena, "[");
                 for (size_t idx = 0; idx < num_items; idx++) {
-                    char* new_buffer = format_alloc(
+                    ArenaString* new_buffer = arena_string_new_fmt(
                         arena,
                         "%s\n  %*s%s",
-                        buffer,
+                        arena_string_buffer(buffer),
                         indent,
                         "",
-                        item_strs[idx]
+                        arena_string_buffer(item_strs[idx])
                     );
                     if (new_buffer) {
                         buffer = new_buffer;
@@ -943,66 +929,86 @@ char* pdf_fmt_object_indented(
                     }
                 }
 
-                return format_alloc(arena, "%s\n%*s]", buffer, indent, "");
+                return arena_string_new_fmt(
+                    arena,
+                    "%s\n%*s]",
+                    arena_string_buffer(buffer),
+                    indent,
+                    ""
+                );
             } else {
-                char* buffer = format_alloc(arena, "[");
+                ArenaString* buffer = arena_string_new_fmt(arena, "[");
                 for (size_t idx = 0; idx < num_items; idx++) {
-                    buffer =
-                        format_alloc(arena, "%s %s", buffer, item_strs[idx]);
+                    buffer = arena_string_new_fmt(
+                        arena,
+                        "%s %s",
+                        arena_string_buffer(buffer),
+                        arena_string_buffer(item_strs[idx])
+                    );
                 }
 
-                return format_alloc(arena, "%s ]", buffer);
+                return arena_string_new_fmt(
+                    arena,
+                    "%s ]",
+                    arena_string_buffer(buffer)
+                );
             }
         }
         case PDF_OBJECT_TYPE_DICT: {
             PdfDictEntryVec* entries = object->data.dict.entries;
 
             if (pdf_dict_entry_vec_len(entries) == 0) {
-                return format_alloc(arena, "<< >>");
+                return arena_string_new_fmt(arena, "<< >>");
             } else {
-                char* buffer = format_alloc(arena, "<<");
+                ArenaString* buffer = arena_string_new_fmt(arena, "<<");
                 for (size_t idx = 0; idx < pdf_dict_entry_vec_len(entries);
                      idx++) {
                     PdfDictEntry entry;
                     RELEASE_ASSERT(pdf_dict_entry_vec_get(entries, idx, &entry)
                     );
-                    char* key_text = pdf_fmt_object_indented(
+                    ArenaString* key_text = pdf_fmt_object_indented(
                         arena,
                         entry.key,
                         indent + 2,
                         NULL
                     );
-                    char* value_text = pdf_fmt_object_indented(
+                    ArenaString* value_text = pdf_fmt_object_indented(
                         arena,
                         entry.value,
-                        indent + (int)strlen(key_text) + 3,
+                        indent + (int)arena_string_len(key_text) + 3,
                         NULL
                     );
 
-                    buffer = format_alloc(
+                    buffer = arena_string_new_fmt(
                         arena,
                         "%s\n  %*s%s %s",
-                        buffer,
+                        arena_string_buffer(buffer),
                         indent,
                         "",
-                        key_text,
-                        value_text
+                        arena_string_buffer(key_text),
+                        arena_string_buffer(value_text)
                     );
                 }
 
-                return format_alloc(arena, "%s\n%*s>>", buffer, indent, "");
+                return arena_string_new_fmt(
+                    arena,
+                    "%s\n%*s>>",
+                    arena_string_buffer(buffer),
+                    indent,
+                    ""
+                );
             }
         }
         case PDF_OBJECT_TYPE_STREAM: {
-            return format_alloc(
+            return arena_string_new_fmt(
                 arena,
                 "%s\n%*sstream\n%*s...\n%*sendstream",
-                pdf_fmt_object_indented(
+                arena_string_buffer(pdf_fmt_object_indented(
                     arena,
                     object->data.stream.stream_dict,
                     indent,
                     NULL
-                ),
+                )),
                 indent,
                 "",
                 indent,
@@ -1016,19 +1022,19 @@ char* pdf_fmt_object_indented(
                 *force_indent_parent = true;
             }
 
-            return format_alloc(
+            return arena_string_new_fmt(
                 arena,
                 "%zu %zu obj\n%*s%s\n%*sendobj",
                 object->data.indirect_object.object_id,
                 object->data.indirect_object.generation,
                 indent + 2,
                 "",
-                pdf_fmt_object_indented(
+                arena_string_buffer(pdf_fmt_object_indented(
                     arena,
                     object->data.indirect_object.object,
                     indent + 2,
                     NULL
-                ),
+                )),
                 indent,
                 ""
             );
@@ -1037,7 +1043,7 @@ char* pdf_fmt_object_indented(
             if (force_indent_parent) {
                 *force_indent_parent = true;
             }
-            return format_alloc(
+            return arena_string_new_fmt(
                 arena,
                 "%zu %zu R",
                 object->data.indirect_ref.object_id,
@@ -1045,11 +1051,11 @@ char* pdf_fmt_object_indented(
             );
         }
         case PDF_OBJECT_TYPE_NULL: {
-            return format_alloc(arena, "null");
+            return arena_string_new_fmt(arena, "null");
         }
     }
 
-    return format_alloc(arena, "unreachable");
+    return arena_string_new_fmt(arena, "unreachable");
 }
 
 char* pdf_fmt_object(Arena* arena, const PdfObject* object) {
@@ -1057,14 +1063,25 @@ char* pdf_fmt_object(Arena* arena, const PdfObject* object) {
     RELEASE_ASSERT(object);
 
     Arena* temp_arena = arena_new(512);
-    char* formatted = pdf_fmt_object_indented(temp_arena, object, 0, NULL);
+    ArenaString* formatted =
+        pdf_fmt_object_indented(temp_arena, object, 0, NULL);
 
-    size_t len = (size_t)strlen(formatted);
-    char* allocated = arena_alloc(arena, sizeof(char) * (len + 1));
-    strncpy(allocated, formatted, (size_t)len + 1);
+    size_t len = arena_string_len(formatted) + 1;
+    char* allocated = arena_alloc(arena, sizeof(char) * len);
+    strncpy(allocated, arena_string_buffer(formatted), len);
     arena_free(temp_arena);
 
     return allocated;
+}
+
+char* pdf_string_as_cstr(PdfString pdf_string, Arena* arena) {
+    RELEASE_ASSERT(arena);
+
+    char* cstr = arena_alloc(arena, sizeof(char) * (pdf_string.len + 1));
+    memcpy(cstr, pdf_string.data, pdf_string.len);
+    cstr[pdf_string.len] = '\0';
+
+    return cstr;
 }
 
 #ifdef TEST
@@ -1234,7 +1251,10 @@ TEST_FUNC(test_object_real_trailing_whitespace) {
 
 TEST_FUNC(test_object_literal_str) {
     SETUP_VALID_PARSE_OBJECT("(This is a string)", PDF_OBJECT_TYPE_STRING);
-    TEST_ASSERT_EQ("This is a string", object.data.string);
+    TEST_ASSERT_EQ(
+        "This is a string",
+        pdf_string_as_cstr(object.data.string, arena)
+    );
     return TEST_RESULT_PASS;
 }
 
@@ -1245,7 +1265,7 @@ TEST_FUNC(test_object_literal_str_newline) {
     );
     TEST_ASSERT_EQ(
         "Strings may contain newlines\nand such.",
-        object.data.string
+        pdf_string_as_cstr(object.data.string, arena)
     );
     return TEST_RESULT_PASS;
 }
@@ -1257,14 +1277,14 @@ TEST_FUNC(test_object_literal_str_parenthesis) {
     );
     TEST_ASSERT_EQ(
         "Strings may contain balanced parentheses () and special characters (*!&^% and so on).",
-        object.data.string
+        pdf_string_as_cstr(object.data.string, arena)
     );
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_object_literal_str_empty) {
     SETUP_VALID_PARSE_OBJECT("()", PDF_OBJECT_TYPE_STRING);
-    TEST_ASSERT_EQ("", object.data.string);
+    TEST_ASSERT_EQ("", pdf_string_as_cstr(object.data.string, arena));
     return TEST_RESULT_PASS;
 }
 
@@ -1275,7 +1295,7 @@ TEST_FUNC(test_object_literal_str_escapes) {
     );
     TEST_ASSERT_EQ(
         "This is a line\nThis is a newline\r\nThis is another line with tabs (\t), backspaces(\b), form feeds (\f), unbalanced parenthesis (((), and backslashes \\\\",
-        object.data.string
+        pdf_string_as_cstr(object.data.string, arena)
     );
     return TEST_RESULT_PASS;
 }
@@ -1368,7 +1388,7 @@ TEST_FUNC(test_object_array) {
     TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 3, &element3));
     TEST_ASSERT(element3);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, element3->type);
-    TEST_ASSERT_EQ("Ralph", element3->data.string);
+    TEST_ASSERT_EQ("Ralph", pdf_string_as_cstr(element3->data.string, arena));
 
     PdfObject* element4;
     TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 4, &element4));
@@ -1410,7 +1430,7 @@ TEST_FUNC(test_object_array_whitespace) {
     TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 3, &element3));
     TEST_ASSERT(element3);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, element3->type);
-    TEST_ASSERT_EQ("Ralph", element3->data.string);
+    TEST_ASSERT_EQ("Ralph", pdf_string_as_cstr(element3->data.string, arena));
 
     PdfObject* element4;
     TEST_ASSERT(pdf_object_vec_get(object.data.array.elements, 4, &element4));
@@ -1544,7 +1564,10 @@ TEST_FUNC(test_object_dict) {
     TEST_ASSERT_EQ("StringItem", entry4.key->data.name);
     TEST_ASSERT(entry4.value);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, entry4.value->type);
-    TEST_ASSERT_EQ("a string", entry4.value->data.string);
+    TEST_ASSERT_EQ(
+        "a string",
+        pdf_string_as_cstr(entry4.value->data.string, arena)
+    );
 
     PdfDictEntry entry5;
     TEST_ASSERT(pdf_dict_entry_vec_get(object.data.dict.entries, 5, &entry5));
@@ -1577,7 +1600,7 @@ TEST_FUNC(test_object_dict) {
     TEST_ASSERT_EQ("LastItem", sub2.key->data.name);
     TEST_ASSERT(sub2.value);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, sub2.value->type);
-    TEST_ASSERT_EQ("not!", sub2.value->data.string);
+    TEST_ASSERT_EQ("not!", pdf_string_as_cstr(sub2.value->data.string, arena));
 
     PdfDictEntry sub3;
     TEST_ASSERT(pdf_dict_entry_vec_get(subdict, 3, &sub3));
@@ -1585,7 +1608,7 @@ TEST_FUNC(test_object_dict) {
     TEST_ASSERT_EQ("VeryLastItem", sub3.key->data.name);
     TEST_ASSERT(sub3.value);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_STRING, sub3.value->type);
-    TEST_ASSERT_EQ("OK", sub3.value->data.string);
+    TEST_ASSERT_EQ("OK", pdf_string_as_cstr(sub3.value->data.string, arena));
 
     TEST_ASSERT_EQ((size_t)4, pdf_dict_entry_vec_len(subdict));
     TEST_ASSERT_EQ((size_t)6, pdf_dict_entry_vec_len(object.data.dict.entries));
@@ -1656,7 +1679,13 @@ TEST_FUNC(test_object_indirect) {
         (PdfObjectType)PDF_OBJECT_TYPE_STRING,
         object.data.indirect_object.object->type
     );
-    TEST_ASSERT_EQ("Brillig", object.data.indirect_object.object->data.string);
+    TEST_ASSERT_EQ(
+        "Brillig",
+        pdf_string_as_cstr(
+            object.data.indirect_object.object->data.string,
+            arena
+        )
+    );
 
     return TEST_RESULT_PASS;
 }
@@ -1700,7 +1729,7 @@ TEST_FUNC(test_object_indirect_nested) {
     TEST_ASSERT_EQ(
         "Name",
         object.data.indirect_object.object->data.indirect_object.object->data
-            .string
+            .name
     );
 
     return TEST_RESULT_PASS;
