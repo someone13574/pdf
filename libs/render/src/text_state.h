@@ -46,5 +46,5 @@ PdfError* text_state_render(
     GeomMat3 ctm,
     TextState* state,
     TextObjectState* object_state,
-    const char* data
+    PdfString text
 );
