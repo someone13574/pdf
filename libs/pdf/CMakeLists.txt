@@ -1,0 +1,28 @@
+add_library(pdf
+    src/catalog.c
+    src/stream/stream_dict.c
+    src/stream/filters.c
+    src/stream/ascii.c
+    src/content_stream/op.c
+    src/content_stream/stream.c
+    src/content_stream/operator.c
+    src/resources/resources.c
+    src/resources/font.c
+    src/deserde_types.c
+    src/object.c
+    src/page.c
+    src/pdf.c
+    src/trailer.c
+    src/types.c
+    src/ctx.c
+    src/deserialize.c
+    src/test_helpers.c
+    src/xref.c)
+target_include_directories(pdf PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_link_libraries(pdf PUBLIC arena pdf-error)
+target_link_libraries(pdf PRIVATE codec pdf-logger pdf-test)
+target_compile_features(pdf PUBLIC c_std_11)
+if (NOT MSVC)
+    target_compile_options(pdf PRIVATE -fsanitize=address,undefined)
+    target_link_options(pdf PRIVATE -fsanitize=address,undefined)
+endif()

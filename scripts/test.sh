@@ -5,4 +5,4 @@ set -e
 CC=clang CXX=clang++ cmake -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -j 8
 echo "----------------"
-build/src/test/pdf-test-main "$@"
+build/libs/test/pdf-test-main "$@"

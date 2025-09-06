@@ -41,4 +41,4 @@ jobs:
 
       - name: Run tests
         run: |
-          build-${{ matrix.compiler.name }}/src/test/pdf-test-main
+          build-${{ matrix.compiler.name }}/libs/test/pdf-test-main
