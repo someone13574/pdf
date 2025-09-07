@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #include "logger/log.h"
@@ -9,7 +10,8 @@
 
 typedef enum {
     PDF_FIELD_KIND_OBJECT,
-    PDF_FIELD_KIND_REF,
+    PDF_FIELD_KIND_REF, // TODO: Remove refs, add parameter to custom fields to
+                        // require indirect refs
     PDF_FIELD_KIND_CUSTOM,
     PDF_FIELD_KIND_ARRAY,
     PDF_FIELD_KIND_AS_ARRAY,
@@ -127,7 +129,8 @@ PdfError* pdf_deserialize_object(
     const PdfFieldDescriptor* fields,
     size_t num_fields,
     Arena* arena,
-    PdfOptionalResolver resolver
+    PdfOptionalResolver resolver,
+    bool allow_unknown_fields
 );
 
 PdfError* pdf_deserialize_operands(
@@ -138,19 +141,25 @@ PdfError* pdf_deserialize_operands(
     Arena* arena
 );
 
-#define PDF_FIELD(struct_type, key_str, field_name, field_info)                \
+#define PDF_FIELD(                                                             \
+    target_struct_name,                                                        \
+    pdf_key_string,                                                            \
+    field_name_in_struct,                                                      \
+    field_info                                                                 \
+)                                                                              \
     {                                                                          \
-        .key = (key_str), .offset = offsetof(struct_type, field_name),         \
+        .key = (pdf_key_string),                                               \
+        .offset = offsetof(target_struct_name, field_name_in_struct),          \
         .info = (field_info), .debug = {                                       \
             .file = RELATIVE_FILE_PATH,                                        \
             .line = __LINE__                                                   \
         }                                                                      \
     }
 
-#define PDF_OPERAND(struct_type, field_name, field_info)                       \
+#define PDF_OPERAND(target_struct_name, field_name_in_struct, field_info)      \
     {                                                                          \
-        .offset = offsetof(struct_type, field_name), .info = (field_info),     \
-        .debug = {                                                             \
+        .offset = offsetof(target_struct_name, field_name_in_struct),          \
+        .info = (field_info), .debug = {                                       \
             .file = RELATIVE_FILE_PATH,                                        \
             .line = __LINE__                                                   \
         }                                                                      \
@@ -172,29 +181,29 @@ PdfError* pdf_deserialize_operands(
         .kind = PDF_FIELD_KIND_CUSTOM, .data.custom = deserializer_fn          \
     }
 
-#define PDF_ARRAY_FIELD(array_type, element_type, field_info)                  \
+#define PDF_ARRAY_FIELD(array_struct_name, element_type, field_info)           \
     (PdfFieldInfo) {                                                           \
         .kind = PDF_FIELD_KIND_ARRAY, .data.array = {                          \
-            .vec_offset = offsetof(array_type, elements),                      \
+            .vec_offset = offsetof(array_struct_name, elements),               \
             .element_size = sizeof(element_type),                              \
             .element_info = (PdfFieldInfo*)&(field_info)                       \
         }                                                                      \
     }
 
-#define PDF_AS_ARRAY_FIELD(array_type, element_type, field_info)               \
+#define PDF_AS_ARRAY_FIELD(array_struct_name, element_type, field_info)        \
     (PdfFieldInfo) {                                                           \
         .kind = PDF_FIELD_KIND_AS_ARRAY, .data.array = {                       \
-            .vec_offset = offsetof(array_type, elements),                      \
+            .vec_offset = offsetof(array_struct_name, elements),               \
             .element_size = sizeof(element_type),                              \
             .element_info = (PdfFieldInfo*)&(field_info)                       \
         }                                                                      \
     }
 
-#define PDF_OPTIONAL_FIELD(optional_type, field_info)                          \
+#define PDF_OPTIONAL_FIELD(optional_type_name, field_info)                     \
     (PdfFieldInfo) {                                                           \
         .kind = PDF_FIELD_KIND_OPTIONAL, .data.optional = {                    \
-            .discriminant_offset = offsetof(optional_type, discriminant),      \
-            .data_offset = offsetof(optional_type, value),                     \
+            .discriminant_offset = offsetof(optional_type_name, discriminant), \
+            .data_offset = offsetof(optional_type_name, value),                \
             .inner_info = (PdfFieldInfo*)&(field_info)                         \
         }                                                                      \
     }

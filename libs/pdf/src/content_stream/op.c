@@ -154,7 +154,7 @@ static PdfError* pdf_deserialize_single_show_text_op(
     );
 }
 
-static PdfError* pdf_deserialize_show_positoned_text_op(
+static PdfError* pdf_deserialize_show_positioned_text_op(
     const PdfObjectVec* operands,
     PdfContentOpVec* operation_queue
 ) {
@@ -307,7 +307,7 @@ PdfError* pdf_deserialize_content_op(
             );
         }
         case PDF_OPERATOR_TJ: {
-            return pdf_deserialize_show_positoned_text_op(
+            return pdf_deserialize_show_positioned_text_op(
                 operands,
                 operation_queue
             );

@@ -1,6 +1,6 @@
-#include "pdf/resources/resources.h"
+#include "pdf/resources.h"
 
-#include "../deserialize.h"
+#include "deserialize.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
@@ -30,7 +30,8 @@ PdfError* pdf_deserialize_resources(
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
-        resolver
+        resolver,
+        false
     ));
 
     return NULL;

@@ -4,7 +4,7 @@
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf/resources/resources.h"
+#include "pdf/resources.h"
 #include "pdf_error/error.h"
 
 PDF_DESERIALIZABLE_REF_IMPL(
@@ -61,7 +61,8 @@ PdfError* pdf_deserialize_page_tree_node(
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
-        resolver
+        resolver,
+        false
     ));
 
     return NULL;
@@ -132,7 +133,8 @@ PdfError* pdf_deserialize_page(
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
-        resolver
+        resolver,
+        false
     ));
 
     return NULL;

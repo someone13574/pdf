@@ -9,9 +9,9 @@
 #include "logger/log.h"
 #include "pdf/content_op.h"
 #include "pdf/content_stream.h"
+#include "pdf/fonts/font.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf/resources/font.h"
 #include "pdf/types.h"
 #include "pdf_error/error.h"
 #include "text_state.h"
@@ -89,6 +89,7 @@ static PdfError* process_content_stream(
                 ));
                 state->graphics_state.text_state.text_font_size =
                     pdf_number_as_real(op.data.set_font.size);
+                state->graphics_state.text_state.font_set = true;
 
                 break;
             }
@@ -108,6 +109,19 @@ static PdfError* process_content_stream(
                 state->text_object_state.text_matrix = geom_mat3_mul(
                     transform,
                     state->text_object_state.text_line_matrix
+                );
+                state->text_object_state.text_line_matrix =
+                    state->text_object_state.text_matrix;
+                break;
+            }
+            case PDF_CONTENT_OP_SET_TM: {
+                state->text_object_state.text_matrix = geom_mat3_new_pdf(
+                    pdf_number_as_real(op.data.set_matrix.a),
+                    pdf_number_as_real(op.data.set_matrix.b),
+                    pdf_number_as_real(op.data.set_matrix.c),
+                    pdf_number_as_real(op.data.set_matrix.d),
+                    pdf_number_as_real(op.data.set_matrix.e),
+                    pdf_number_as_real(op.data.set_matrix.f)
                 );
                 state->text_object_state.text_line_matrix =
                     state->text_object_state.text_matrix;

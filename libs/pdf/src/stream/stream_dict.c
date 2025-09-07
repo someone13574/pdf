@@ -43,7 +43,8 @@ PdfError* pdf_deserialize_stream_dict(
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
-        pdf_op_resolver_none(false)
+        pdf_op_resolver_none(false),
+        false
     ));
 
     return NULL;

@@ -6,8 +6,10 @@ add_library(pdf
     src/content_stream/op.c
     src/content_stream/stream.c
     src/content_stream/operator.c
-    src/resources/resources.c
-    src/resources/font.c
+    src/resources.c
+    src/fonts/font.c
+    src/fonts/font_descriptor.c
+    src/fonts/font_widths.c
     src/deserde_types.c
     src/object.c
     src/page.c
