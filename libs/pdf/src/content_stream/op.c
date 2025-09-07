@@ -131,7 +131,7 @@ static PdfError* pdf_deserialize_next_line_op(
     );
 }
 
-static PdfError* pdf_deserialize_show_text_op(
+static PdfError* pdf_deserialize_single_show_text_op(
     const PdfObjectVec* operands,
     Arena* arena,
     PdfContentOpShowText* deserialized
@@ -152,6 +152,71 @@ static PdfError* pdf_deserialize_show_text_op(
         operands,
         arena
     );
+}
+
+static PdfError* pdf_deserialize_show_positoned_text_op(
+    const PdfObjectVec* operands,
+    PdfContentOpVec* operation_queue
+) {
+    RELEASE_ASSERT(operands);
+    RELEASE_ASSERT(operation_queue);
+
+    if (pdf_object_vec_len(operands) < 1) {
+        return PDF_ERROR(PDF_ERR_MISSING_OPERAND);
+    } else if (pdf_object_vec_len(operands) > 1) {
+        return PDF_ERROR(PDF_ERR_EXCESS_OPERAND);
+    }
+
+    PdfObject* array_object = NULL;
+    RELEASE_ASSERT(pdf_object_vec_get(operands, 0, &array_object));
+
+    if (array_object->type != PDF_OBJECT_TYPE_ARRAY) {
+        return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+    }
+
+    for (size_t idx = 0;
+         idx < pdf_object_vec_len(array_object->data.array.elements);
+         idx++) {
+        PdfObject* element = NULL;
+        RELEASE_ASSERT(
+            pdf_object_vec_get(array_object->data.array.elements, idx, &element)
+        );
+
+        switch (element->type) {
+            case PDF_OBJECT_TYPE_STRING: {
+                PdfContentOp* new_op =
+                    new_queue_op(operation_queue, PDF_CONTENT_OP_SHOW_TEXT);
+                new_op->data.show_text.text = element->data.string;
+                break;
+            }
+            case PDF_OBJECT_TYPE_INTEGER: {
+                PdfContentOp* new_op =
+                    new_queue_op(operation_queue, PDF_CONTENT_OP_POSITION_TEXT);
+                new_op->data.position_text.translation.type =
+                    PDF_NUMBER_TYPE_INTEGER;
+                new_op->data.position_text.translation.value.integer =
+                    element->data.integer;
+                break;
+            }
+            case PDF_OBJECT_TYPE_REAL: {
+                PdfContentOp* new_op =
+                    new_queue_op(operation_queue, PDF_CONTENT_OP_POSITION_TEXT);
+                new_op->data.position_text.translation.type =
+                    PDF_NUMBER_TYPE_REAL;
+                new_op->data.position_text.translation.value.real =
+                    element->data.real;
+                break;
+            }
+            default: {
+                return PDF_ERROR(
+                    PDF_ERR_INCORRECT_TYPE,
+                    "Expected a string or number in positioned text array"
+                );
+            }
+        }
+    }
+
+    return NULL;
 }
 
 static PdfError* pdf_deserialize_set_gray_op(
@@ -235,10 +300,16 @@ PdfError* pdf_deserialize_content_op(
         case PDF_OPERATOR_Tj: {
             PdfContentOp* new_op =
                 new_queue_op(operation_queue, PDF_CONTENT_OP_SHOW_TEXT);
-            return pdf_deserialize_show_text_op(
+            return pdf_deserialize_single_show_text_op(
                 operands,
                 arena,
                 &new_op->data.show_text
+            );
+        }
+        case PDF_OPERATOR_TJ: {
+            return pdf_deserialize_show_positoned_text_op(
+                operands,
+                operation_queue
             );
         }
         case PDF_OPERATOR_g: {

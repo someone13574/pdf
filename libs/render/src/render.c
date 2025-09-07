@@ -46,6 +46,17 @@ static PdfError* process_content_stream(
         );
 
         switch (op.kind) {
+            case PDF_CONTENT_OP_SET_CTM: {
+                state->graphics_state.ctm = geom_mat3_new_pdf(
+                    pdf_number_as_real(op.data.set_matrix.a),
+                    pdf_number_as_real(op.data.set_matrix.b),
+                    pdf_number_as_real(op.data.set_matrix.c),
+                    pdf_number_as_real(op.data.set_matrix.d),
+                    pdf_number_as_real(op.data.set_matrix.e),
+                    pdf_number_as_real(op.data.set_matrix.f)
+                );
+                break;
+            }
             case PDF_CONTENT_OP_BEGIN_TEXT: {
                 state->text_object_state = text_object_state_default();
                 break;
@@ -112,6 +123,10 @@ static PdfError* process_content_stream(
                     op.data.show_text.text
                 ));
 
+                break;
+            }
+            case PDF_CONTENT_OP_SET_GRAY: {
+                // TODO: colors
                 break;
             }
             default: {
