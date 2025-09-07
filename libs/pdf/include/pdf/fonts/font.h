@@ -2,6 +2,7 @@
 
 #include "arena/arena.h"
 #include "pdf/deserde_types.h"
+#include "pdf/fonts/cmap.h"
 #include "pdf/fonts/font_descriptor.h"
 #include "pdf/fonts/font_widths.h"
 #include "pdf/object.h"
@@ -99,7 +100,7 @@ typedef struct {
 
     /// A dictionary containing entries that define the character collection of
     /// the CIDFont.
-    PdfDict cid_system_info;
+    PdfCIDSystemInfo cid_system_info;
 
     /// A font descriptor describing the CIDFont’s default metrics other than
     /// its glyph widths.

@@ -107,6 +107,13 @@ PdfError* pdf_deserialize_type0_font(
         );
     }
 
+    if (pdf_void_vec_len(deserialized->descendant_fonts.elements) != 1) {
+        return PDF_ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "The `DescendantFonts` array of a Type0 font must have exactly one element"
+        );
+    }
+
     return NULL;
 }
 
@@ -143,8 +150,8 @@ PdfError* pdf_deserialize_cid_font(
         PDF_FIELD(
             PdfCIDFont,
             "CIDSystemInfo",
-            type,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+            cid_system_info,
+            PDF_CUSTOM_FIELD(pdf_deserialize_cid_font_wrapper)
         ),
         PDF_FIELD(
             PdfCIDFont,
@@ -182,6 +189,19 @@ PdfError* pdf_deserialize_cid_font(
         resolver,
         false
     ));
+
+    if (strcmp(deserialized->type, "Font") != 0) {
+        return PDF_ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "`Type` key must be `Font`, found `%s`",
+            deserialized->type
+        );
+    } else if (strcmp(deserialized->subtype, "CIDFontType0") != 0 && strcmp(deserialized->subtype, "CIDFontType2") != 0) {
+        return PDF_ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "`Subtype` key must be `CIDFontType0` or `CIDFontType2`"
+        );
+    }
 
     return NULL;
 }
