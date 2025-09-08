@@ -167,14 +167,17 @@ static char* ps_string_as_cstr(PostscriptString string, Arena* arena) {
     TEST_ASSERT_EQ(tokenizer->data_len, tokenizer->offset);                    \
     arena_free(arena);
 
-#define GET_TOKEN_WITH_DATA(expected_type, data_field, expected_value)         \
+#define GET_TOKEN_NO_DATA(expected_type)                                       \
     TEST_PDF_REQUIRE(postscript_next_token(tokenizer, &token, &got_token));    \
     TEST_ASSERT(got_token, "Expected token");                                  \
     TEST_ASSERT_EQ(                                                            \
         (int)(expected_type),                                                  \
         (int)(token.type),                                                     \
         "Incorrect token type"                                                 \
-    );                                                                         \
+    );
+
+#define GET_TOKEN_WITH_DATA(expected_type, data_field, expected_value)         \
+    GET_TOKEN_NO_DATA(expected_type)                                           \
     TEST_ASSERT_EQ(                                                            \
         expected_value,                                                        \
         token.data.data_field,                                                 \
@@ -182,13 +185,7 @@ static char* ps_string_as_cstr(PostscriptString string, Arena* arena) {
     );
 
 #define GET_STR_TOKEN_WITH_DATA(expected_type, expected_value)                 \
-    TEST_PDF_REQUIRE(postscript_next_token(tokenizer, &token, &got_token));    \
-    TEST_ASSERT(got_token, "Expected token");                                  \
-    TEST_ASSERT_EQ(                                                            \
-        (int)(expected_type),                                                  \
-        (int)(token.type),                                                     \
-        "Incorrect token type"                                                 \
-    );                                                                         \
+    GET_TOKEN_NO_DATA(expected_type)                                           \
     TEST_ASSERT_EQ(                                                            \
         expected_value,                                                        \
         ps_string_as_cstr(token.data.string, arena),                           \
@@ -544,6 +541,64 @@ TEST_FUNC(test_postscript_tokenize_lit_name_delim_term) {
 TEST_FUNC(test_postscript_tokenize_imm_name) {
     SETUP_TOKENIZER("//name")
     GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_IMM_NAME, name, "name")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_array) {
+    SETUP_TOKENIZER("[ 123 /abc (xyz) ]")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_START_ARRAY)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 123)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "abc")
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "xyz")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_END_ARRAY)
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_array_minspace) {
+    SETUP_TOKENIZER("[123/abc(xyz)]")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_START_ARRAY)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 123)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "abc")
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "xyz")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_END_ARRAY)
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_proc) {
+    SETUP_TOKENIZER("{add 2 div}")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_START_PROC)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "add")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 2)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "div")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_END_PROC)
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_dict) {
+    SETUP_TOKENIZER("<<key1 4 /key2 (value)>>")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_START_DICT)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "key1")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 4)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "key2")
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "value")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_comments) {
+    SETUP_TOKENIZER("  % This is a comment\ntest  (test2)\n3 % test")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "test")
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "test2")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 3)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
