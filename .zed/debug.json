@@ -39,7 +39,7 @@
       "args": [],
       "cwd": "$ZED_WORKTREE_ROOT",
       "env": {
-        "DEBUG_TEST_FUNCTION": "test_object_indirect_nested"
+        "DEBUG_TEST_FUNCTION": "test_postscript_tokenize_no_leading_real"
       }
     },
     "program": "$ZED_WORKTREE_ROOT/build/libs/test/pdf-test-main",

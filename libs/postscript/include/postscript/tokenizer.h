@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "arena/arena.h"
@@ -32,11 +33,24 @@ typedef enum {
 } PostscriptTokenType;
 
 typedef struct {
+    uint8_t* data;
+    size_t len;
+} PostscriptString;
+
+typedef struct {
     PostscriptTokenType type;
+    union {
+        int32_t integer;
+        double real;
+        PostscriptString string;
+        char* name;
+    } data;
 } PostscriptToken;
 
-/// Get the next token in the postscript file, storing it in `token_out`.
+/// Get the next token in the postscript file, storing it in `token_out`. If
+/// `got_token` is set to false, there were no remaining tokens to get.
 PdfError* postscript_next_token(
     PostscriptTokenizer* tokenizer,
-    PostscriptToken* token_out
+    PostscriptToken* token_out,
+    bool* got_token
 );

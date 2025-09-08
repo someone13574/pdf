@@ -1,7 +1,7 @@
 add_library(postscript src/tokenizer.c)
 target_include_directories(postscript PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(postscript PUBLIC arena pdf-error)
-target_link_libraries(postscript PRIVATE pdf-logger)
+target_link_libraries(postscript PRIVATE pdf-logger pdf-test)
 target_compile_features(postscript PUBLIC c_std_11)
 if (NOT MSVC)
     target_compile_options(postscript PRIVATE -fsanitize=address,undefined)
