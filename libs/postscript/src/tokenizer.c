@@ -246,6 +246,87 @@ static PdfError* read_lit_string(
     }
 }
 
+static bool char_to_hex(char c, int* out) {
+    if (c >= '0' && c <= '9') {
+        *out = c - '0';
+        return true;
+    } else if (c >= 'A' && c <= 'F') {
+        *out = c - 'A' + 10;
+        return true;
+    } else if (c >= 'a' && c <= 'f') {
+        *out = c - 'a' + 10;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+static PdfError* read_hex_string(
+    PostscriptTokenizer* tokenizer,
+    PostscriptString* string_out,
+    bool first_pass
+) {
+    RELEASE_ASSERT(tokenizer);
+    RELEASE_ASSERT(string_out);
+
+    size_t restore_offset = tokenizer->offset;
+
+    if (first_pass) {
+        string_out->data = NULL;
+        string_out->len = 0;
+    }
+
+    size_t write_offset = 0;
+    bool upper = true;
+
+    while (tokenizer->offset < tokenizer->data_len) {
+        char c = tokenizer->data[tokenizer->offset++];
+
+        if (is_postscript_whitespace(c)) {
+            continue;
+        }
+
+        if (c == '>') {
+            break;
+        }
+
+        int hex;
+        if (char_to_hex(c, &hex)) {
+            if (upper) {
+                if (first_pass) {
+                    string_out->len++;
+                } else {
+                    string_out->data[write_offset] = (uint8_t)(hex << 4);
+                }
+
+                upper = false;
+            } else {
+                if (!first_pass) {
+                    string_out->data[write_offset] |= (uint8_t)hex;
+                }
+
+                upper = true;
+                write_offset++;
+            }
+        } else {
+            return PDF_ERROR(
+                PDF_ERR_POSTSCRIPT_INVALID_CHAR,
+                "Non-hex character `%c` found in postscript hex string",
+                c
+            );
+        }
+    }
+
+    if (first_pass) {
+        string_out->data =
+            arena_alloc(tokenizer->arena, sizeof(uint8_t) * string_out->len);
+        tokenizer->offset = restore_offset;
+        return read_hex_string(tokenizer, string_out, false);
+    } else {
+        return NULL;
+    }
+}
+
 PdfError* postscript_next_token(
     PostscriptTokenizer* tokenizer,
     PostscriptToken* token_out,
@@ -279,7 +360,23 @@ PdfError* postscript_next_token(
         token_out->type = POSTSCRIPT_TOKEN_LIT_STRING;
         return read_lit_string(tokenizer, &token_out->data.string, true);
     } else if (c == '<') {
-        LOG_TODO("Hex string, base-85 string, or start dictionary");
+        if (tokenizer->offset >= tokenizer->data_len) {
+            return PDF_ERROR(
+                PDF_ERR_POSTSCRIPT_EOF,
+                "EOF after start of hex string."
+            );
+        }
+
+        char c2 = tokenizer->data[tokenizer->offset];
+        if (c2 == '<') {
+            tokenizer->offset++;
+            token_out->type = POSTSCRIPT_TOKEN_START_DICT;
+        } else if (c2 == '~') {
+            LOG_TODO("Base-85 postscript strings");
+        } else {
+            token_out->type = POSTSCRIPT_TOKEN_HEX_STRING;
+            return read_hex_string(tokenizer, &token_out->data.string, true);
+        }
     } else if (c == '/') {
         if (tokenizer->offset >= tokenizer->data_len) {
             token_out->type = POSTSCRIPT_TOKEN_LIT_NAME;
@@ -678,6 +775,17 @@ TEST_FUNC(test_postscript_tokenize_hex_string_odd_len) {
     SETUP_TOKENIZER("<901fa>")
     GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_HEX_STRING, "\x90\x1f\xa0")
     CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_hex_string_unexpected) {
+    SETUP_TOKENIZER("<90x3>")
+
+    TEST_PDF_REQUIRE_ERR(
+        postscript_next_token(tokenizer, &token, &got_token),
+        PDF_ERR_POSTSCRIPT_INVALID_CHAR
+    );
 
     return TEST_RESULT_PASS;
 }
