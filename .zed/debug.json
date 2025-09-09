@@ -39,7 +39,7 @@
       "args": [],
       "cwd": "$ZED_WORKTREE_ROOT",
       "env": {
-        "DEBUG_TEST_FUNCTION": "test_postscript_tokenize_no_leading_real"
+        "DEBUG_TEST_FUNCTION": "test_postscript_tokenize_lit_string_octal"
       }
     },
     "program": "$ZED_WORKTREE_ROOT/build/libs/test/pdf-test-main",

@@ -1,12 +1,16 @@
 #include "postscript/tokenizer.h"
 
 #include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
 
 #include "arena/arena.h"
 #include "logger/log.h"
 #include "pdf_error/error.h"
 
 struct PostscriptTokenizer {
+    Arena* arena;
+
     const char* data;
     size_t data_len;
     size_t offset;
@@ -19,6 +23,7 @@ postscript_tokenizer_new(Arena* arena, const char* data, size_t data_len) {
 
     PostscriptTokenizer* tokenizer =
         arena_alloc(arena, sizeof(PostscriptTokenizer));
+    tokenizer->arena = arena;
     tokenizer->data = data;
     tokenizer->data_len = data_len;
     tokenizer->offset = 0;
@@ -76,6 +81,171 @@ static bool consume_comment(PostscriptTokenizer* tokenizer) {
     return true;
 }
 
+static char* read_name(PostscriptTokenizer* tokenizer, size_t known_length) {
+    RELEASE_ASSERT(tokenizer);
+
+    // Measure length
+    while (tokenizer->offset < tokenizer->data_len) {
+        char c = tokenizer->data[tokenizer->offset];
+
+        if (is_postscript_regular(c)) {
+            tokenizer->offset++;
+            known_length++;
+        } else {
+            break;
+        }
+    }
+
+    // Copy name
+    RELEASE_ASSERT(known_length <= tokenizer->offset);
+
+    char* name =
+        arena_alloc(tokenizer->arena, sizeof(char) * (known_length + 1));
+    memcpy(
+        name,
+        tokenizer->data + tokenizer->offset - known_length,
+        sizeof(char) * known_length
+    );
+    name[known_length] = '\0';
+
+    return name;
+}
+
+static PdfError* read_lit_string(
+    PostscriptTokenizer* tokenizer,
+    PostscriptString* string_out,
+    bool first_pass
+) {
+    RELEASE_ASSERT(tokenizer);
+    RELEASE_ASSERT(string_out);
+
+    size_t restore_offset = tokenizer->offset;
+
+    if (first_pass) {
+        string_out->data = NULL;
+        string_out->len = 0;
+    }
+
+    int open_parenthesis = 1;
+    int escape = 0;
+    uint16_t octal_builder = 0; // used for constructing escaped octal values
+    size_t write_idx = 0;
+
+    while (tokenizer->offset < tokenizer->data_len) {
+        uint8_t c = (uint8_t)tokenizer->data[tokenizer->offset++];
+
+        if (escape > 0) {
+            // Handle line-continuation escapes: LF, CR, or CRLF. Skips when
+            // escaped
+            if (c == '\n') {
+                escape = 0;
+                continue;
+            } else if (c == '\r') {
+                escape = 0;
+                if (tokenizer->offset < tokenizer->data_len
+                    && tokenizer->data[tokenizer->offset] == '\n') {
+                    tokenizer->offset++;
+                }
+                continue;
+            }
+
+            if (c >= '0' && c <= '7') {
+                RELEASE_ASSERT(escape <= 3);
+
+                octal_builder |= (uint16_t)((c - '0') << (3 - escape) * 3);
+                escape++;
+
+                if (escape == 4) {
+                    escape = 0;
+                    c = (uint8_t)octal_builder;
+                } else {
+                    continue;
+                }
+            } else if (escape > 1) {
+                // Emit accumulated octal, shifting to account for it not
+                // be fully built.
+                c = (uint8_t)(octal_builder >> (4 - escape) * 3);
+                escape = 0;
+                tokenizer
+                    ->offset--; // the current character isn't being emitted,
+                                // the octal one is, so we need to reprocess it
+            } else {
+                escape = 0;
+
+                switch (c) {
+                    case 'n': {
+                        c = '\n';
+                        break;
+                    }
+                    case 'r': {
+                        c = '\r';
+                        break;
+                    }
+                    case 't': {
+                        c = '\t';
+                        break;
+                    }
+                    case 'b': {
+                        c = '\b';
+                        break;
+                    }
+                    case 'f': {
+                        c = '\f';
+                        break;
+                    }
+                    case '\\': {
+                        c = '\\';
+                        break;
+                    }
+                    case '(': {
+                        c = '(';
+                        break;
+                    }
+                    case ')': {
+                        c = ')';
+                        break;
+                    }
+                    default: {
+                        break;
+                    }
+                }
+            }
+        } else if (c == '(') {
+            open_parenthesis++;
+        } else if (c == ')') {
+            open_parenthesis--;
+
+            if (open_parenthesis == 0) {
+                break;
+            }
+        } else if (c == '\\') {
+            escape = 1;
+            octal_builder = 0;
+            continue;
+        }
+
+        if (first_pass) {
+            string_out->len++;
+        } else {
+            RELEASE_ASSERT(write_idx < string_out->len);
+            string_out->data[write_idx++] = c;
+        }
+    }
+
+    if (open_parenthesis != 0) {
+        return PDF_ERROR(PDF_ERR_POSTSCRIPT_EOF);
+    }
+
+    if (first_pass) {
+        string_out->data =
+            arena_alloc(tokenizer->arena, sizeof(uint8_t) * string_out->len);
+        tokenizer->offset = restore_offset;
+        return read_lit_string(tokenizer, string_out, false);
+    } else {
+        return NULL;
+    }
+}
+
 PdfError* postscript_next_token(
     PostscriptTokenizer* tokenizer,
     PostscriptToken* token_out,
@@ -100,29 +270,58 @@ PdfError* postscript_next_token(
 
     char c = tokenizer->data[tokenizer->offset++];
     if (c == '+' || c == '-') {
-        LOG_TODO("Integer or real");
+        LOG_TODO("Integer, real, or executable name");
     } else if (c == '.') {
         LOG_TODO("Real");
     } else if (c >= '0' && c <= '9') {
         LOG_TODO("Integer, real, radix number, or executable name");
     } else if (c == '(') {
-        LOG_TODO("Literal string");
+        token_out->type = POSTSCRIPT_TOKEN_LIT_STRING;
+        return read_lit_string(tokenizer, &token_out->data.string, true);
     } else if (c == '<') {
         LOG_TODO("Hex string, base-85 string, or start dictionary");
     } else if (c == '/') {
-        LOG_TODO("Literal or immediately evaluated name");
+        if (tokenizer->offset >= tokenizer->data_len) {
+            token_out->type = POSTSCRIPT_TOKEN_LIT_NAME;
+            token_out->data.name = "";
+
+            return NULL;
+        }
+
+        char c2 = tokenizer->data[tokenizer->offset];
+        if (c2 == '/') {
+            tokenizer->offset++;
+            token_out->type = POSTSCRIPT_TOKEN_IMM_NAME;
+            token_out->data.name = read_name(tokenizer, 0);
+        } else {
+            token_out->type = POSTSCRIPT_TOKEN_LIT_NAME;
+            token_out->data.name = read_name(tokenizer, 0);
+        }
     } else if (c == '[') {
-        LOG_TODO("Start array");
+        token_out->type = POSTSCRIPT_TOKEN_START_ARRAY;
     } else if (c == ']') {
-        LOG_TODO("End array");
+        token_out->type = POSTSCRIPT_TOKEN_END_ARRAY;
     } else if (c == '{') {
-        LOG_TODO("Start procedure");
+        token_out->type = POSTSCRIPT_TOKEN_START_PROC;
     } else if (c == '}') {
-        LOG_TODO("End procedure");
+        token_out->type = POSTSCRIPT_TOKEN_END_PROC;
     } else if (c == '>') {
-        LOG_TODO("End dictionary");
+        if (tokenizer->offset >= tokenizer->data_len) {
+            return PDF_ERROR(
+                PDF_ERR_POSTSCRIPT_EOF,
+                "Hit EOF when expecting `>`"
+            );
+        }
+
+        char c2 = tokenizer->data[tokenizer->offset++];
+        if (c2 != '>') {
+            return PDF_ERROR(PDF_ERR_POSTSCRIPT_INVALID_CHAR, "Expected `>`");
+        }
+
+        token_out->type = POSTSCRIPT_TOKEN_END_DICT;
     } else if (is_postscript_regular(c)) {
-        LOG_TODO("Executable name");
+        token_out->type = POSTSCRIPT_TOKEN_EXE_NAME;
+        token_out->data.name = read_name(tokenizer, 1);
     } else {
         return PDF_ERROR(
             PDF_ERR_POSTSCRIPT_INVALID_CHAR,
@@ -399,7 +598,7 @@ TEST_FUNC(test_postscript_tokenize_lit_string_balanced_parens) {
     )
     GET_STR_TOKEN_WITH_DATA(
         POSTSCRIPT_TOKEN_LIT_STRING,
-        "Strings may contain balanced parenthesis () (and so on)"
+        "Strings may contain balanced parenthesis () (and so on ())"
     )
     CHECK_STREAM_CONSUMED()
 
@@ -502,6 +701,14 @@ TEST_FUNC(test_postscript_tokenize_name_non_alpha) {
 TEST_FUNC(test_postscript_tokenize_leading_nums) {
     SETUP_TOKENIZER("23a")
     GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "23a")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_leading_signed_num) {
+    SETUP_TOKENIZER("+51a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "+51a")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
