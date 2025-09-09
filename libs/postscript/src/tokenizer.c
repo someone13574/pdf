@@ -1,5 +1,6 @@
 #include "postscript/tokenizer.h"
 
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -81,6 +82,78 @@ static bool consume_comment(PostscriptTokenizer* tokenizer) {
     return true;
 }
 
+/// Reads the largest integer possible from the stream, starting at the current
+/// offset. If the size exceeds the 32-bit unsigned limit, it will be output as
+/// a real instead. This function doesn't check for a trailing delimiter.
+static void read_unsigned_integer(
+    PostscriptTokenizer* tokenizer,
+    uint8_t radix,
+    size_t* read_length_out,
+    uint64_t* integer_out,
+    double* real_out,
+    bool* is_integer_out
+) {
+    RELEASE_ASSERT(tokenizer);
+    RELEASE_ASSERT(radix >= 2 && radix <= 36);
+    RELEASE_ASSERT(read_length_out);
+    RELEASE_ASSERT(integer_out);
+    RELEASE_ASSERT(real_out);
+    RELEASE_ASSERT(is_integer_out);
+
+    *read_length_out = 0;
+    *integer_out = 0;
+    *real_out = 0;
+    *is_integer_out = true;
+
+    while (tokenizer->offset < tokenizer->data_len) {
+        char c = tokenizer->data[tokenizer->offset];
+
+        // Determine value of character
+        uint64_t character_value;
+        if (c >= '0' && c <= '9') {
+            if (c >= '0' + radix) {
+                break;
+            }
+
+            character_value = (uint64_t)(c - '0');
+        } else if (c >= 'a' && c <= 'z') {
+            if (c >= 'a' + radix - 10) {
+                break;
+            }
+
+            character_value = (uint64_t)(c + 10 - 'a');
+        } else if (c >= 'A' && c <= 'Z') {
+            if (c >= 'A' + radix - 10) {
+                break;
+            }
+
+            character_value = (uint64_t)(c + 10 - 'A');
+        } else {
+            break;
+        }
+
+        *read_length_out += 1;
+        tokenizer->offset++;
+
+        // Shift integer
+        if (*is_integer_out) {
+            *integer_out *= radix;
+            *integer_out += character_value;
+
+            if (*integer_out > UINT32_MAX) {
+                *real_out = (double)*integer_out;
+                *is_integer_out = false;
+            }
+
+            continue;
+        }
+
+        // Shift real
+        *real_out *= radix;
+        *real_out += (double)character_value;
+    }
+}
+
 static char* read_name(PostscriptTokenizer* tokenizer, size_t known_length) {
     RELEASE_ASSERT(tokenizer);
 
@@ -109,6 +182,241 @@ static char* read_name(PostscriptTokenizer* tokenizer, size_t known_length) {
     name[known_length] = '\0';
 
     return name;
+}
+
+/// Attempts to real a number, and then falls back to treating it as a name. If
+/// the leading character is a number, the offset must be set to the start of
+/// the number, otherwise, it must exclude that character. `name_read_offset`
+/// corresponds to the offset which would be used to read a name if it needs to
+/// fall back to that.
+static PdfError* read_number_or_executable_name(
+    PostscriptTokenizer* tokenizer,
+    size_t name_read_offset,
+    bool negative,
+    bool has_leading_sign,
+    bool has_leading_decimal,
+    PostscriptToken* token_out
+) {
+    RELEASE_ASSERT(tokenizer);
+    RELEASE_ASSERT(token_out);
+
+    // Handle unavailable buffer
+    if (tokenizer->offset >= tokenizer->data_len) {
+        if (has_leading_sign || has_leading_decimal) {
+            token_out->type = POSTSCRIPT_TOKEN_EXE_NAME;
+            token_out->data.name =
+                has_leading_sign ? (negative ? "-" : "+") : ".";
+            return NULL;
+        } else {
+            // Impossible, since the caller should have adjusted the offset back
+            // one to include the digit.
+            LOG_PANIC("Unreachable");
+        }
+    }
+
+    // Check for dot after leading sign
+    if (has_leading_sign) {
+        if (tokenizer->data[tokenizer->offset] == '.') {
+            tokenizer->offset++;
+            has_leading_decimal = true;
+        }
+    }
+
+    // Read integer part
+    size_t integer_part_read_digits = 0;
+    uint64_t integer_part_int = 0;
+    double integer_part_real = 0.0;
+    bool is_integer_part_int = true;
+
+    if (!has_leading_decimal) {
+        read_unsigned_integer(
+            tokenizer,
+            10,
+            &integer_part_read_digits,
+            &integer_part_int,
+            &integer_part_real,
+            &is_integer_part_int
+        );
+
+        // The integer ends
+        if (integer_part_read_digits != 0
+            && (tokenizer->offset >= tokenizer->data_len
+                || !is_postscript_regular(tokenizer->data[tokenizer->offset])
+            )) {
+            uint64_t max_val =
+                negative ? (uint64_t)2147483648LL : (uint64_t)2147483647;
+            if (is_integer_part_int && integer_part_int > max_val) {
+                is_integer_part_int = false;
+                integer_part_real = (double)integer_part_int;
+            }
+
+            if (is_integer_part_int) {
+                token_out->type = POSTSCRIPT_TOKEN_INTEGER;
+                token_out->data.integer = negative ? (int32_t)-integer_part_int
+                                                   : (int32_t)integer_part_int;
+            } else {
+                token_out->type = POSTSCRIPT_TOKEN_REAL;
+                token_out->data.real =
+                    negative ? -integer_part_real : integer_part_real;
+            }
+
+            return NULL;
+        }
+    }
+
+    // Try to read radix number
+    if (!has_leading_sign && !has_leading_decimal
+        && tokenizer->offset < tokenizer->data_len
+        && tokenizer->data[tokenizer->offset] == '#' && is_integer_part_int
+        && integer_part_int >= 2 && integer_part_int <= 36) {
+        size_t radix_restore_offset = tokenizer->offset;
+        tokenizer->offset++;
+
+        size_t read_length;
+        uint64_t integer_val;
+        double real_val;
+        bool is_int_val;
+
+        read_unsigned_integer(
+            tokenizer,
+            (uint8_t)integer_part_int,
+            &read_length,
+            &integer_val,
+            &real_val,
+            &is_int_val
+        );
+
+        // If the number is unterminated, we want to treat it as a name instead
+        // of as limitcheck.
+        bool unterminated =
+            tokenizer->offset < tokenizer->data_len
+            && is_postscript_regular(tokenizer->data[tokenizer->offset]);
+
+        if (read_length > 0 && !unterminated) {
+            if (!is_int_val || integer_val > UINT32_MAX) {
+                return PDF_ERROR(
+                    PDF_ERR_POSTSCRIPT_LIMITCHECK,
+                    "Radix number too large"
+                );
+            }
+
+            union UintToSint {
+                uint32_t uint;
+                int32_t sint;
+            } converter = {.uint = (uint32_t)integer_val};
+
+            token_out->type = POSTSCRIPT_TOKEN_RADIX_NUM;
+            token_out->data.integer = converter.sint;
+            return NULL;
+        } else {
+            tokenizer->offset = radix_restore_offset;
+        }
+    }
+
+    // Try to read real part
+    bool has_decimal = has_leading_decimal;
+    if (!has_leading_decimal && tokenizer->data[tokenizer->offset] == '.') {
+        tokenizer->offset++;
+        has_decimal = true;
+    }
+
+    double real_val = integer_part_real;
+    if (is_integer_part_int) {
+        real_val = (double)integer_part_int;
+    }
+
+    size_t real_part_read_digits = 0;
+    if (has_decimal) {
+        uint64_t real_part_int;
+        double real_part_real;
+        bool is_real_part_int;
+
+        read_unsigned_integer(
+            tokenizer,
+            10,
+            &real_part_read_digits,
+            &real_part_int,
+            &real_part_real,
+            &is_real_part_int
+        );
+
+        if (is_real_part_int) {
+            real_part_real = (double)real_part_int;
+        }
+
+        if (real_part_read_digits != 0) {
+            real_part_real /= pow(10.0, (double)real_part_read_digits);
+        }
+
+        real_val += real_part_real;
+    }
+
+    // All numbers *must* have a decimal digit in it, so this is a name
+    if (integer_part_read_digits == 0 && real_part_read_digits == 0) {
+        tokenizer->offset = name_read_offset;
+        token_out->type = POSTSCRIPT_TOKEN_EXE_NAME;
+        token_out->data.name = read_name(tokenizer, 0);
+        return NULL;
+    }
+
+    if (tokenizer->offset >= tokenizer->data_len) {
+        token_out->type = POSTSCRIPT_TOKEN_REAL;
+        token_out->data.real = negative ? -real_val : real_val;
+        return NULL;
+    }
+
+    // Try to read exponent
+    char c = tokenizer->data[tokenizer->offset];
+    bool failed_exp = false;
+    if (c == 'e' || c == 'E') {
+        tokenizer->offset++;
+
+        bool exp_neg = false;
+        if (tokenizer->offset < tokenizer->data_len) {
+            char sign_char = tokenizer->data[tokenizer->offset];
+            if (sign_char == '+') {
+                tokenizer->offset++;
+            } else if (sign_char == '-') {
+                exp_neg = true;
+                tokenizer->offset++;
+            }
+        }
+
+        size_t read_digits;
+        uint64_t exp_int;
+        double exp_real;
+        bool is_exp_int;
+
+        read_unsigned_integer(
+            tokenizer,
+            10,
+            &read_digits,
+            &exp_int,
+            &exp_real,
+            &is_exp_int
+        );
+
+        if (is_exp_int && read_digits > 0) {
+            real_val *= pow(10.0, exp_neg ? -(double)exp_int : (double)exp_int);
+        } else {
+            failed_exp = true;
+        }
+    }
+
+    // Determine if it is a name or number
+    if (!failed_exp
+        && (tokenizer->offset >= tokenizer->data_len
+            || !is_postscript_regular(tokenizer->data[tokenizer->offset]))) {
+        token_out->type = POSTSCRIPT_TOKEN_REAL;
+        token_out->data.real = negative ? -real_val : real_val;
+        return NULL;
+    }
+
+    // Treat as name
+    tokenizer->offset = name_read_offset;
+    token_out->type = POSTSCRIPT_TOKEN_EXE_NAME;
+    token_out->data.name = read_name(tokenizer, 0);
+    return NULL;
 }
 
 static PdfError* read_lit_string(
@@ -351,11 +659,33 @@ PdfError* postscript_next_token(
 
     char c = tokenizer->data[tokenizer->offset++];
     if (c == '+' || c == '-') {
-        LOG_TODO("Integer, real, or executable name");
+        return read_number_or_executable_name(
+            tokenizer,
+            tokenizer->offset - 1,
+            c == '-',
+            true,
+            false,
+            token_out
+        );
     } else if (c == '.') {
-        LOG_TODO("Real");
+        return read_number_or_executable_name(
+            tokenizer,
+            tokenizer->offset - 1,
+            false,
+            false,
+            true,
+            token_out
+        );
     } else if (c >= '0' && c <= '9') {
-        LOG_TODO("Integer, real, radix number, or executable name");
+        tokenizer->offset--;
+        return read_number_or_executable_name(
+            tokenizer,
+            tokenizer->offset,
+            false,
+            false,
+            false,
+            token_out
+        );
     } else if (c == '(') {
         token_out->type = POSTSCRIPT_TOKEN_LIT_STRING;
         return read_lit_string(tokenizer, &token_out->data.string, true);
@@ -452,7 +782,7 @@ static char* ps_string_as_cstr(PostscriptString string, Arena* arena) {
     PostscriptTokenizer* tokenizer = postscript_tokenizer_new(                 \
         arena,                                                                 \
         buffer,                                                                \
-        sizeof(buffer) / sizeof(char)                                          \
+        sizeof(buffer) / sizeof(char) - 1                                      \
     );                                                                         \
     PostscriptToken token;                                                     \
     bool got_token = false;
@@ -628,7 +958,7 @@ TEST_FUNC(test_postscript_tokenize_oct_radix) {
 }
 
 TEST_FUNC(test_postscript_tokenize_radix_neg) {
-    SETUP_TOKENIZER("16#fffe")
+    SETUP_TOKENIZER("16#fffffffe")
     GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_RADIX_NUM, integer, -2)
     CHECK_STREAM_CONSUMED()
 
@@ -636,7 +966,7 @@ TEST_FUNC(test_postscript_tokenize_radix_neg) {
 }
 
 TEST_FUNC(test_postscript_tokenize_radix_uppercase) {
-    SETUP_TOKENIZER("16#FFFE")
+    SETUP_TOKENIZER("16#ffFfFFFE")
     GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_RADIX_NUM, integer, -2)
     CHECK_STREAM_CONSUMED()
 
@@ -800,13 +1130,13 @@ TEST_FUNC(test_postscript_tokenize_name) {
 
 TEST_FUNC(test_postscript_tokenize_name_non_alpha) {
     SETUP_TOKENIZER("$@a_3name#")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "$@a_name#")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "$@a_3name#")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_postscript_tokenize_leading_nums) {
+TEST_FUNC(test_postscript_tokenize_leading_num_name) {
     SETUP_TOKENIZER("23a")
     GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "23a")
     CHECK_STREAM_CONSUMED()
@@ -814,7 +1144,106 @@ TEST_FUNC(test_postscript_tokenize_leading_nums) {
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_postscript_tokenize_leading_signed_num) {
+TEST_FUNC(test_postscript_tokenize_leading_real_name) {
+    SETUP_TOKENIZER("23.54a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "23.54a")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_leading_real_name2) {
+    SETUP_TOKENIZER(".54a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, ".54a")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_leading_real_name3) {
+    SETUP_TOKENIZER("-.54a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "-.54a")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_leading_exp_name) {
+    SETUP_TOKENIZER(".54e5a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, ".54e5a")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_leading_exp_name2) {
+    SETUP_TOKENIZER("54e5a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "54e5a")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_leading_radix_name) {
+    SETUP_TOKENIZER("2#101a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "2#101a")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_leading_radix_name2) {
+    SETUP_TOKENIZER("2#1012")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "2#1012")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+// Since 37 is an invalid radix, it should fall back to a name
+TEST_FUNC(test_postscript_tokenize_invalid_radix_name) {
+    SETUP_TOKENIZER("37#101")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "37#101")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+// "A real number consists of an optional sign and one or more decimal
+// digits..." This has no decimal digits, therefore is not a real, it is a name.
+TEST_FUNC(test_postscript_tokenize_single_dot_name) {
+    SETUP_TOKENIZER(".")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, ".")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_single_plus_name) {
+    SETUP_TOKENIZER("+")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "+")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_single_plus_name_non_eof) {
+    SETUP_TOKENIZER("+ ")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "+")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_plus_dot_name) {
+    SETUP_TOKENIZER("+.")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "+.")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_postscript_tokenize_leading_signed_num_name) {
     SETUP_TOKENIZER("+51a")
     GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "+51a")
     CHECK_STREAM_CONSUMED()
@@ -904,6 +1333,7 @@ TEST_FUNC(test_postscript_tokenize_dict) {
     GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 4)
     GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "key2")
     GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "value")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_END_DICT)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
