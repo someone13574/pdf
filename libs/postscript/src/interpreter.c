@@ -30,8 +30,7 @@ struct PostscriptInterpreter {
     Arena* arena;
 
     PostscriptObjectList* operands;
-    PostscriptObjectList* dict_stack; /// This stack is stored backwards, with
-                                      /// index 0 being the top of the stack
+    PostscriptObjectList* dict_stack;
 
     PostscriptResourceCategoryVec* resource_categories;
     PostscriptUserDataStack* user_data_stack;
@@ -72,6 +71,68 @@ PostscriptInterpreter* postscript_interpreter_new(Arena* arena) {
     );
 
     return interpreter;
+}
+
+void postscript_interpreter_dump(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    Arena* fmt_arena = arena_new(1024);
+    LOG_DIAG(INFO, PS, "Interpreter state:");
+
+    // Dictionaries
+
+    LOG_DIAG(
+        INFO,
+        PS,
+        "    Dictionary stack (len=%zu):",
+        postscript_object_list_len(interpreter->dict_stack)
+    );
+    for (size_t idx = 0;
+         idx < postscript_object_list_len(interpreter->dict_stack);
+         idx++) {
+        PostscriptObject* stack_object = NULL;
+        RELEASE_ASSERT(postscript_object_list_get_ptr(
+            interpreter->dict_stack,
+            idx,
+            &stack_object
+        ));
+
+        LOG_DIAG(
+            INFO,
+            PS,
+            "       %zu: %s",
+            idx,
+            postscript_object_fmt(fmt_arena, stack_object)
+        );
+    }
+
+    // Operands
+    LOG_DIAG(
+        INFO,
+        PS,
+        "   Operand stack (len=%zu):",
+        postscript_object_list_len(interpreter->operands)
+    );
+    for (size_t idx = 0;
+         idx < postscript_object_list_len(interpreter->operands);
+         idx++) {
+        PostscriptObject* stack_object = NULL;
+        RELEASE_ASSERT(postscript_object_list_get_ptr(
+            interpreter->operands,
+            idx,
+            &stack_object
+        ));
+
+        LOG_DIAG(
+            INFO,
+            PS,
+            "       %zu: %s",
+            idx,
+            postscript_object_fmt(fmt_arena, stack_object)
+        );
+    }
+
+    arena_free(fmt_arena);
 }
 
 PostscriptResourceCategoryVec* postscript_interpreter_get_resource_categories(
@@ -370,6 +431,18 @@ void postscript_interpreter_operand_push(
     }
 }
 
+void postscript_interpreter_dict(
+    PostscriptInterpreter* interpreter,
+    PostscriptObject* object_out
+) {
+    RELEASE_ASSERT(interpreter);
+    RELEASE_ASSERT(object_out);
+
+    RELEASE_ASSERT(
+        postscript_object_list_back(interpreter->dict_stack, object_out)
+    );
+}
+
 void postscript_interpreter_dict_push(
     PostscriptInterpreter* interpreter,
     PostscriptObject dictionary
@@ -378,7 +451,7 @@ void postscript_interpreter_dict_push(
     RELEASE_ASSERT(dictionary.type == POSTSCRIPT_OBJECT_DICT);
 
     LOG_DIAG(INFO, PS, "Pushing dictionary to dict stack");
-    postscript_object_list_push_front(interpreter->dict_stack, dictionary);
+    postscript_object_list_push_back(interpreter->dict_stack, dictionary);
 }
 
 PdfError* postscript_interpreter_dict_pop(PostscriptInterpreter* interpreter) {
@@ -393,7 +466,7 @@ PdfError* postscript_interpreter_dict_pop(PostscriptInterpreter* interpreter) {
 
     PostscriptObject dict;
     RELEASE_ASSERT(
-        postscript_object_list_pop_front(interpreter->dict_stack, &dict)
+        postscript_object_list_pop_back(interpreter->dict_stack, &dict)
     );
 
     return NULL;
@@ -412,9 +485,8 @@ PdfError* postscript_interpreter_dict_entry(
         LOG_TODO("String to name conversion for postscript dict lookup");
     }
 
-    for (size_t dict_idx = 0;
-         dict_idx < postscript_object_list_len(interpreter->dict_stack);
-         dict_idx++) {
+    for (size_t dict_idx = postscript_object_list_len(interpreter->dict_stack);
+         dict_idx-- > 0;) {
         PostscriptObject dict;
         RELEASE_ASSERT(
             postscript_object_list_get(interpreter->dict_stack, dict_idx, &dict)
@@ -460,7 +532,7 @@ PdfError* postscript_interpreter_define(
 
     PostscriptObject current_dict;
     RELEASE_ASSERT(
-        postscript_object_list_get(interpreter->dict_stack, 0, &current_dict)
+        postscript_object_list_back(interpreter->dict_stack, &current_dict)
     );
     RELEASE_ASSERT(current_dict.type == POSTSCRIPT_OBJECT_DICT);
 

@@ -90,7 +90,7 @@ PdfError* postscript_object_execute(
     const PostscriptObject* object
 );
 bool postscript_object_eq(const PostscriptObject* a, const PostscriptObject* b);
-char* postscript_object_fmt(Arena* arena, const PostscriptObject* object);
+const char* postscript_object_fmt(Arena* arena, const PostscriptObject* object);
 
 #define DLINKED_NAME PostscriptObjectList
 #define DLINKED_LOWERCASE_NAME postscript_object_list

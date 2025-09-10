@@ -57,7 +57,13 @@ PostscriptObject postscript_systemdict_ops(Arena* arena) {
     push_operator(dict.data.dict, postscript_op_def, "def");
     push_operator(dict.data.dict, postscript_op_begin, "begin");
     push_operator(dict.data.dict, postscript_op_end, "end");
+    push_operator(dict.data.dict, postscript_op_currentdict, "currentdict");
     push_operator(dict.data.dict, postscript_op_findresource, "findresource");
+    push_operator(
+        dict.data.dict,
+        postscript_op_defineresource,
+        "defineresource"
+    );
 
     return dict;
 }
@@ -131,6 +137,25 @@ PdfError* postscript_op_end(PostscriptInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PDF_PROPAGATE(postscript_interpreter_dict_pop(interpreter));
+
+    return NULL;
+}
+
+PdfError* postscript_op_currentdict(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    PostscriptObject current_dict;
+    postscript_interpreter_dict(interpreter, &current_dict);
+    postscript_interpreter_operand_push(interpreter, current_dict);
+
+    return NULL;
+}
+
+PdfError* postscript_op_defineresource(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    postscript_interpreter_dump(interpreter);
+    LOG_TODO();
 
     return NULL;
 }

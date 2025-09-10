@@ -80,6 +80,7 @@ PdfError* pdf_deserialize_cid_system_info_wrapper(
 
 typedef struct {
     size_t codespacerange_len;
+    size_t cidrange_len;
 } CMapPostscriptUserData;
 
 static PdfError* cidinit_begincmap(PostscriptInterpreter* interpreter) {
@@ -89,7 +90,18 @@ static PdfError* cidinit_begincmap(PostscriptInterpreter* interpreter) {
         postscript_interpreter_get_arena(interpreter),
         sizeof(CMapPostscriptUserData)
     );
+    user_data->codespacerange_len = 0;
+    user_data->cidrange_len = 0;
+
     postscript_interpreter_user_data_push(interpreter, user_data, "cmap");
+
+    return NULL;
+}
+
+static PdfError* cidinit_endcmap(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    PDF_PROPAGATE(postscript_interpreter_user_data_pop(interpreter, "cmap"));
 
     return NULL;
 }
@@ -172,6 +184,83 @@ static PdfError* cidinit_endcodespacerange(PostscriptInterpreter* interpreter) {
     return NULL;
 }
 
+static PdfError* cidinit_begincidrange(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    CMapPostscriptUserData* user_data = NULL;
+    PDF_PROPAGATE(postscript_interpreter_user_data(
+        interpreter,
+        "cmap",
+        (void**)&user_data
+    ));
+
+    PostscriptObject length;
+    PDF_PROPAGATE(postscript_interpreter_pop_operand_typed(
+        interpreter,
+        POSTSCRIPT_OBJECT_INTEGER,
+        true,
+        &length
+    ));
+
+    if (length.data.integer < 0) {
+        return PDF_ERROR(PDF_ERR_POSTSCRIPT_INVALID_LENGTH);
+    }
+
+    postscript_interpreter_operand_push(
+        interpreter,
+        (PostscriptObject
+        ) {.type = POSTSCRIPT_OBJECT_SINK,
+           .data.sink.list = postscript_object_list_new(
+               postscript_interpreter_get_arena(interpreter)
+           ),
+           .data.sink.type = POSTSCRIPT_SINK_CUSTOM,
+           .data.sink.sink_name = "cidrange",
+           .access = POSTSCRIPT_ACCESS_UNLIMITED,
+           .literal = true}
+    );
+
+    user_data->cidrange_len = (size_t)length.data.integer;
+
+    return NULL;
+}
+
+static PdfError* cidinit_endcidrange(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    CMapPostscriptUserData* user_data = NULL;
+    PDF_PROPAGATE(postscript_interpreter_user_data(
+        interpreter,
+        "cmap",
+        (void**)&user_data
+    ));
+
+    PostscriptObject sink;
+    PDF_PROPAGATE(postscript_interpreter_pop_operand_typed(
+        interpreter,
+        POSTSCRIPT_OBJECT_SINK,
+        true,
+        &sink
+    ));
+
+    if (sink.data.sink.type != POSTSCRIPT_SINK_CUSTOM
+        || strcmp("cidrange", sink.data.sink.sink_name) != 0) {
+        return PDF_ERROR(
+            PDF_ERR_POSTSCRIPT_OPERAND_TYPE,
+            "cidrange sink had wrong name"
+        );
+    }
+
+    if (postscript_object_list_len(sink.data.sink.list)
+        != user_data->cidrange_len * 3) {
+        return PDF_ERROR(
+            PDF_ERR_POSTSCRIPT_OPERAND_TYPE,
+            "cidrange sink had incorrect number of elements"
+        );
+    }
+
+    return NULL;
+}
+
 PdfError* pdf_parse_cmap(Arena* arena, const char* data, size_t data_len) {
     RELEASE_ASSERT(data);
 
@@ -189,6 +278,13 @@ PdfError* pdf_parse_cmap(Arena* arena, const char* data, size_t data_len) {
         interpreter,
         "ProcSet",
         "CIDInit",
+        cidinit_endcmap,
+        "endcmap"
+    );
+    postscript_interpreter_add_operator(
+        interpreter,
+        "ProcSet",
+        "CIDInit",
         cidinit_begincodespacerange,
         "begincodespacerange"
     );
@@ -198,6 +294,20 @@ PdfError* pdf_parse_cmap(Arena* arena, const char* data, size_t data_len) {
         "CIDInit",
         cidinit_endcodespacerange,
         "endcodespacerange"
+    );
+    postscript_interpreter_add_operator(
+        interpreter,
+        "ProcSet",
+        "CIDInit",
+        cidinit_begincidrange,
+        "begincidrange"
+    );
+    postscript_interpreter_add_operator(
+        interpreter,
+        "ProcSet",
+        "CIDInit",
+        cidinit_endcidrange,
+        "endcidrange"
     );
 
     while (true) {

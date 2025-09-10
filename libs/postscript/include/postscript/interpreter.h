@@ -14,6 +14,9 @@ typedef struct PostscriptInterpreter PostscriptInterpreter;
 /// Create a new postscript interpreter instance.
 PostscriptInterpreter* postscript_interpreter_new(Arena* arena);
 
+/// Display the interpreter's current state.
+void postscript_interpreter_dump(PostscriptInterpreter* interpreter);
+
 /// Get the interpreter's arena.
 Arena* postscript_interpreter_get_arena(PostscriptInterpreter* interpreter);
 
@@ -58,6 +61,12 @@ PdfError* postscript_interpreter_pop_operand_typed(
 void postscript_interpreter_operand_push(
     PostscriptInterpreter* interpreter,
     PostscriptObject object
+);
+
+/// Get the top of the dictionary stack.
+void postscript_interpreter_dict(
+    PostscriptInterpreter* interpreter,
+    PostscriptObject* object_out
 );
 
 /// Push a dictionary to the dictionary stack.
