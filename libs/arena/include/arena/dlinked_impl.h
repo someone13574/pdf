@@ -1,10 +1,7 @@
-#ifndef DLINKED_H
-#define DLINKED_H
+#include <stdbool.h>
 
 #include "arena/arena.h"
 #include "logger/log.h"
-
-#endif // DLINKED_H
 
 // Check arguments
 #ifndef DLINKED_NAME

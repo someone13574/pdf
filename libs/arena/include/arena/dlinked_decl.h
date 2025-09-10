@@ -1,6 +1,8 @@
 #ifndef DLINKED_H
 #define DLINKED_H
 
+#include <stdbool.h>
+
 #include "arena/arena.h"
 
 #endif // DLINKED_H

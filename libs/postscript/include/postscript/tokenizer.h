@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -45,6 +46,8 @@ typedef struct {
         PostscriptString string;
         char* name;
     } data;
+
+    PostscriptString text;
 } PostscriptToken;
 
 /// Get the next token in the postscript file, storing it in `token_out`. If
@@ -54,3 +57,6 @@ PdfError* postscript_next_token(
     PostscriptToken* token_out,
     bool* got_token
 );
+
+/// Converts a PostscriptString into a null-terminated c-string.
+char* postscript_string_as_cstr(PostscriptString string, Arena* arena);

@@ -1,10 +1,14 @@
 #include "pdf/fonts/cmap.h"
 
 #include "../deserialize.h"
+#include "arena/arena.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
+#include "postscript/interpreter.h"
+#include "postscript/object.h"
+#include "postscript/tokenizer.h"
 
 PdfError* pdf_deserialize_cid_system_info(
     const PdfObject* object,
@@ -71,9 +75,45 @@ PdfError* pdf_deserialize_cid_system_info_wrapper(
     );
 }
 
-PdfError* pdf_parse_cmap(const uint8_t* data, size_t data_len) {
+static PdfError* cid_init_begincmap(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    return NULL;
+}
+
+PdfError* pdf_parse_cmap(Arena* arena, const char* data, size_t data_len) {
     RELEASE_ASSERT(data);
-    (void)data_len;
+
+    PostscriptTokenizer* tokenizer =
+        postscript_tokenizer_new(arena, data, data_len);
+    PostscriptInterpreter* interpreter = postscript_interpreter_new(arena);
+    postscript_interpreter_add_proc(
+        interpreter,
+        "ProcSet",
+        "CIDInit",
+        cid_init_begincmap,
+        "begincmap"
+    );
+
+    while (true) {
+        bool got_token;
+        PostscriptToken token;
+
+        PDF_PROPAGATE(postscript_next_token(tokenizer, &token, &got_token));
+
+        LOG_DIAG(
+            DEBUG,
+            CMAP,
+            "Got token: `%s`",
+            postscript_string_as_cstr(token.text, arena)
+        );
+
+        if (!got_token) {
+            break;
+        }
+
+        PDF_PROPAGATE(postscript_interpret_token(interpreter, token));
+    }
 
     return NULL;
 }

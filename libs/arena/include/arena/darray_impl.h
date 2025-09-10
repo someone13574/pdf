@@ -1,13 +1,8 @@
-#ifndef DARRAY_IMPL_H
-#define DARRAY_IMPL_H
-
 #include <stdbool.h>
 #include <string.h>
 
 #include "arena/arena.h"
 #include "logger/log.h"
-
-#endif // DARRAY_IMPL_H
 
 // Check arguments
 #ifndef DARRAY_NAME

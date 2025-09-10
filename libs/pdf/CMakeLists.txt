@@ -23,7 +23,7 @@ add_library(pdf
     src/xref.c)
 target_include_directories(pdf PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(pdf PUBLIC arena pdf-error)
-target_link_libraries(pdf PRIVATE codec pdf-logger pdf-test)
+target_link_libraries(pdf PRIVATE codec pdf-logger pdf-test postscript)
 target_compile_features(pdf PUBLIC c_std_11)
 if (NOT MSVC)
     target_compile_options(pdf PRIVATE -fsanitize=address,undefined)

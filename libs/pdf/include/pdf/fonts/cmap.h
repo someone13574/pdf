@@ -38,4 +38,4 @@ PdfError* pdf_deserialize_cid_system_info_wrapper(
     void* deserialized
 );
 
-PdfError* pdf_parse_cmap(const uint8_t* data, size_t data_len);
+PdfError* pdf_parse_cmap(Arena* arena, const char* data, size_t data_len);

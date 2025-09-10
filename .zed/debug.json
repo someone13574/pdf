@@ -33,6 +33,17 @@
     "adapter": "CodeLLDB"
   },
   {
+    "label": "Debug cmap-example",
+    "build": {
+      "command": "scripts/dev-build.sh",
+      "args": [],
+      "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    "program": "$ZED_WORKTREE_ROOT/build/examples/cmap-example",
+    "request": "launch",
+    "adapter": "CodeLLDB"
+  },
+  {
     "label": "Debug test",
     "build": {
       "command": "scripts/dev-build.sh",
