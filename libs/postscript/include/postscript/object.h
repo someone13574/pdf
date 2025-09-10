@@ -7,27 +7,32 @@
 #include "pdf_error/error.h"
 #include "postscript/tokenizer.h"
 
-typedef enum {
-    POSTSCRIPT_OBJECT_BOOLEAN,
-    POSTSCRIPT_OBJECT_FONT_ID,
-    POSTSCRIPT_OBJECT_INTEGER,
-    POSTSCRIPT_OBJECT_MARK,
-    POSTSCRIPT_OBJECT_NAME,
-    POSTSCRIPT_OBJECT_NULL,
-    POSTSCRIPT_OBJECT_OPERATOR,
-    POSTSCRIPT_OBJECT_REAL,
-    POSTSCRIPT_OBJECT_ARRAY,
-    POSTSCRIPT_OBJECT_CUSTOM_PROC, /// Builtin or custom procedure
-    POSTSCRIPT_OBJECT_DICT,
-    POSTSCRIPT_OBJECT_FILE,
-    POSTSCRIPT_OBJECT_GSTATE,
-    POSTSCRIPT_OBJECT_PACKEDARRAY,
-    POSTSCRIPT_OBJECT_SAVE,
-    POSTSCRIPT_OBJECT_STRING
-} PostscriptObjectType;
+#define POSTSCRIPT_OBJECT_TYPES                                                \
+    X(BOOLEAN)                                                                 \
+    X(FONT_ID)                                                                 \
+    X(INTEGER)                                                                 \
+    X(MARK)                                                                    \
+    X(NAME)                                                                    \
+    X(NULL)                                                                    \
+    X(REAL)                                                                    \
+    X(ARRAY)                                                                   \
+    X(OPERATOR)                                                                \
+    X(DICT)                                                                    \
+    X(FILE)                                                                    \
+    X(GSTATE)                                                                  \
+    X(PACKEDARRAY)                                                             \
+    X(SAVE)                                                                    \
+    X(STRING)                                                                  \
+    X(SINK)
+
+#define X(name) POSTSCRIPT_OBJECT_##name,
+typedef enum { POSTSCRIPT_OBJECT_TYPES } PostscriptObjectType;
+#undef X
+
+extern const char* postscript_object_name_lookup[];
 
 typedef enum {
-    /// All operations defined for that object are allowed. However, packed
+    /// All operators defined for that object are allowed. However, packed
     /// array objects always have read-only (or even more restricted) access.
     POSTSCRIPT_ACCESS_UNLIMITED,
 
@@ -48,9 +53,19 @@ typedef enum {
 
 typedef struct PostscriptInterpreter PostscriptInterpreter;
 typedef struct PostscriptObjectList PostscriptObjectList;
-typedef PdfError* (*PostscriptCustomProcedure)(
-    PostscriptInterpreter* interpreter
-);
+typedef PdfError* (*PostscriptOperator)(PostscriptInterpreter* interpreter);
+
+/// A buffer for collecting literal objects.
+typedef struct {
+    PostscriptObjectList* list;
+
+    /// Restricts the final size of the buffer.
+    enum { POSTSCRIPT_SINK_ARRAY, POSTSCRIPT_SINK_CUSTOM } type;
+
+    /// If this sink is a `POSTSCRIPT_SINK_CUSTOM`, then set the name here so it
+    /// can be type-checked when consumed.
+    char* sink_name;
+} PostscriptObjectSink;
 
 typedef struct {
     PostscriptObjectType type;
@@ -61,8 +76,9 @@ typedef struct {
         double real;
         PostscriptObjectList* array;
         PostscriptObjectList* dict;
-        PostscriptCustomProcedure custom_proc;
+        PostscriptOperator operator;
         PostscriptString string;
+        PostscriptObjectSink sink;
     } data;
 
     bool literal;

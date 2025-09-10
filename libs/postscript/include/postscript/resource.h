@@ -13,11 +13,12 @@ typedef struct {
 /// Create a new resource with dictionary storage.
 PostscriptResource postscript_resource_new_dict(Arena* arena, char* name);
 
-/// Add a new custom procedure to the dictionary resource.
-void postscript_resource_add_fn(
+/// Add a new operator to the dictionary resource.
+void postscript_resource_add_op(
     PostscriptResource* resource,
-    char* name,
-    PostscriptCustomProcedure procedure
+    PostscriptOperator
+    operator,
+    char * name
 );
 
 #define DVEC_NAME PostscriptResourceVec

@@ -14,18 +14,22 @@ typedef struct PostscriptInterpreter PostscriptInterpreter;
 /// Create a new postscript interpreter instance.
 PostscriptInterpreter* postscript_interpreter_new(Arena* arena);
 
+/// Get the interpreter's arena.
+Arena* postscript_interpreter_get_arena(PostscriptInterpreter* interpreter);
+
 /// Get the resource categories associated with the interpreter.
 PostscriptResourceCategoryVec* postscript_interpreter_get_resource_categories(
     PostscriptInterpreter* interpreter
 );
 
-/// Add a new custom procedure to a resource.
-void postscript_interpreter_add_proc(
+/// Add a new operator to a resource.
+void postscript_interpreter_add_operator(
     PostscriptInterpreter* interpreter,
     char* category_name,
     char* resource_name,
-    PostscriptCustomProcedure procedure,
-    char* procedure_name
+    PostscriptOperator
+    operator,
+    char * operator_name
 );
 
 /// Process a token.
@@ -62,9 +66,39 @@ void postscript_interpreter_dict_push(
     PostscriptObject dictionary
 );
 
+/// Pop a dictionary from the dictionary stack.
+PdfError* postscript_interpreter_dict_pop(PostscriptInterpreter* interpreter);
+
 /// Get a dictionary value from the dictionary stack.
 PdfError* postscript_interpreter_dict_entry(
     const PostscriptInterpreter* interpreter,
     const PostscriptObject* key,
     PostscriptObject* value_out
+);
+
+/// Define a new key-value pair in the current dictionary.
+PdfError* postscript_interpreter_define(
+    PostscriptInterpreter* interpreter,
+    PostscriptObject key,
+    PostscriptObject value
+);
+
+/// Gets the current user-data.
+PdfError* postscript_interpreter_user_data(
+    PostscriptInterpreter* interpreter,
+    const char* expected_name,
+    void** user_data_out
+);
+
+/// Pushes a new user-data to the stack.
+void postscript_interpreter_user_data_push(
+    PostscriptInterpreter* interpreter,
+    void* user_data,
+    const char* name
+);
+
+/// Pops a user-data from the stack.
+PdfError* postscript_interpreter_user_data_pop(
+    PostscriptInterpreter* interpreter,
+    const char* expected_name
 );

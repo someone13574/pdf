@@ -50,6 +50,10 @@ bool DLINKED_FN(get_ptr)(
     DLINKED_TYPE** out
 );
 
+// Gets the last element of the linked-list and stores it in `out`. If the list
+// is empty, false is returned and `out` isn't set.
+bool DLINKED_FN(back)(const DLINKED_NAME* linked_list, DLINKED_TYPE* out);
+
 // Sets the element stored at index `idx`, which must be in bounds.
 void DLINKED_FN(set)(DLINKED_NAME* linked_list, size_t idx, DLINKED_TYPE value);
 

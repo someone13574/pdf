@@ -1,18 +1,29 @@
 #include "postscript/interpreter.h"
 
+#include <stdbool.h>
 #include <string.h>
 
 #include "arena/arena.h"
 #include "logger/log.h"
+#include "operators.h"
 #include "pdf_error/error.h"
 #include "postscript/object.h"
 #include "postscript/resource.h"
 #include "postscript/tokenizer.h"
-#include "procedures.h"
 
 #define DLINKED_NAME PostscriptListStack
 #define DLINKED_LOWERCASE_NAME postscript_list_stack
 #define DLINKED_TYPE PostscriptObjectList*
+#include "arena/dlinked_impl.h"
+
+typedef struct {
+    const char* name;
+    void* data;
+} PostscriptUserData;
+
+#define DLINKED_NAME PostscriptUserDataStack
+#define DLINKED_LOWERCASE_NAME postscript_user_data_stack
+#define DLINKED_TYPE PostscriptUserData
 #include "arena/dlinked_impl.h"
 
 struct PostscriptInterpreter {
@@ -21,12 +32,21 @@ struct PostscriptInterpreter {
     PostscriptObjectList* operands;
     PostscriptObjectList* dict_stack; /// This stack is stored backwards, with
                                       /// index 0 being the top of the stack
+
     PostscriptResourceCategoryVec* resource_categories;
-    PostscriptListStack* list_construction_stack;
+    PostscriptUserDataStack* user_data_stack;
 };
+
+Arena* postscript_interpreter_get_arena(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    return interpreter->arena;
+}
 
 PostscriptInterpreter* postscript_interpreter_new(Arena* arena) {
     RELEASE_ASSERT(arena);
+
+    LOG_DIAG(INFO, PS, "Creating new postscript interpreter");
 
     PostscriptInterpreter* interpreter =
         arena_alloc(arena, sizeof(PostscriptInterpreter));
@@ -35,12 +55,20 @@ PostscriptInterpreter* postscript_interpreter_new(Arena* arena) {
     interpreter->dict_stack = postscript_object_list_new(arena);
     interpreter->resource_categories =
         postscript_resource_category_vec_new(arena);
-    interpreter->list_construction_stack = postscript_list_stack_new(arena);
+    interpreter->user_data_stack = postscript_user_data_stack_new(arena);
 
-    // Initialize systemdict
-    postscript_object_list_push_front(
-        interpreter->dict_stack,
-        postscript_systemdict_procedures(arena)
+    // Initialize standard dictionaries
+    postscript_interpreter_dict_push(
+        interpreter,
+        postscript_systemdict_ops(arena)
+    );
+    postscript_interpreter_dict_push(
+        interpreter,
+        (PostscriptObject
+        ) {.type = POSTSCRIPT_OBJECT_DICT,
+           .data.dict = postscript_object_list_new(arena),
+           .access = POSTSCRIPT_ACCESS_UNLIMITED,
+           .literal = true}
     );
 
     return interpreter;
@@ -54,17 +82,19 @@ PostscriptResourceCategoryVec* postscript_interpreter_get_resource_categories(
     return interpreter->resource_categories;
 }
 
-void postscript_interpreter_add_proc(
+void postscript_interpreter_add_operator(
     PostscriptInterpreter* interpreter,
     char* category_name,
     char* resource_name,
-    PostscriptCustomProcedure procedure,
-    char* procedure_name
+    PostscriptOperator
+    operator,
+    char * operator_name
 ) {
     RELEASE_ASSERT(interpreter);
     RELEASE_ASSERT(category_name);
     RELEASE_ASSERT(resource_name);
-    RELEASE_ASSERT(procedure);
+    RELEASE_ASSERT(operator);
+    RELEASE_ASSERT(operator_name);
 
     // Get category
     PostscriptResourceCategory* category = postscript_get_resource_category(
@@ -88,27 +118,29 @@ void postscript_interpreter_add_proc(
         );
     }
 
-    // Add procedure
-    postscript_resource_add_fn(resource, procedure_name, procedure);
+    // Add operator
+    postscript_resource_add_op(resource, operator, operator_name);
 }
 
-static PostscriptObjectList*
-get_current_object_list(const PostscriptInterpreter* interpreter) {
+static PostscriptObjectList* get_current_object_list(
+    const PostscriptInterpreter* interpreter,
+    bool* is_sink
+) {
     RELEASE_ASSERT(interpreter);
 
-    size_t stack_len =
-        postscript_list_stack_len(interpreter->list_construction_stack);
-    if (stack_len == 0) {
+    PostscriptObject object;
+    if (!postscript_object_list_back(interpreter->operands, &object)
+        || object.type != POSTSCRIPT_OBJECT_SINK) {
+        if (is_sink) {
+            *is_sink = false;
+        }
         return interpreter->operands;
     }
 
-    PostscriptObjectList* current_construction_list = NULL;
-    RELEASE_ASSERT(postscript_list_stack_get(
-        interpreter->list_construction_stack,
-        stack_len - 1,
-        &current_construction_list
-    ));
-    return current_construction_list;
+    if (is_sink) {
+        *is_sink = true;
+    }
+    return object.data.sink.list;
 }
 
 PdfError* postscript_interpret_token(
@@ -117,13 +149,21 @@ PdfError* postscript_interpret_token(
 ) {
     RELEASE_ASSERT(interpreter);
 
-    PostscriptObjectList* current_object_list =
-        get_current_object_list(interpreter);
+    {
+        Arena* str_arena = arena_new(128);
+        LOG_DIAG(
+            TRACE,
+            PS,
+            "Interpreting token: `%s`",
+            postscript_string_as_cstr(token.text, str_arena)
+        );
+        arena_free(str_arena);
+    }
 
     switch (token.type) {
         case POSTSCRIPT_TOKEN_INTEGER: {
-            postscript_object_list_push_back(
-                current_object_list,
+            postscript_interpreter_operand_push(
+                interpreter,
                 (PostscriptObject
                 ) {.type = POSTSCRIPT_OBJECT_INTEGER,
                    .data.integer = token.data.integer,
@@ -133,8 +173,8 @@ PdfError* postscript_interpret_token(
             break;
         }
         case POSTSCRIPT_TOKEN_REAL: {
-            postscript_object_list_push_back(
-                current_object_list,
+            postscript_interpreter_operand_push(
+                interpreter,
                 (PostscriptObject
                 ) {.type = POSTSCRIPT_OBJECT_REAL,
                    .data.real = token.data.real,
@@ -145,8 +185,8 @@ PdfError* postscript_interpret_token(
         }
         case POSTSCRIPT_TOKEN_LIT_STRING:
         case POSTSCRIPT_TOKEN_HEX_STRING: {
-            postscript_object_list_push_back(
-                current_object_list,
+            postscript_interpreter_operand_push(
+                interpreter,
                 (PostscriptObject
                 ) {.type = POSTSCRIPT_OBJECT_STRING,
                    .data.string = token.data.string,
@@ -164,25 +204,33 @@ PdfError* postscript_interpret_token(
             };
 
             PDF_PROPAGATE(postscript_object_execute(interpreter, &name_object));
-
             break;
         }
         case POSTSCRIPT_TOKEN_LIT_NAME: {
             bool is_true = strcmp(token.data.name, "true") == 0;
             bool is_false = strcmp(token.data.name, "false") == 0;
+            bool is_null = strcmp(token.data.name, "null") == 0;
 
             if (is_true || is_false) {
-                postscript_object_list_push_back(
-                    current_object_list,
+                postscript_interpreter_operand_push(
+                    interpreter,
                     (PostscriptObject
                     ) {.type = POSTSCRIPT_OBJECT_BOOLEAN,
                        .data.boolean = is_true,
                        .access = POSTSCRIPT_ACCESS_UNLIMITED,
                        .literal = true}
                 );
+            } else if (is_null) {
+                postscript_interpreter_operand_push(
+                    interpreter,
+                    (PostscriptObject
+                    ) {.type = POSTSCRIPT_OBJECT_NAME,
+                       .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                       .literal = true}
+                );
             } else {
-                postscript_object_list_push_back(
-                    current_object_list,
+                postscript_interpreter_operand_push(
+                    interpreter,
                     (PostscriptObject
                     ) {.type = POSTSCRIPT_OBJECT_NAME,
                        .data.name = token.data.name,
@@ -195,30 +243,39 @@ PdfError* postscript_interpret_token(
         case POSTSCRIPT_TOKEN_START_ARRAY: {
             PostscriptObjectList* array =
                 postscript_object_list_new(interpreter->arena);
-            postscript_list_stack_push_back(
-                interpreter->list_construction_stack,
-                array
+            postscript_interpreter_operand_push(
+                interpreter,
+                (PostscriptObject
+                ) {.type = POSTSCRIPT_OBJECT_SINK,
+                   .data.sink.list = array,
+                   .data.sink.type = POSTSCRIPT_SINK_ARRAY,
+                   .data.sink.sink_name = "array",
+                   .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                   .literal = true}
             );
             break;
         }
         case POSTSCRIPT_TOKEN_END_ARRAY: {
-            if (postscript_list_stack_len(interpreter->list_construction_stack)
-                <= 1) {
-                return PDF_ERROR(PDF_ERR_POSTSCRIPT_ARRAY_NOT_STARTED);
-            }
-
-            PostscriptObjectList* array;
-            RELEASE_ASSERT(postscript_list_stack_pop_back(
-                interpreter->list_construction_stack,
-                &array
+            PostscriptObject sink;
+            PDF_PROPAGATE(postscript_interpreter_pop_operand_typed(
+                interpreter,
+                POSTSCRIPT_OBJECT_SINK,
+                true,
+                &sink
             ));
 
-            current_object_list = get_current_object_list(interpreter);
-            postscript_object_list_push_back(
-                current_object_list,
+            if (sink.data.sink.type != POSTSCRIPT_SINK_ARRAY) {
+                return PDF_ERROR(
+                    PDF_ERR_POSTSCRIPT_OPERAND_TYPE,
+                    "Wrong sink type"
+                );
+            }
+
+            postscript_interpreter_operand_push(
+                interpreter,
                 (PostscriptObject
                 ) {.type = POSTSCRIPT_OBJECT_ARRAY,
-                   .data.array = array,
+                   .data.array = sink.data.sink.list,
                    .access = POSTSCRIPT_ACCESS_UNLIMITED,
                    .literal = true}
             );
@@ -242,6 +299,14 @@ PdfError* postscript_interpreter_pop_operand(
     if (!postscript_object_list_pop_back(interpreter->operands, object_out)) {
         return PDF_ERROR(PDF_ERR_POSTSCRIPT_OPERANDS_EMPTY);
     }
+
+    LOG_DIAG(
+        TRACE,
+        PS,
+        "Popped operand of type %s from operand stack (new_len=%zu)",
+        postscript_object_name_lookup[object_out->type],
+        postscript_object_list_len(interpreter->operands)
+    );
 
     return NULL;
 }
@@ -281,7 +346,28 @@ void postscript_interpreter_operand_push(
 ) {
     RELEASE_ASSERT(interpreter);
 
-    postscript_object_list_push_back(interpreter->operands, object);
+    bool is_sink;
+    PostscriptObjectList* current_object_list =
+        get_current_object_list(interpreter, &is_sink);
+    postscript_object_list_push_back(current_object_list, object);
+
+    if (is_sink) {
+        LOG_DIAG(
+            TRACE,
+            PS,
+            "Pushed operand of type %s to sink (new_len=%zu)",
+            postscript_object_name_lookup[object.type],
+            postscript_object_list_len(current_object_list)
+        );
+    } else {
+        LOG_DIAG(
+            TRACE,
+            PS,
+            "Pushed operand of type %s to operand stack (new_len=%zu)",
+            postscript_object_name_lookup[object.type],
+            postscript_object_list_len(current_object_list)
+        );
+    }
 }
 
 void postscript_interpreter_dict_push(
@@ -291,7 +377,26 @@ void postscript_interpreter_dict_push(
     RELEASE_ASSERT(interpreter);
     RELEASE_ASSERT(dictionary.type == POSTSCRIPT_OBJECT_DICT);
 
+    LOG_DIAG(INFO, PS, "Pushing dictionary to dict stack");
     postscript_object_list_push_front(interpreter->dict_stack, dictionary);
+}
+
+PdfError* postscript_interpreter_dict_pop(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    if (postscript_object_list_len(interpreter->dict_stack) <= 2) {
+        return PDF_ERROR(
+            PDF_ERR_POSTSCRIPT_POP_STANDARD_DICT,
+            "Cannot pop userdict from dictionary stack"
+        );
+    }
+
+    PostscriptObject dict;
+    RELEASE_ASSERT(
+        postscript_object_list_pop_front(interpreter->dict_stack, &dict)
+    );
+
+    return NULL;
 }
 
 PdfError* postscript_interpreter_dict_entry(
@@ -344,4 +449,107 @@ PdfError* postscript_interpreter_dict_entry(
         "Entry with key `%s` not found in dictionary",
         postscript_object_fmt(interpreter->arena, key)
     );
+}
+
+PdfError* postscript_interpreter_define(
+    PostscriptInterpreter* interpreter,
+    PostscriptObject key,
+    PostscriptObject value
+) {
+    RELEASE_ASSERT(interpreter);
+
+    PostscriptObject current_dict;
+    RELEASE_ASSERT(
+        postscript_object_list_get(interpreter->dict_stack, 0, &current_dict)
+    );
+    RELEASE_ASSERT(current_dict.type == POSTSCRIPT_OBJECT_DICT);
+
+    if (current_dict.access != POSTSCRIPT_ACCESS_UNLIMITED) {
+        return PDF_ERROR(
+            PDF_ERR_POSTSCRIPT_ACCESS_VIOLATION,
+            "The current top of the dictionary stack doesn't have write access"
+        );
+    }
+
+    postscript_object_list_push_back(current_dict.data.dict, key);
+    postscript_object_list_push_back(current_dict.data.dict, value);
+
+    return NULL;
+}
+
+PdfError* postscript_interpreter_user_data(
+    PostscriptInterpreter* interpreter,
+    const char* expected_name,
+    void** user_data_out
+) {
+    RELEASE_ASSERT(interpreter);
+    RELEASE_ASSERT(expected_name);
+    RELEASE_ASSERT(user_data_out);
+
+    PostscriptUserData user_data_top;
+    if (!postscript_user_data_stack_back(
+            interpreter->user_data_stack,
+            &user_data_top
+        )) {
+        return PDF_ERROR(
+            PDF_ERR_POSTSCRIPT_USER_DATA_INVALID,
+            "The user-data stack is empty"
+        );
+    }
+
+    if (strcmp(expected_name, user_data_top.name) != 0) {
+        return PDF_ERROR(
+            PDF_ERR_POSTSCRIPT_USER_DATA_INVALID,
+            "The user-data at the top of the stack had an unexpected name"
+        );
+    }
+
+    *user_data_out = user_data_top.data;
+
+    return NULL;
+}
+
+/// Pushes a new user-data to the stack.
+void postscript_interpreter_user_data_push(
+    PostscriptInterpreter* interpreter,
+    void* user_data,
+    const char* name
+) {
+    RELEASE_ASSERT(interpreter);
+    RELEASE_ASSERT(user_data);
+    RELEASE_ASSERT(name);
+
+    postscript_user_data_stack_push_back(
+        interpreter->user_data_stack,
+        (PostscriptUserData) {.data = user_data, .name = name}
+    );
+}
+
+/// Pops a user-data from the stack.
+PdfError* postscript_interpreter_user_data_pop(
+    PostscriptInterpreter* interpreter,
+    const char* expected_name
+) {
+    RELEASE_ASSERT(interpreter);
+    RELEASE_ASSERT(expected_name);
+
+    PostscriptUserData user_data_top;
+    if (!postscript_user_data_stack_pop_back(
+            interpreter->user_data_stack,
+            &user_data_top
+        )) {
+        return PDF_ERROR(
+            PDF_ERR_POSTSCRIPT_USER_DATA_INVALID,
+            "The user-data stack is empty"
+        );
+    }
+
+    if (strcmp(expected_name, user_data_top.name) != 0) {
+        return PDF_ERROR(
+            PDF_ERR_POSTSCRIPT_USER_DATA_INVALID,
+            "The user-data at the top of the stack had an unexpected name"
+        );
+    }
+
+    return NULL;
 }

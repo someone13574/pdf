@@ -1,23 +1,25 @@
-#include "procedures.h"
+#include "operators.h"
 
 #include <stdbool.h>
 
 #include "arena/arena.h"
-// #include "interpreter.h"
 #include "logger/log.h"
 #include "pdf_error/error.h"
 #include "postscript/interpreter.h"
 #include "postscript/object.h"
 #include "postscript/resource.h"
 
-static void push_procedure(
+static void push_operator(
     PostscriptObjectList* dict,
-    PostscriptCustomProcedure procedure,
-    char* name
+    PostscriptOperator
+    operator,
+    char * name
 ) {
     RELEASE_ASSERT(dict);
-    RELEASE_ASSERT(procedure);
+    RELEASE_ASSERT(operator);
     RELEASE_ASSERT(name);
+
+    LOG_DIAG(DEBUG, PS, "Adding systemdict operator `%s`", name);
 
     postscript_object_list_push_back(
         dict,
@@ -31,32 +33,86 @@ static void push_procedure(
     postscript_object_list_push_back(
         dict,
         (PostscriptObject
-        ) {.type = POSTSCRIPT_OBJECT_CUSTOM_PROC,
-           .data.custom_proc = procedure,
+        ) {.type = POSTSCRIPT_OBJECT_OPERATOR,
+           .data.operator= operator,
            .access = POSTSCRIPT_ACCESS_EXECUTE_ONLY,
            .literal = false}
     );
 }
 
-PostscriptObject postscript_systemdict_procedures(Arena* arena) {
+PostscriptObject postscript_systemdict_ops(Arena* arena) {
+    RELEASE_ASSERT(arena);
+
+    LOG_DIAG(INFO, PS, "Getting systemdict operators");
+
     PostscriptObject dict = {
         .type = POSTSCRIPT_OBJECT_DICT,
         .data.dict = postscript_object_list_new(arena),
-        .access = POSTSCRIPT_ACCESS_EXECUTE_ONLY,
+        .access = POSTSCRIPT_ACCESS_READ_ONLY,
         .literal = true
     };
 
-    push_procedure(dict.data.dict, postscript_proc_begin, "begin");
-    push_procedure(
-        dict.data.dict,
-        postscript_proc_findresource,
-        "findresource"
-    );
+    push_operator(dict.data.dict, postscript_op_dup, "dup");
+    push_operator(dict.data.dict, postscript_op_dict, "dict");
+    push_operator(dict.data.dict, postscript_op_def, "def");
+    push_operator(dict.data.dict, postscript_op_begin, "begin");
+    push_operator(dict.data.dict, postscript_op_end, "end");
+    push_operator(dict.data.dict, postscript_op_findresource, "findresource");
 
     return dict;
 }
 
-PdfError* postscript_proc_begin(PostscriptInterpreter* interpreter) {
+PdfError* postscript_op_dup(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    PostscriptObject object;
+    PDF_PROPAGATE(postscript_interpreter_pop_operand(interpreter, &object));
+
+    postscript_interpreter_operand_push(interpreter, object);
+    postscript_interpreter_operand_push(interpreter, object);
+
+    return NULL;
+}
+
+PdfError* postscript_op_dict(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    PostscriptObject length_object;
+    PDF_PROPAGATE(postscript_interpreter_pop_operand_typed(
+        interpreter,
+        POSTSCRIPT_OBJECT_INTEGER,
+        true,
+        &length_object
+    ));
+
+    postscript_interpreter_operand_push(
+        interpreter,
+        (PostscriptObject
+        ) {.type = POSTSCRIPT_OBJECT_DICT,
+           .data.dict = postscript_object_list_new(
+               postscript_interpreter_get_arena(interpreter)
+           ),
+           .access = POSTSCRIPT_ACCESS_UNLIMITED,
+           .literal = true}
+    );
+
+    return NULL;
+}
+
+PdfError* postscript_op_def(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    PostscriptObject value;
+    PostscriptObject key;
+    PDF_PROPAGATE(postscript_interpreter_pop_operand(interpreter, &value));
+    PDF_PROPAGATE(postscript_interpreter_pop_operand(interpreter, &key));
+
+    PDF_PROPAGATE(postscript_interpreter_define(interpreter, key, value));
+
+    return NULL;
+}
+
+PdfError* postscript_op_begin(PostscriptInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PostscriptObject dict_object;
@@ -71,7 +127,15 @@ PdfError* postscript_proc_begin(PostscriptInterpreter* interpreter) {
     return NULL;
 }
 
-PdfError* postscript_proc_findresource(PostscriptInterpreter* interpreter) {
+PdfError* postscript_op_end(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    PDF_PROPAGATE(postscript_interpreter_dict_pop(interpreter));
+
+    return NULL;
+}
+
+PdfError* postscript_op_findresource(PostscriptInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     // Read operands

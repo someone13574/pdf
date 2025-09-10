@@ -23,18 +23,19 @@ PostscriptResource postscript_resource_new_dict(Arena* arena, char* name) {
     ) {.name = name,
        .object.type = POSTSCRIPT_OBJECT_DICT,
        .object.data.dict = postscript_object_list_new(arena),
-       .object.access = POSTSCRIPT_ACCESS_EXECUTE_ONLY,
+       .object.access = POSTSCRIPT_ACCESS_READ_ONLY,
        .object.literal = true};
 }
 
-void postscript_resource_add_fn(
+void postscript_resource_add_op(
     PostscriptResource* resource,
-    char* name,
-    PostscriptCustomProcedure procedure
+    PostscriptOperator
+    operator,
+    char * name
 ) {
     RELEASE_ASSERT(resource);
     RELEASE_ASSERT(name);
-    RELEASE_ASSERT(procedure);
+    RELEASE_ASSERT(operator);
     RELEASE_ASSERT(resource->object.type == POSTSCRIPT_OBJECT_DICT);
 
     postscript_object_list_push_back(
@@ -49,8 +50,8 @@ void postscript_resource_add_fn(
     postscript_object_list_push_back(
         resource->object.data.dict,
         (PostscriptObject
-        ) {.type = POSTSCRIPT_OBJECT_CUSTOM_PROC,
-           .data.custom_proc = procedure,
+        ) {.type = POSTSCRIPT_OBJECT_OPERATOR,
+           .data.operator= operator,
            .access = POSTSCRIPT_ACCESS_EXECUTE_ONLY,
            .literal = false}
     );

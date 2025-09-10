@@ -1,7 +1,7 @@
 add_library(postscript
     src/interpreter.c
     src/object.c
-    src/procedures.c
+    src/operators.c
     src/resource.c
     src/tokenizer.c)
 target_include_directories(postscript PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")

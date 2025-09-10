@@ -11,6 +11,10 @@
 #define DLINKED_TYPE PostscriptObject
 #include "arena/dlinked_impl.h"
 
+#define X(name) #name,
+const char* postscript_object_name_lookup[] = {POSTSCRIPT_OBJECT_TYPES};
+#undef X
+
 PdfError* postscript_object_execute(
     PostscriptInterpreter* interpreter,
     const PostscriptObject* object
@@ -21,6 +25,8 @@ PdfError* postscript_object_execute(
 
     switch (object->type) {
         case POSTSCRIPT_OBJECT_NAME: {
+            LOG_DIAG(DEBUG, PS, "Executing name `%s`", object->data.name);
+
             PostscriptObject dict_object;
             PDF_PROPAGATE(postscript_interpreter_dict_entry(
                 interpreter,
@@ -31,10 +37,12 @@ PdfError* postscript_object_execute(
             PDF_PROPAGATE(postscript_object_execute(interpreter, &dict_object));
             break;
         }
-        case POSTSCRIPT_OBJECT_CUSTOM_PROC: {
+        case POSTSCRIPT_OBJECT_OPERATOR: {
+            LOG_DIAG(TRACE, PS, "Executing operator");
+
             PDF_PROPAGATE(
-                object->data.custom_proc(interpreter),
-                "Error occurred while executing procedure"
+                object->data.operator(interpreter),
+                "Error occurred while executing operator"
             );
             break;
         }

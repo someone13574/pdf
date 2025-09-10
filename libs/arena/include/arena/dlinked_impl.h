@@ -169,6 +169,29 @@ bool DLINKED_FN(get_ptr)(
     return true;
 }
 
+// Gets the last element of the linked-list and stores it in `out`. If the list
+// is empty, false is returned and `out` isn't set.
+bool DLINKED_FN(back)(const DLINKED_NAME* linked_list, DLINKED_TYPE* out) {
+    RELEASE_ASSERT(linked_list);
+    RELEASE_ASSERT(out);
+
+    LOG_DIAG(
+        DEBUG,
+        LINKED_LIST,
+        "Getting last " STRINGIFY(DLINKED_TYPE
+        ) " element from " STRINGIFY(DLINKED_NAME)
+    );
+
+    if (linked_list->len == 0) {
+        LOG_DIAG(TRACE, LINKED_LIST, "List empty");
+        return false;
+    }
+
+    *out = linked_list->back->data;
+
+    return true;
+}
+
 // Sets the element stored at index `idx`, which must be in bounds.
 void DLINKED_FN(set)(
     DLINKED_NAME* linked_list,
