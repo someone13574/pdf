@@ -52,6 +52,7 @@ PostscriptObject postscript_systemdict_ops(Arena* arena) {
         .literal = true
     };
 
+    push_operator(dict.data.dict, postscript_op_pop, "pop");
     push_operator(dict.data.dict, postscript_op_dup, "dup");
     push_operator(dict.data.dict, postscript_op_dict, "dict");
     push_operator(dict.data.dict, postscript_op_def, "def");
@@ -66,6 +67,15 @@ PostscriptObject postscript_systemdict_ops(Arena* arena) {
     );
 
     return dict;
+}
+
+PdfError* postscript_op_pop(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    PostscriptObject popped;
+    PDF_PROPAGATE(postscript_interpreter_pop_operand(interpreter, &popped));
+
+    return NULL;
 }
 
 PdfError* postscript_op_dup(PostscriptInterpreter* interpreter) {
@@ -154,8 +164,45 @@ PdfError* postscript_op_currentdict(PostscriptInterpreter* interpreter) {
 PdfError* postscript_op_defineresource(PostscriptInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
-    postscript_interpreter_dump(interpreter);
-    LOG_TODO();
+    PostscriptObject category_name;
+    PostscriptObject instance;
+    PostscriptObject key_name;
+    PDF_PROPAGATE(postscript_interpreter_pop_operand_typed(
+        interpreter,
+        POSTSCRIPT_OBJECT_NAME,
+        true,
+        &category_name
+    ));
+    PDF_PROPAGATE(postscript_interpreter_pop_operand_typed(
+        interpreter,
+        POSTSCRIPT_OBJECT_DICT,
+        true,
+        &instance
+    ));
+    PDF_PROPAGATE(postscript_interpreter_pop_operand_typed(
+        interpreter,
+        POSTSCRIPT_OBJECT_NAME,
+        true,
+        &key_name
+    ));
+
+    PostscriptResourceCategory* category = postscript_get_resource_category(
+        postscript_interpreter_get_resource_categories(interpreter),
+        category_name.data.name
+    );
+    if (!category) {
+        return PDF_ERROR(
+            PDF_ERR_POSTSCRIPT_UNKNOWN_RESOURCE,
+            "Unknown resource category %s",
+            category_name.data.name
+        );
+    }
+
+    PostscriptResource resource =
+        postscript_resource_new(key_name.data.name, instance);
+    postscript_resource_category_add_resource(category, resource);
+
+    postscript_interpreter_operand_push(interpreter, instance);
 
     return NULL;
 }

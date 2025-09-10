@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "logger/log.h"
+#include "pdf_error/error.h"
 #include "postscript/object.h"
 
 #define DVEC_NAME PostscriptResourceVec
@@ -14,6 +15,13 @@
 #define DVEC_LOWERCASE_NAME postscript_resource_category_vec
 #define DVEC_TYPE PostscriptResourceCategory
 #include "arena/dvec_impl.h"
+
+PostscriptResource
+postscript_resource_new(char* name, PostscriptObject object) {
+    RELEASE_ASSERT(name);
+
+    return (PostscriptResource) {.name = name, .object = object};
+}
 
 PostscriptResource postscript_resource_new_dict(Arena* arena, char* name) {
     RELEASE_ASSERT(arena);
@@ -64,6 +72,26 @@ postscript_resource_category_new(Arena* arena, char* name) {
 
     return (PostscriptResourceCategory
     ) {.name = name, .resources = postscript_resource_vec_new(arena)};
+}
+
+PdfError* postscript_resource_category_add_resource(
+    PostscriptResourceCategory* category,
+    PostscriptResource resource
+) {
+    RELEASE_ASSERT(category);
+    RELEASE_ASSERT(resource.name);
+
+    if (postscript_resource_category_get_resource(category, resource.name)) {
+        PDF_ERROR(
+            PDF_ERR_POSTSCRIPT_RESOURCE_DEFINED,
+            "Resource `%s` is already defined",
+            resource.name
+        );
+    }
+
+    postscript_resource_vec_push(category->resources, resource);
+
+    return NULL;
 }
 
 PostscriptResourceCategory* postscript_get_resource_category(

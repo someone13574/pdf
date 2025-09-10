@@ -323,5 +323,7 @@ PdfError* pdf_parse_cmap(Arena* arena, const char* data, size_t data_len) {
         PDF_PROPAGATE(postscript_interpret_token(interpreter, token));
     }
 
+    postscript_interpreter_dump(interpreter);
+
     return NULL;
 }

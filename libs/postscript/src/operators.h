@@ -8,6 +8,7 @@
 /// Get a dictionary containing builtin operators.
 PostscriptObject postscript_systemdict_ops(Arena* arena);
 
+PdfError* postscript_op_pop(PostscriptInterpreter* interpreter);
 PdfError* postscript_op_dup(PostscriptInterpreter* interpreter);
 
 PdfError* postscript_op_dict(PostscriptInterpreter* interpreter);

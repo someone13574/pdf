@@ -136,7 +136,7 @@ postscript_object_fmt(Arena* arena, const PostscriptObject* object) {
             ));
         }
         case POSTSCRIPT_OBJECT_OPERATOR: {
-            return ".operator.";
+            return "<|builtin|>";
         }
         case POSTSCRIPT_OBJECT_DICT: {
             ArenaString* str = arena_string_new_fmt(arena, "<< ");

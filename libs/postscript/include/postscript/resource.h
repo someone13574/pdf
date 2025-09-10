@@ -1,6 +1,7 @@
 #pragma once
 
 #include "arena/arena.h"
+#include "pdf_error/error.h"
 #include "postscript/object.h"
 
 /// A collection of named objects that reside in VM or can be located and
@@ -9,6 +10,9 @@ typedef struct {
     char* name;
     PostscriptObject object;
 } PostscriptResource;
+
+/// Creates a new resource from an existing object.
+PostscriptResource postscript_resource_new(char* name, PostscriptObject object);
 
 /// Create a new resource with dictionary storage.
 PostscriptResource postscript_resource_new_dict(Arena* arena, char* name);
@@ -35,6 +39,12 @@ typedef struct {
 /// Create a new resource category.
 PostscriptResourceCategory
 postscript_resource_category_new(Arena* arena, char* name);
+
+/// Add a resource to a resource category
+PdfError* postscript_resource_category_add_resource(
+    PostscriptResourceCategory* category,
+    PostscriptResource resource
+);
 
 #define DVEC_NAME PostscriptResourceCategoryVec
 #define DVEC_LOWERCASE_NAME postscript_resource_category_vec

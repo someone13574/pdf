@@ -42,6 +42,48 @@ Arena* postscript_interpreter_get_arena(PostscriptInterpreter* interpreter) {
     return interpreter->arena;
 }
 
+static void init_default_resource_categories(PostscriptInterpreter* interpreter
+) {
+    RELEASE_ASSERT(interpreter);
+
+    // TODO: non-dict categories
+    char* category_names[] = {
+        "Font",
+        "CIDFont",
+        "CMap",
+        "FontSet",
+        "Form",
+        "Pattern",
+        "ProcSet",
+        "Halftone",
+        "ColorRendering",
+        "IdiomSet",
+        "InkParams",
+        "TrapParams",
+        "OutputDevice",
+        "ControlLanguage",
+        "Localization",
+        "PDL",
+        "HWOptions",
+        "Category"
+    };
+
+    for (size_t idx = 0; idx < sizeof(category_names) / sizeof(char*); idx++) {
+        if (!postscript_get_resource_category(
+                interpreter->resource_categories,
+                category_names[idx]
+            )) {
+            postscript_resource_category_vec_push(
+                interpreter->resource_categories,
+                postscript_resource_category_new(
+                    interpreter->arena,
+                    category_names[idx]
+                )
+            );
+        }
+    }
+}
+
 PostscriptInterpreter* postscript_interpreter_new(Arena* arena) {
     RELEASE_ASSERT(arena);
 
@@ -54,6 +96,7 @@ PostscriptInterpreter* postscript_interpreter_new(Arena* arena) {
     interpreter->dict_stack = postscript_object_list_new(arena);
     interpreter->resource_categories =
         postscript_resource_category_vec_new(arena);
+    init_default_resource_categories(interpreter);
     interpreter->user_data_stack = postscript_user_data_stack_new(arena);
 
     // Initialize standard dictionaries
@@ -79,8 +122,46 @@ void postscript_interpreter_dump(PostscriptInterpreter* interpreter) {
     Arena* fmt_arena = arena_new(1024);
     LOG_DIAG(INFO, PS, "Interpreter state:");
 
-    // Dictionaries
+    // Resources
+    LOG_DIAG(INFO, PS, " ");
+    LOG_DIAG(INFO, PS, " ");
+    LOG_DIAG(INFO, PS, "    Resources:");
+    for (size_t category_idx = 0;
+         category_idx
+         < postscript_resource_category_vec_len(interpreter->resource_categories
+         );
+         category_idx++) {
+        PostscriptResourceCategory category;
+        RELEASE_ASSERT(postscript_resource_category_vec_get(
+            interpreter->resource_categories,
+            category_idx,
+            &category
+        ));
 
+        for (size_t resource_idx = 0;
+             resource_idx < postscript_resource_vec_len(category.resources);
+             resource_idx++) {
+            PostscriptResource resource;
+            RELEASE_ASSERT(postscript_resource_vec_get(
+                category.resources,
+                resource_idx,
+                &resource
+            ));
+
+            LOG_DIAG(
+                INFO,
+                PS,
+                "        %s/%s: %s",
+                category.name,
+                resource.name,
+                postscript_object_fmt(fmt_arena, &resource.object)
+            );
+        }
+    }
+
+    // Dictionaries
+    LOG_DIAG(INFO, PS, " ");
+    LOG_DIAG(INFO, PS, " ");
     LOG_DIAG(
         INFO,
         PS,
@@ -107,6 +188,8 @@ void postscript_interpreter_dump(PostscriptInterpreter* interpreter) {
     }
 
     // Operands
+    LOG_DIAG(INFO, PS, " ");
+    LOG_DIAG(INFO, PS, " ");
     LOG_DIAG(
         INFO,
         PS,
@@ -358,7 +441,10 @@ PdfError* postscript_interpreter_pop_operand(
     RELEASE_ASSERT(object_out);
 
     if (!postscript_object_list_pop_back(interpreter->operands, object_out)) {
-        return PDF_ERROR(PDF_ERR_POSTSCRIPT_OPERANDS_EMPTY);
+        return PDF_ERROR(
+            PDF_ERR_POSTSCRIPT_OPERANDS_EMPTY,
+            "No operands to pop"
+        );
     }
 
     LOG_DIAG(
@@ -518,7 +604,7 @@ PdfError* postscript_interpreter_dict_entry(
 
     return PDF_ERROR(
         PDF_ERR_POSTSCRIPT_KEY_MISSING,
-        "Entry with key `%s` not found in dictionary",
+        "Entry with key `%s` not found in dictionary stack",
         postscript_object_fmt(interpreter->arena, key)
     );
 }
