@@ -11,9 +11,9 @@
 #include "ctx.h"
 #include "logger/log.h"
 #include "pdf/object.h"
+#include "pdf/stream/stream_dict.h"
 #include "pdf_error/error.h"
 #include "stream/filters.h"
-#include "stream/stream_dict.h"
 
 #define DVEC_NAME PdfObjectVec
 #define DVEC_LOWERCASE_NAME pdf_object_vec
@@ -68,7 +68,8 @@ PdfError* pdf_parse_stream(
     PdfCtx* ctx,
     uint8_t** stream_bytes,
     size_t* decoded_len,
-    PdfObject* stream_dict
+    PdfObject* stream_dict,
+    PdfStreamDict* stream_dict_out
 );
 
 PdfError* pdf_parse_object(
@@ -739,12 +740,14 @@ PdfError* pdf_parse_dict(
 
         uint8_t* stream_bytes;
         size_t decoded_len;
+        PdfStreamDict stream_dict;
         if (!pdf_error_free_is_ok(pdf_parse_stream(
                 arena,
                 ctx,
                 &stream_bytes,
                 &decoded_len,
-                object
+                object,
+                &stream_dict
             ))
             || !stream_bytes) {
             // Not a stream
@@ -753,11 +756,12 @@ PdfError* pdf_parse_dict(
         }
 
         // Type is a stream
-        PdfObject* stream_dict = arena_alloc(arena, sizeof(PdfObject));
-        *stream_dict = *object;
+        PdfStreamDict* stream_dict_ptr =
+            arena_alloc(arena, sizeof(PdfStreamDict));
+        *stream_dict_ptr = stream_dict;
 
         object->type = PDF_OBJECT_TYPE_STREAM;
-        object->data.stream.stream_dict = stream_dict;
+        object->data.stream.stream_dict = stream_dict_ptr;
         object->data.stream.stream_bytes = stream_bytes;
         object->data.stream.decoded_stream_len = decoded_len;
 
@@ -772,13 +776,15 @@ PdfError* pdf_parse_stream(
     PdfCtx* ctx,
     uint8_t** stream_body,
     size_t* decoded_len,
-    PdfObject* stream_dict_obj
+    PdfObject* stream_dict_obj,
+    PdfStreamDict* stream_dict_out
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(stream_body);
     RELEASE_ASSERT(decoded_len);
     RELEASE_ASSERT(stream_dict_obj);
+    RELEASE_ASSERT(stream_dict_out);
 
     // Parse start
     PDF_PROPAGATE(pdf_ctx_expect(ctx, "stream"));
@@ -830,6 +836,8 @@ PdfError* pdf_parse_stream(
             "Missing newline and `endstream` keyword at expected location"
         );
     }
+
+    *stream_dict_out = stream_dict;
 
     return NULL;
 }
@@ -1064,7 +1072,7 @@ ArenaString* pdf_fmt_object_indented(
                 "%s\n%*sstream\n%*s...\n%*sendstream",
                 arena_string_buffer(pdf_fmt_object_indented(
                     arena,
-                    object->data.stream.stream_dict,
+                    object->data.stream.stream_dict->raw_dict,
                     indent,
                     NULL
                 )),

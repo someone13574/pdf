@@ -75,59 +75,77 @@ PdfError* deserialize_field(
 
     switch (field_info.kind) {
         case PDF_FIELD_KIND_OBJECT: {
-            PDF_PROPAGATE(pdf_deserialize_object_field(
-                field_ptr,
-                &resolved_object,
-                field_info.data.object
-            ));
+            PDF_PROPAGATE(
+                pdf_deserialize_object_field(
+                    field_ptr,
+                    &resolved_object,
+                    field_info.data.object
+                ),
+                "Error while deserializing object field"
+            );
             break;
         }
         case PDF_FIELD_KIND_REF: {
-            PDF_PROPAGATE(pdf_deserialize_ref_field(
-                field_ptr,
-                &resolved_object,
-                field_info.data.ref
-            ));
+            PDF_PROPAGATE(
+                pdf_deserialize_ref_field(
+                    field_ptr,
+                    &resolved_object,
+                    field_info.data.ref
+                ),
+                "Error while deserializing ref field"
+            );
             break;
         }
         case PDF_FIELD_KIND_CUSTOM: {
-            PDF_PROPAGATE(pdf_deserialize_custom_field(
-                field_ptr,
-                &resolved_object,
-                arena,
-                field_info.data.custom,
-                resolver
-            ));
+            PDF_PROPAGATE(
+                pdf_deserialize_custom_field(
+                    field_ptr,
+                    &resolved_object,
+                    arena,
+                    field_info.data.custom,
+                    resolver
+                ),
+                "Error while deserializing custom field"
+            );
             break;
         }
         case PDF_FIELD_KIND_ARRAY: {
-            PDF_PROPAGATE(pdf_deserialize_array_field(
-                field_ptr,
-                &resolved_object,
-                field_info.data.array,
-                arena,
-                resolver
-            ));
+            PDF_PROPAGATE(
+                pdf_deserialize_array_field(
+                    field_ptr,
+                    &resolved_object,
+                    field_info.data.array,
+                    arena,
+                    resolver
+                ),
+                "Error while deserializing array field"
+            );
             break;
         }
         case PDF_FIELD_KIND_AS_ARRAY: {
-            PDF_PROPAGATE(pdf_deserialize_as_array_field(
-                field_ptr,
-                &resolved_object,
-                field_info.data.array,
-                arena,
-                resolver
-            ));
+            PDF_PROPAGATE(
+                pdf_deserialize_as_array_field(
+                    field_ptr,
+                    &resolved_object,
+                    field_info.data.array,
+                    arena,
+                    resolver
+                ),
+                "Error while deserializing as-array field"
+            );
             break;
         }
         case PDF_FIELD_KIND_OPTIONAL: {
-            PDF_PROPAGATE(pdf_deserialize_optional_field(
-                field_ptr,
-                &resolved_object,
-                field_info.data.optional,
-                arena,
-                resolver
-            ));
+            PDF_PROPAGATE(
+                pdf_deserialize_optional_field(
+                    field_ptr,
+                    &resolved_object,
+                    field_info.data.optional,
+                    arena,
+                    resolver
+                ),
+                "Error while deserializing optional field"
+            );
             break;
         }
         case PDF_FIELD_KIND_IGNORED: {
@@ -283,8 +301,8 @@ PdfError* pdf_deserialize_array_field(
     if (object->type != PDF_OBJECT_TYPE_ARRAY) {
         return PDF_ERROR(
             PDF_ERR_INCORRECT_TYPE,
-            "Array field has incorrect type %d",
-            object->type
+            "Array field has incorrect type %d (expected array)",
+            (int)object->type
         );
     }
 
@@ -405,7 +423,8 @@ PdfError* pdf_deserialize_object(
     size_t num_fields,
     Arena* arena,
     PdfOptionalResolver resolver,
-    bool allow_unknown_fields
+    bool allow_unknown_fields,
+    const char* name
 ) {
     RELEASE_ASSERT(target);
     RELEASE_ASSERT(object);
@@ -421,7 +440,7 @@ PdfError* pdf_deserialize_object(
         return PDF_ERROR(PDF_ERR_OBJECT_NOT_DICT);
     }
 
-    LOG_DIAG(INFO, DESERDE, "Deserializing dictionary object");
+    LOG_DIAG(INFO, DESERDE, "Deserializing dictionary object `%s`", name);
 
     // Reject unknown keys
     if (!allow_unknown_fields) {
@@ -490,13 +509,19 @@ PdfError* pdf_deserialize_object(
                 continue;
             }
 
-            PDF_PROPAGATE(deserialize_field(
-                (char*)target + field->offset,
-                entry.value,
-                field->info,
-                arena,
-                resolver
-            ));
+            PDF_PROPAGATE(
+                deserialize_field(
+                    (char*)target + field->offset,
+                    entry.value,
+                    field->info,
+                    arena,
+                    resolver
+                ),
+                "Error while deserializing field `%s` (\x1b[4m%s:%lu\x1b[0m)",
+                field->key,
+                field->debug.file,
+                field->debug.line
+            );
 
             found = true;
             break;
@@ -627,7 +652,8 @@ PdfError* pdf_deserialize_operands(
             sizeof(fields) / sizeof(PdfFieldDescriptor),                       \
             arena,                                                             \
             resolver,                                                          \
-            false                                                              \
+            false,                                                             \
+            "test-object"                                                      \
         ));                                                                    \
         return NULL;                                                           \
     } while (0)

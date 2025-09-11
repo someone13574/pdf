@@ -27,7 +27,7 @@ PdfError* postscript_object_execute(
 
     switch (object->type) {
         case POSTSCRIPT_OBJECT_NAME: {
-            LOG_DIAG(DEBUG, PS, "Executing name `%s`", object->data.name);
+            LOG_DIAG(DEBUG, PS, "Executing `%s`", object->data.name);
 
             PostscriptObject dict_object;
             PDF_PROPAGATE(postscript_interpreter_dict_entry(

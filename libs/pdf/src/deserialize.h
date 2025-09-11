@@ -130,7 +130,8 @@ PdfError* pdf_deserialize_object(
     size_t num_fields,
     Arena* arena,
     PdfOptionalResolver resolver,
-    bool allow_unknown_fields
+    bool allow_unknown_fields,
+    const char* name
 );
 
 PdfError* pdf_deserialize_operands(

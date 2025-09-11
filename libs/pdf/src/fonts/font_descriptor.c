@@ -62,7 +62,7 @@ PdfError* pdf_deserialize_font_descriptor(
         ),
         PDF_FIELD(
             PdfFontDescriptor,
-            "flags",
+            "Flags",
             flags,
             PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
         ),
@@ -199,7 +199,8 @@ PdfError* pdf_deserialize_font_descriptor(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
         resolver,
-        false
+        false,
+        "PdfFontDescriptor"
     ));
 
     if (strcmp(deserialized->type, "FontDescriptor") != 0) {
@@ -229,3 +230,9 @@ PdfError* pdf_deserialize_font_descriptor(
 
     return NULL;
 }
+
+PDF_DESERIALIZABLE_REF_IMPL(
+    PdfFontDescriptor,
+    font_descriptor,
+    pdf_deserialize_font_descriptor
+)

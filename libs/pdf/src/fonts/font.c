@@ -88,7 +88,8 @@ PdfError* pdf_deserialize_type0_font(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
         resolver,
-        false
+        false,
+        "PdfType0font"
     ));
 
     if (strcmp(deserialized->type, "Font") != 0) {
@@ -187,7 +188,8 @@ PdfError* pdf_deserialize_cid_font(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
         resolver,
-        false
+        false,
+        "PdfCIDFont"
     ));
 
     if (strcmp(deserialized->type, "Font") != 0) {
@@ -245,7 +247,8 @@ PdfError* pdf_deserialize_font(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
         resolver,
-        true
+        true,
+        "PdfFontInfo"
     ));
 
     if (strcmp(font_info.type, "Font") != 0) {

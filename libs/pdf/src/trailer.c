@@ -37,7 +37,8 @@ PdfError* pdf_deserialize_trailer(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
         resolver,
-        false
+        false,
+        "PdfTrailer"
     ));
 
     return NULL;

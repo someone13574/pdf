@@ -58,7 +58,8 @@ PdfError* pdf_deserialize_cid_system_info(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
         resolver,
-        false
+        false,
+        "PdfCIDSystemInfo"
     ));
 
     return NULL;
@@ -564,7 +565,6 @@ PdfError* pdf_parse_cmap(
         PDF_PROPAGATE(postscript_interpret_token(interpreter, token));
     }
 
-    postscript_interpreter_dump(interpreter);
     arena_free(interpreter_arena);
 
     return NULL;

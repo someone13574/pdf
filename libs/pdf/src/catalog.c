@@ -36,7 +36,8 @@ PdfError* pdf_deserialize_catalog(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
         resolver,
-        false
+        false,
+        "PdfCatelog"
     ));
 
     return NULL;

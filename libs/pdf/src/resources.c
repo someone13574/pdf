@@ -31,7 +31,8 @@ PdfError* pdf_deserialize_resources(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
         resolver,
-        false
+        false,
+        "PdfResources"
     ));
 
     return NULL;

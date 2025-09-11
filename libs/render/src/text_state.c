@@ -8,6 +8,7 @@
 #include "geom/mat3.h"
 #include "logger/log.h"
 #include "pdf/object.h"
+#include "pdf/resolver.h"
 #include "pdf_error/error.h"
 
 TextState text_state_default(void) {
@@ -27,6 +28,7 @@ TextObjectState text_object_state_default(void) {
 PdfError* text_state_render(
     Arena* arena,
     Canvas* canvas,
+    PdfOptionalResolver resolver,
     PdfCMapCache* cmap_cache,
     GeomMat3 ctm,
     TextState* state,
@@ -35,6 +37,7 @@ PdfError* text_state_render(
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(canvas);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
     RELEASE_ASSERT(cmap_cache);
     RELEASE_ASSERT(state);
     RELEASE_ASSERT(object_state);
@@ -49,6 +52,7 @@ PdfError* text_state_render(
     size_t offset = 0;
 
     while (true) {
+        // Get CID
         bool finished = false;
         uint32_t cid;
         PDF_PROPAGATE(next_cid(
@@ -63,6 +67,10 @@ PdfError* text_state_render(
         if (finished) {
             break;
         }
+
+        // Get GID
+        uint32_t gid;
+        PDF_PROPAGATE(cid_to_gid(&state->text_font, resolver, cid, &gid));
 
         LOG_WARN(RENDER, "Cid: %u", (unsigned int)cid);
     }

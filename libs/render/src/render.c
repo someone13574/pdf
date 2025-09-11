@@ -134,6 +134,7 @@ static PdfError* process_content_stream(
                 PDF_PROPAGATE(text_state_render(
                     arena,
                     canvas,
+                    resolver,
                     state->cmap_cache,
                     state->graphics_state.ctm,
                     &state->graphics_state.text_state,

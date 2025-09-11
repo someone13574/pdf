@@ -20,7 +20,7 @@
     X(DESERDE, INHERIT, PDF)                                                   \
     X(RENDER, INHERIT, GLOBAL)                                                 \
     X(FONT, INHERIT, GLOBAL)                                                   \
-    X(PS, TRACE, GLOBAL)                                                       \
+    X(PS, INHERIT, GLOBAL)                                                     \
     X(PS_TOKEN, INFO, PS)                                                      \
     X(CMAP, INHERIT, FONT)                                                     \
     X(SFNT, INHERIT, GLOBAL)                                                   \
