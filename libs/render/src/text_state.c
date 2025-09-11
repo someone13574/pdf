@@ -9,7 +9,6 @@
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf_error/error.h"
-#include "sfnt/sfnt.h"
 
 TextState text_state_default(void) {
     return (TextState
@@ -28,6 +27,7 @@ TextObjectState text_object_state_default(void) {
 PdfError* text_state_render(
     Arena* arena,
     Canvas* canvas,
+    PdfCMapCache* cmap_cache,
     GeomMat3 ctm,
     TextState* state,
     TextObjectState* object_state,
@@ -35,6 +35,7 @@ PdfError* text_state_render(
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(canvas);
+    RELEASE_ASSERT(cmap_cache);
     RELEASE_ASSERT(state);
     RELEASE_ASSERT(object_state);
     RELEASE_ASSERT(text.data);
@@ -46,10 +47,23 @@ PdfError* text_state_render(
     }
 
     size_t offset = 0;
-    bool finished = false;
 
-    while (!finished) {
-        uint32_t cid = next_cid(&state->text_font, &text, &offset, &finished);
+    while (true) {
+        bool finished = false;
+        uint32_t cid;
+        PDF_PROPAGATE(next_cid(
+            &state->text_font,
+            cmap_cache,
+            &text,
+            &offset,
+            &finished,
+            &cid
+        ));
+
+        if (finished) {
+            break;
+        }
+
         LOG_WARN(RENDER, "Cid: %u", (unsigned int)cid);
     }
 

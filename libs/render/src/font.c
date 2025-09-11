@@ -3,40 +3,49 @@
 #include <string.h>
 
 #include "logger/log.h"
+#include "pdf/fonts/cmap.h"
 #include "pdf/fonts/font.h"
+#include "pdf_error/error.h"
 
-uint32_t
-next_cid(PdfFont* font, PdfString* data, size_t* offset, bool* finished) {
+PdfError* next_cid(
+    PdfFont* font,
+    PdfCMapCache* cmap_cache,
+    PdfString* data,
+    size_t* offset,
+    bool* finished_out,
+    uint32_t* cid_out
+) {
     RELEASE_ASSERT(font);
+    RELEASE_ASSERT(cmap_cache);
     RELEASE_ASSERT(data);
     RELEASE_ASSERT(offset);
-    RELEASE_ASSERT(finished);
+    RELEASE_ASSERT(finished_out);
+    RELEASE_ASSERT(cid_out);
 
     switch (font->type) {
         case PDF_FONT_TYPE0: {
-            // Length check is done by deserializer, so assert is valid
-            void* descendant_font_ptr;
-            RELEASE_ASSERT(pdf_void_vec_get(
-                font->data.type0.descendant_fonts.elements,
-                0,
-                &descendant_font_ptr
-            ));
-
-            PdfCIDFont* cid_font = descendant_font_ptr;
-            PdfFont descendant_font = (PdfFont
-            ) {.type = (strcmp(cid_font->subtype, "CIDFontType0") == 0)
-                         ? PDF_FONT_CIDTYPE0
-                         : PDF_FONT_CIDTYPE2,
-               .data.cid = *cid_font};
-
-            return next_cid(&descendant_font, data, offset, finished);
-        }
-        case PDF_FONT_CIDTYPE0: {
-            *offset += 1;
-            if (*offset == data->len) {
-                *finished = true;
+            if (*offset + 1 >= data->len) {
+                *finished_out = true;
+                return NULL;
             }
-            return 0;
+
+            // Get CMap. TODO: Check ROS against descendent font's ROS
+            PdfCMap* cmap = NULL;
+            PDF_PROPAGATE(
+                pdf_cmap_cache_get(cmap_cache, font->data.type0.encoding, &cmap)
+            );
+
+            // Get codepoint
+            RELEASE_ASSERT(*offset + 1 < data->len);
+            uint32_t codepoint = ((uint32_t)data->data[*offset] << 8)
+                               | (uint32_t)data->data[*offset + 1];
+
+            // Map codepoint to cid
+            PDF_PROPAGATE(pdf_cmap_get_cid(cmap, codepoint, cid_out));
+
+            *offset += 2;
+
+            return NULL;
         }
         default: {
             LOG_TODO("CID decoding for font type %d", font->type);

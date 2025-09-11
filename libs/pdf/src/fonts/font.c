@@ -151,7 +151,7 @@ PdfError* pdf_deserialize_cid_font(
             PdfCIDFont,
             "CIDSystemInfo",
             cid_system_info,
-            PDF_CUSTOM_FIELD(pdf_deserialize_cid_font_wrapper)
+            PDF_CUSTOM_FIELD(pdf_deserialize_cid_system_info_wrapper)
         ),
         PDF_FIELD(
             PdfCIDFont,

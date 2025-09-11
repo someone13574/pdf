@@ -19,7 +19,7 @@ typedef struct {
     /// increased. Supplements shall not alter the ordering of existing CIDs in
     /// the character collection. This value shall not be used in determining
     /// compatibility between character collections.
-    PdfString supplement;
+    PdfInteger supplement;
 
     const PdfObject* raw_dict;
 } PdfCIDSystemInfo;
@@ -51,3 +51,12 @@ PdfError* pdf_parse_cmap(
 );
 
 PdfError* pdf_load_cmap(Arena* arena, char* name, PdfCMap** cmap_out);
+
+typedef struct PdfCMapCache PdfCMapCache;
+
+/// Creates a new cmap cache.
+PdfCMapCache* pdf_cmap_cache_new(Arena* arena);
+
+/// Gets a cmap associated with a name, loading it if required.
+PdfError*
+pdf_cmap_cache_get(PdfCMapCache* cache, char* name, PdfCMap** cmap_out);

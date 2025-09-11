@@ -43,6 +43,7 @@ TextObjectState text_object_state_default(void);
 PdfError* text_state_render(
     Arena* arena,
     Canvas* canvas,
+    PdfCMapCache* cmap_cache,
     GeomMat3 ctm,
     TextState* state,
     TextObjectState* object_state,

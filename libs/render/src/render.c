@@ -9,6 +9,7 @@
 #include "logger/log.h"
 #include "pdf/content_op.h"
 #include "pdf/content_stream.h"
+#include "pdf/fonts/cmap.h"
 #include "pdf/fonts/font.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
@@ -21,6 +22,8 @@
 typedef struct {
     GraphicsState graphics_state;
     TextObjectState text_object_state;
+
+    PdfCMapCache* cmap_cache;
 } RenderState;
 
 static PdfError* process_content_stream(
@@ -131,6 +134,7 @@ static PdfError* process_content_stream(
                 PDF_PROPAGATE(text_state_render(
                     arena,
                     canvas,
+                    state->cmap_cache,
                     state->graphics_state.ctm,
                     &state->graphics_state.text_state,
                     &state->text_object_state,
@@ -177,7 +181,8 @@ PdfError* render_page(
 
     RenderState state = {
         .graphics_state = graphics_state_default(),
-        .text_object_state = text_object_state_default()
+        .text_object_state = text_object_state_default(),
+        .cmap_cache = pdf_cmap_cache_new(arena)
     };
 
     state.graphics_state.ctm = geom_mat3_mul(
