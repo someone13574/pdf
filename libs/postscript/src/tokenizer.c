@@ -781,6 +781,36 @@ char* postscript_string_as_cstr(PostscriptString string, Arena* arena) {
     return cstr;
 }
 
+PdfError*
+postscript_string_as_uint(PostscriptString string, uint64_t* out_value) {
+    RELEASE_ASSERT(out_value);
+
+    if (string.len == 0) {
+        *out_value = 0;
+        return NULL;
+    }
+
+    if (string.len > 8) {
+        // Check high bytes for non-zero values, which would be an overflow
+        for (size_t idx = 0; idx < string.len - 8; idx++) {
+            if (string.data[idx] != 0) {
+                return PDF_ERROR(
+                    PDF_ERR_POSTSCRIPT_LIMITCHECK,
+                    "Failed to convert hex string to 64-bit unsigned integer"
+                );
+            }
+        }
+    }
+
+    *out_value = 0;
+    for (size_t idx = 0; idx < string.len; idx++) {
+        *out_value <<= 8;
+        *out_value |= (uint64_t)string.data[idx];
+    }
+
+    return NULL;
+}
+
 #ifdef TEST
 
 #include <string.h>

@@ -60,3 +60,7 @@ PdfError* postscript_next_token(
 
 /// Converts a PostscriptString into a null-terminated c-string.
 char* postscript_string_as_cstr(PostscriptString string, Arena* arena);
+
+/// Converts a hex PostscriptString into an unsigned integer.
+PdfError*
+postscript_string_as_uint(PostscriptString string, uint64_t* out_value);

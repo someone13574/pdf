@@ -38,4 +38,14 @@ PdfError* pdf_deserialize_cid_system_info_wrapper(
     void* deserialized
 );
 
-PdfError* pdf_parse_cmap(Arena* arena, const char* data, size_t data_len);
+typedef struct PdfCMap PdfCMap;
+
+PdfError*
+pdf_cmap_get_cid(PdfCMap* cmap, uint32_t codepoint, uint32_t* cid_out);
+
+PdfError* pdf_parse_cmap(
+    Arena* arena,
+    const char* data,
+    size_t data_len,
+    PdfCMap** cmap_out
+);
