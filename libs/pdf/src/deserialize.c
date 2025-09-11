@@ -1,5 +1,6 @@
 #include "deserialize.h"
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -403,7 +404,8 @@ PdfError* pdf_deserialize_object(
     const PdfFieldDescriptor* fields,
     size_t num_fields,
     Arena* arena,
-    PdfOptionalResolver resolver
+    PdfOptionalResolver resolver,
+    bool allow_unknown_fields
 ) {
     RELEASE_ASSERT(target);
     RELEASE_ASSERT(object);
@@ -422,38 +424,41 @@ PdfError* pdf_deserialize_object(
     LOG_DIAG(INFO, DESERDE, "Deserializing dictionary object");
 
     // Reject unknown keys
-    for (size_t entry_idx = 0;
-         entry_idx < pdf_dict_entry_vec_len(resolved_object.data.dict.entries);
-         entry_idx++) {
-        bool found = false;
+    if (!allow_unknown_fields) {
+        for (size_t entry_idx = 0;
+             entry_idx
+             < pdf_dict_entry_vec_len(resolved_object.data.dict.entries);
+             entry_idx++) {
+            bool found = false;
 
-        PdfDictEntry entry;
-        pdf_dict_entry_vec_get(
-            resolved_object.data.dict.entries,
-            entry_idx,
-            &entry
-        );
-
-        for (size_t field_idx = 0; field_idx < num_fields; field_idx++) {
-            if (strcmp(entry.key->data.name, fields[field_idx].key) == 0) {
-                if (found) {
-                    return PDF_ERROR(
-                        PDF_ERR_DUPLICATE_KEY,
-                        "Duplicate dict key `%s`",
-                        entry.key->data.name
-                    );
-                }
-
-                found = true;
-            }
-        }
-
-        if (!found) {
-            return PDF_ERROR(
-                PDF_ERR_UNKNOWN_KEY,
-                "Dict key `%s` is not a known field",
-                entry.key->data.name
+            PdfDictEntry entry;
+            pdf_dict_entry_vec_get(
+                resolved_object.data.dict.entries,
+                entry_idx,
+                &entry
             );
+
+            for (size_t field_idx = 0; field_idx < num_fields; field_idx++) {
+                if (strcmp(entry.key->data.name, fields[field_idx].key) == 0) {
+                    if (found) {
+                        return PDF_ERROR(
+                            PDF_ERR_DUPLICATE_KEY,
+                            "Duplicate dict key `%s`",
+                            entry.key->data.name
+                        );
+                    }
+
+                    found = true;
+                }
+            }
+
+            if (!found) {
+                return PDF_ERROR(
+                    PDF_ERR_UNKNOWN_KEY,
+                    "Dict key `%s` is not a known field",
+                    entry.key->data.name
+                );
+            }
         }
     }
 
@@ -621,7 +626,8 @@ PdfError* pdf_deserialize_operands(
             fields,                                                            \
             sizeof(fields) / sizeof(PdfFieldDescriptor),                       \
             arena,                                                             \
-            resolver                                                           \
+            resolver,                                                          \
+            false                                                              \
         ));                                                                    \
         return NULL;                                                           \
     } while (0)

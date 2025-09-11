@@ -104,6 +104,7 @@ static char* fmt_error_message(const char* fmt, va_list args) {
 struct PdfError {
     PdfErrorCode code;
     PdfErrorCtx* ctx_chain;
+    PdfError* next_error;
 };
 
 PdfError* pdf_error_new(PdfErrorCode code) {
@@ -112,6 +113,7 @@ PdfError* pdf_error_new(PdfErrorCode code) {
 
     error->code = code;
     error->ctx_chain = NULL;
+    error->next_error = NULL;
 
     return error;
 }
@@ -121,6 +123,35 @@ void pdf_error_free(PdfError* error) {
 
     pdf_error_ctx_free(error->ctx_chain);
     free(error);
+}
+
+PdfError*
+pdf_error_conditional_context(PdfError* error, PdfError* context_error) {
+    if (!error) {
+        pdf_error_free(context_error);
+        return NULL;
+    }
+
+    if (!context_error) {
+        return error;
+    }
+
+    RELEASE_ASSERT(error);
+    RELEASE_ASSERT(context_error);
+
+    PDF_ERROR_ADD_CONTEXT_FMT(error, "Attached context error to this error");
+    PDF_ERROR_ADD_CONTEXT_FMT(
+        context_error,
+        "Attached this error as context to another error"
+    );
+
+    PdfError* curr_error = context_error;
+    while (curr_error->next_error) {
+        curr_error = curr_error->next_error;
+    }
+
+    curr_error->next_error = error;
+    return context_error;
 }
 
 PdfError* pdf_error_add_context(
@@ -135,17 +166,28 @@ PdfError* pdf_error_add_context(
     RELEASE_ASSERT(func);
     RELEASE_ASSERT(file);
 
-    if (fmt) {
-        va_list args;
-        va_start(args, fmt);
-        char* message = fmt_error_message(fmt, args);
-        va_end(args);
-        error->ctx_chain =
-            pdf_error_ctx_extend(error->ctx_chain, message, func, file, line);
-    } else {
-        error->ctx_chain =
-            pdf_error_ctx_extend(error->ctx_chain, NULL, func, file, line);
-    }
+    PdfError* curr_error = error;
+
+    do {
+        if (fmt) {
+            va_list args;
+            va_start(args, fmt);
+            char* message = fmt_error_message(fmt, args);
+            va_end(args);
+            error->ctx_chain = pdf_error_ctx_extend(
+                error->ctx_chain,
+                message,
+                func,
+                file,
+                line
+            );
+        } else {
+            error->ctx_chain =
+                pdf_error_ctx_extend(error->ctx_chain, NULL, func, file, line);
+        }
+
+        curr_error = curr_error->next_error;
+    } while (curr_error);
 
     return error;
 }
@@ -171,11 +213,13 @@ void pdf_error_unwrap(PdfError* error, const char* file, unsigned long line) {
     pdf_error_print(error);
 
     PdfErrorCode code = error->code;
+    PdfError* next_error = error->next_error;
+
     pdf_error_free(error);
 
     logger_log(
         "ERROR",
-        LOG_SEVERITY_PANIC,
+        next_error ? LOG_SEVERITY_ERROR : LOG_SEVERITY_PANIC,
         LOG_DIAG_VERBOSITY_INFO,
         LOG_DIAG_VERBOSITY_TRACE,
         file,
@@ -183,7 +227,13 @@ void pdf_error_unwrap(PdfError* error, const char* file, unsigned long line) {
         "Error code %d occurred",
         code
     );
-    exit(EXIT_FAILURE);
+
+    if (next_error) {
+        printf("\n");
+        pdf_error_unwrap(next_error, file, line);
+    } else {
+        exit(EXIT_FAILURE);
+    }
 }
 
 bool pdf_error_free_is_ok(PdfError* error) {

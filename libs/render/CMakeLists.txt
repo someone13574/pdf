@@ -1,7 +1,8 @@
 add_library(render
     src/render.c
     src/graphics_state.c
-    src/text_state.c)
+    src/text_state.c
+    src/font.c)
 target_include_directories(render PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(render PUBLIC arena canvas pdf)
 target_link_libraries(render PRIVATE geom pdf-logger sfnt)

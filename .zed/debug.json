@@ -33,13 +33,24 @@
     "adapter": "CodeLLDB"
   },
   {
+    "label": "Debug cmap-example",
+    "build": {
+      "command": "scripts/dev-build.sh",
+      "args": [],
+      "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    "program": "$ZED_WORKTREE_ROOT/build/examples/cmap-example",
+    "request": "launch",
+    "adapter": "CodeLLDB"
+  },
+  {
     "label": "Debug test",
     "build": {
       "command": "scripts/dev-build.sh",
       "args": [],
       "cwd": "$ZED_WORKTREE_ROOT",
       "env": {
-        "DEBUG_TEST_FUNCTION": "test_object_indirect_nested"
+        "DEBUG_TEST_FUNCTION": "test_postscript_tokenize_single_plus_name_non_eof"
       }
     },
     "program": "$ZED_WORKTREE_ROOT/build/libs/test/pdf-test-main",

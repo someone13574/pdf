@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
 
     size_t buffer_size;
     char* buffer =
-        load_file_to_buffer(arena, "test-files/test.pdf", &buffer_size);
+        load_file_to_buffer(arena, "test-files/embedded.pdf", &buffer_size);
 
     PdfResolver* resolver;
     PDF_REQUIRE(
@@ -92,28 +92,6 @@ int main(int argc, char** argv) {
             render_page(arena, pdf_op_resolver_some(resolver), &page, &canvas)
         );
         canvas_write_file(canvas, "test.svg");
-
-        // if (page.contents.discriminant) {
-        //     for (size_t contents_idx = 0;
-        //          contents_idx <
-        //          pdf_void_vec_len(page.contents.value.elements);
-        //          contents_idx++) {
-        //         void* content_ptr;
-        //         RELEASE_ASSERT(pdf_void_vec_get(
-        //             page.contents.value.elements,
-        //             contents_idx,
-        //             &content_ptr
-        //         ));
-        //         PdfStream* content = content_ptr;
-
-        //         printf("%s\n", content->stream_bytes);
-
-        //         PdfContentStream stream;
-        //         PDF_REQUIRE(
-        //             pdf_deserialize_content_stream(content, arena, &stream)
-        //         );
-        //     }
-        // }
     }
 
     LOG_DIAG(INFO, EXAMPLE, "Finished");

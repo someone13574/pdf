@@ -1,3 +1,6 @@
 [submodule "assets/fonts-urw-base35"]
 	path = assets/fonts-urw-base35
 	url = https://github.com/ArtifexSoftware/urw-base35-fonts.git
+[submodule "assets/cmap-resources"]
+	path = assets/cmap-resources
+	url = https://github.com/adobe-type-tools/cmap-resources.git

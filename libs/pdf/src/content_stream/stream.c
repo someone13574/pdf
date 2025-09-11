@@ -33,9 +33,18 @@ PdfError* pdf_deserialize_content_stream(
 
         PdfObject operand;
         size_t restore_offset = pdf_ctx_offset(ctx);
-        while (
-            pdf_error_free_is_ok(pdf_parse_operand_object(arena, ctx, &operand))
-        ) {
+        PdfError* stop_reason = NULL;
+
+        while (true) {
+            stop_reason = pdf_parse_operand_object(arena, ctx, &operand);
+            if (stop_reason) {
+                stop_reason = PDF_ERROR_ADD_CONTEXT_FMT(
+                    stop_reason,
+                    "Ending operand parsing"
+                );
+                break;
+            }
+
             PdfObject* operand_alloc = arena_alloc(arena, sizeof(PdfObject));
             *operand_alloc = operand;
             pdf_object_vec_push(operands, operand_alloc);
@@ -48,7 +57,10 @@ PdfError* pdf_deserialize_content_stream(
 
         // Parse operator
         PdfOperator operator;
-        PDF_PROPAGATE(pdf_parse_operator(ctx, &operator));
+        PDF_PROPAGATE(pdf_error_conditional_context(
+            pdf_parse_operator(ctx, &operator),
+            stop_reason
+        ));
         PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, is_pdf_non_regular));
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 

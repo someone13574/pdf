@@ -1,11 +1,10 @@
-#ifndef DVEC_IMPL_H
-#define DVEC_IMPL_H
-
 #include <stdbool.h>
 
 #include "arena/arena.h"
 #include "logger/log.h"
 
+#ifndef DVEC_SRC
+#define DVEC_SRC
 #ifdef _MSC_VER
 #include <intrin.h>
 #pragma intrinsic(_BitScanReverse64)
@@ -25,8 +24,7 @@ static int clzll(unsigned long long x) {
     return __builtin_clzll(x);
 }
 #endif
-
-#endif // DVEC_IMPL_H
+#endif // DVEC_SRC
 
 // Check arguments
 #ifndef DVEC_NAME

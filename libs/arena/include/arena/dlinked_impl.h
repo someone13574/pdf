@@ -1,10 +1,7 @@
-#ifndef DLINKED_H
-#define DLINKED_H
+#include <stdbool.h>
 
 #include "arena/arena.h"
 #include "logger/log.h"
-
-#endif // DLINKED_H
 
 // Check arguments
 #ifndef DLINKED_NAME
@@ -169,6 +166,29 @@ bool DLINKED_FN(get_ptr)(
 
     DLINKED_FN(set_cursor)(linked_list, idx);
     *out = &linked_list->cursor->data;
+    return true;
+}
+
+// Gets the last element of the linked-list and stores it in `out`. If the list
+// is empty, false is returned and `out` isn't set.
+bool DLINKED_FN(back)(const DLINKED_NAME* linked_list, DLINKED_TYPE* out) {
+    RELEASE_ASSERT(linked_list);
+    RELEASE_ASSERT(out);
+
+    LOG_DIAG(
+        DEBUG,
+        LINKED_LIST,
+        "Getting last " STRINGIFY(DLINKED_TYPE
+        ) " element from " STRINGIFY(DLINKED_NAME)
+    );
+
+    if (linked_list->len == 0) {
+        LOG_DIAG(TRACE, LINKED_LIST, "List empty");
+        return false;
+    }
+
+    *out = linked_list->back->data;
+
     return true;
 }
 

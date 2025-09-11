@@ -2,8 +2,8 @@
 
 #include "canvas/canvas.h"
 #include "geom/mat3.h"
+#include "pdf/fonts/font.h"
 #include "pdf/object.h"
-#include "pdf/resources/font.h"
 #include "pdf_error/error.h"
 
 typedef enum {

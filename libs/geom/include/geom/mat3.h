@@ -18,6 +18,11 @@ GeomMat3 geom_mat3_new(
     double m22
 );
 
+/// Creates a new 3x3 matrix following the 6-number PDF convention used by the
+/// Tm text-positioning operator
+GeomMat3
+geom_mat3_new_pdf(double a, double b, double c, double d, double e, double f);
+
 /// Creates a new 3x3 identity matrix
 GeomMat3 geom_mat3_identity(void);
 

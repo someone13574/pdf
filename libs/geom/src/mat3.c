@@ -16,6 +16,11 @@ GeomMat3 geom_mat3_new(
     };
 }
 
+GeomMat3
+geom_mat3_new_pdf(double a, double b, double c, double d, double e, double f) {
+    return geom_mat3_new(a, b, 0.0, c, d, 0.0, e, f, 1.0);
+}
+
 GeomMat3 geom_mat3_identity(void) {
     return (GeomMat3) {
         .mat = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}}

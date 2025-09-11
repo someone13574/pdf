@@ -12,6 +12,11 @@ typedef struct {
     } value;
 } PdfNumber;
 
+typedef struct {
+    bool discriminant;
+    PdfNumber value;
+} PdfOpNumber;
+
 PdfError*
 pdf_deserialize_number(const PdfObject* object, PdfNumber* deserialized);
 
@@ -30,6 +35,11 @@ typedef struct {
     PdfNumber upper_right_x;
     PdfNumber upper_right_y;
 } PdfRectangle;
+
+typedef struct {
+    bool discriminant;
+    PdfRectangle value;
+} PdfOpRectangle;
 
 PdfError*
 pdf_deserialize_rectangle(const PdfObject* object, PdfRectangle* deserialized);

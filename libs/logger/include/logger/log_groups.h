@@ -16,8 +16,12 @@
     X(DOC, TRACE, PDF)                                                         \
     X(XREF, INHERIT, PDF)                                                      \
     X(CTX, INFO, PDF)                                                          \
-    X(OBJECT, TRACE, PDF)                                                      \
+    X(OBJECT, OFF, PDF)                                                        \
     X(DESERDE, INHERIT, PDF)                                                   \
     X(RENDER, INHERIT, GLOBAL)                                                 \
+    X(FONT, INHERIT, GLOBAL)                                                   \
+    X(PS, TRACE, GLOBAL)                                                       \
+    X(PS_TOKEN, INFO, PS)                                                      \
+    X(CMAP, INHERIT, FONT)                                                     \
     X(SFNT, INHERIT, GLOBAL)                                                   \
     X(SFNT_PARSE, INHERIT, SFNT)

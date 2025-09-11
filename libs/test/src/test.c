@@ -11,6 +11,8 @@
 
 #include "logger/log.h"
 
+#define TEST_TIMEOUT_MS 5000
+
 #ifdef DEBUG_TEST_FUNCTION
 #include <string.h>
 #define _STRINGIFY(x) #x
@@ -36,6 +38,20 @@ static void print_line(void) {
 }
 
 #ifndef DEBUG_TEST_FUNCTION
+#include <poll.h>
+#include <signal.h>
+#include <time.h>
+
+static long elapsed_ms(const struct timespec* start) {
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+        return 0;
+    }
+    long sec = now.tv_sec - start->tv_sec;
+    long nsec = now.tv_nsec - start->tv_nsec;
+    return sec * 1000 + nsec / 1000000;
+}
+
 #ifdef TEST_NO_CAPTURE
 static void
 run_forked_test(_TestFuncEntry* test_entry, int* passed, int* failed) {
@@ -50,11 +66,39 @@ run_forked_test(_TestFuncEntry* test_entry, int* passed, int* failed) {
         TestResult result = test_entry->func();
         _exit((result == TEST_RESULT_PASS) ? EXIT_SUCCESS : EXIT_FAILURE);
     } else {
-
         int status;
-        waitpid(pid, &status, 0);
+        bool timed_out = false;
+        struct timespec start;
+        clock_gettime(CLOCK_MONOTONIC, &start);
 
-        if (WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS) {
+        while (true) {
+            pid_t wait_result = waitpid(pid, &status, WNOHANG);
+            if (wait_result == pid) {
+                // Child exited
+                break;
+            } else if (wait_result == -1) {
+                perror("waitpid");
+                exit(EXIT_FAILURE);
+            }
+
+            long elapsed_time = elapsed_ms(&start);
+            if (elapsed_time >= TEST_TIMEOUT_MS) {
+                kill(pid, SIGKILL);
+                waitpid(pid, &status, 0);
+                timed_out = true;
+                break;
+            }
+
+            long remaining_time = TEST_TIMEOUT_MS - elapsed_time;
+            long poll_time = remaining_time < elapsed_time
+                               ? remaining_time
+                               : elapsed_time; // have poll speed start fast
+            struct timespec wait_time = {0, poll_time * 1000L * 1000L};
+            nanosleep(&wait_time, NULL);
+        }
+
+        if (!timed_out && WIFEXITED(status)
+            && WEXITSTATUS(status) == EXIT_SUCCESS) {
             LOG_DIAG(
                 DEBUG,
                 TEST,
@@ -69,6 +113,16 @@ run_forked_test(_TestFuncEntry* test_entry, int* passed, int* failed) {
             *passed += 1;
         } else {
             print_line();
+
+            if (timed_out) {
+                LOG_WARN(
+                    TEST,
+                    "Test `%s` (\x1b[4m%s:%lu\x1b[0m) exceeded test timeout",
+                    test_entry->name,
+                    test_entry->file,
+                    test_entry->line
+                );
+            }
 
             LOG_ERROR(
                 TEST,
@@ -87,6 +141,7 @@ run_forked_test(_TestFuncEntry* test_entry, int* passed, int* failed) {
 #endif // TEST_NO_CAPTURE
 
 #ifndef TEST_NO_CAPTURE
+#include <errno.h>
 #include <string.h>
 
 static void
@@ -104,7 +159,7 @@ run_forked_test(_TestFuncEntry* test_entry, int* passed, int* failed) {
     }
 
     if (pid == 0) {
-        close(pipefd[0]); // we only write
+        close(pipefd[0]); // child only write
 
         // Save stdout for restore
         int saved_stdout = dup(STDOUT_FILENO);
@@ -133,35 +188,133 @@ run_forked_test(_TestFuncEntry* test_entry, int* passed, int* failed) {
         close(saved_stdout);
         _exit((result == TEST_RESULT_PASS) ? EXIT_SUCCESS : EXIT_FAILURE);
     } else {
-        close(pipefd[1]); // we only read
+        close(pipefd[1]); // parent only reads
 
-        // Save stdout into buffer
+        struct timespec start;
+        clock_gettime(CLOCK_MONOTONIC, &start);
+
+        // Buffer for accumulated output
         char* buffer = NULL;
         size_t buffer_size = 0;
-        int64_t bytes_read;
         char read_buf[4096];
 
-        while ((bytes_read = read(pipefd[0], read_buf, sizeof(read_buf))) > 0) {
-            // Grow buffer
-            char* old_buffer = buffer;
-            buffer = realloc(buffer, buffer_size + (size_t)bytes_read + 1);
-            if (!buffer) {
-                free(old_buffer);
-                perror("realloc");
-                exit(EXIT_FAILURE);
+        struct pollfd poll_fd = {
+            .fd = pipefd[0],
+            .events = POLLIN | POLLHUP | POLLERR
+        };
+
+        bool timed_out = false;
+        int status = 0;
+        bool child_exited = 0;
+
+        while (1) {
+            long elapsed_time = elapsed_ms(&start);
+            if (!child_exited && elapsed_time >= TEST_TIMEOUT_MS) {
+                kill(pid, SIGKILL);
+                waitpid(pid, &status, 0);
+                timed_out = true;
+                child_exited = true;
             }
 
-            // Copy new bytes to buffer
-            memcpy(buffer + buffer_size, read_buf, (size_t)bytes_read);
-            buffer_size += (size_t)bytes_read;
-            buffer[buffer_size] = '\0';
+            if (!child_exited) {
+                pid_t r = waitpid(pid, &status, WNOHANG);
+                if (r == pid) {
+                    child_exited = 1;
+                } else if (r == -1) {
+                    perror("waitpid");
+                }
+            }
+
+            long remaining_time = TEST_TIMEOUT_MS - elapsed_time;
+            long poll_time = remaining_time < elapsed_time
+                               ? remaining_time
+                               : elapsed_time; // have poll speed start fast
+
+            int poll_return = poll(&poll_fd, 1, (int)poll_time);
+            if (poll_return > 0) {
+                if (poll_fd.revents & POLLIN) {
+                    ssize_t n = read(pipefd[0], read_buf, sizeof(read_buf));
+                    if (n > 0) {
+                        char* old = buffer;
+                        buffer = realloc(buffer, buffer_size + (size_t)n + 1);
+                        if (!buffer) {
+                            free(old);
+                            perror("realloc");
+                            exit(EXIT_FAILURE);
+                        }
+                        memcpy(buffer + buffer_size, read_buf, (size_t)n);
+                        buffer_size += (size_t)n;
+                        buffer[buffer_size] = '\0';
+                    } else if (n == 0) {
+                        // EOF from child
+                        break;
+                    } else if (n < 0 && errno != EINTR && errno != EAGAIN) {
+                        perror("read");
+                        break;
+                    }
+                }
+
+                if (poll_fd.revents & (POLLHUP | POLLERR)) {
+                    // drain any remaining bytes
+                    ssize_t n;
+                    while ((n = read(pipefd[0], read_buf, sizeof(read_buf))) > 0
+                    ) {
+                        char* old = buffer;
+                        buffer = realloc(buffer, buffer_size + (size_t)n + 1);
+                        if (!buffer) {
+                            free(old);
+                            perror("realloc");
+                            exit(EXIT_FAILURE);
+                        }
+                        memcpy(buffer + buffer_size, read_buf, (size_t)n);
+                        buffer_size += (size_t)n;
+                        buffer[buffer_size] = '\0';
+                    }
+                    break;
+                }
+            } else if (poll_return < 0) {
+                if (errno == EINTR) {
+                    continue;
+                }
+
+                perror("poll");
+                break;
+            }
+
+            if (child_exited) {
+                ssize_t n = read(pipefd[0], read_buf, sizeof(read_buf));
+                if (n > 0) {
+                    char* old = buffer;
+                    buffer = realloc(buffer, buffer_size + (size_t)n + 1);
+                    if (!buffer) {
+                        free(old);
+                        perror("realloc");
+                        exit(EXIT_FAILURE);
+                    }
+
+                    memcpy(buffer + buffer_size, read_buf, (size_t)n);
+                    buffer_size += (size_t)n;
+                    buffer[buffer_size] = '\0';
+                    continue; // Continue until all data is read
+                } else if (n == 0 || (n < 0 && errno == EAGAIN)) {
+                    break;
+                } else if (n < 0 && errno == EINTR) {
+                    continue;
+                } else if (n < 0) {
+                    perror("read");
+                    break;
+                }
+            }
         }
+
         close(pipefd[0]);
 
-        int status;
-        waitpid(pid, &status, 0);
+        if (!child_exited) {
+            waitpid(pid, &status, 0);
+        }
 
-        if (WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS) {
+        if (!timed_out && WIFEXITED(status)
+            && WEXITSTATUS(status) == EXIT_SUCCESS) {
             LOG_DIAG(
                 DEBUG,
                 TEST,
@@ -180,6 +333,16 @@ run_forked_test(_TestFuncEntry* test_entry, int* passed, int* failed) {
                     perror("fwrite");
                     exit(EXIT_FAILURE);
                 }
+            }
+
+            if (timed_out) {
+                LOG_WARN(
+                    TEST,
+                    "Test `%s` (\x1b[4m%s:%lu\x1b[0m) exceeded test timeout",
+                    test_entry->name,
+                    test_entry->file,
+                    test_entry->line
+                );
             }
 
             LOG_ERROR(

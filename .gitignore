@@ -1,5 +1,6 @@
 /build
 /.cache
 /pdf-1.7-spec.pdf
+/postscript-spec.pdf
 /*.bmp
 /*.svg
