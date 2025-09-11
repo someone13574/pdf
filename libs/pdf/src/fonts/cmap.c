@@ -2,12 +2,14 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "../deserialize.h"
 #include "arena/arena.h"
 #include "arena/common.h"
+#include "cmap_paths.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
@@ -96,6 +98,8 @@ typedef struct {
 struct PdfCMap {
     Arena* arena;
     CMapTableVec* tables;
+
+    PdfCMap* use_cmap;
 };
 
 static PdfError*
@@ -121,6 +125,11 @@ cmap_get_entry(PdfCMap* cmap, size_t codepoint, uint32_t** cid_entry_out) {
         return NULL;
     }
 
+    if (cmap->use_cmap) {
+        PDF_PROPAGATE(cmap_get_entry(cmap->use_cmap, codepoint, cid_entry_out));
+        return NULL;
+    }
+
     return PDF_ERROR(
         PDF_ERR_CMAP_INVALID_CODEPOINT,
         "Couldn't find entry for codepoint %zu",
@@ -135,6 +144,10 @@ pdf_cmap_get_cid(PdfCMap* cmap, uint32_t codepoint, uint32_t* cid_out) {
 
     uint32_t* entry = NULL;
     PDF_PROPAGATE(cmap_get_entry(cmap, (size_t)codepoint, &entry));
+
+    if (*entry == UINT32_MAX && cmap->use_cmap) {
+        PDF_PROPAGATE(cmap_get_entry(cmap->use_cmap, codepoint, &entry));
+    }
 
     if (*entry == UINT32_MAX) {
         return PDF_ERROR(
@@ -160,6 +173,43 @@ static PdfError* cidinit_begincmap(PostscriptInterpreter* interpreter) {
 
 static PdfError* cidinit_endcmap(PostscriptInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
+    return NULL;
+}
+
+static PdfError* cidinit_usecmap(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    CMapPostscriptUserData* user_data = NULL;
+    PDF_PROPAGATE(postscript_interpreter_user_data(
+        interpreter,
+        "cmap",
+        (void**)&user_data
+    ));
+
+    if (user_data->cmap->use_cmap) {
+        return PDF_ERROR(
+            PDF_ERR_CMAP_ALREADY_DERIVE,
+            "Cannot call `usecmap` multiple times"
+        );
+    }
+
+    PostscriptObject cmap_name;
+    PDF_PROPAGATE(postscript_interpreter_pop_operand_typed(
+        interpreter,
+        POSTSCRIPT_OBJECT_NAME,
+        true,
+        &cmap_name
+    ));
+
+    PDF_PROPAGATE(
+        pdf_load_cmap(
+            user_data->cmap->arena,
+            cmap_name.data.name,
+            &user_data->cmap->use_cmap
+        ),
+        "Error occurred while running `usecmap`"
+    );
+
     return NULL;
 }
 
@@ -438,6 +488,7 @@ PdfError* pdf_parse_cmap(
     *cmap_out = arena_alloc(arena, sizeof(PdfCMap));
     (*cmap_out)->arena = arena;
     (*cmap_out)->tables = cmap_table_vec_new(arena);
+    (*cmap_out)->use_cmap = NULL;
 
     Arena* interpreter_arena = arena_new(1024);
 
@@ -458,6 +509,13 @@ PdfError* pdf_parse_cmap(
         "CIDInit",
         cidinit_endcmap,
         "endcmap"
+    );
+    postscript_interpreter_add_operator(
+        interpreter,
+        "ProcSet",
+        "CIDInit",
+        cidinit_usecmap,
+        "usecmap"
     );
     postscript_interpreter_add_operator(
         interpreter,
@@ -509,5 +567,64 @@ PdfError* pdf_parse_cmap(
     postscript_interpreter_dump(interpreter);
     arena_free(interpreter_arena);
 
+    return NULL;
+}
+
+static char*
+load_file_to_buffer(Arena* arena, const char* path, size_t* out_size) {
+    FILE* file = fopen(path, "rb");
+    *out_size = 0;
+    if (!file) {
+        return NULL;
+    }
+
+    if (fseek(file, 0, SEEK_END) != 0) {
+        fclose(file);
+        return NULL;
+    }
+
+    long len = ftell(file);
+    if (len < 0) {
+        fclose(file);
+        return NULL;
+    }
+
+    if (fseek(file, 0, SEEK_SET) != 0) {
+        fclose(file);
+        return NULL;
+    }
+
+    char* buffer = arena_alloc(arena, (size_t)len);
+    if (!buffer) {
+        fclose(file);
+        return NULL;
+    }
+
+    if (fread(buffer, 1, (size_t)len, file) != (size_t)len) {
+        fclose(file);
+        return NULL;
+    }
+    fclose(file);
+
+    *out_size = (size_t)len;
+    return buffer;
+}
+
+PdfError* pdf_load_cmap(Arena* arena, char* name, PdfCMap** cmap_out) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(name);
+    RELEASE_ASSERT(cmap_out);
+
+    const char* cmap_path = NULL;
+    PDF_PROPAGATE(pdf_cmap_name_to_path(name, &cmap_path));
+
+    Arena* file_arena = arena_new(1);
+
+    size_t file_len;
+    char* file = load_file_to_buffer(file_arena, cmap_path, &file_len);
+
+    PDF_PROPAGATE(pdf_parse_cmap(arena, file, file_len, cmap_out));
+
+    arena_free(file_arena);
     return NULL;
 }
