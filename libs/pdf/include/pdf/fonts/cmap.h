@@ -49,3 +49,5 @@ PdfError* pdf_parse_cmap(
     size_t data_len,
     PdfCMap** cmap_out
 );
+
+PdfError* pdf_load_cmap(Arena* arena, char* name, PdfCMap** cmap_out);

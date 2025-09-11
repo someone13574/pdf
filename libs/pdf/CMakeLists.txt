@@ -11,6 +11,7 @@ add_library(pdf
     src/fonts/font_descriptor.c
     src/fonts/font_widths.c
     src/fonts/cmap.c
+    src/fonts/cmap_paths.c
     src/deserde_types.c
     src/object.c
     src/page.c
