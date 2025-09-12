@@ -7,7 +7,11 @@
 #include "pdf_error/error.h"
 #include "sfnt/types.h"
 
-void sfnt_parser_new(uint8_t* buffer, size_t buffer_len, SfntParser* parser) {
+void sfnt_parser_new(
+    const uint8_t* buffer,
+    size_t buffer_len,
+    SfntParser* parser
+) {
     RELEASE_ASSERT(buffer);
     RELEASE_ASSERT(parser);
 
