@@ -1,19 +1,8 @@
 #pragma once
 
-#include "arena/arena.h"
 #include "parser.h"
 #include "pdf_error/error.h"
 #include "types.h"
-
-#define DARRAY_NAME CffOffsetArray
-#define DARRAY_LOWERCASE_NAME cff_offset_array
-#define DARRAY_TYPE CffOffset
-#include "arena/darray_decl.h"
-
-#define DARRAY_NAME CffCard8Array
-#define DARRAY_LOWERCASE_NAME cff_card8_array
-#define DARRAY_TYPE CffCard8
-#include "arena/darray_decl.h"
 
 /// An INDEX is an array of variable-sized objects. It comprises a header, an
 /// offset array, and object data. The offset array specifies offsets within the
@@ -29,12 +18,20 @@ typedef struct {
     /// Offset array element size.
     CffOffsetSize offset_size;
 
-    /// Offset array (from byte preceding object data).
-    CffOffsetArray* offset;
-
-    /// Object data.
-    CffCard8Array* data;
+    /// Parser offset of index.
+    size_t parser_start_offset;
 } CffIndex;
 
 /// Read a `CffIndex` from the current parser offset.
-PdfError* cff_parse_index(CffParser* parser, Arena* arena, CffIndex* index_out);
+PdfError* cff_parse_index(CffParser* parser, CffIndex* index_out);
+
+/// Seeks to the end of a CFF index.
+PdfError* cff_index_skip(CffIndex* index, CffParser* parser);
+
+/// Seeks to object `object_idx` and returns its size.
+PdfError* cff_index_seek_object(
+    CffIndex* index,
+    CffParser* parser,
+    CffCard16 object_idx,
+    size_t* object_size_out
+);

@@ -2,240 +2,274 @@
 
 #include <stdint.h>
 
-#include "arena/arena.h"
 #include "logger/log.h"
 #include "parser.h"
 #include "pdf_error/error.h"
+#include "test/test.h"
 #include "types.h"
 
-#define DARRAY_NAME CffOffsetArray
-#define DARRAY_LOWERCASE_NAME cff_offset_array
-#define DARRAY_TYPE CffOffset
-#include "arena/darray_impl.h"
-
-#define DARRAY_NAME CffCard8Array
-#define DARRAY_LOWERCASE_NAME cff_card8_array
-#define DARRAY_TYPE CffCard8
-#include "arena/darray_impl.h"
-
-PdfError*
-cff_parse_index(CffParser* parser, Arena* arena, CffIndex* index_out) {
+PdfError* cff_parse_index(CffParser* parser, CffIndex* index_out) {
     RELEASE_ASSERT(parser);
-    RELEASE_ASSERT(arena);
     RELEASE_ASSERT(index_out);
+
+    index_out->parser_start_offset = parser->offset;
 
     PDF_PROPAGATE(cff_parser_read_card16(parser, &index_out->count));
     if (index_out->count == 0) {
         index_out->offset_size = 0;
-        index_out->offset = NULL;
-        index_out->data = NULL;
         return NULL;
     }
 
     PDF_PROPAGATE(cff_parser_read_offset_size(parser, &index_out->offset_size));
+    return NULL;
+}
 
-    index_out->offset = cff_offset_array_new(arena, index_out->count + 1);
-    for (CffCard16 idx = 0; idx < index_out->count + 1; idx++) {
-        CffOffset offset;
-        PDF_PROPAGATE(
-            cff_parser_read_offset(parser, index_out->offset_size, &offset)
-        );
-        cff_offset_array_set(index_out->offset, idx, offset);
+static PdfError* cff_index_get_object_offset(
+    CffIndex* index,
+    CffParser* parser,
+    CffCard16 object_idx,
+    size_t* offset_out
+) {
+    RELEASE_ASSERT(index);
+    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(offset_out);
 
-        if (idx == 0 && offset != 1) {
-            return PDF_ERROR(
-                PDF_ERR_CFF_INVALID_INDEX,
-                "First offset of index must be 1"
-            );
-        }
-    }
-
-    CffOffset last_offset;
+    RELEASE_ASSERT(index->count != 0);
     RELEASE_ASSERT(
-        cff_offset_array_get(index_out->offset, index_out->count, &last_offset)
+        object_idx <= index->count
+    ); // Caller should do stricter check
+
+    // Read object offset
+    size_t offset_offset = index->parser_start_offset + 3
+                         + (size_t)object_idx * index->offset_size;
+    PDF_PROPAGATE(cff_parser_seek(parser, offset_offset));
+
+    CffOffset object_rel_offset;
+    PDF_PROPAGATE(
+        cff_parser_read_offset(parser, index->offset_size, &object_rel_offset)
     );
 
-    size_t data_len = last_offset - 1;
-    index_out->data = cff_card8_array_new(arena, data_len);
-    for (size_t idx = 0; idx < data_len; idx++) {
-        CffCard8 card8;
-        PDF_PROPAGATE(cff_parser_read_card8(parser, &card8));
-        cff_card8_array_set(index_out->data, idx, card8);
+    // Get object absolute offset
+    *offset_out = index->parser_start_offset + 2
+                + (size_t)(index->count + 1) * index->offset_size
+                + object_rel_offset;
+
+    return NULL;
+}
+
+PdfError* cff_index_skip(CffIndex* index, CffParser* parser) {
+    RELEASE_ASSERT(index);
+    RELEASE_ASSERT(parser);
+
+    if (index->count == 0) {
+        PDF_PROPAGATE(cff_parser_seek(parser, index->parser_start_offset + 2));
+        return NULL;
     }
+
+    size_t end_offset;
+    PDF_PROPAGATE(
+        cff_index_get_object_offset(index, parser, index->count, &end_offset)
+    );
+    PDF_PROPAGATE(cff_parser_seek(parser, end_offset));
+
+    return NULL;
+}
+
+PdfError* cff_index_seek_object(
+    CffIndex* index,
+    CffParser* parser,
+    CffCard16 object_idx,
+    size_t* object_size_out
+) {
+    RELEASE_ASSERT(index);
+    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(object_size_out);
+
+    if (object_idx >= index->count) {
+        return PDF_ERROR(
+            PDF_ERR_CFF_INVALID_OBJECT_IDX,
+            "Cannot seek object %u in index of %u objects",
+            (unsigned int)object_idx,
+            (unsigned int)index->count
+        );
+    }
+
+    size_t start_offset;
+    size_t end_offset;
+    PDF_PROPAGATE(
+        cff_index_get_object_offset(index, parser, object_idx, &start_offset)
+    );
+    PDF_PROPAGATE(
+        cff_index_get_object_offset(index, parser, object_idx + 1, &end_offset)
+    );
+
+    if (end_offset < start_offset) {
+        return PDF_ERROR(
+            PDF_ERR_CFF_INVALID_INDEX,
+            "Objects in INDEX not in order"
+        );
+    }
+
+    PDF_PROPAGATE(cff_parser_seek(parser, start_offset));
+
+    *object_size_out = end_offset - start_offset;
 
     return NULL;
 }
 
 #ifdef TEST
 
-#include "test/test.h"
+TEST_FUNC(test_cff_index_empty_skip) {
+    uint8_t buffer[] = {0x00, 0x00};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
 
-#define TEST_CHECK_EOF()                                                       \
-    CffCard8 next_byte;                                                        \
-    TEST_PDF_REQUIRE_ERR(                                                      \
-        cff_parser_read_card8(&parser, &next_byte),                            \
-        PDF_ERR_CFF_EOF                                                        \
+    CffIndex index;
+    TEST_PDF_REQUIRE(cff_parse_index(&parser, &index));
+
+    TEST_PDF_REQUIRE(cff_index_skip(&index, &parser));
+    TEST_ASSERT_EQ((size_t)2, parser.offset);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_index_empty_seek_object) {
+    uint8_t buffer[] = {0x00, 0x00};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffIndex index;
+    TEST_PDF_REQUIRE(cff_parse_index(&parser, &index));
+
+    size_t object_size;
+    TEST_PDF_REQUIRE_ERR(
+        cff_index_seek_object(&index, &parser, 0, &object_size),
+        PDF_ERR_CFF_INVALID_OBJECT_IDX
     );
 
-TEST_FUNC(test_cff_parse_index_empty) {
-    uint8_t data[] = {0x00, 0x00};
-    CffParser parser = cff_parser_new(data, sizeof(data) / sizeof(uint8_t));
-    Arena* arena = arena_new(1024);
-
-    CffIndex index;
-    TEST_PDF_REQUIRE(cff_parse_index(&parser, arena, &index));
-    TEST_ASSERT_EQ((CffCard16)0, index.count);
-
-    TEST_CHECK_EOF()
-
-    arena_free(arena);
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_cff_parse_index_offsize1) {
-    uint8_t buffer[] = {// count 1
+TEST_FUNC(test_cff_index_seek_offset_size_1) {
+    uint8_t buffer[] = {// size = 3
                         0x00,
-                        0x01,
-                        // offset size 1
-                        0x01,
-                        // offsets 1, 4
-                        0x01,
-                        0x04,
-                        // object data
-                        'a',
-                        'b',
-                        'c'
-    };
-    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
-    Arena* arena = arena_new(1024);
-
-    CffIndex index;
-    TEST_PDF_REQUIRE(cff_parse_index(&parser, arena, &index));
-    TEST_ASSERT_EQ((CffCard16)1, index.count);
-    TEST_ASSERT_EQ((CffOffsetSize)1, index.offset_size);
-
-    CffOffset offset;
-    TEST_ASSERT_EQ((size_t)2, cff_offset_array_len(index.offset));
-    TEST_ASSERT(cff_offset_array_get(index.offset, 0, &offset));
-    TEST_ASSERT_EQ((CffOffset)1, offset);
-    TEST_ASSERT(cff_offset_array_get(index.offset, 1, &offset));
-    TEST_ASSERT_EQ((CffOffset)4, offset);
-
-    CffCard8 data;
-    TEST_ASSERT_EQ((size_t)3, cff_card8_array_len(index.data));
-    TEST_ASSERT(cff_card8_array_get(index.data, 0, &data));
-    TEST_ASSERT_EQ((CffCard8)'a', data);
-    TEST_ASSERT(cff_card8_array_get(index.data, 1, &data));
-    TEST_ASSERT_EQ((CffCard8)'b', data);
-    TEST_ASSERT(cff_card8_array_get(index.data, 2, &data));
-    TEST_ASSERT_EQ((CffCard8)'c', data);
-
-    TEST_CHECK_EOF()
-
-    arena_free(arena);
-    return TEST_RESULT_PASS;
-}
-
-TEST_FUNC(test_cff_parse_index_offsize3) {
-    uint8_t buffer[] = {// count 1
-                        0x00,
-                        0x01,
-                        // offset size 3
                         0x03,
-                        // offsets 1, 4
-                        0x00,
-                        0x00,
+                        // offset size = 1
                         0x01,
-                        0x00,
-                        0x00,
-                        0x04,
-                        // object data
-                        'a',
-                        'b',
-                        'c'
-    };
-    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
-    Arena* arena = arena_new(1024);
-
-    CffIndex index;
-    TEST_PDF_REQUIRE(cff_parse_index(&parser, arena, &index));
-    TEST_ASSERT_EQ((CffCard16)1, index.count);
-    TEST_ASSERT_EQ((CffOffsetSize)3, index.offset_size);
-
-    CffOffset offset;
-    TEST_ASSERT_EQ((size_t)2, cff_offset_array_len(index.offset));
-    TEST_ASSERT(cff_offset_array_get(index.offset, 0, &offset));
-    TEST_ASSERT_EQ((CffOffset)1, offset);
-    TEST_ASSERT(cff_offset_array_get(index.offset, 1, &offset));
-    TEST_ASSERT_EQ((CffOffset)4, offset);
-
-    CffCard8 data;
-    TEST_ASSERT_EQ((size_t)3, cff_card8_array_len(index.data));
-    TEST_ASSERT(cff_card8_array_get(index.data, 0, &data));
-    TEST_ASSERT_EQ((CffCard8)'a', data);
-    TEST_ASSERT(cff_card8_array_get(index.data, 1, &data));
-    TEST_ASSERT_EQ((CffCard8)'b', data);
-    TEST_ASSERT(cff_card8_array_get(index.data, 2, &data));
-    TEST_ASSERT_EQ((CffCard8)'c', data);
-
-    TEST_CHECK_EOF()
-
-    arena_free(arena);
-    return TEST_RESULT_PASS;
-}
-
-TEST_FUNC(test_cff_parse_index_multi_object) {
-    uint8_t buffer[] = {// count 2
-                        0x00,
-                        0x02,
-                        // offset size 1
-                        0x01,
-                        // offsets 1, 4, 6
+                        // offsets = [1, 4, 6, 7]
                         0x01,
                         0x04,
                         0x06,
-                        // object data
+                        0x07,
+                        // data
                         'a',
                         'b',
                         'c',
                         4,
-                        2
+                        2,
+                        '@'
     };
     CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
-    Arena* arena = arena_new(1024);
 
     CffIndex index;
-    TEST_PDF_REQUIRE(cff_parse_index(&parser, arena, &index));
-    TEST_ASSERT_EQ((CffCard16)2, index.count);
-    TEST_ASSERT_EQ((CffOffsetSize)1, index.offset_size);
+    TEST_PDF_REQUIRE(cff_parse_index(&parser, &index));
 
-    CffOffset offset;
-    TEST_ASSERT_EQ((size_t)3, cff_offset_array_len(index.offset));
-    TEST_ASSERT(cff_offset_array_get(index.offset, 0, &offset));
-    TEST_ASSERT_EQ((CffOffset)1, offset);
-    TEST_ASSERT(cff_offset_array_get(index.offset, 1, &offset));
-    TEST_ASSERT_EQ((CffOffset)4, offset);
-    TEST_ASSERT(cff_offset_array_get(index.offset, 2, &offset));
-    TEST_ASSERT_EQ((CffOffset)6, offset);
+    size_t object_size;
+    TEST_PDF_REQUIRE(cff_index_seek_object(&index, &parser, 0, &object_size));
+    TEST_ASSERT_EQ((size_t)7, parser.offset);
+    TEST_ASSERT_EQ((size_t)3, object_size);
 
-    CffCard8 data;
-    TEST_ASSERT_EQ((size_t)5, cff_card8_array_len(index.data));
-    TEST_ASSERT(cff_card8_array_get(index.data, 0, &data));
-    TEST_ASSERT_EQ((CffCard8)'a', data);
-    TEST_ASSERT(cff_card8_array_get(index.data, 1, &data));
-    TEST_ASSERT_EQ((CffCard8)'b', data);
-    TEST_ASSERT(cff_card8_array_get(index.data, 2, &data));
-    TEST_ASSERT_EQ((CffCard8)'c', data);
-    TEST_ASSERT(cff_card8_array_get(index.data, 3, &data));
-    TEST_ASSERT_EQ((CffCard8)4, data);
-    TEST_ASSERT(cff_card8_array_get(index.data, 4, &data));
-    TEST_ASSERT_EQ((CffCard8)2, data);
+    TEST_PDF_REQUIRE(cff_index_seek_object(&index, &parser, 1, &object_size));
+    TEST_ASSERT_EQ((size_t)10, parser.offset);
+    TEST_ASSERT_EQ((size_t)2, object_size);
 
-    TEST_CHECK_EOF()
+    TEST_PDF_REQUIRE(cff_index_seek_object(&index, &parser, 2, &object_size));
+    TEST_ASSERT_EQ((size_t)12, parser.offset);
+    TEST_ASSERT_EQ((size_t)1, object_size);
 
-    arena_free(arena);
+    TEST_PDF_REQUIRE_ERR(
+        cff_index_seek_object(&index, &parser, 4, &object_size),
+        PDF_ERR_CFF_INVALID_OBJECT_IDX
+    );
+
     return TEST_RESULT_PASS;
 }
 
-#undef TEST_CHECK_EOF
+TEST_FUNC(test_cff_index_seek_offset_size_2) {
+    uint8_t buffer[] = {// size = 3
+                        0x00,
+                        0x03,
+                        // offset size = 2
+                        0x02,
+                        // offsets = [1, 4, 6, 7]
+                        0x00,
+                        0x01,
+                        0x00,
+                        0x04,
+                        0x00,
+                        0x06,
+                        0x00,
+                        0x07,
+                        // data
+                        'a',
+                        'b',
+                        'c',
+                        4,
+                        2,
+                        '@'
+    };
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffIndex index;
+    TEST_PDF_REQUIRE(cff_parse_index(&parser, &index));
+
+    size_t object_size;
+    TEST_PDF_REQUIRE(cff_index_seek_object(&index, &parser, 0, &object_size));
+    TEST_ASSERT_EQ((size_t)11, parser.offset);
+    TEST_ASSERT_EQ((size_t)3, object_size);
+
+    TEST_PDF_REQUIRE(cff_index_seek_object(&index, &parser, 1, &object_size));
+    TEST_ASSERT_EQ((size_t)14, parser.offset);
+    TEST_ASSERT_EQ((size_t)2, object_size);
+
+    TEST_PDF_REQUIRE(cff_index_seek_object(&index, &parser, 2, &object_size));
+    TEST_ASSERT_EQ((size_t)16, parser.offset);
+    TEST_ASSERT_EQ((size_t)1, object_size);
+
+    TEST_PDF_REQUIRE_ERR(
+        cff_index_seek_object(&index, &parser, 4, &object_size),
+        PDF_ERR_CFF_INVALID_OBJECT_IDX
+    );
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_index_skip_size_1) {
+    uint8_t buffer[] = {// size = 3
+                        0x00,
+                        0x03,
+                        // offset size = 1
+                        0x01,
+                        // offsets = [1, 4, 6, 7]
+                        0x01,
+                        0x04,
+                        0x06,
+                        0x07,
+                        // data
+                        'a',
+                        'b',
+                        'c',
+                        4,
+                        2,
+                        '@'
+    };
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffIndex index;
+    TEST_PDF_REQUIRE(cff_parse_index(&parser, &index));
+
+    TEST_PDF_REQUIRE(cff_index_skip(&index, &parser));
+    TEST_ASSERT_EQ((size_t)13, parser.offset);
+
+    return TEST_RESULT_PASS;
+}
+
 #endif // TEST

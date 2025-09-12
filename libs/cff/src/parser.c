@@ -17,7 +17,7 @@ CffParser cff_parser_new(const uint8_t* buffer, size_t buffer_len) {
 PdfError* cff_parser_seek(CffParser* parser, size_t offset) {
     RELEASE_ASSERT(parser);
 
-    if (offset >= parser->buffer_len) {
+    if (offset > parser->buffer_len) {
         return PDF_ERROR(PDF_ERR_CFF_EOF);
     }
 
@@ -338,8 +338,8 @@ TEST_FUNC(test_cff_parser_seek_last) {
     CffParser parser =
         cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
 
-    TEST_PDF_REQUIRE(cff_parser_seek(&parser, 2));
-    TEST_ASSERT_EQ((size_t)2, parser.offset);
+    TEST_PDF_REQUIRE(cff_parser_seek(&parser, 3));
+    TEST_ASSERT_EQ((size_t)3, parser.offset);
 
     return TEST_RESULT_PASS;
 }
@@ -349,7 +349,7 @@ TEST_FUNC(test_cff_parser_seek_invalid) {
 
     CffParser parser =
         cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
-    TEST_PDF_REQUIRE_ERR(cff_parser_seek(&parser, 3), PDF_ERR_CFF_EOF);
+    TEST_PDF_REQUIRE_ERR(cff_parser_seek(&parser, 4), PDF_ERR_CFF_EOF);
 
     return TEST_RESULT_PASS;
 }
