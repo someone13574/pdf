@@ -160,8 +160,8 @@ read_int_operand(CffParser* parser, CffCard8 byte0, CffToken* token_out) {
     PDF_PROPAGATE(cff_parser_read_card8(parser, &byte3));
     PDF_PROPAGATE(cff_parser_read_card8(parser, &byte4));
 
-    uint32_t value = (uint32_t)byte1 << 24 | (uint32_t)byte2 << 16
-                   | (uint32_t)byte3 | (uint32_t)byte4;
+    uint32_t value = ((uint32_t)byte1 << 24) | ((uint32_t)byte2 << 16)
+                   | ((uint32_t)byte3 << 8) | (uint32_t)byte4;
     token_out->value.integer =
         *(int32_t*)&value; // Doesn't violate strict aliasing. See above.
 
@@ -219,6 +219,8 @@ static PdfError* read_real_operand(CffParser* parser, CffToken* token_out) {
                     "Real cannot have more than one decimal and the exponent cannot be fractional"
                 );
             }
+
+            integer_part = false;
         } else if (nibble == 0xb) {
             if (exp_part) {
                 return PDF_ERROR(
@@ -300,43 +302,422 @@ PdfError* cff_parser_read_token(CffParser* parser, CffToken* token_out) {
         PDF_PROPAGATE(read_int_operand(parser, byte0, token_out));
     }
 
-    LOG_TODO();
+    return NULL;
 }
 
 #ifdef TEST
 
-// TODO: test CFF parser
-// cff_parser_new
-//   - test fields set correctly
-// cff_parser_seek
-//   - valid seek
-//   - invalid seek
-//   - eof seek
-// cff_parser_read_card8
-//   - first and second bytes
-//   - last byte
-//   - eof byte
-// cff_parser_read_card16
-//   - first and second byte
-//   - second and third byte
-//   - second last and last byte
-//   - last and eof byte
-// cff_parser_read_offset
-//   - test reading offsets of sizes 1, 2, 3, and 4
-//   - test eof
-// cff_parser_read_offset_size
-//   - test reading valid numbers (1, 2, 3, 4)
-//   - test reading 0, 5
-// cff_parser_read_sid
-//   - test in range num
-//   - test 64999
-//   - test err 65000
-//   - test eof
-// cff_parser_read_token
-//   - test operators from 0-21 via loop
-//   - test integers from spec (one test fn per format)
-//   - test real valid from spec
-//   - invalid reals (+fn for reserved)
-//   - reserved values (one fn)
+#include "test/test.h"
+
+TEST_FUNC(test_cff_parser_new) {
+    uint8_t buffer[] = "abc";
+    CffParser parser =
+        cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
+
+    TEST_ASSERT(parser.buffer);
+    TEST_ASSERT_EQ((size_t)3, parser.buffer_len);
+    TEST_ASSERT_EQ((size_t)0, parser.offset);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_seek) {
+    uint8_t buffer[] = "abc";
+    CffParser parser =
+        cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
+
+    TEST_PDF_REQUIRE(cff_parser_seek(&parser, 1));
+    TEST_ASSERT_EQ((size_t)1, parser.offset);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_seek_last) {
+    uint8_t buffer[] = "abc";
+
+    CffParser parser =
+        cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
+
+    TEST_PDF_REQUIRE(cff_parser_seek(&parser, 2));
+    TEST_ASSERT_EQ((size_t)2, parser.offset);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_seek_invalid) {
+    uint8_t buffer[] = "abc";
+
+    CffParser parser =
+        cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
+    TEST_PDF_REQUIRE_ERR(cff_parser_seek(&parser, 3), PDF_ERR_CFF_EOF);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_card8) {
+    uint8_t buffer[] = "abc";
+
+    CffParser parser =
+        cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
+
+    CffCard8 card8;
+    TEST_PDF_REQUIRE(cff_parser_read_card8(&parser, &card8));
+    TEST_ASSERT_EQ((CffCard8)'a', card8);
+    TEST_PDF_REQUIRE(cff_parser_read_card8(&parser, &card8));
+    TEST_ASSERT_EQ((CffCard8)'b', card8);
+    TEST_PDF_REQUIRE(cff_parser_read_card8(&parser, &card8));
+    TEST_ASSERT_EQ((CffCard8)'c', card8);
+    TEST_PDF_REQUIRE_ERR(
+        cff_parser_read_card8(&parser, &card8),
+        PDF_ERR_CFF_EOF
+    );
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_card16_even) {
+    uint8_t buffer[] = "abcdef";
+
+    CffParser parser =
+        cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
+
+    CffCard16 card16;
+    TEST_PDF_REQUIRE(cff_parser_read_card16(&parser, &card16));
+    TEST_ASSERT_EQ((CffCard16)0x6162, card16);
+    TEST_PDF_REQUIRE(cff_parser_read_card16(&parser, &card16));
+    TEST_ASSERT_EQ((CffCard16)0x6364, card16);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_card16_odd) {
+    uint8_t buffer[] = "abcdef";
+
+    CffParser parser =
+        cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
+    TEST_PDF_REQUIRE(cff_parser_seek(&parser, 1));
+
+    CffCard16 card16;
+    TEST_PDF_REQUIRE(cff_parser_read_card16(&parser, &card16));
+    TEST_ASSERT_EQ((CffCard16)0x6263, card16);
+    TEST_PDF_REQUIRE(cff_parser_read_card16(&parser, &card16));
+    TEST_ASSERT_EQ((CffCard16)0x6465, card16);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_card16_last) {
+    uint8_t buffer[] = "abcdef";
+
+    CffParser parser =
+        cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
+    TEST_PDF_REQUIRE(cff_parser_seek(&parser, 4));
+
+    CffCard16 card16;
+    TEST_PDF_REQUIRE(cff_parser_read_card16(&parser, &card16));
+    TEST_ASSERT_EQ((CffCard16)0x6566, card16);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_card16_eof) {
+    uint8_t buffer[] = "abcdef";
+    CffParser parser =
+        cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
+    TEST_PDF_REQUIRE(cff_parser_seek(&parser, 5));
+
+    CffCard16 card16;
+    TEST_PDF_REQUIRE_ERR(
+        cff_parser_read_card16(&parser, &card16),
+        PDF_ERR_CFF_EOF
+    );
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_offset) {
+    uint8_t buffer[] = {0xa2, 0x2f, 0xe6, 0xf6, 0x42};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffOffset offset;
+    TEST_PDF_REQUIRE(cff_parser_seek(&parser, 2));
+    TEST_PDF_REQUIRE(cff_parser_read_offset(&parser, 1, &offset));
+    TEST_ASSERT_EQ((CffOffset)0xe6, offset);
+
+    TEST_PDF_REQUIRE(cff_parser_read_offset(&parser, 2, &offset));
+    TEST_ASSERT_EQ((CffOffset)0xf642, offset);
+
+    TEST_PDF_REQUIRE(cff_parser_seek(&parser, 1));
+    TEST_PDF_REQUIRE(cff_parser_read_offset(&parser, 3, &offset));
+    TEST_ASSERT_EQ((CffOffset)0x2fe6f6, offset);
+
+    TEST_PDF_REQUIRE(cff_parser_seek(&parser, 0));
+    TEST_PDF_REQUIRE(cff_parser_read_offset(&parser, 4, &offset));
+    TEST_ASSERT_EQ((CffOffset)0xa22fe6f6, offset);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_offset_eof) {
+    uint8_t buffer[] = {0xa2, 0x2f, 0xe6, 0xf6, 0x42};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffOffset offset;
+    TEST_PDF_REQUIRE(cff_parser_seek(&parser, 2));
+    TEST_PDF_REQUIRE_ERR(
+        cff_parser_read_offset(&parser, 4, &offset),
+        PDF_ERR_CFF_EOF
+    );
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_offset_size) {
+    uint8_t buffer[] = {0x1, 0x2, 0x3, 0x4};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffOffsetSize offset_size;
+    TEST_PDF_REQUIRE(cff_parser_read_offset_size(&parser, &offset_size));
+    TEST_ASSERT_EQ((CffOffsetSize)1, offset_size);
+    TEST_PDF_REQUIRE(cff_parser_read_offset_size(&parser, &offset_size));
+    TEST_ASSERT_EQ((CffOffsetSize)2, offset_size);
+    TEST_PDF_REQUIRE(cff_parser_read_offset_size(&parser, &offset_size));
+    TEST_ASSERT_EQ((CffOffsetSize)3, offset_size);
+    TEST_PDF_REQUIRE(cff_parser_read_offset_size(&parser, &offset_size));
+    TEST_ASSERT_EQ((CffOffsetSize)4, offset_size);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_offset_size0) {
+    uint8_t buffer[] = {0x0};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffOffsetSize offset_size;
+    TEST_PDF_REQUIRE_ERR(
+        cff_parser_read_offset_size(&parser, &offset_size),
+        PDF_ERR_CFF_INVALID_OFFSET_SIZE
+    );
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_offset_size5) {
+    uint8_t buffer[] = {0x5};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffOffsetSize offset_size;
+    TEST_PDF_REQUIRE_ERR(
+        cff_parser_read_offset_size(&parser, &offset_size),
+        PDF_ERR_CFF_INVALID_OFFSET_SIZE
+    );
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_sid) {
+    uint8_t buffer[] = {0x95, 0x5c, 0xd5, 0xc3};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffStringID sid;
+    TEST_PDF_REQUIRE(cff_parser_read_sid(&parser, &sid));
+    TEST_ASSERT_EQ((CffStringID)0x955c, sid);
+    TEST_PDF_REQUIRE(cff_parser_read_sid(&parser, &sid));
+    TEST_ASSERT_EQ((CffStringID)0xd5c3, sid);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_sid_64999) {
+    uint8_t buffer[] = {0xfd, 0xe7};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffStringID sid;
+    TEST_PDF_REQUIRE(cff_parser_read_sid(&parser, &sid));
+    TEST_ASSERT_EQ((CffStringID)64999, sid);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_sid_invalid_65000) {
+    uint8_t buffer[] = {0xfd, 0xe8};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffStringID sid;
+    TEST_PDF_REQUIRE_ERR(
+        cff_parser_read_sid(&parser, &sid),
+        PDF_ERR_CFF_INVALID_SID
+    );
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_sid_eof) {
+    uint8_t buffer[] = {0xfd};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffStringID sid;
+    TEST_PDF_REQUIRE_ERR(cff_parser_read_sid(&parser, &sid), PDF_ERR_CFF_EOF);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_operator) {
+    for (uint8_t operator= 0; operator<= 21; operator++) {
+        uint8_t buffer[] = {operator};
+        CffParser parser =
+            cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+        CffToken token;
+        TEST_PDF_REQUIRE(cff_parser_read_token(&parser, &token));
+        TEST_ASSERT_EQ((CffTokenType)CFF_TOKEN_OPERATOR, token.type);
+        TEST_ASSERT_EQ(operator, token.value.operator);
+    }
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_token_eof) {
+    uint8_t buffer[] = {0};
+    CffParser parser = cff_parser_new(buffer, 0);
+
+    CffToken token;
+    TEST_PDF_REQUIRE_ERR(
+        cff_parser_read_token(&parser, &token),
+        PDF_ERR_CFF_EOF
+    );
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_token_reserved) {
+    uint8_t reserved_bytes[] = {22, 23, 24, 25, 26, 27, 31, 255};
+    for (size_t idx = 0; idx < sizeof(reserved_bytes) / sizeof(uint8_t);
+         idx++) {
+        uint8_t buffer[] = {reserved_bytes[idx]};
+        CffParser parser =
+            cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+        CffToken token;
+        TEST_PDF_REQUIRE_ERR(
+            cff_parser_read_token(&parser, &token),
+            PDF_ERR_CFF_RESERVED
+        );
+    }
+
+    return TEST_RESULT_PASS;
+}
+
+// From 'Table 4 Integer Format Examples' of
+// https://adobe-type-tools.github.io/font-tech-notes/pdfs/5176.CFF.pdf.
+TEST_FUNC(test_cff_parser_read_int_operand) {
+    uint8_t buffer[] = {0x8b, 0xef, 0x27, 0xfa, 0x7c, 0xfe, 0x7c, 0x1c,
+                        0x27, 0x10, 0x1c, 0xd8, 0xf0, 0x1d, 0x00, 0x01,
+                        0x86, 0xa0, 0x1d, 0xff, 0xfe, 0x79, 0x60};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffToken token;
+    int32_t expected_values[] =
+        {0, 100, -100, 1000, -1000, 10000, -10000, 100000, -100000};
+    for (size_t idx = 0; idx < sizeof(expected_values) / sizeof(int32_t);
+         idx++) {
+        TEST_PDF_REQUIRE(cff_parser_read_token(&parser, &token));
+        TEST_ASSERT_EQ((CffTokenType)CFF_TOKEN_INT_OPERAND, token.type);
+        TEST_ASSERT_EQ(expected_values[idx], token.value.integer);
+    }
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_real_operand) {
+    uint8_t buffer[] =
+        {0x1e, 0xe2, 0xa2, 0x5f, 0x1e, 0x0a, 0x14, 0x05, 0x41, 0xc3, 0xff};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffToken token;
+    TEST_PDF_REQUIRE(cff_parser_read_token(&parser, &token));
+    TEST_ASSERT_EQ((CffTokenType)CFF_TOKEN_REAL_OPERAND, token.type);
+    TEST_ASSERT_EQ(-2.25, token.value.real);
+
+    TEST_PDF_REQUIRE(cff_parser_read_token(&parser, &token));
+    TEST_ASSERT_EQ((CffTokenType)CFF_TOKEN_REAL_OPERAND, token.type);
+    TEST_ASSERT_EQ_EPS(0.140541e-3, token.value.real, 1e-9L);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_real_operand_no_fractional) {
+    uint8_t buffer[] = {0x1e, 0x5f};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffToken token;
+    TEST_PDF_REQUIRE(cff_parser_read_token(&parser, &token));
+    TEST_ASSERT_EQ((CffTokenType)CFF_TOKEN_REAL_OPERAND, token.type);
+    TEST_ASSERT_EQ(5.0, token.value.real);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_real_operand_no_fractional_with_exp) {
+    uint8_t buffer[] = {0x1e, 0x5b, 0x3f};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffToken token;
+    TEST_PDF_REQUIRE(cff_parser_read_token(&parser, &token));
+    TEST_ASSERT_EQ((CffTokenType)CFF_TOKEN_REAL_OPERAND, token.type);
+    TEST_ASSERT_EQ(5e3, token.value.real);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_real_operand_no_integer) {
+    uint8_t buffer[] = {0x1e, 0xa5, 0xff};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffToken token;
+    TEST_PDF_REQUIRE(cff_parser_read_token(&parser, &token));
+    TEST_ASSERT_EQ((CffTokenType)CFF_TOKEN_REAL_OPERAND, token.type);
+    TEST_ASSERT_EQ(0.5, token.value.real);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_real_operand_fractional_exp_err) {
+    uint8_t buffer[] = {0x1e, 0x5b, 0x2a, 0x5f};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffToken token;
+    TEST_PDF_REQUIRE_ERR(
+        cff_parser_read_token(&parser, &token),
+        PDF_ERR_CFF_INVALID_REAL_OPERAND
+    );
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_real_operand_trailing_zeros) {
+    uint8_t buffer[] = {0x1e, 0x5a, 0x50, 0x00, 0x0f};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffToken token;
+    TEST_PDF_REQUIRE(cff_parser_read_token(&parser, &token));
+    TEST_ASSERT_EQ((CffTokenType)CFF_TOKEN_REAL_OPERAND, token.type);
+    TEST_ASSERT_EQ(5.5, token.value.real);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_cff_parser_read_real_operand_reserved_nibble) {
+    uint8_t buffer[] = {0x1e, 0x5a, 0x50, 0xd0, 0x0f};
+    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+
+    CffToken token;
+    TEST_PDF_REQUIRE_ERR(
+        cff_parser_read_token(&parser, &token),
+        PDF_ERR_CFF_RESERVED
+    );
+
+    return TEST_RESULT_PASS;
+}
 
 #endif // TEST
