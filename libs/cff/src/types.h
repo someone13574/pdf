@@ -16,7 +16,19 @@ typedef uint32_t CffOffset;
 typedef uint8_t CffOffsetSize;
 
 /// 2-byte string identifier (range: 0-64999).
-typedef uint16_t CffStringID;
+typedef uint16_t CffSID;
+
+typedef struct {
+    enum { CFF_NUMBER_INT, CFF_NUMBER_REAL } type;
+
+    union {
+        int32_t integer;
+        double real;
+    } value;
+} CffNumber;
+
+/// Converts an integer or real to a real
+double cff_num_as_real(CffNumber num);
 
 /// The type of CffToken.
 typedef enum {

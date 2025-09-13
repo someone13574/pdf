@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "arena/arena.h"
 #include "pdf_error/error.h"
 #include "types.h"
 
@@ -39,7 +40,15 @@ cff_parser_read_offset_size(CffParser* parser, CffOffsetSize* offset_size_out);
 
 /// Read a 2-byte string identifier which must have a value from 0 to 64999 from
 /// the current offset.
-PdfError* cff_parser_read_sid(CffParser* parser, CffStringID* sid_out);
+PdfError* cff_parser_read_sid(CffParser* parser, CffSID* sid_out);
 
 /// Read a operator or operand from the current offset.
 PdfError* cff_parser_read_token(CffParser* parser, CffToken* token_out);
+
+/// Get a null-terminated string of a specified length from the current offset.
+PdfError* cff_parser_get_str(
+    Arena* arena,
+    CffParser* parser,
+    size_t length,
+    char** str_out
+);

@@ -2,7 +2,9 @@
 
 #include <math.h>
 #include <stdint.h>
+#include <string.h>
 
+#include "arena/arena.h"
 #include "logger/log.h"
 #include "pdf_error/error.h"
 #include "types.h"
@@ -94,7 +96,7 @@ cff_parser_read_offset_size(CffParser* parser, CffOffsetSize* offset_size_out) {
     return NULL;
 }
 
-PdfError* cff_parser_read_sid(CffParser* parser, CffStringID* sid_out) {
+PdfError* cff_parser_read_sid(CffParser* parser, CffSID* sid_out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(sid_out);
 
@@ -301,6 +303,27 @@ PdfError* cff_parser_read_token(CffParser* parser, CffToken* token_out) {
     } else {
         PDF_PROPAGATE(read_int_operand(parser, byte0, token_out));
     }
+
+    return NULL;
+}
+
+PdfError* cff_parser_get_str(
+    Arena* arena,
+    CffParser* parser,
+    size_t length,
+    char** str_out
+) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(str_out);
+
+    if (parser->offset + length >= parser->buffer_len) {
+        return PDF_ERROR(PDF_ERR_CFF_EOF);
+    }
+
+    *str_out = arena_alloc(arena, sizeof(char) * (length + 1));
+    memcpy(*str_out, parser->buffer + parser->offset, length);
+    (*str_out)[length] = '\0';
 
     return NULL;
 }
@@ -519,11 +542,11 @@ TEST_FUNC(test_cff_parser_read_sid) {
     uint8_t buffer[] = {0x95, 0x5c, 0xd5, 0xc3};
     CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
 
-    CffStringID sid;
+    CffSID sid;
     TEST_PDF_REQUIRE(cff_parser_read_sid(&parser, &sid));
-    TEST_ASSERT_EQ((CffStringID)0x955c, sid);
+    TEST_ASSERT_EQ((CffSID)0x955c, sid);
     TEST_PDF_REQUIRE(cff_parser_read_sid(&parser, &sid));
-    TEST_ASSERT_EQ((CffStringID)0xd5c3, sid);
+    TEST_ASSERT_EQ((CffSID)0xd5c3, sid);
 
     return TEST_RESULT_PASS;
 }
@@ -532,9 +555,9 @@ TEST_FUNC(test_cff_parser_read_sid_64999) {
     uint8_t buffer[] = {0xfd, 0xe7};
     CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
 
-    CffStringID sid;
+    CffSID sid;
     TEST_PDF_REQUIRE(cff_parser_read_sid(&parser, &sid));
-    TEST_ASSERT_EQ((CffStringID)64999, sid);
+    TEST_ASSERT_EQ((CffSID)64999, sid);
 
     return TEST_RESULT_PASS;
 }
@@ -543,7 +566,7 @@ TEST_FUNC(test_cff_parser_read_sid_invalid_65000) {
     uint8_t buffer[] = {0xfd, 0xe8};
     CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
 
-    CffStringID sid;
+    CffSID sid;
     TEST_PDF_REQUIRE_ERR(
         cff_parser_read_sid(&parser, &sid),
         PDF_ERR_CFF_INVALID_SID
@@ -556,7 +579,7 @@ TEST_FUNC(test_cff_parser_read_sid_eof) {
     uint8_t buffer[] = {0xfd};
     CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
 
-    CffStringID sid;
+    CffSID sid;
     TEST_PDF_REQUIRE_ERR(cff_parser_read_sid(&parser, &sid), PDF_ERR_CFF_EOF);
 
     return TEST_RESULT_PASS;

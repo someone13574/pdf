@@ -21,6 +21,8 @@ PdfError* cff_parse_index(CffParser* parser, CffIndex* index_out) {
     }
 
     PDF_PROPAGATE(cff_parser_read_offset_size(parser, &index_out->offset_size));
+    PDF_PROPAGATE(cff_index_skip(index_out, parser));
+
     return NULL;
 }
 

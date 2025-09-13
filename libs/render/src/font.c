@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "arena/arena.h"
 #include "cff/cff.h"
 #include "logger/log.h"
 #include "pdf/fonts/cmap.h"
@@ -120,12 +121,15 @@ PdfError* cid_to_gid(
                 if (strcmp(subtype, "Type1C") == 0) {
                     LOG_TODO("Type1C FontFile3 embedded font");
                 } else if (strcmp(subtype, "CIDFontType0C") == 0) {
+                    Arena* arena = arena_new(1024);
                     CffFont* cff_font;
                     PDF_PROPAGATE(cff_parse(
+                        arena,
                         font_descriptor.font_file3.value.stream_bytes,
                         font_descriptor.font_file3.value.decoded_stream_len,
                         &cff_font
                     ));
+                    arena_free(arena);
 
                     LOG_TODO("CIDFontType0C FontFile3 embedded font");
                 } else {

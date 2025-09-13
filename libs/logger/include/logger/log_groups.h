@@ -24,4 +24,5 @@
     X(PS_TOKEN, INFO, PS)                                                      \
     X(CMAP, INHERIT, FONT)                                                     \
     X(SFNT, INHERIT, GLOBAL)                                                   \
-    X(SFNT_PARSE, INHERIT, SFNT)
+    X(SFNT_PARSE, INHERIT, SFNT)                                               \
+    X(CFF, TRACE, GLOBAL)
