@@ -8,7 +8,7 @@
     },
     "program": "$ZED_WORKTREE_ROOT/build/examples/pdf-example",
     "request": "launch",
-    "adapter": "CodeLLDB"
+    "adapter": "GDB"
   },
   {
     "label": "Debug font-example",
@@ -19,7 +19,7 @@
     },
     "program": "$ZED_WORKTREE_ROOT/build/examples/font-example",
     "request": "launch",
-    "adapter": "CodeLLDB"
+    "adapter": "GDB"
   },
   {
     "label": "Debug tessellation-example",
@@ -30,7 +30,7 @@
     },
     "program": "$ZED_WORKTREE_ROOT/build/examples/tessellation-example",
     "request": "launch",
-    "adapter": "CodeLLDB"
+    "adapter": "GDB"
   },
   {
     "label": "Debug cmap-example",
@@ -41,7 +41,7 @@
     },
     "program": "$ZED_WORKTREE_ROOT/build/examples/cmap-example",
     "request": "launch",
-    "adapter": "CodeLLDB"
+    "adapter": "GDB"
   },
   {
     "label": "Debug test",
@@ -50,11 +50,11 @@
       "args": [],
       "cwd": "$ZED_WORKTREE_ROOT",
       "env": {
-        "DEBUG_TEST_FUNCTION": "test_postscript_tokenize_single_plus_name_non_eof"
+        "DEBUG_TEST_FUNCTION": "test_vec_growth"
       }
     },
     "program": "$ZED_WORKTREE_ROOT/build/libs/test/pdf-test-main",
     "request": "launch",
-    "adapter": "CodeLLDB"
+    "adapter": "GDB"
   }
 ]

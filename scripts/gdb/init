@@ -1,0 +1,6 @@
+python
+import sys, os
+sys.path.insert(0, os.path.join(os.getcwd(), "scripts", "gdb"))
+import darray_gdb
+import dvec_gdb
+end
