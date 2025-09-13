@@ -1,7 +1,10 @@
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "arena/arena.h"
 #include "logger/log.h"
+
+#define DVEC_DEBUG_MAGIC 0x5645435F444247ULL
 
 #ifndef DVEC_SRC
 #define DVEC_SRC
@@ -60,6 +63,9 @@ struct DVEC_NAME {
     size_t len;
     size_t allocated_blocks;
     DVEC_TYPE* blocks[DVEC_MAX_BLOCKS];
+
+    /// Marker field so that the lldb formatter can detect vecs.
+    uint64_t dbg_magic;
 };
 
 // Creates a new arena-backed vector with zero elements
@@ -77,6 +83,7 @@ DVEC_NAME* DVEC_FN(new)(Arena* arena) {
     vec->len = 0;
     vec->allocated_blocks = 0;
     vec->blocks[0] = NULL;
+    vec->dbg_magic = DVEC_DEBUG_MAGIC;
 
     return vec;
 }
@@ -223,6 +230,7 @@ size_t DVEC_FN(len)(const DVEC_NAME* vec) {
 }
 
 // Undefines
+#undef DVEC_DEBUG_MAGIC
 #undef DVEC_NAME
 #undef DVEC_LOWERCASE_NAME
 #undef DVEC_TYPE

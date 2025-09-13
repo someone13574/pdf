@@ -1,8 +1,11 @@
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "arena/arena.h"
 #include "logger/log.h"
+
+#define DARRAY_DEBUG_MAGIC 0x4152525F444247ULL
 
 // Check arguments
 #ifndef DARRAY_NAME
@@ -33,6 +36,9 @@ typedef struct DARRAY_NAME DARRAY_NAME;
 struct DARRAY_NAME {
     size_t len;
     DARRAY_TYPE* elements;
+
+    /// Marker field so that the lldb formatter can detect arrays.
+    uint64_t dbg_magic;
 };
 
 // Creates a new arena-backed array of a set size with uninitialized elements
@@ -49,6 +55,7 @@ DARRAY_NAME* DARRAY_FN(new)(Arena* arena, size_t num_elements) {
 
     DARRAY_NAME* array = arena_alloc(arena, sizeof(DARRAY_NAME));
     array->len = num_elements;
+    array->dbg_magic = DARRAY_DEBUG_MAGIC;
 
     if (num_elements != 0) {
         array->elements =
@@ -160,6 +167,7 @@ DARRAY_TYPE* DARRAY_FN(get_raw)(const DARRAY_NAME* array, size_t* len_out) {
 }
 
 // Undefines
+#undef DARRAY_DEBUG_MAGIC
 #undef DARRAY_NAME
 #undef DARRAY_LOWERCASE_NAME
 #undef DARRAY_TYPE
