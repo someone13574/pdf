@@ -7,6 +7,7 @@
 #include "canvas/canvas.h"
 #include "canvas/path_builder.h"
 #include "geom/vec2.h"
+#include "index.h"
 #include "logger/log.h"
 #include "parser.h"
 #include "pdf_error/error.h"
@@ -98,7 +99,7 @@ static const char* charstr_operator_names[] = {CHARSTR_OPERATORS};
 typedef struct {
     enum { CHARSTR_OPERAND_INT } type;
     union {
-        int32_t integer;
+        int32_t integer; // TODO: Use Card16?
     } value;
 } CharstrOperand;
 
@@ -113,6 +114,15 @@ typedef struct {
     PathBuilder* path_builder;
     GeomVec2 current_point;
 } CharstrState;
+
+static PdfError* cff_charstr2_subr(
+    CffParser* parser,
+    CffIndex global_subr_index,
+    CffIndex local_subr_index,
+    size_t length,
+    CharstrState* state,
+    bool* endchar_out
+);
 
 static double operand_as_real(CharstrOperand operand) {
     switch (operand.type) {
@@ -292,6 +302,16 @@ static PdfError* get_relative_y(CharstrState* state, GeomVec2* point_out) {
     return NULL;
 }
 
+static PdfError* pop_operand(CharstrState* state, CharstrOperand* operand_out) {
+    RELEASE_ASSERT(state);
+    RELEASE_ASSERT(operand_out);
+
+    PDF_PROPAGATE(check_operands_available(1, state));
+    *operand_out = state->operand_stack[--state->operand_count];
+
+    return NULL;
+}
+
 static PdfError* check_stack_consumed(CharstrState* state) {
     RELEASE_ASSERT(state);
 
@@ -302,18 +322,50 @@ static PdfError* check_stack_consumed(CharstrState* state) {
     state->operand_count = 0;
     state->stack_bottom = 0;
 
+    LOG_DIAG(TRACE, CFF, "Stack empty");
+
     return NULL;
 }
 
-static PdfError*
-charstring_interpret_operator(CharstrOperator operator, CharstrState * state) {
+static CffCard16 subr_bias(CffCard16 num_subrs) {
+    if (num_subrs < 1240) {
+        return 107;
+    } else if (num_subrs < 33900) {
+        return 1131;
+    } else {
+        return 32768;
+    }
+}
+
+static PdfError* charstring_interpret_operator(
+    CharstrOperator
+    operator,
+    CharstrState * state,
+    CffParser* parser,
+    CffIndex global_subr_index,
+    CffIndex local_subr_index,
+    bool* endchar_out,
+    bool* return_out
+) {
     RELEASE_ASSERT(operator<70);
     RELEASE_ASSERT(state);
     RELEASE_ASSERT(state->stack_bottom == 0);
+    RELEASE_ASSERT(endchar_out);
+    RELEASE_ASSERT(return_out);
 
-    LOG_DIAG(DEBUG, CFF, "Operator: %s", charstr_operator_names[operator]);
+    *endchar_out = false;
+    *return_out = false;
+
+    LOG_DIAG(DEBUG, CFF, "Operator: %s (stack=%zu)", charstr_operator_names[operator], num_operands_available(state));
 
     switch (operator) {
+        case CHARSTR_OPERATOR_VMOVETO: {
+            PDF_PROPAGATE(handle_width(1, state));
+            PDF_PROPAGATE(get_relative_y(state, NULL));
+            path_builder_new_contour(state->path_builder, state->current_point);
+            PDF_PROPAGATE(check_stack_consumed(state));
+            break;
+        }
         case CHARSTR_OPERATOR_RLINETO: {
             do {
                 PDF_PROPAGATE(get_relative_position(state, NULL));
@@ -372,9 +424,52 @@ charstring_interpret_operator(CharstrOperator operator, CharstrState * state) {
             PDF_PROPAGATE(check_stack_consumed(state));
             break;
         }
-        case CHARSTR_OPERATOR_ENDCHAR: {
-            // TODO: Forbid more outline operations
+        case CHARSTR_OPERATOR_CALLSUBR: {
+            CharstrOperand unbiased_subr_num;
+            PDF_PROPAGATE(pop_operand(state, &unbiased_subr_num));
+            if (unbiased_subr_num.type != CHARSTR_OPERAND_INT) {
+                return PDF_ERROR(
+                    PDF_ERR_CFF_INCORRECT_OPERAND,
+                    "Expected an integer operand"
+                );
+            }
 
+            CffCard16 bias = subr_bias(local_subr_index.count);
+            int64_t subr_idx = unbiased_subr_num.value.integer + bias;
+            if (subr_idx < 0 || subr_idx >= local_subr_index.count) {
+                return PDF_ERROR(
+                    PDF_ERR_CFF_INVALID_SUBR,
+                    "Invalid local subroutine #%lld",
+                    (long long int)subr_idx
+                );
+            }
+
+            size_t return_offset = parser->offset;
+            size_t subr_size;
+            PDF_PROPAGATE(cff_index_seek_object(
+                &local_subr_index,
+                parser,
+                (CffCard16)subr_idx,
+                &subr_size
+            ));
+            PDF_PROPAGATE(cff_charstr2_subr(
+                parser,
+                global_subr_index,
+                local_subr_index,
+                subr_size,
+                state,
+                endchar_out
+            ));
+            PDF_PROPAGATE(cff_parser_seek(parser, return_offset));
+            break;
+        }
+        case CHARSTR_OPERATOR_RETURN: {
+            *return_out = true;
+            break;
+        }
+        case CHARSTR_OPERATOR_ENDCHAR: {
+            *endchar_out = true;
+            PDF_PROPAGATE(handle_width(0, state));
             PDF_PROPAGATE(check_stack_consumed(state));
             break;
         }
@@ -382,7 +477,13 @@ charstring_interpret_operator(CharstrOperator operator, CharstrState * state) {
             PDF_PROPAGATE(handle_width(2, state));
             PDF_PROPAGATE(get_relative_position(state, NULL));
             path_builder_new_contour(state->path_builder, state->current_point);
-
+            PDF_PROPAGATE(check_stack_consumed(state));
+            break;
+        }
+        case CHARSTR_OPERATOR_HMOVETO: {
+            PDF_PROPAGATE(handle_width(1, state));
+            PDF_PROPAGATE(get_relative_x(state, NULL));
+            path_builder_new_contour(state->path_builder, state->current_point);
             PDF_PROPAGATE(check_stack_consumed(state));
             break;
         }
@@ -488,9 +589,48 @@ charstring_interpret_operator(CharstrOperator operator, CharstrState * state) {
             PDF_PROPAGATE(check_stack_consumed(state));
             break;
         }
+        case CHARSTR_OPERATOR_CALLGSUBR: {
+            CharstrOperand unbiased_subr_num;
+            PDF_PROPAGATE(pop_operand(state, &unbiased_subr_num));
+            if (unbiased_subr_num.type != CHARSTR_OPERAND_INT) {
+                return PDF_ERROR(
+                    PDF_ERR_CFF_INCORRECT_OPERAND,
+                    "Expected an integer operand"
+                );
+            }
+
+            CffCard16 bias = subr_bias(global_subr_index.count);
+            int64_t subr_idx = unbiased_subr_num.value.integer + bias;
+            if (subr_idx < 0 || subr_idx >= global_subr_index.count) {
+                return PDF_ERROR(
+                    PDF_ERR_CFF_INVALID_SUBR,
+                    "Invalid global subroutine #%lld",
+                    (long long int)subr_idx
+                );
+            }
+
+            size_t return_offset = parser->offset;
+            size_t subr_size;
+            PDF_PROPAGATE(cff_index_seek_object(
+                &global_subr_index,
+                parser,
+                (CffCard16)subr_idx,
+                &subr_size
+            ));
+            PDF_PROPAGATE(cff_charstr2_subr(
+                parser,
+                global_subr_index,
+                local_subr_index,
+                subr_size,
+                state,
+                endchar_out
+            ));
+            PDF_PROPAGATE(cff_parser_seek(parser, return_offset));
+
+            break;
+        }
         case CHARSTR_OPERATOR_VHCURVETO: {
             bool horizontal = false;
-            bool first_pass = true;
             do {
                 GeomVec2 control_a;
                 if (horizontal) {
@@ -502,7 +642,7 @@ charstring_interpret_operator(CharstrOperator operator, CharstrState * state) {
                 GeomVec2 control_b;
                 PDF_PROPAGATE(get_relative_position(state, &control_b));
 
-                if (num_operands_available(state) == 2 && !first_pass) {
+                if (num_operands_available(state) == 2) {
                     // Handle full point at end
                     if (horizontal) {
                         PDF_PROPAGATE(get_relative_position_yx(state, NULL));
@@ -523,7 +663,6 @@ charstring_interpret_operator(CharstrOperator operator, CharstrState * state) {
                     control_b
                 );
                 horizontal = !horizontal;
-                first_pass = false;
             } while (num_operands_available(state) >= 4);
 
             PDF_PROPAGATE(check_stack_consumed(state));
@@ -531,7 +670,6 @@ charstring_interpret_operator(CharstrOperator operator, CharstrState * state) {
         }
         case CHARSTR_OPERATOR_HVCURVETO: {
             bool horizontal = true;
-            bool first_pass = true;
             do {
                 GeomVec2 control_a;
                 if (horizontal) {
@@ -543,7 +681,7 @@ charstring_interpret_operator(CharstrOperator operator, CharstrState * state) {
                 GeomVec2 control_b;
                 PDF_PROPAGATE(get_relative_position(state, &control_b));
 
-                if (num_operands_available(state) == 2 && !first_pass) {
+                if (num_operands_available(state) == 2) {
                     // Handle full point at end
                     if (horizontal) {
                         PDF_PROPAGATE(get_relative_position_yx(state, NULL));
@@ -564,7 +702,6 @@ charstring_interpret_operator(CharstrOperator operator, CharstrState * state) {
                     control_b
                 );
                 horizontal = !horizontal;
-                first_pass = false;
             } while (num_operands_available(state) >= 4);
 
             PDF_PROPAGATE(check_stack_consumed(state));
@@ -578,8 +715,135 @@ charstring_interpret_operator(CharstrOperator operator, CharstrState * state) {
     return NULL;
 }
 
+static PdfError* cff_charstr2_subr(
+    CffParser* parser,
+    CffIndex global_subr_index,
+    CffIndex local_subr_index,
+    size_t length,
+    CharstrState* state,
+    bool* endchar_out
+) {
+    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(state);
+    RELEASE_ASSERT(endchar_out);
+
+    size_t end_offset = parser->offset + length;
+    while (parser->offset < end_offset) {
+        CffCard8 byte;
+        PDF_PROPAGATE(cff_parser_read_card8(parser, &byte));
+
+        bool endchar = false;
+        bool return_subr = false;
+
+        if (byte <= 11) {
+            PDF_PROPAGATE(charstring_interpret_operator(
+                byte,
+                state,
+                parser,
+                global_subr_index,
+                local_subr_index,
+                &endchar,
+                &return_subr
+            ));
+        } else if (byte == 12) {
+            CffCard8 next_byte;
+            PDF_PROPAGATE(cff_parser_read_card8(parser, &next_byte));
+
+            LOG_DIAG(
+                INFO,
+                CFF,
+                "Operator: %s",
+                charstr_operator_names[next_byte + 32]
+            );
+            LOG_TODO();
+        } else if (byte <= 18) {
+            PDF_PROPAGATE(charstring_interpret_operator(
+                byte,
+                state,
+                parser,
+                global_subr_index,
+                local_subr_index,
+                &endchar,
+                &return_subr
+            ));
+        } else if (byte <= 20) {
+            LOG_TODO();
+        } else if (byte <= 27) {
+            PDF_PROPAGATE(charstring_interpret_operator(
+                byte,
+                state,
+                parser,
+                global_subr_index,
+                local_subr_index,
+                &endchar,
+                &return_subr
+            ));
+        } else if (byte == 28) {
+            LOG_TODO();
+        } else if (byte <= 31) {
+            PDF_PROPAGATE(charstring_interpret_operator(
+                byte,
+                state,
+                parser,
+                global_subr_index,
+                local_subr_index,
+                &endchar,
+                &return_subr
+            ));
+        } else if (byte <= 246) {
+            PDF_PROPAGATE(push_integer_operand((int32_t)byte - 139, state));
+        } else if (byte <= 250) {
+            CffCard8 next_byte;
+            PDF_PROPAGATE(cff_parser_read_card8(parser, &next_byte));
+            PDF_PROPAGATE(push_integer_operand(
+                ((int32_t)byte - 247) * 256 + (int32_t)next_byte + 108,
+                state
+            ));
+        } else if (byte <= 254) {
+            CffCard8 next_byte;
+            PDF_PROPAGATE(cff_parser_read_card8(parser, &next_byte));
+            PDF_PROPAGATE(push_integer_operand(
+                -(((int32_t)byte - 251) * 256) - (int32_t)next_byte - 108,
+                state
+            ));
+        } else {
+            LOG_TODO("4 byte twos complement");
+        }
+
+        GeomMat3 transform =
+            geom_mat3_new(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 500.0, 1000.0, 0.0);
+        Arena* temp_arena = arena_new(4096);
+        Canvas* temp_canvas =
+            canvas_new_scalable(temp_arena, 1500, 1500, 0xffffffff);
+        PathBuilder* path_copy =
+            path_builder_clone(temp_arena, state->path_builder);
+        path_builder_apply_transform(path_copy, transform);
+        canvas_draw_path(temp_canvas, path_copy);
+        canvas_draw_circle(
+            temp_canvas,
+            geom_vec2_transform(state->current_point, transform).x,
+            geom_vec2_transform(state->current_point, transform).y,
+            10.0,
+            0xff0000ff
+        );
+        RELEASE_ASSERT(canvas_write_file(temp_canvas, "glyph.svg"));
+        arena_free(temp_arena);
+
+        if (endchar) {
+            *endchar_out = true;
+            break;
+        } else if (return_subr) {
+            break;
+        }
+    }
+
+    return NULL;
+}
+
 PdfError* cff_charstr2_render(
     CffParser* parser,
+    CffIndex global_subr_index,
+    CffIndex local_subr_index,
     size_t length,
     Canvas* canvas,
     GeomMat3 transform
@@ -596,73 +860,16 @@ PdfError* cff_charstr2_render(
        .path_builder = path_builder_new(temp_arena),
        .current_point = geom_vec2_new(0.0, 0.0)};
 
-    size_t end_offset = parser->offset + length;
-    while (parser->offset < end_offset) {
-        CffCard8 byte;
-        PDF_PROPAGATE(cff_parser_read_card8(parser, &byte));
-
-        if (byte <= 11) {
-            PDF_PROPAGATE(charstring_interpret_operator(byte, &state));
-        } else if (byte == 12) {
-            CffCard8 next_byte;
-            PDF_PROPAGATE(cff_parser_read_card8(parser, &next_byte));
-
-            LOG_DIAG(
-                INFO,
-                CFF,
-                "Operator: %s",
-                charstr_operator_names[next_byte + 32]
-            );
-        } else if (byte <= 18) {
-            PDF_PROPAGATE(charstring_interpret_operator(byte, &state));
-        } else if (byte <= 20) {
-            LOG_TODO();
-        } else if (byte <= 27) {
-            PDF_PROPAGATE(charstring_interpret_operator(byte, &state));
-        } else if (byte == 28) {
-            LOG_TODO();
-        } else if (byte <= 31) {
-            PDF_PROPAGATE(charstring_interpret_operator(byte, &state));
-        } else if (byte <= 246) {
-            PDF_PROPAGATE(push_integer_operand((int32_t)byte - 139, &state));
-        } else if (byte <= 250) {
-            CffCard8 next_byte;
-            PDF_PROPAGATE(cff_parser_read_card8(parser, &next_byte));
-            PDF_PROPAGATE(push_integer_operand(
-                ((int32_t)byte - 247) * 256 + (int32_t)next_byte + 108,
-                &state
-            ));
-        } else if (byte <= 254) {
-            CffCard8 next_byte;
-            PDF_PROPAGATE(cff_parser_read_card8(parser, &next_byte));
-            PDF_PROPAGATE(push_integer_operand(
-                -(((int32_t)byte - 251) * 256) - (int32_t)next_byte - 108,
-                &state
-            ));
-        } else {
-            LOG_TODO("4 byte twos complement");
-        }
-
-        Canvas* canvas_temp =
-            canvas_new_scalable(temp_arena, 1500, 1500, 0xffffffff);
-        PathBuilder* cloned_path =
-            path_builder_clone(temp_arena, state.path_builder);
-        path_builder_apply_transform(cloned_path, transform);
-        canvas_draw_path(canvas_temp, cloned_path);
-
-        GeomVec2 curr_point_transformed =
-            geom_vec2_transform(state.current_point, transform);
-        canvas_draw_circle(
-            canvas_temp,
-            curr_point_transformed.x,
-            curr_point_transformed.y,
-            10.0,
-            0xff0000ff
-        );
-        canvas_write_file(canvas_temp, "glyph.svg");
-        int x = 0;
-        (void)x;
-    }
+    bool endchar; // We don't actually need this since we aren't actually
+                  // calling a subroutine.
+    PDF_PROPAGATE(cff_charstr2_subr(
+        parser,
+        global_subr_index,
+        local_subr_index,
+        length,
+        &state,
+        &endchar
+    ));
 
     path_builder_apply_transform(state.path_builder, transform);
     canvas_draw_path(canvas, state.path_builder);

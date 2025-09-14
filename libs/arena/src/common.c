@@ -15,6 +15,11 @@
 #define DARRAY_TYPE uint16_t
 #include "arena/darray_impl.h"
 
+#define DARRAY_NAME Int32Array
+#define DARRAY_LOWERCASE_NAME int32_array
+#define DARRAY_TYPE int32_t
+#include "arena/darray_impl.h"
+
 #define DARRAY_NAME Uint32Array
 #define DARRAY_LOWERCASE_NAME uint32_array
 #define DARRAY_TYPE uint32_t

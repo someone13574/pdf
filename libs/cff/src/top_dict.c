@@ -175,6 +175,7 @@ pop_sid(CffToken* operand_stack, size_t* operand_count, CffSID* sid_out) {
     return NULL;
 }
 
+// TODO: Share these functions with private dict
 static PdfError*
 pop_int(CffToken* operand_stack, size_t* operand_count, int32_t* int_out) {
     RELEASE_ASSERT(operand_stack);
@@ -364,12 +365,12 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
                         PDF_PROPAGATE(pop_int(
                             operand_stack,
                             &operand_count,
-                            &top_dict_out->private_dict_size
+                            &top_dict_out->private_offset
                         ));
                         PDF_PROPAGATE(pop_int(
                             operand_stack,
                             &operand_count,
-                            &top_dict_out->private_offset
+                            &top_dict_out->private_dict_size
                         ));
                         break;
                     }

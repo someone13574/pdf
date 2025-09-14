@@ -108,6 +108,7 @@ struct PdfError {
 };
 
 PdfError* pdf_error_new(PdfErrorCode code) {
+    // TODO: find a way to do this without dynamically allocated memory
     PdfError* error = malloc(sizeof(PdfError));
     RELEASE_ASSERT(error);
 

@@ -5,6 +5,7 @@ add_library(cff
     src/header.c
     src/index.c
     src/parser.c
+    src/private_dict.c
     src/top_dict.c
     src/types.c)
 target_include_directories(cff PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")

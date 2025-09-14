@@ -1,5 +1,7 @@
 #include "cff/cff.h"
 
+#include <unistd.h>
+
 #include "arena/arena.h"
 #include "canvas/canvas.h"
 #include "charsets.h"
@@ -10,6 +12,7 @@
 #include "logger/log.h"
 #include "parser.h"
 #include "pdf_error/error.h"
+#include "private_dict.h"
 #include "top_dict.h"
 #include "types.h"
 
@@ -66,9 +69,25 @@ PdfError* cff_parse(
         CffTopDict top_dict = cff_top_dict_default();
         PDF_PROPAGATE(cff_parse_top_dict(&parser, top_dict_len, &top_dict));
 
+        CffPrivateDict private_dict = cff_private_dict_default();
+        PDF_PROPAGATE(cff_parser_seek(&parser, (size_t)top_dict.private_offset)
+        );
+        PDF_PROPAGATE(cff_parse_private_dict(
+            arena,
+            &parser,
+            (size_t)top_dict.private_dict_size,
+            &private_dict
+        ));
+
+        CffIndex subrs_index;
+        PDF_PROPAGATE(cff_parser_seek(
+            &parser,
+            (size_t)top_dict.private_offset + (size_t)private_dict.subrs
+        ));
+        PDF_PROPAGATE(cff_parse_index(&parser, &subrs_index));
+
         CffIndex charstring_index;
-        PDF_PROPAGATE(cff_parser_seek(&parser, (size_t)top_dict.char_strings)
-        ); // TODO: check offsets for neg
+        PDF_PROPAGATE(cff_parser_seek(&parser, (size_t)top_dict.char_strings));
         PDF_PROPAGATE(cff_parse_index(&parser, &charstring_index));
 
         CffCharset charset = {0};
@@ -81,21 +100,39 @@ PdfError* cff_parse(
             cff_parse_charset(&parser, arena, charstring_index.count, &charset)
         );
 
-        size_t charstring_size;
-        PDF_PROPAGATE(cff_index_seek_object(
-            &charstring_index,
-            &parser,
-            101,
-            &charstring_size
-        ));
+        for (CffCard16 idx = 0; idx < charstring_index.count; idx++) {
+            size_t charstring_size;
+            PDF_PROPAGATE(cff_index_seek_object(
+                &charstring_index,
+                &parser,
+                idx,
+                &charstring_size
+            ));
 
-        Canvas* canvas = canvas_new_scalable(arena, 1500, 1500, 0xffffffff);
-        GeomMat3 transform =
-            geom_mat3_new(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 500.0, 1000.0, 0.0);
-        PDF_PROPAGATE(
-            cff_charstr2_render(&parser, charstring_size, canvas, transform)
-        );
-        RELEASE_ASSERT(canvas_write_file(canvas, "glyph.svg"));
+            Canvas* canvas = canvas_new_scalable(arena, 1500, 1500, 0xffffffff);
+            GeomMat3 transform = geom_mat3_new(
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                -1.0,
+                0.0,
+                500.0,
+                1000.0,
+                0.0
+            );
+            PDF_PROPAGATE(cff_charstr2_render(
+                &parser,
+                font.global_subr_index,
+                subrs_index,
+                charstring_size,
+                canvas,
+                transform
+            ));
+            RELEASE_ASSERT(canvas_write_file(canvas, "glyph.svg"));
+
+            usleep(150000);
+        }
     }
 
     *cff_font_out = arena_alloc(arena, sizeof(CffFont));
