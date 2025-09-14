@@ -382,7 +382,7 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
             }
             case CFF_TOKEN_INT_OPERAND: {
                 LOG_DIAG(
-                    DEBUG,
+                    TRACE,
                     CFF,
                     "Integer operand: %ld",
                     (long int)token.value.integer

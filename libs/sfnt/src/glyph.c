@@ -5,7 +5,7 @@
 #include "arena/arena.h"
 #include "canvas/canvas.h"
 #include "canvas/path_builder.h"
-#include "geom/vec3.h"
+#include "geom/vec2.h"
 #include "logger/log.h"
 #include "parser.h"
 #include "pdf_error/error.h"
@@ -216,6 +216,7 @@ PdfError* sfnt_parse_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
     LOG_TODO("Compound glyphs");
 }
 
+// TODO: Fully translate this to using the geometry helper lib
 void sfnt_glyph_render(
     Canvas* canvas,
     const SfntGlyph* glyph,
@@ -263,7 +264,7 @@ void sfnt_glyph_render(
         int32_t contour_start_y = y_coord;
         int32_t contour_end_x = x_coord;
         int32_t contour_end_y = y_coord;
-        double curve_control_x = 0.0, curve_control_y = 0.0;
+        GeomVec2 curve_control = geom_vec2_new(0.0, 0.0);
 
         for (size_t pass = 0; pass < 2; pass++) {
             x_coord = contour_start_x;
@@ -284,51 +285,41 @@ void sfnt_glyph_render(
                     contour_end_y = y_coord;
                 }
 
-                GeomVec3 position = geom_vec3_transform(
-                    geom_vec3_new((double)x_coord, (double)y_coord, 1.0),
+                GeomVec2 position = geom_vec2_transform(
+                    geom_vec2_new((double)x_coord, (double)y_coord),
                     transform
                 );
 
                 if (!has_curve_start && point.on_curve) {
                     has_curve_start = true;
-                    path_builder_new_contour(path, position.x, position.y);
+                    path_builder_new_contour(path, position);
                 } else if (has_curve_start && !has_curve_control && !point.on_curve) {
                     has_curve_control = true;
-                    curve_control_x = position.x;
-                    curve_control_y = position.y;
+                    curve_control = position;
                 } else if (has_curve_start && !has_curve_control && point.on_curve) {
-                    path_builder_line_to(path, position.x, position.y);
+                    path_builder_line_to(path, position);
 
                     if (pass != 0) {
                         break;
                     }
                 } else if (has_curve_start && has_curve_control && point.on_curve) {
-                    path_builder_bezier_to(
-                        path,
-                        position.x,
-                        position.y,
-                        curve_control_x,
-                        curve_control_y
-                    );
+                    path_builder_quad_bezier_to(path, position, curve_control);
 
                     has_curve_control = false;
                     if (pass != 0) {
                         break;
                     }
                 } else if (has_curve_start && has_curve_control && !point.on_curve) {
-                    double mid_x = (curve_control_x + position.x) / 2.0;
-                    double mid_y = (curve_control_y + position.y) / 2.0;
+                    double mid_x = (curve_control.x + position.x) / 2.0;
+                    double mid_y = (curve_control.y + position.y) / 2.0;
 
-                    path_builder_bezier_to(
+                    path_builder_quad_bezier_to(
                         path,
-                        mid_x,
-                        mid_y,
-                        curve_control_x,
-                        curve_control_y
+                        geom_vec2_new(mid_x, mid_y),
+                        curve_control
                     );
 
-                    curve_control_x = position.x;
-                    curve_control_y = position.y;
+                    curve_control = position;
                     if (pass != 0) {
                         break;
                     }

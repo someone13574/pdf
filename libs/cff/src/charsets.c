@@ -55,7 +55,7 @@ PdfError* cff_parse_charset(
                 PDF_PROPAGATE(cff_parser_read_sid(parser, &sid));
                 PDF_PROPAGATE(cff_parser_read_card8(parser, &n_left));
 
-                for (CffCard8 idx = 0; idx <= n_left; idx++) {
+                for (size_t idx = 0; idx <= (size_t)n_left; idx++) {
                     if (glyph_idx == num_glyphs - 1) {
                         return PDF_ERROR(
                             PDF_ERR_CFF_INVALID_CHARSET,
@@ -85,7 +85,7 @@ PdfError* cff_parse_charset(
                 PDF_PROPAGATE(cff_parser_read_sid(parser, &sid));
                 PDF_PROPAGATE(cff_parser_read_card16(parser, &n_left));
 
-                for (CffCard16 idx = 0; idx <= n_left; idx++) {
+                for (size_t idx = 0; idx <= (size_t)n_left; idx++) {
                     if (glyph_idx == num_glyphs - 1) {
                         return PDF_ERROR(
                             PDF_ERR_CFF_INVALID_CHARSET,

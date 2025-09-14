@@ -1,0 +1,672 @@
+#include "charstring.h"
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "arena/arena.h"
+#include "canvas/canvas.h"
+#include "canvas/path_builder.h"
+#include "geom/vec2.h"
+#include "logger/log.h"
+#include "parser.h"
+#include "pdf_error/error.h"
+#include "types.h"
+
+enum { CHARSTR_MAX_OPERANDS = 48 };
+
+#define CHARSTR_OPERATORS                                                      \
+    X(RESERVED0)                                                               \
+    X(HSTEM)                                                                   \
+    X(RESERVED2)                                                               \
+    X(VSTEM)                                                                   \
+    X(VMOVETO)                                                                 \
+    X(RLINETO)                                                                 \
+    X(HLINETO)                                                                 \
+    X(VLINETO)                                                                 \
+    X(RRCURVETO)                                                               \
+    X(RESERVED9)                                                               \
+    X(CALLSUBR)                                                                \
+    X(RETURN)                                                                  \
+    X(ESCAPE)                                                                  \
+    X(RESERVED13)                                                              \
+    X(ENDCHAR)                                                                 \
+    X(RESERVED15)                                                              \
+    X(RESERVED16)                                                              \
+    X(RESERVED17)                                                              \
+    X(HSTEMHM)                                                                 \
+    X(HINTMASK)                                                                \
+    X(CNTRMASK)                                                                \
+    X(RMOVETO)                                                                 \
+    X(HMOVETO)                                                                 \
+    X(VSTEMHM)                                                                 \
+    X(RCURVELINE)                                                              \
+    X(RLINECURVE)                                                              \
+    X(VVCURVETO)                                                               \
+    X(HHCURVETO)                                                               \
+    X(SHORTINT)                                                                \
+    X(CALLGSUBR)                                                               \
+    X(VHCURVETO)                                                               \
+    X(HVCURVETO)                                                               \
+    X(RESERVED_ESC0)                                                           \
+    X(RESERVED_ESC1)                                                           \
+    X(RESERVED_ESC2)                                                           \
+    X(AND)                                                                     \
+    X(OR)                                                                      \
+    X(NOT)                                                                     \
+    X(RESERVED_ESC6)                                                           \
+    X(RESERVED_ESC7)                                                           \
+    X(RESERVED_ESC8)                                                           \
+    X(ABS)                                                                     \
+    X(ADD)                                                                     \
+    X(SUB)                                                                     \
+    X(DIV)                                                                     \
+    X(RESERVED_ESC13)                                                          \
+    X(NEG)                                                                     \
+    X(EQ)                                                                      \
+    X(RESERVED_ESC16)                                                          \
+    X(RESERVED_ESC17)                                                          \
+    X(DROP)                                                                    \
+    X(RESERVED_ESC19)                                                          \
+    X(PUT)                                                                     \
+    X(GET)                                                                     \
+    X(IFELSE)                                                                  \
+    X(RANDOM)                                                                  \
+    X(MUL)                                                                     \
+    X(RESERVED_ESC23)                                                          \
+    X(SQRT)                                                                    \
+    X(DUP)                                                                     \
+    X(EXCH)                                                                    \
+    X(INDEX)                                                                   \
+    X(ROLL)                                                                    \
+    X(RESERVED_ESC31)                                                          \
+    X(RESERVED_ESC32)                                                          \
+    X(RESERVED_ESC33)                                                          \
+    X(HFLEX)                                                                   \
+    X(FLEX)                                                                    \
+    X(HFLEX1)                                                                  \
+    X(FLEX1)
+
+#define X(name) CHARSTR_OPERATOR_##name,
+typedef enum { CHARSTR_OPERATORS } CharstrOperator;
+#undef X
+
+#define X(name) #name,
+static const char* charstr_operator_names[] = {CHARSTR_OPERATORS};
+#undef X
+#undef CHARSTR_OPERATORS
+
+typedef struct {
+    enum { CHARSTR_OPERAND_INT } type;
+    union {
+        int32_t integer;
+    } value;
+} CharstrOperand;
+
+typedef struct {
+    CharstrOperand operand_stack[CHARSTR_MAX_OPERANDS];
+    size_t operand_count;
+    size_t stack_bottom;
+
+    bool width_set;
+    double width;
+
+    PathBuilder* path_builder;
+    GeomVec2 current_point;
+} CharstrState;
+
+static double operand_as_real(CharstrOperand operand) {
+    switch (operand.type) {
+        case CHARSTR_OPERAND_INT: {
+            return (double)operand.value.integer;
+        }
+    }
+
+    LOG_PANIC("Unreachable");
+}
+
+static PdfError* push_integer_operand(int32_t value, CharstrState* state) {
+    RELEASE_ASSERT(state);
+
+    if (state->operand_count == CHARSTR_MAX_OPERANDS) {
+        return PDF_ERROR(
+            PDF_ERR_EXCESS_OPERAND,
+            "An operator may be preceded by up to a maximum of 48 operands"
+        );
+    }
+
+    state->operand_stack[state->operand_count++] =
+        (CharstrOperand) {.type = CHARSTR_OPERAND_INT, .value.integer = value};
+
+    LOG_DIAG(
+        TRACE,
+        CFF,
+        "Pushed integer: %d",
+        (int)state->operand_stack[state->operand_count - 1].value.integer
+    );
+
+    return NULL;
+}
+
+static size_t num_operands_available(CharstrState* state) {
+    RELEASE_ASSERT(state);
+    return state->operand_count - state->stack_bottom;
+}
+
+static PdfError*
+check_operands_available(size_t required_count, CharstrState* state) {
+    RELEASE_ASSERT(state);
+
+    if (num_operands_available(state) < required_count) {
+        return PDF_ERROR(PDF_ERR_CFF_MISSING_OPERAND);
+    }
+
+    return NULL;
+}
+
+static PdfError* handle_width(size_t required_operands, CharstrState* state) {
+    RELEASE_ASSERT(state);
+
+    if (!state->width_set
+        && num_operands_available(state) > required_operands) {
+        LOG_DIAG(TRACE, CFF, "Reading width in charstring");
+
+        PDF_PROPAGATE(check_operands_available(1, state));
+
+        state->width =
+            operand_as_real(state->operand_stack[state->stack_bottom++]);
+        state->width_set = true;
+    }
+
+    return NULL;
+}
+
+static PdfError*
+get_relative_position(CharstrState* state, GeomVec2* point_out) {
+    RELEASE_ASSERT(state);
+
+    PDF_PROPAGATE(check_operands_available(2, state));
+
+    state->current_point = geom_vec2_add(
+        state->current_point,
+        geom_vec2_new(
+            operand_as_real(state->operand_stack[state->stack_bottom]),
+            operand_as_real(state->operand_stack[state->stack_bottom + 1])
+        )
+    );
+    state->stack_bottom += 2;
+
+    if (point_out) {
+        *point_out = state->current_point;
+    }
+    LOG_DIAG(
+        TRACE,
+        CFF,
+        "New position: (%f, %f) (point)",
+        state->current_point.x,
+        state->current_point.y
+    );
+
+    return NULL;
+}
+
+static PdfError*
+get_relative_position_yx(CharstrState* state, GeomVec2* point_out) {
+    RELEASE_ASSERT(state);
+
+    PDF_PROPAGATE(check_operands_available(2, state));
+
+    state->current_point = geom_vec2_add(
+        state->current_point,
+        geom_vec2_new(
+            operand_as_real(state->operand_stack[state->stack_bottom + 1]),
+            operand_as_real(state->operand_stack[state->stack_bottom])
+        )
+    );
+    state->stack_bottom += 2;
+
+    if (point_out) {
+        *point_out = state->current_point;
+    }
+    LOG_DIAG(
+        TRACE,
+        CFF,
+        "New position: (%f, %f) (yx point)",
+        state->current_point.x,
+        state->current_point.y
+    );
+
+    return NULL;
+}
+
+static PdfError* get_relative_x(CharstrState* state, GeomVec2* point_out) {
+    RELEASE_ASSERT(state);
+
+    PDF_PROPAGATE(check_operands_available(1, state));
+
+    state->current_point = geom_vec2_add(
+        state->current_point,
+        geom_vec2_new(
+            operand_as_real(state->operand_stack[state->stack_bottom++]),
+            0.0
+        )
+    );
+
+    if (point_out) {
+        *point_out = state->current_point;
+    }
+    LOG_DIAG(
+        TRACE,
+        CFF,
+        "New position: (%f, %f) (x)",
+        state->current_point.x,
+        state->current_point.y
+    );
+
+    return NULL;
+}
+
+static PdfError* get_relative_y(CharstrState* state, GeomVec2* point_out) {
+    RELEASE_ASSERT(state);
+
+    PDF_PROPAGATE(check_operands_available(1, state));
+
+    state->current_point = geom_vec2_add(
+        state->current_point,
+        geom_vec2_new(
+            0.0,
+            operand_as_real(state->operand_stack[state->stack_bottom++])
+        )
+    );
+
+    if (point_out) {
+        *point_out = state->current_point;
+    }
+    LOG_DIAG(
+        TRACE,
+        CFF,
+        "New position: (%f, %f) (y)",
+        state->current_point.x,
+        state->current_point.y
+    );
+
+    return NULL;
+}
+
+static PdfError* check_stack_consumed(CharstrState* state) {
+    RELEASE_ASSERT(state);
+
+    if (num_operands_available(state) != 0) {
+        return PDF_ERROR(PDF_ERR_EXCESS_OPERAND, "Operand must consume stack");
+    }
+
+    state->operand_count = 0;
+    state->stack_bottom = 0;
+
+    return NULL;
+}
+
+static PdfError*
+charstring_interpret_operator(CharstrOperator operator, CharstrState * state) {
+    RELEASE_ASSERT(operator<70);
+    RELEASE_ASSERT(state);
+    RELEASE_ASSERT(state->stack_bottom == 0);
+
+    LOG_DIAG(DEBUG, CFF, "Operator: %s", charstr_operator_names[operator]);
+
+    switch (operator) {
+        case CHARSTR_OPERATOR_RLINETO: {
+            do {
+                PDF_PROPAGATE(get_relative_position(state, NULL));
+                path_builder_line_to(state->path_builder, state->current_point);
+            } while (num_operands_available(state) >= 2);
+
+            PDF_PROPAGATE(check_stack_consumed(state));
+            break;
+        }
+        case CHARSTR_OPERATOR_HLINETO: {
+            bool horizontal = true;
+            do {
+                if (horizontal) {
+                    PDF_PROPAGATE(get_relative_x(state, NULL));
+                } else {
+                    PDF_PROPAGATE(get_relative_y(state, NULL));
+                }
+                path_builder_line_to(state->path_builder, state->current_point);
+                horizontal = !horizontal;
+            } while (num_operands_available(state) >= 1);
+
+            PDF_PROPAGATE(check_stack_consumed(state));
+            break;
+        }
+        case CHARSTR_OPERATOR_VLINETO: {
+            bool horizontal = false;
+            do {
+                if (horizontal) {
+                    PDF_PROPAGATE(get_relative_x(state, NULL));
+                } else {
+                    PDF_PROPAGATE(get_relative_y(state, NULL));
+                }
+                path_builder_line_to(state->path_builder, state->current_point);
+                horizontal = !horizontal;
+            } while (num_operands_available(state) >= 1);
+
+            PDF_PROPAGATE(check_stack_consumed(state));
+            break;
+        }
+        case CHARSTR_OPERATOR_RRCURVETO: {
+            do {
+                GeomVec2 control_a;
+                GeomVec2 control_b;
+                PDF_PROPAGATE(get_relative_position(state, &control_a));
+                PDF_PROPAGATE(get_relative_position(state, &control_b));
+                PDF_PROPAGATE(get_relative_position(state, NULL));
+
+                path_builder_cubic_bezier_to(
+                    state->path_builder,
+                    state->current_point,
+                    control_a,
+                    control_b
+                );
+            } while (num_operands_available(state) >= 6);
+
+            PDF_PROPAGATE(check_stack_consumed(state));
+            break;
+        }
+        case CHARSTR_OPERATOR_ENDCHAR: {
+            // TODO: Forbid more outline operations
+
+            PDF_PROPAGATE(check_stack_consumed(state));
+            break;
+        }
+        case CHARSTR_OPERATOR_RMOVETO: {
+            PDF_PROPAGATE(handle_width(2, state));
+            PDF_PROPAGATE(get_relative_position(state, NULL));
+            path_builder_new_contour(state->path_builder, state->current_point);
+
+            PDF_PROPAGATE(check_stack_consumed(state));
+            break;
+        }
+        case CHARSTR_OPERATOR_RCURVELINE: {
+            do {
+                GeomVec2 control_a;
+                GeomVec2 control_b;
+                PDF_PROPAGATE(get_relative_position(state, &control_a));
+                PDF_PROPAGATE(get_relative_position(state, &control_b));
+                PDF_PROPAGATE(get_relative_position(state, NULL));
+
+                path_builder_cubic_bezier_to(
+                    state->path_builder,
+                    state->current_point,
+                    control_a,
+                    control_b
+                );
+            } while (num_operands_available(state) >= 6);
+
+            PDF_PROPAGATE(get_relative_position(state, NULL));
+            path_builder_line_to(state->path_builder, state->current_point);
+
+            PDF_PROPAGATE(check_stack_consumed(state));
+            break;
+        }
+        case CHARSTR_OPERATOR_RLINECURVE: {
+            do {
+                PDF_PROPAGATE(get_relative_position(state, NULL));
+                path_builder_line_to(state->path_builder, state->current_point);
+            } while (num_operands_available(state) >= 8);
+
+            GeomVec2 control_a;
+            GeomVec2 control_b;
+            PDF_PROPAGATE(get_relative_position(state, &control_a));
+            PDF_PROPAGATE(get_relative_position(state, &control_b));
+            PDF_PROPAGATE(get_relative_position(state, NULL));
+
+            path_builder_cubic_bezier_to(
+                state->path_builder,
+                state->current_point,
+                control_a,
+                control_b
+            );
+
+            PDF_PROPAGATE(check_stack_consumed(state));
+            break;
+        }
+        case CHARSTR_OPERATOR_VVCURVETO: {
+            bool read_x_delta = num_operands_available(state) % 4 == 1;
+            do {
+                GeomVec2 control_a;
+                if (read_x_delta) {
+                    // If there is an extra operand at the front, the first
+                    // point is a full point and not just a y-delta.
+                    PDF_PROPAGATE(get_relative_position(state, &control_a));
+                    read_x_delta = false;
+                } else {
+                    PDF_PROPAGATE(get_relative_y(state, &control_a));
+                }
+
+                GeomVec2 control_b;
+                PDF_PROPAGATE(get_relative_position(state, &control_b));
+                PDF_PROPAGATE(get_relative_y(state, NULL));
+
+                path_builder_cubic_bezier_to(
+                    state->path_builder,
+                    state->current_point,
+                    control_a,
+                    control_b
+                );
+            } while (num_operands_available(state) >= 4);
+
+            PDF_PROPAGATE(check_stack_consumed(state));
+            break;
+        }
+        case CHARSTR_OPERATOR_HHCURVETO: {
+            bool read_y_delta = num_operands_available(state) % 4 == 1;
+            do {
+                GeomVec2 control_a;
+                if (read_y_delta) {
+                    // If there is an extra operand at the front, the first
+                    // point is a full point and not just a x-delta. We also
+                    // read the operands backwards since that is how they are
+                    // stored in this case.
+                    PDF_PROPAGATE(get_relative_position_yx(state, &control_a));
+                    read_y_delta = false;
+                } else {
+                    PDF_PROPAGATE(get_relative_x(state, &control_a));
+                }
+
+                GeomVec2 control_b;
+                PDF_PROPAGATE(get_relative_position(state, &control_b));
+                PDF_PROPAGATE(get_relative_x(state, NULL));
+
+                path_builder_cubic_bezier_to(
+                    state->path_builder,
+                    state->current_point,
+                    control_a,
+                    control_b
+                );
+            } while (num_operands_available(state) >= 4);
+
+            PDF_PROPAGATE(check_stack_consumed(state));
+            break;
+        }
+        case CHARSTR_OPERATOR_VHCURVETO: {
+            bool horizontal = false;
+            bool first_pass = true;
+            do {
+                GeomVec2 control_a;
+                if (horizontal) {
+                    PDF_PROPAGATE(get_relative_x(state, &control_a));
+                } else {
+                    PDF_PROPAGATE(get_relative_y(state, &control_a));
+                }
+
+                GeomVec2 control_b;
+                PDF_PROPAGATE(get_relative_position(state, &control_b));
+
+                if (num_operands_available(state) == 2 && !first_pass) {
+                    // Handle full point at end
+                    if (horizontal) {
+                        PDF_PROPAGATE(get_relative_position_yx(state, NULL));
+                    } else {
+                        PDF_PROPAGATE(get_relative_position(state, NULL));
+                    }
+                } else if (horizontal) {
+                    // Horizontal delta is now zero
+                    PDF_PROPAGATE(get_relative_y(state, NULL));
+                } else {
+                    PDF_PROPAGATE(get_relative_x(state, NULL));
+                }
+
+                path_builder_cubic_bezier_to(
+                    state->path_builder,
+                    state->current_point,
+                    control_a,
+                    control_b
+                );
+                horizontal = !horizontal;
+                first_pass = false;
+            } while (num_operands_available(state) >= 4);
+
+            PDF_PROPAGATE(check_stack_consumed(state));
+            break;
+        }
+        case CHARSTR_OPERATOR_HVCURVETO: {
+            bool horizontal = true;
+            bool first_pass = true;
+            do {
+                GeomVec2 control_a;
+                if (horizontal) {
+                    PDF_PROPAGATE(get_relative_x(state, &control_a));
+                } else {
+                    PDF_PROPAGATE(get_relative_y(state, &control_a));
+                }
+
+                GeomVec2 control_b;
+                PDF_PROPAGATE(get_relative_position(state, &control_b));
+
+                if (num_operands_available(state) == 2 && !first_pass) {
+                    // Handle full point at end
+                    if (horizontal) {
+                        PDF_PROPAGATE(get_relative_position_yx(state, NULL));
+                    } else {
+                        PDF_PROPAGATE(get_relative_position(state, NULL));
+                    }
+                } else if (horizontal) {
+                    // Horizontal delta is now zero
+                    PDF_PROPAGATE(get_relative_y(state, NULL));
+                } else {
+                    PDF_PROPAGATE(get_relative_x(state, NULL));
+                }
+
+                path_builder_cubic_bezier_to(
+                    state->path_builder,
+                    state->current_point,
+                    control_a,
+                    control_b
+                );
+                horizontal = !horizontal;
+                first_pass = false;
+            } while (num_operands_available(state) >= 4);
+
+            PDF_PROPAGATE(check_stack_consumed(state));
+            break;
+        }
+        default: {
+        LOG_TODO("Operator: %s (%d)", charstr_operator_names[operator], (int)operator);
+        }
+    }
+
+    return NULL;
+}
+
+PdfError* cff_charstr2_render(
+    CffParser* parser,
+    size_t length,
+    Canvas* canvas,
+    GeomMat3 transform
+) {
+    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(canvas);
+
+    Arena* temp_arena = arena_new(4096);
+    CharstrState state = (CharstrState
+    ) {.operand_count = 0,
+       .stack_bottom = 0,
+       .width_set = false,
+       .width = 0.0,
+       .path_builder = path_builder_new(temp_arena),
+       .current_point = geom_vec2_new(0.0, 0.0)};
+
+    size_t end_offset = parser->offset + length;
+    while (parser->offset < end_offset) {
+        CffCard8 byte;
+        PDF_PROPAGATE(cff_parser_read_card8(parser, &byte));
+
+        if (byte <= 11) {
+            PDF_PROPAGATE(charstring_interpret_operator(byte, &state));
+        } else if (byte == 12) {
+            CffCard8 next_byte;
+            PDF_PROPAGATE(cff_parser_read_card8(parser, &next_byte));
+
+            LOG_DIAG(
+                INFO,
+                CFF,
+                "Operator: %s",
+                charstr_operator_names[next_byte + 32]
+            );
+        } else if (byte <= 18) {
+            PDF_PROPAGATE(charstring_interpret_operator(byte, &state));
+        } else if (byte <= 20) {
+            LOG_TODO();
+        } else if (byte <= 27) {
+            PDF_PROPAGATE(charstring_interpret_operator(byte, &state));
+        } else if (byte == 28) {
+            LOG_TODO();
+        } else if (byte <= 31) {
+            PDF_PROPAGATE(charstring_interpret_operator(byte, &state));
+        } else if (byte <= 246) {
+            PDF_PROPAGATE(push_integer_operand((int32_t)byte - 139, &state));
+        } else if (byte <= 250) {
+            CffCard8 next_byte;
+            PDF_PROPAGATE(cff_parser_read_card8(parser, &next_byte));
+            PDF_PROPAGATE(push_integer_operand(
+                ((int32_t)byte - 247) * 256 + (int32_t)next_byte + 108,
+                &state
+            ));
+        } else if (byte <= 254) {
+            CffCard8 next_byte;
+            PDF_PROPAGATE(cff_parser_read_card8(parser, &next_byte));
+            PDF_PROPAGATE(push_integer_operand(
+                -(((int32_t)byte - 251) * 256) - (int32_t)next_byte - 108,
+                &state
+            ));
+        } else {
+            LOG_TODO("4 byte twos complement");
+        }
+
+        Canvas* canvas_temp =
+            canvas_new_scalable(temp_arena, 1500, 1500, 0xffffffff);
+        PathBuilder* cloned_path =
+            path_builder_clone(temp_arena, state.path_builder);
+        path_builder_apply_transform(cloned_path, transform);
+        canvas_draw_path(canvas_temp, cloned_path);
+
+        GeomVec2 curr_point_transformed =
+            geom_vec2_transform(state.current_point, transform);
+        canvas_draw_circle(
+            canvas_temp,
+            curr_point_transformed.x,
+            curr_point_transformed.y,
+            10.0,
+            0xff0000ff
+        );
+        canvas_write_file(canvas_temp, "glyph.svg");
+        int x = 0;
+        (void)x;
+    }
+
+    path_builder_apply_transform(state.path_builder, transform);
+    canvas_draw_path(canvas, state.path_builder);
+    arena_free(temp_arena);
+
+    return NULL;
+}

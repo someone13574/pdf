@@ -1,7 +1,10 @@
 #include "cff/cff.h"
 
 #include "arena/arena.h"
+#include "canvas/canvas.h"
 #include "charsets.h"
+#include "charstring.h"
+#include "geom/mat3.h"
 #include "header.h"
 #include "index.h"
 #include "logger/log.h"
@@ -63,24 +66,40 @@ PdfError* cff_parse(
         CffTopDict top_dict = cff_top_dict_default();
         PDF_PROPAGATE(cff_parse_top_dict(&parser, top_dict_len, &top_dict));
 
-        CffIndex char_string_index;
+        CffIndex charstring_index;
         PDF_PROPAGATE(cff_parser_seek(&parser, (size_t)top_dict.char_strings)
         ); // TODO: check offsets for neg
-        PDF_PROPAGATE(cff_parse_index(&parser, &char_string_index));
+        PDF_PROPAGATE(cff_parse_index(&parser, &charstring_index));
 
         CffCharset charset = {0};
+        if (top_dict.charset <= 2) {
+            LOG_TODO("Support predefined charset IDs");
+        }
+
         PDF_PROPAGATE(cff_parser_seek(&parser, (size_t)top_dict.charset));
         PDF_PROPAGATE(
-            cff_parse_charset(&parser, arena, char_string_index.count, &charset)
+            cff_parse_charset(&parser, arena, charstring_index.count, &charset)
         );
 
-        LOG_DIAG(INFO, CFF, "Done");
+        size_t charstring_size;
+        PDF_PROPAGATE(cff_index_seek_object(
+            &charstring_index,
+            &parser,
+            101,
+            &charstring_size
+        ));
+
+        Canvas* canvas = canvas_new_scalable(arena, 1500, 1500, 0xffffffff);
+        GeomMat3 transform =
+            geom_mat3_new(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 500.0, 1000.0, 0.0);
+        PDF_PROPAGATE(
+            cff_charstr2_render(&parser, charstring_size, canvas, transform)
+        );
+        RELEASE_ASSERT(canvas_write_file(canvas, "glyph.svg"));
     }
 
     *cff_font_out = arena_alloc(arena, sizeof(CffFont));
     **cff_font_out = font;
-
-    LOG_TODO();
 
     return NULL;
 }
