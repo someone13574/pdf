@@ -3,6 +3,7 @@
 #include "../deserialize.h"
 #include "arena/arena.h"
 #include "logger/log.h"
+#include "operator.h"
 #include "pdf/content_op.h"
 #include "pdf/object.h"
 #include "pdf/types.h"
@@ -242,6 +243,29 @@ static PdfError* pdf_deserialize_set_gray_op(
     );
 }
 
+static PdfError* pdf_deserialize_paint_xobject_op(
+    const PdfObjectVec* operands,
+    Arena* arena,
+    PdfContentOpPaintXObject* deserialized
+) {
+    RELEASE_ASSERT(operands);
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(deserialized);
+
+    PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
+        PdfContentOpPaintXObject,
+        xobject,
+        PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+    )};
+    return pdf_deserialize_operands(
+        deserialized,
+        descriptors,
+        sizeof(descriptors) / sizeof(PdfOperandDescriptor),
+        operands,
+        arena
+    );
+}
+
 PdfError* pdf_deserialize_content_op(
     PdfOperator op,
     const PdfObjectVec* operands,
@@ -253,6 +277,14 @@ PdfError* pdf_deserialize_content_op(
     RELEASE_ASSERT(operation_queue);
 
     switch (op) {
+        case PDF_OPERATOR_q: {
+            new_queue_op(operation_queue, PDF_CONTENT_OP_SAVE_GSTATE);
+            return NULL;
+        }
+        case PDF_OPERATOR_Q: {
+            new_queue_op(operation_queue, PDF_CONTENT_OP_RESTORE_GSTATE);
+            return NULL;
+        }
         case PDF_OPERATOR_cm: {
             PdfContentOp* new_op =
                 new_queue_op(operation_queue, PDF_CONTENT_OP_SET_CTM);
@@ -320,6 +352,15 @@ PdfError* pdf_deserialize_content_op(
                 operands,
                 arena,
                 &new_op->data.set_gray
+            );
+        }
+        case PDF_OPERATOR_Do: {
+            PdfContentOp* new_op =
+                new_queue_op(operation_queue, PDF_CONTENT_OP_PAINT_XOBJECT);
+            return pdf_deserialize_paint_xobject_op(
+                operands,
+                arena,
+                &new_op->data.paint_xobject
             );
         }
         default: {

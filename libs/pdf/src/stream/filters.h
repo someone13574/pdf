@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 #include "arena/arena.h"
-#include "pdf/stream/stream_dict.h"
+#include "pdf/object.h"
 #include "pdf_error/error.h"
 
 PdfError* pdf_decode_filtered_stream(

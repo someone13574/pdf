@@ -26,3 +26,9 @@ bool pdf_op_resolver_valid(PdfOptionalResolver resolver);
 Arena* pdf_resolver_arena(PdfResolver* resolver);
 PdfError*
 pdf_resolve_ref(PdfResolver* resolver, PdfIndirectRef ref, PdfObject* resolved);
+
+PdfError* pdf_resolve_object(
+    PdfOptionalResolver resolver,
+    const PdfObject* object,
+    PdfObject* resolved
+);

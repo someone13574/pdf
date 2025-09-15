@@ -1,6 +1,9 @@
-#include "pdf/stream/stream_dict.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "../deserialize.h"
+#include "arena/arena.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
@@ -78,20 +81,40 @@ PdfError* pdf_deserialize_stream_dict(
                 PdfOpStream,
                 PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STREAM)
             )
-        )
+        ),
+        // Panic if we find any of these fields
+        PDF_UNIMPLEMENTED_FIELD("DecodeParams"),
+        PDF_UNIMPLEMENTED_FIELD("F"),
+        PDF_UNIMPLEMENTED_FIELD("FFilter"),
+        PDF_UNIMPLEMENTED_FIELD("FDecodeParams"),
+        PDF_UNIMPLEMENTED_FIELD("DL")
     };
 
-    deserialized->raw_dict = object;
+    // Need to do a copy since the stream will take over the original
+    // object.
+    PdfObject* copied_object = arena_alloc(arena, sizeof(PdfObject));
+    memcpy(copied_object, object, sizeof(PdfObject));
+    deserialized->raw_dict = copied_object;
+
+    LOG_DIAG(
+        INFO,
+        DESERDE,
+        "Stream dict:\n%s\n",
+        pdf_fmt_object(arena, copied_object)
+    );
+
     PDF_PROPAGATE(pdf_deserialize_object(
         deserialized,
-        object,
+        copied_object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
         pdf_op_resolver_none(false),
-        false,
+        true,
         "PdfStreamDict"
     ));
+
+    RELEASE_ASSERT(deserialized->length != 0);
 
     return NULL;
 }

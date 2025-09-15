@@ -4,7 +4,6 @@
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf/stream/stream_dict.h"
 
 PdfError* pdf_deserialize_resources(
     const PdfObject* object,
@@ -18,6 +17,42 @@ PdfError* pdf_deserialize_resources(
     RELEASE_ASSERT(deserialized);
 
     PdfFieldDescriptor fields[] = {
+        PDF_FIELD(
+            PdfResources,
+            "ExtGState",
+            ext_gstate,
+            PDF_OPTIONAL_FIELD(
+                PdfOpDict,
+                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+            )
+        ),
+        PDF_FIELD(
+            PdfResources,
+            "ColorSpace",
+            color_space,
+            PDF_OPTIONAL_FIELD(
+                PdfOpDict,
+                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+            )
+        ),
+        PDF_FIELD(
+            PdfResources,
+            "Pattern",
+            pattern,
+            PDF_OPTIONAL_FIELD(
+                PdfOpDict,
+                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+            )
+        ),
+        PDF_FIELD(
+            PdfResources,
+            "Shading",
+            shading,
+            PDF_OPTIONAL_FIELD(
+                PdfOpDict,
+                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+            )
+        ),
         PDF_FIELD(
             PdfResources,
             "XObject",

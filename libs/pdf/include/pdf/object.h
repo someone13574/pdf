@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "deserde_types.h"
 #include "pdf_error/error.h"
 
 typedef struct PdfObject PdfObject;
@@ -83,6 +84,30 @@ DECL_OPTIONAL_TYPE(IndirectObject)
 DECL_OPTIONAL_TYPE(IndirectRef)
 
 #undef DECL_OPTIONAL_TYPE
+
+DESERIALIZABLE_ARRAY_TYPE(PdfNameArray)
+DESERIALIZABLE_OPTIONAL_TYPE(PdfOpNameArray, PdfNameArray)
+
+struct PdfStreamDict {
+    PdfInteger length;
+    PdfOpNameArray filter;
+
+    // Additional entries in an embedded font stream dictionary. TODO: Since
+    // unknown fields are now allowed, this should be a different structure.
+    PdfOpInteger length1;
+    PdfOpInteger length2;
+    PdfOpInteger length3;
+    PdfOpName subtype;
+    PdfOpStream metadata;
+
+    const PdfObject* raw_dict;
+};
+
+PdfError* pdf_deserialize_stream_dict(
+    const PdfObject* object,
+    Arena* arena,
+    PdfStreamDict* deserialized
+);
 
 typedef enum {
     PDF_OBJECT_TYPE_BOOLEAN,

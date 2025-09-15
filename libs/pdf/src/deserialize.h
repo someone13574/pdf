@@ -16,7 +16,8 @@ typedef enum {
     PDF_FIELD_KIND_ARRAY,
     PDF_FIELD_KIND_AS_ARRAY,
     PDF_FIELD_KIND_OPTIONAL,
-    PDF_FIELD_KIND_IGNORED
+    PDF_FIELD_KIND_IGNORED,
+    PDF_FIELD_KIND_UNIMPLEMENTED // Panics if found
 } PdfFieldKind;
 
 typedef struct PdfFieldInfo PdfFieldInfo;
@@ -77,12 +78,6 @@ typedef struct {
     PdfFieldInfo info;
     PdfFieldDebugInfo debug;
 } PdfOperandDescriptor;
-
-PdfError* pdf_resolve_object(
-    PdfOptionalResolver resolver,
-    const PdfObject* object,
-    PdfObject* resolved
-);
 
 PdfError* pdf_deserialize_object_field(
     void* field_ptr,
@@ -152,6 +147,16 @@ PdfError* pdf_deserialize_operands(
         .key = (pdf_key_string),                                               \
         .offset = offsetof(target_struct_name, field_name_in_struct),          \
         .info = (field_info), .debug = {                                       \
+            .file = RELATIVE_FILE_PATH,                                        \
+            .line = __LINE__                                                   \
+        }                                                                      \
+    }
+
+#define PDF_UNIMPLEMENTED_FIELD(pdf_key_string)                                \
+    {                                                                          \
+        .key = (pdf_key_string),                                               \
+        .info = (PdfFieldInfo) {.kind = PDF_FIELD_KIND_UNIMPLEMENTED},         \
+        .debug = {                                                             \
             .file = RELATIVE_FILE_PATH,                                        \
             .line = __LINE__                                                   \
         }                                                                      \

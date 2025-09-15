@@ -11,44 +11,6 @@
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
 
-PdfError* pdf_resolve_object(
-    PdfOptionalResolver resolver,
-    const PdfObject* object,
-    PdfObject* resolved
-) {
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(object);
-    RELEASE_ASSERT(resolved);
-
-    if (object->type == PDF_OBJECT_TYPE_INDIRECT_OBJECT
-        && resolver.unwrap_indirect_objs) {
-        LOG_DIAG(TRACE, DESERDE, "Unwrapping indirect object");
-        return pdf_resolve_object(
-            resolver,
-            object->data.indirect_object.object,
-            resolved
-        );
-    }
-
-    if (object->type == PDF_OBJECT_TYPE_INDIRECT_REF && resolver.present) {
-        LOG_DIAG(TRACE, DESERDE, "Resolving indirect reference");
-
-        PdfObject indirect_object;
-        PDF_PROPAGATE(pdf_resolve_ref(
-            resolver.resolver,
-            object->data.indirect_ref,
-            &indirect_object
-        ));
-
-        return pdf_resolve_object(resolver, &indirect_object, resolved);
-    }
-
-    LOG_DIAG(TRACE, DESERDE, "Resolved type is %d", object->type);
-
-    *resolved = *object;
-    return NULL;
-}
-
 PdfError* deserialize_field(
     void* field_ptr,
     const PdfObject* object,
@@ -148,6 +110,10 @@ PdfError* deserialize_field(
             );
             break;
         }
+        case PDF_FIELD_KIND_UNIMPLEMENTED: {
+            // We handle this higher up
+            LOG_PANIC("Unreachable");
+        }
         case PDF_FIELD_KIND_IGNORED: {
             break;
         }
@@ -178,14 +144,27 @@ PdfError* pdf_deserialize_object_field(
     switch (object->type) {
         case PDF_OBJECT_TYPE_BOOLEAN: {
             *(PdfBoolean*)field_ptr = object->data.boolean;
+            LOG_DIAG(
+                TRACE,
+                DESERDE,
+                "Got boolean %d",
+                (int)object->data.boolean
+            );
             break;
         }
         case PDF_OBJECT_TYPE_INTEGER: {
             *(PdfInteger*)field_ptr = object->data.integer;
+            LOG_DIAG(
+                TRACE,
+                DESERDE,
+                "Got integer %d",
+                (int)object->data.integer
+            );
             break;
         }
         case PDF_OBJECT_TYPE_REAL: {
             *(PdfReal*)field_ptr = object->data.real;
+            LOG_DIAG(TRACE, DESERDE, "Got real %f", object->data.real);
             break;
         }
         case PDF_OBJECT_TYPE_STRING: {
@@ -437,7 +416,10 @@ PdfError* pdf_deserialize_object(
 
     // Check object type
     if (resolved_object.type != PDF_OBJECT_TYPE_DICT) {
-        return PDF_ERROR(PDF_ERR_OBJECT_NOT_DICT);
+        return PDF_ERROR(
+            PDF_ERR_OBJECT_NOT_DICT,
+            "Cannot deserialize non-dict objects"
+        );
     }
 
     LOG_DIAG(INFO, DESERDE, "Deserializing dictionary object `%s`", name);
@@ -509,6 +491,15 @@ PdfError* pdf_deserialize_object(
                 continue;
             }
 
+            if (field->info.kind == PDF_FIELD_KIND_UNIMPLEMENTED) {
+                LOG_PANIC(
+                    "Unimplemented field `%s` (\x1b[4m%s:%lu\x1b[0m)",
+                    field->key,
+                    field->debug.file,
+                    field->debug.line
+                );
+            }
+
             PDF_PROPAGATE(
                 deserialize_field(
                     (char*)target + field->offset,
@@ -533,10 +524,17 @@ PdfError* pdf_deserialize_object(
                     (char*)target + field->offset,
                     field->info.data.optional
                 );
-            } else {
+            } else if (field->info.kind != PDF_FIELD_KIND_UNIMPLEMENTED) {
                 return PDF_ERROR(
                     PDF_ERR_MISSING_DICT_KEY,
                     "Missing key `%s`",
+                    field->key
+                );
+            } else {
+                LOG_DIAG(
+                    TRACE,
+                    DESERDE,
+                    "Unimplemented key `%s` wasn't found",
                     field->key
                 );
             }

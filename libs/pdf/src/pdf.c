@@ -177,6 +177,44 @@ PdfError* pdf_resolve_ref(
     return NULL;
 }
 
+PdfError* pdf_resolve_object(
+    PdfOptionalResolver resolver,
+    const PdfObject* object,
+    PdfObject* resolved
+) {
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(resolved);
+
+    if (object->type == PDF_OBJECT_TYPE_INDIRECT_OBJECT
+        && resolver.unwrap_indirect_objs) {
+        LOG_DIAG(TRACE, PDF, "Unwrapping indirect object");
+        return pdf_resolve_object(
+            resolver,
+            object->data.indirect_object.object,
+            resolved
+        );
+    }
+
+    if (object->type == PDF_OBJECT_TYPE_INDIRECT_REF && resolver.present) {
+        LOG_DIAG(TRACE, PDF, "Resolving indirect reference");
+
+        PdfObject indirect_object;
+        PDF_PROPAGATE(pdf_resolve_ref(
+            resolver.resolver,
+            object->data.indirect_ref,
+            &indirect_object
+        ));
+
+        return pdf_resolve_object(resolver, &indirect_object, resolved);
+    }
+
+    LOG_DIAG(TRACE, PDF, "Resolved type is %d", object->type);
+
+    *resolved = *object;
+    return NULL;
+}
+
 // The first line of a PDF file shall be a header consisting of the 5 characters
 // %PDF– followed by a version number of the form 1.N, where N is a digit
 // between 0 and 7.

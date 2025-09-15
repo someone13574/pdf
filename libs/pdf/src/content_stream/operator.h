@@ -302,9 +302,10 @@ typedef enum {
     PDF_OPERATOR_BX, // Begin a compatibility section. Unrecognized operators
                      // (along with their operands) shall be ignored without
                      // error until the balancing EX operator is encountered.
-    PDF_OPERATOR_EX  // End a compatibility section begun by a balancing BX
+    PDF_OPERATOR_EX, // End a compatibility section begun by a balancing BX
                      // operator. Ignore any unrecognized operands and operators
                      // from previous matching BX onward.
+    PDF_OPERATOR_UNSET // This should never be set.
 } PdfOperator;
 
 PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator);

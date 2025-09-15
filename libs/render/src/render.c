@@ -1,5 +1,7 @@
 #include "render/render.h"
 
+#include <stdio.h>
+
 #include "arena/arena.h"
 #include "canvas/canvas.h"
 #include "geom/mat3.h"
@@ -14,17 +16,28 @@
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/types.h"
+#include "pdf/xobject.h"
 #include "pdf_error/error.h"
 #include "text_state.h"
 
 #define SCALE (25.4 / 72.0) // TODO: Load user-space units for conversion factor
 
 typedef struct {
-    GraphicsState graphics_state;
+    GraphicsStateStack* graphics_state_stack; // idx 0 == top
     TextObjectState text_object_state;
 
     PdfCMapCache* cmap_cache;
 } RenderState;
+
+static GraphicsState* current_graphics_state(RenderState* state) {
+    RELEASE_ASSERT(state);
+
+    GraphicsState* gstate = NULL;
+    RELEASE_ASSERT(
+        graphics_state_stack_get_ptr(state->graphics_state_stack, 0, &gstate)
+    );
+    return gstate;
+}
 
 static PdfError* process_content_stream(
     Arena* arena,
@@ -49,8 +62,28 @@ static PdfError* process_content_stream(
         );
 
         switch (op.kind) {
+            case PDF_CONTENT_OP_SAVE_GSTATE: {
+                graphics_state_stack_push_front(
+                    state->graphics_state_stack,
+                    *current_graphics_state(state)
+                );
+                break;
+            }
+            case PDF_CONTENT_OP_RESTORE_GSTATE: {
+                if (!graphics_state_stack_pop_front(
+                        state->graphics_state_stack,
+                        NULL
+                    )) {
+                    return PDF_ERROR(
+                        PDF_ERR_RENDER_GSTATE_CANNOT_RESTORE,
+                        "GState stack underflow"
+                    );
+                }
+
+                break;
+            }
             case PDF_CONTENT_OP_SET_CTM: {
-                state->graphics_state.ctm = geom_mat3_new_pdf(
+                current_graphics_state(state)->ctm = geom_mat3_new_pdf(
                     pdf_number_as_real(op.data.set_matrix.a),
                     pdf_number_as_real(op.data.set_matrix.b),
                     pdf_number_as_real(op.data.set_matrix.c),
@@ -76,7 +109,8 @@ static PdfError* process_content_stream(
                     pdf_number_as_real(op.data.set_font.size)
                 );
 
-                RELEASE_ASSERT(resources->discriminant);
+                RELEASE_ASSERT(resources->discriminant
+                ); // TODO: This should be an error, and ideally a function
                 RELEASE_ASSERT(resources->value.font.discriminant);
 
                 PdfObject* font_object = pdf_dict_get(
@@ -88,11 +122,11 @@ static PdfError* process_content_stream(
                     font_object,
                     arena,
                     resolver,
-                    &state->graphics_state.text_state.text_font
+                    &current_graphics_state(state)->text_state.text_font
                 ));
-                state->graphics_state.text_state.text_font_size =
+                current_graphics_state(state)->text_state.text_font_size =
                     pdf_number_as_real(op.data.set_font.size);
-                state->graphics_state.text_state.font_set = true;
+                current_graphics_state(state)->text_state.font_set = true;
 
                 break;
             }
@@ -136,8 +170,8 @@ static PdfError* process_content_stream(
                     canvas,
                     resolver,
                     state->cmap_cache,
-                    state->graphics_state.ctm,
-                    &state->graphics_state.text_state,
+                    current_graphics_state(state)->ctm,
+                    &current_graphics_state(state)->text_state,
                     &state->text_object_state,
                     op.data.show_text.text
                 ));
@@ -146,6 +180,34 @@ static PdfError* process_content_stream(
             }
             case PDF_CONTENT_OP_SET_GRAY: {
                 // TODO: colors
+                break;
+            }
+            case PDF_CONTENT_OP_PAINT_XOBJECT: {
+                RELEASE_ASSERT(resources->discriminant);
+                RELEASE_ASSERT(resources->value.xobject.discriminant);
+
+                PdfObject* xobject_object = pdf_dict_get(
+                    &resources->value.xobject.value,
+                    op.data.paint_xobject.xobject
+                );
+
+                PdfXObject xobject;
+                PDF_PROPAGATE(pdf_deserialize_xobject(
+                    xobject_object,
+                    arena,
+                    resolver,
+                    &xobject
+                ));
+
+                switch (xobject.type) {
+                    case PDF_XOBJECT_IMAGE: {
+                        LOG_TODO();
+                    }
+                    case PDF_XOBJECT_FORM: {
+                        LOG_TODO();
+                    }
+                }
+
                 break;
             }
             default: {
@@ -181,12 +243,17 @@ PdfError* render_page(
     );
 
     RenderState state = {
-        .graphics_state = graphics_state_default(),
+        .graphics_state_stack = graphics_state_stack_new(arena),
         .text_object_state = text_object_state_default(),
         .cmap_cache = pdf_cmap_cache_new(arena)
     };
 
-    state.graphics_state.ctm = geom_mat3_mul(
+    graphics_state_stack_push_back(
+        state.graphics_state_stack,
+        graphics_state_default()
+    );
+
+    current_graphics_state(&state)->ctm = geom_mat3_mul(
         geom_mat3_translate(-rect.min.x * SCALE, -rect.min.y * SCALE),
         geom_mat3_new(
             SCALE,

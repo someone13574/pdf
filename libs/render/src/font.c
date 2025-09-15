@@ -11,7 +11,6 @@
 #include "pdf/fonts/font.h"
 #include "pdf/fonts/font_descriptor.h"
 #include "pdf/resolver.h"
-#include "pdf/stream/stream_dict.h"
 #include "pdf_error/error.h"
 
 PdfError* next_cid(

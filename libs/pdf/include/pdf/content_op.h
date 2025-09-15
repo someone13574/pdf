@@ -4,15 +4,18 @@
 #include "pdf/types.h"
 
 typedef enum {
-    PDF_CONTENT_OP_SET_CTM,       // cm
-    PDF_CONTENT_OP_BEGIN_TEXT,    // BT
-    PDF_CONTENT_OP_END_TEXT,      // ET
-    PDF_CONTENT_OP_SET_FONT,      // Tf
-    PDF_CONTENT_OP_NEXT_LINE,     // Td
-    PDF_CONTENT_OP_SET_TM,        // Tm
-    PDF_CONTENT_OP_SHOW_TEXT,     // Tj, TJ
-    PDF_CONTENT_OP_POSITION_TEXT, // TJ
-    PDF_CONTENT_OP_SET_GRAY       // G, g
+    PDF_CONTENT_OP_SAVE_GSTATE,    // q
+    PDF_CONTENT_OP_RESTORE_GSTATE, // Q
+    PDF_CONTENT_OP_SET_CTM,        // cm
+    PDF_CONTENT_OP_BEGIN_TEXT,     // BT
+    PDF_CONTENT_OP_END_TEXT,       // ET
+    PDF_CONTENT_OP_SET_FONT,       // Tf
+    PDF_CONTENT_OP_NEXT_LINE,      // Td
+    PDF_CONTENT_OP_SET_TM,         // Tm
+    PDF_CONTENT_OP_SHOW_TEXT,      // Tj, TJ
+    PDF_CONTENT_OP_POSITION_TEXT,  // TJ
+    PDF_CONTENT_OP_SET_GRAY,       // G, g
+    PDF_CONTENT_OP_PAINT_XOBJECT   // Do
 } PdfContentOpKind;
 
 /// Used by PDF_CONTENT_OP_SET_CTM, PDF_CONTENT_OP_SET_TM
@@ -49,6 +52,10 @@ typedef struct {
 } PdfContentOpSetGray;
 
 typedef struct {
+    PdfName xobject;
+} PdfContentOpPaintXObject;
+
+typedef struct {
     PdfContentOpKind kind;
 
     union {
@@ -58,6 +65,7 @@ typedef struct {
         PdfContentOpShowText show_text;
         PdfContentOpPositionText position_text;
         PdfContentOpSetGray set_gray;
+        PdfContentOpPaintXObject paint_xobject;
     } data;
 } PdfContentOp;
 

@@ -5,6 +5,8 @@
 #define DVEC_TYPE void*
 #include "arena/dvec_decl.h"
 
+typedef int PdfUnimplemented;
+
 #define DESERIALIZABLE_STRUCT_REF(base_struct, lowercase_name)                 \
     typedef struct {                                                           \
         PdfIndirectRef ref;                                                    \
