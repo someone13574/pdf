@@ -43,8 +43,6 @@ PdfError* text_state_render(
     RELEASE_ASSERT(object_state);
     RELEASE_ASSERT(text.data);
 
-    (void)ctm;
-
     if (!state->font_set) {
         return PDF_ERROR(PDF_ERR_RENDER_FONT_NOT_SET);
     }
@@ -72,50 +70,42 @@ PdfError* text_state_render(
         uint32_t gid;
         PDF_PROPAGATE(cid_to_gid(&state->text_font, resolver, cid, &gid));
 
-        LOG_WARN(RENDER, "Cid: %u", (unsigned int)cid);
+        // Render
+        GeomMat3 render_matrix = geom_mat3_mul(
+            geom_mat3_mul(
+                geom_mat3_new(
+                    state->text_font_size * state->horizontal_spacing * 0.001,
+                    0.0,
+                    0.0,
+                    0.0,
+                    state->text_font_size * 0.001,
+                    0.0,
+                    0.0,
+                    state->text_rise,
+                    1.0
+                ),
+                object_state->text_matrix
+            ),
+            ctm
+        );
+
+        PDF_PROPAGATE(render_glyph(
+            &state->text_font,
+            resolver,
+            gid,
+            canvas,
+            render_matrix
+        ));
+
+        // TODO: support vertical fonts
+        double t_x = ((double)500.0 * state->text_font_size
+                      + state->character_spacing + state->word_spacing)
+                   * state->horizontal_spacing * 0.001;
+        object_state->text_matrix = geom_mat3_mul(
+            object_state->text_matrix,
+            geom_mat3_translate(t_x, 0.0)
+        );
     }
-
-    // size_t buffer_len;
-    // uint8_t* buffer = load_file_to_buffer(
-    //     arena,
-    //     "assets/fonts-urw-base35/fonts/NimbusRoman-Regular.ttf",
-    //     &buffer_len
-    // );
-
-    // SfntFont* font;
-    // PDF_REQUIRE(sfnt_font_new(arena, buffer, buffer_len, &font));
-
-    // for (size_t cid_idx = 0; cid_idx < text.len; cid_idx++) {
-    //     SfntGlyph glyph;
-    //     PDF_PROPAGATE(sfnt_get_glyph(font, (uint32_t)text.data[cid_idx],
-    //     &glyph)
-    //     );
-
-    //     GeomMat3 render_matrix = geom_mat3_mul(
-    //         geom_mat3_mul(
-    //             geom_mat3_new(
-    //                 state->text_font_size * state->horizontal_spacing *
-    //                 0.001, 0.0, 0.0, 0.0, state->text_font_size * 0.001, 0.0,
-    //                 0.0,
-    //                 state->text_rise,
-    //                 1.0
-    //             ),
-    //             object_state->text_matrix
-    //         ),
-    //         ctm
-    //     );
-
-    //     sfnt_glyph_render(canvas, &glyph, render_matrix);
-
-    //     // TODO: support vertical fonts
-    //     double t_x = ((double)glyph.advance_width * state->text_font_size
-    //                   + state->character_spacing + state->word_spacing)
-    //                * state->horizontal_spacing * 0.001;
-    //     object_state->text_matrix = geom_mat3_mul(
-    //         object_state->text_matrix,
-    //         geom_mat3_translate(t_x, 0.0)
-    //     );
-    // }
 
     return NULL;
 }

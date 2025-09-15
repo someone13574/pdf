@@ -2,7 +2,9 @@
 
 #include <stdint.h>
 
+#include "canvas/canvas.h"
 #include "pdf/fonts/font.h"
+#include "pdf/resolver.h"
 #include "pdf_error/error.h"
 
 /// Returns the next CID in the data stream, advancing `offset` and setting
@@ -22,4 +24,13 @@ PdfError* cid_to_gid(
     PdfOptionalResolver resolver,
     uint32_t cid,
     uint32_t* gid_out
+);
+
+/// Renders a given glyph.
+PdfError* render_glyph(
+    PdfFont* font,
+    PdfOptionalResolver resolver,
+    uint32_t gid,
+    Canvas* canvas,
+    GeomMat3 transform
 );

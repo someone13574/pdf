@@ -1,7 +1,7 @@
 #pragma once
 
 #define LOG_GROUPS                                                             \
-    X(GLOBAL, DEBUG, )                                                         \
+    X(GLOBAL, INFO, )                                                          \
     X(EXAMPLE, TRACE, GLOBAL)                                                  \
     X(TEST, TRACE, GLOBAL)                                                     \
     X(ARENA, OFF, GLOBAL)                                                      \
@@ -9,20 +9,20 @@
     X(ARRAY, INHERIT, ARENA)                                                   \
     X(VEC, INHERIT, ARENA)                                                     \
     X(LINKED_LIST, INHERIT, ARENA)                                             \
-    X(CODEC, TRACE, GLOBAL)                                                    \
-    X(CANVAS, OFF, GLOBAL)                                                     \
-    X(DCEL, TRACE, CANVAS)                                                     \
+    X(CODEC, INHERIT, GLOBAL)                                                  \
+    X(CANVAS, INHERIT, GLOBAL)                                                 \
+    X(DCEL, INHERIT, CANVAS)                                                   \
     X(PDF, INHERIT, GLOBAL)                                                    \
-    X(DOC, TRACE, PDF)                                                         \
+    X(DOC, INHERIT, PDF)                                                       \
     X(XREF, INHERIT, PDF)                                                      \
-    X(CTX, INFO, PDF)                                                          \
+    X(CTX, INHERIT, PDF)                                                       \
     X(OBJECT, OFF, PDF)                                                        \
     X(DESERDE, INHERIT, PDF)                                                   \
     X(RENDER, INHERIT, GLOBAL)                                                 \
     X(FONT, INHERIT, GLOBAL)                                                   \
-    X(PS, INHERIT, GLOBAL)                                                     \
-    X(PS_TOKEN, INFO, PS)                                                      \
+    X(PS, OFF, GLOBAL)                                                         \
+    X(PS_TOKEN, INHERIT, PS)                                                   \
     X(CMAP, INHERIT, FONT)                                                     \
     X(SFNT, INHERIT, GLOBAL)                                                   \
     X(SFNT_PARSE, INHERIT, SFNT)                                               \
-    X(CFF, TRACE, GLOBAL)
+    X(CFF, INHERIT, GLOBAL)

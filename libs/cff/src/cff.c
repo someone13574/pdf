@@ -3,7 +3,6 @@
 #include <unistd.h>
 
 #include "arena/arena.h"
-#include "canvas/canvas.h"
 #include "charsets.h"
 #include "charstring.h"
 #include "geom/mat3.h"
@@ -16,127 +15,204 @@
 #include "top_dict.h"
 #include "types.h"
 
-struct CffFont {
+typedef struct {
+    char* name;
+    CffTopDict top_dict;
+    CffPrivateDict private_dict;
+    CffIndex subrs_index;
+    CffIndex charstr_index;
+    CffCharset charset;
+} CffFont;
+
+#define DARRAY_NAME CffFontArray
+#define DARRAY_LOWERCASE_NAME cff_font_array
+#define DARRAY_TYPE CffFont
+#include "arena/darray_impl.h"
+
+struct CffFontSet {
+    CffParser parser;
+
     CffHeader header;
     CffIndex name_index;
     CffIndex top_dict_index;
     CffIndex string_index;
     CffIndex global_subr_index;
+
+    CffFontArray* fonts;
 };
 
-PdfError* cff_parse(
+PdfError* cff_parse_fontset(
     Arena* arena,
     const uint8_t* data,
     size_t data_len,
-    CffFont** cff_font_out
+    CffFontSet** cff_font_out
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(data);
     RELEASE_ASSERT(cff_font_out);
 
-    CffFont font;
-    CffParser parser = cff_parser_new(data, data_len);
+    CffFontSet fontset;
+    fontset.parser = cff_parser_new(data, data_len);
 
-    PDF_PROPAGATE(cff_read_header(&parser, &font.header));
-    PDF_PROPAGATE(cff_parser_seek(&parser, font.header.header_size));
+    PDF_PROPAGATE(cff_read_header(&fontset.parser, &fontset.header));
+    PDF_PROPAGATE(cff_parser_seek(&fontset.parser, fontset.header.header_size));
+    PDF_PROPAGATE(cff_parse_index(&fontset.parser, &fontset.name_index));
+    PDF_PROPAGATE(cff_parse_index(&fontset.parser, &fontset.top_dict_index));
+    PDF_PROPAGATE(cff_parse_index(&fontset.parser, &fontset.string_index));
+    PDF_PROPAGATE(cff_parse_index(&fontset.parser, &fontset.global_subr_index));
 
-    PDF_PROPAGATE(cff_parse_index(&parser, &font.name_index));
-    PDF_PROPAGATE(cff_parse_index(&parser, &font.top_dict_index));
-    PDF_PROPAGATE(cff_parse_index(&parser, &font.string_index));
-    PDF_PROPAGATE(cff_parse_index(&parser, &font.global_subr_index));
+    fontset.fonts = cff_font_array_new_init(
+        arena,
+        fontset.name_index.count,
+        (CffFont
+        ) {.top_dict = cff_top_dict_default(),
+           .private_dict = cff_private_dict_default()}
+    );
+    for (CffCard16 font_idx = 0; font_idx < fontset.name_index.count;
+         font_idx++) {
+        CffFont* font = NULL;
+        RELEASE_ASSERT(cff_font_array_get_ptr(fontset.fonts, font_idx, &font));
 
-    for (CffCard16 font_idx = 0; font_idx < font.name_index.count; font_idx++) {
+        // Name
         size_t name_len;
         PDF_PROPAGATE(cff_index_seek_object(
-            &font.name_index,
-            &parser,
+            &fontset.name_index,
+            &fontset.parser,
             font_idx,
             &name_len
         ));
+        PDF_PROPAGATE(
+            cff_parser_get_str(arena, &fontset.parser, name_len, &font->name)
+        );
+        LOG_DIAG(INFO, CFF, "Font name: %s", font->name);
 
-        char* name = NULL;
-        PDF_PROPAGATE(cff_parser_get_str(arena, &parser, name_len, &name));
-        LOG_DIAG(INFO, CFF, "Font name: %s", name);
-
+        // Top dict
         size_t top_dict_len;
         PDF_PROPAGATE(cff_index_seek_object(
-            &font.top_dict_index,
-            &parser,
+            &fontset.top_dict_index,
+            &fontset.parser,
             font_idx,
             &top_dict_len
         ));
-
-        CffTopDict top_dict = cff_top_dict_default();
-        PDF_PROPAGATE(cff_parse_top_dict(&parser, top_dict_len, &top_dict));
-
-        CffPrivateDict private_dict = cff_private_dict_default();
-        PDF_PROPAGATE(cff_parser_seek(&parser, (size_t)top_dict.private_offset)
+        PDF_PROPAGATE(
+            cff_parse_top_dict(&fontset.parser, top_dict_len, &font->top_dict)
         );
+
+        // Private dict
+        CffPrivateDict private_dict = cff_private_dict_default();
+        PDF_PROPAGATE(cff_parser_seek(
+            &fontset.parser,
+            (size_t)font->top_dict.private_offset
+        ));
         PDF_PROPAGATE(cff_parse_private_dict(
             arena,
-            &parser,
-            (size_t)top_dict.private_dict_size,
+            &fontset.parser,
+            (size_t)font->top_dict.private_dict_size,
             &private_dict
         ));
 
-        CffIndex subrs_index;
+        // Local sub-routines
         PDF_PROPAGATE(cff_parser_seek(
-            &parser,
-            (size_t)top_dict.private_offset + (size_t)private_dict.subrs
+            &fontset.parser,
+            (size_t)font->top_dict.private_offset + (size_t)private_dict.subrs
         ));
-        PDF_PROPAGATE(cff_parse_index(&parser, &subrs_index));
+        PDF_PROPAGATE(cff_parse_index(&fontset.parser, &font->subrs_index));
 
-        CffIndex charstring_index;
-        PDF_PROPAGATE(cff_parser_seek(&parser, (size_t)top_dict.char_strings));
-        PDF_PROPAGATE(cff_parse_index(&parser, &charstring_index));
+        // Char string index
+        PDF_PROPAGATE(cff_parser_seek(
+            &fontset.parser,
+            (size_t)font->top_dict.char_strings
+        ));
+        PDF_PROPAGATE(cff_parse_index(&fontset.parser, &font->charstr_index));
 
-        CffCharset charset = {0};
-        if (top_dict.charset <= 2) {
+        // Charset
+        if (font->top_dict.charset <= 2) {
             LOG_TODO("Support predefined charset IDs");
         }
 
-        PDF_PROPAGATE(cff_parser_seek(&parser, (size_t)top_dict.charset));
         PDF_PROPAGATE(
-            cff_parse_charset(&parser, arena, charstring_index.count, &charset)
+            cff_parser_seek(&fontset.parser, (size_t)font->top_dict.charset)
         );
+        PDF_PROPAGATE(cff_parse_charset(
+            &fontset.parser,
+            arena,
+            font->charstr_index.count,
+            &font->charset
+        ));
 
-        for (CffCard16 idx = 0; idx < charstring_index.count; idx++) {
-            size_t charstring_size;
-            PDF_PROPAGATE(cff_index_seek_object(
-                &charstring_index,
-                &parser,
-                idx,
-                &charstring_size
-            ));
+        // for (CffCard16 idx = 0; idx < charstring_index.count; idx++) {
+        //     size_t charstring_size;
+        //     PDF_PROPAGATE(cff_index_seek_object(
+        //         &charstring_index,
+        //         &fontset.parser,
+        //         idx,
+        //         &charstring_size
+        //     ));
 
-            Canvas* canvas = canvas_new_scalable(arena, 1500, 1500, 0xffffffff);
-            GeomMat3 transform = geom_mat3_new(
-                1.0,
-                0.0,
-                0.0,
-                0.0,
-                -1.0,
-                0.0,
-                500.0,
-                1000.0,
-                0.0
-            );
-            PDF_PROPAGATE(cff_charstr2_render(
-                &parser,
-                font.global_subr_index,
-                subrs_index,
-                charstring_size,
-                canvas,
-                transform
-            ));
-            RELEASE_ASSERT(canvas_write_file(canvas, "glyph.svg"));
+        //     Canvas* canvas = canvas_new_scalable(arena, 1500, 1500,
+        //     0xffffffff); GeomMat3 transform = geom_mat3_new(
+        //         1.0,
+        //         0.0,
+        //         0.0,
+        //         0.0,
+        //         -1.0,
+        //         0.0,
+        //         500.0,
+        //         1000.0,
+        //         0.0
+        //     );
+        //     PDF_PROPAGATE(cff_charstr2_render(
+        //         &parser,
+        //         fontset.global_subr_index,
+        //         subrs_index,
+        //         charstring_size,
+        //         canvas,
+        //         transform
+        //     ));
+        //     RELEASE_ASSERT(canvas_write_file(canvas, "glyph.svg"));
 
-            usleep(150000);
-        }
+        //     usleep(150000);
+        // }
     }
 
-    *cff_font_out = arena_alloc(arena, sizeof(CffFont));
-    **cff_font_out = font;
+    *cff_font_out = arena_alloc(arena, sizeof(CffFontSet));
+    **cff_font_out = fontset;
+
+    return NULL;
+}
+
+PdfError* cff_render_glyph(
+    CffFontSet* fontset,
+    uint32_t gid,
+    Canvas* canvas,
+    GeomMat3 transform
+) {
+    RELEASE_ASSERT(fontset);
+    RELEASE_ASSERT(canvas);
+
+    if (cff_font_array_len(fontset->fonts) != 1) {
+        LOG_TODO("Fontsets");
+    }
+
+    CffFont font;
+    RELEASE_ASSERT(cff_font_array_get(fontset->fonts, 0, &font));
+
+    size_t charstr_len;
+    PDF_PROPAGATE(cff_index_seek_object(
+        &font.charstr_index,
+        &fontset->parser,
+        (CffCard16)gid,
+        &charstr_len
+    ));
+
+    PDF_PROPAGATE(cff_charstr2_render(
+        &fontset->parser,
+        fontset->global_subr_index,
+        font.subrs_index,
+        charstr_len,
+        canvas,
+        transform
+    ));
 
     return NULL;
 }
