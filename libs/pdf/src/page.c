@@ -62,7 +62,8 @@ PdfError* pdf_deserialize_page_tree_node(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
         resolver,
-        false
+        false,
+        "PdfPageTreeNode"
     ));
 
     return NULL;
@@ -134,7 +135,8 @@ PdfError* pdf_deserialize_page(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
         resolver,
-        false
+        false,
+        "PdfPage"
     ));
 
     return NULL;

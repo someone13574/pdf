@@ -46,7 +46,7 @@ PdfError* pdf_deserialize_cid_system_info(
             PdfCIDSystemInfo,
             "Supplement",
             supplement,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STRING)
+            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
         )
     };
 
@@ -58,7 +58,8 @@ PdfError* pdf_deserialize_cid_system_info(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
         resolver,
-        false
+        false,
+        "PdfCIDSystemInfo"
     ));
 
     return NULL;
@@ -564,7 +565,6 @@ PdfError* pdf_parse_cmap(
         PDF_PROPAGATE(postscript_interpret_token(interpreter, token));
     }
 
-    postscript_interpreter_dump(interpreter);
     arena_free(interpreter_arena);
 
     return NULL;
@@ -626,5 +626,54 @@ PdfError* pdf_load_cmap(Arena* arena, char* name, PdfCMap** cmap_out) {
     PDF_PROPAGATE(pdf_parse_cmap(arena, file, file_len, cmap_out));
 
     arena_free(file_arena);
+    return NULL;
+}
+
+typedef struct {
+    char* name;
+    PdfCMap* cmap;
+} CMapCacheEntry;
+
+#define DVEC_NAME PdfCMapCacheVec
+#define DVEC_LOWERCASE_NAME pdf_cmap_cache_vec
+#define DVEC_TYPE CMapCacheEntry
+#include "arena/dvec_impl.h"
+
+struct PdfCMapCache {
+    Arena* arena;
+    PdfCMapCacheVec* vec;
+};
+
+PdfCMapCache* pdf_cmap_cache_new(Arena* arena) {
+    RELEASE_ASSERT(arena);
+
+    PdfCMapCache* cache = arena_alloc(arena, sizeof(PdfCMapCache));
+    cache->arena = arena;
+    cache->vec = pdf_cmap_cache_vec_new(arena);
+
+    return cache;
+}
+
+PdfError*
+pdf_cmap_cache_get(PdfCMapCache* cache, char* name, PdfCMap** cmap_out) {
+    RELEASE_ASSERT(cache);
+    RELEASE_ASSERT(name);
+    RELEASE_ASSERT(cmap_out);
+
+    for (size_t idx = 0; idx < pdf_cmap_cache_vec_len(cache->vec); idx++) {
+        CMapCacheEntry cache_entry;
+        RELEASE_ASSERT(pdf_cmap_cache_vec_get(cache->vec, idx, &cache_entry));
+
+        if (strcmp(cache_entry.name, name) == 0) {
+            *cmap_out = cache_entry.cmap;
+            return NULL;
+        }
+    }
+
+    CMapCacheEntry new_entry = {.name = name, .cmap = NULL};
+    PDF_PROPAGATE(pdf_load_cmap(cache->arena, name, &new_entry.cmap));
+    pdf_cmap_cache_vec_push(cache->vec, new_entry);
+    *cmap_out = new_entry.cmap;
+
     return NULL;
 }

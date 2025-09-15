@@ -45,8 +45,10 @@ typedef struct {
 // TODO: remove duplicate of `pdf_object_dict_get`
 PdfObject* pdf_dict_get(const PdfDict* dict, PdfName key);
 
+typedef struct PdfStreamDict PdfStreamDict;
+
 typedef struct {
-    PdfObject* stream_dict;
+    PdfStreamDict* stream_dict;
 
     uint8_t* stream_bytes;
     size_t decoded_stream_len;

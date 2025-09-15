@@ -1,4 +1,4 @@
-#include "stream_dict.h"
+#include "pdf/stream/stream_dict.h"
 
 #include "../deserialize.h"
 #include "logger/log.h"
@@ -27,11 +27,56 @@ PdfError* pdf_deserialize_stream_dict(
             filter,
             PDF_OPTIONAL_FIELD(
                 PdfOpNameArray,
-                PDF_ARRAY_FIELD(
+                PDF_AS_ARRAY_FIELD(
                     PdfNameArray,
                     PdfName,
                     PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
                 )
+            )
+        ),
+        PDF_FIELD(
+            PdfStreamDict,
+            "Length1",
+            length1,
+            PDF_OPTIONAL_FIELD(
+                PdfOpInteger,
+                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+            )
+        ),
+        PDF_FIELD(
+            PdfStreamDict,
+            "Length2",
+            length2,
+            PDF_OPTIONAL_FIELD(
+                PdfOpInteger,
+                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+            )
+        ),
+        PDF_FIELD(
+            PdfStreamDict,
+            "Length3",
+            length3,
+            PDF_OPTIONAL_FIELD(
+                PdfOpInteger,
+                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+            )
+        ),
+        PDF_FIELD(
+            PdfStreamDict,
+            "Subtype",
+            subtype,
+            PDF_OPTIONAL_FIELD(
+                PdfOpName,
+                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+            )
+        ),
+        PDF_FIELD(
+            PdfStreamDict,
+            "Metadata",
+            metadata,
+            PDF_OPTIONAL_FIELD(
+                PdfOpStream,
+                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STREAM)
             )
         )
     };
@@ -44,7 +89,8 @@ PdfError* pdf_deserialize_stream_dict(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
         pdf_op_resolver_none(false),
-        false
+        false,
+        "PdfStreamDict"
     ));
 
     return NULL;

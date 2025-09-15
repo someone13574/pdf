@@ -8,12 +8,16 @@
 #include "sfnt/types.h"
 
 typedef struct {
-    uint8_t* buffer;
+    const uint8_t* buffer;
     size_t buffer_len;
     size_t offset;
 } SfntParser;
 
-void sfnt_parser_new(uint8_t* buffer, size_t buffer_len, SfntParser* parser);
+void sfnt_parser_new(
+    const uint8_t* buffer,
+    size_t buffer_len,
+    SfntParser* parser
+);
 PdfError* sfnt_subparser_new(
     SfntParser* parent,
     uint32_t offset,

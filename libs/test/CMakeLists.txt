@@ -13,7 +13,7 @@ endif()
 
 add_executable(pdf-test-main src/main.c)
 target_include_directories(pdf-test-main PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(pdf-test-main PUBLIC -Wl,--whole-archive arena codec pdf postscript sfnt -Wl,--no-whole-archive)
+target_link_libraries(pdf-test-main PUBLIC -Wl,--whole-archive arena cff codec pdf postscript sfnt -Wl,--no-whole-archive)
 target_link_libraries(pdf-test-main PRIVATE pdf-test pdf-logger)
 target_compile_features(pdf-test-main PUBLIC c_std_11)
 target_compile_definitions(pdf-test PUBLIC DEBUG $<$<NOT:$<C_COMPILER_ID:MSVC>>:TEST>)

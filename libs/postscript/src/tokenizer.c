@@ -954,6 +954,14 @@ TEST_FUNC(test_postscript_tokenize_real) {
     return TEST_RESULT_PASS;
 }
 
+TEST_FUNC(test_postscript_tokenize_real_trailing_zeros) {
+    SETUP_TOKENIZER("34.5000")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 34.5, "34.5000")
+    CHECK_STREAM_CONSUMED()
+
+    return TEST_RESULT_PASS;
+}
+
 TEST_FUNC(test_postscript_tokenize_pos_real) {
     SETUP_TOKENIZER("+34.5")
     GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 34.5, "+34.5")

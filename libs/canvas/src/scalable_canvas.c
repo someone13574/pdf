@@ -167,8 +167,8 @@ void scalable_canvas_draw_path(
                         arena_string_new_fmt(
                             canvas->arena,
                             "M %f %f ",
-                            segment.data.start.x,
-                            segment.data.start.y
+                            segment.value.start.x,
+                            segment.value.start.y
                         )
                     );
                     break;
@@ -179,22 +179,38 @@ void scalable_canvas_draw_path(
                         arena_string_new_fmt(
                             canvas->arena,
                             "L %f %f ",
-                            segment.data.line.x,
-                            segment.data.line.y
+                            segment.value.line.x,
+                            segment.value.line.y
                         )
                     );
                     break;
                 }
-                case PATH_CONTOUR_SEGMENT_TYPE_BEZIER: {
+                case PATH_CONTOUR_SEGMENT_TYPE_QUAD_BEZIER: {
                     svg_parts_vec_push(
                         canvas->parts,
                         arena_string_new_fmt(
                             canvas->arena,
                             "Q %f %f %f %f ",
-                            segment.data.bezier.control.x,
-                            segment.data.bezier.control.y,
-                            segment.data.bezier.end.x,
-                            segment.data.bezier.end.y
+                            segment.value.quad_bezier.control.x,
+                            segment.value.quad_bezier.control.y,
+                            segment.value.quad_bezier.end.x,
+                            segment.value.quad_bezier.end.y
+                        )
+                    );
+                    break;
+                }
+                case PATH_CONTOUR_SEGMENT_TYPE_CUBIC_BEZIER: {
+                    svg_parts_vec_push(
+                        canvas->parts,
+                        arena_string_new_fmt(
+                            canvas->arena,
+                            "C %f %f, %f %f, %f %f ",
+                            segment.value.cubic_bezier.control_a.x,
+                            segment.value.cubic_bezier.control_a.y,
+                            segment.value.cubic_bezier.control_b.x,
+                            segment.value.cubic_bezier.control_b.y,
+                            segment.value.cubic_bezier.end.x,
+                            segment.value.cubic_bezier.end.y
                         )
                     );
                     break;

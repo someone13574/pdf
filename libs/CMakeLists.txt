@@ -1,5 +1,6 @@
 add_subdirectory(arena)
 add_subdirectory(canvas)
+add_subdirectory(cff)
 add_subdirectory(codec)
 add_subdirectory(geom)
 add_subdirectory(logger)

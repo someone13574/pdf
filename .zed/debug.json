@@ -8,7 +8,8 @@
     },
     "program": "$ZED_WORKTREE_ROOT/build/examples/pdf-example",
     "request": "launch",
-    "adapter": "GDB"
+    "adapter": "CodeLLDB",
+    "env": { "ASAN_OPTIONS": "detect_leaks=0" }
   },
   {
     "label": "Debug font-example",
@@ -19,7 +20,8 @@
     },
     "program": "$ZED_WORKTREE_ROOT/build/examples/font-example",
     "request": "launch",
-    "adapter": "GDB"
+    "adapter": "CodeLLDB",
+    "env": { "ASAN_OPTIONS": "detect_leaks=0" }
   },
   {
     "label": "Debug tessellation-example",
@@ -30,7 +32,8 @@
     },
     "program": "$ZED_WORKTREE_ROOT/build/examples/tessellation-example",
     "request": "launch",
-    "adapter": "GDB"
+    "adapter": "CodeLLDB",
+    "env": { "ASAN_OPTIONS": "detect_leaks=0" }
   },
   {
     "label": "Debug cmap-example",
@@ -41,7 +44,8 @@
     },
     "program": "$ZED_WORKTREE_ROOT/build/examples/cmap-example",
     "request": "launch",
-    "adapter": "GDB"
+    "adapter": "CodeLLDB",
+    "env": { "ASAN_OPTIONS": "detect_leaks=0" }
   },
   {
     "label": "Debug test",
@@ -50,11 +54,12 @@
       "args": [],
       "cwd": "$ZED_WORKTREE_ROOT",
       "env": {
-        "DEBUG_TEST_FUNCTION": "test_vec_growth"
+        "DEBUG_TEST_FUNCTION": "test_cff_index_seek_offset_size_2"
       }
     },
     "program": "$ZED_WORKTREE_ROOT/build/libs/test/pdf-test-main",
     "request": "launch",
-    "adapter": "GDB"
+    "adapter": "CodeLLDB",
+    "env": { "ASAN_OPTIONS": "detect_leaks=0" }
   }
 ]

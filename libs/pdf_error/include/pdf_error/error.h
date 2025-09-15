@@ -36,6 +36,21 @@ typedef enum {
     PDF_ERR_SFNT_EOF,
     PDF_ERR_SFNT_MISSING_TABLE,
     PDF_ERR_SFNT_TABLE_CHECKSUM,
+    PDF_ERR_CFF_EOF,
+    PDF_ERR_CFF_INVALID_OFFSET_SIZE,
+    PDF_ERR_CFF_INVALID_SID,
+    PDF_ERR_CFF_RESERVED,
+    PDF_ERR_CFF_INVALID_REAL_OPERAND,
+    PDF_ERR_CFF_UNSUPPORTED_VERSION,
+    PDF_ERR_CFF_INVALID_CHARSET,
+    PDF_ERR_CFF_INVALID_INDEX,
+    PDF_ERR_CFF_INVALID_OBJECT_IDX,
+    PDF_ERR_CFF_EXPECTED_OPERATOR,
+    PDF_ERR_CFF_INVALID_OPERATOR,
+    PDF_ERR_CFF_MISSING_OPERAND,
+    PDF_ERR_CFF_INCORRECT_OPERAND,
+    PDF_ERR_CFF_INVALID_SUBR,
+    PDF_ERR_CFF_INVALID_FONT,
     PDF_ERR_CMAP_INVALID_PLATFORM,
     PDF_ERR_CMAP_INVALID_GIA_LEN,
     PDF_ERR_CMAP_INVALID_CODEPOINT,
@@ -163,25 +178,25 @@ bool pdf_error_free_is_ok(PdfError* error);
         }                                                                      \
     } while (0)
 
-#define TEST_PDF_REQUIRE_ERR(expr, code)                                                      \
-    do {                                                                                      \
-        PdfError* error = (expr);                                                             \
-        if (!error) {                                                                         \
-            LOG_ERROR(TEST, "Expected an error of type " #code " to occur");                  \
-            return TEST_RESULT_FAIL;                                                          \
-        }                                                                                     \
-        if (pdf_error_code(error) != (code)) {                                                \
-            LOG_ERROR(                                                                        \
-                TEST,                                                                         \
-                "Expression returned the incorrect error code. Expected %d, found %d (" #code \
-                ")",                                                                          \
-                pdf_error_code(error),                                                        \
-                (code)                                                                        \
-            );                                                                                \
-            pdf_error_free(error);                                                            \
-            return TEST_RESULT_FAIL;                                                          \
-        }                                                                                     \
-        pdf_error_free(error);                                                                \
+#define TEST_PDF_REQUIRE_ERR(expr, code)                                            \
+    do {                                                                            \
+        PdfError* error = (expr);                                                   \
+        if (!error) {                                                               \
+            LOG_ERROR(TEST, "Expected an error of type " #code " to occur");        \
+            return TEST_RESULT_FAIL;                                                \
+        }                                                                           \
+        if (pdf_error_code(error) != (code)) {                                      \
+            LOG_ERROR(                                                              \
+                TEST,                                                               \
+                "Expression returned the incorrect error code. Expected %d (" #code \
+                "), found %d",                                                      \
+                pdf_error_code(error),                                              \
+                (code)                                                              \
+            );                                                                      \
+            pdf_error_free(error);                                                  \
+            return TEST_RESULT_FAIL;                                                \
+        }                                                                           \
+        pdf_error_free(error);                                                      \
     } while (0)
 
 #endif // TEST

@@ -8,12 +8,19 @@
 DESERIALIZABLE_ARRAY_TYPE(PdfNameArray)
 DESERIALIZABLE_OPTIONAL_TYPE(PdfOpNameArray, PdfNameArray)
 
-typedef struct {
+struct PdfStreamDict {
     PdfInteger length;
     PdfOpNameArray filter;
 
+    // Additional entries in an embedded font stream dictionary
+    PdfOpInteger length1;
+    PdfOpInteger length2;
+    PdfOpInteger length3;
+    PdfOpName subtype;
+    PdfOpStream metadata;
+
     const PdfObject* raw_dict;
-} PdfStreamDict;
+};
 
 PdfError* pdf_deserialize_stream_dict(
     const PdfObject* object,

@@ -4,6 +4,7 @@
 #include "geom/mat3.h"
 #include "pdf/fonts/font.h"
 #include "pdf/object.h"
+#include "pdf/resolver.h"
 #include "pdf_error/error.h"
 
 typedef enum {
@@ -43,6 +44,8 @@ TextObjectState text_object_state_default(void);
 PdfError* text_state_render(
     Arena* arena,
     Canvas* canvas,
+    PdfOptionalResolver resolver,
+    PdfCMapCache* cmap_cache,
     GeomMat3 ctm,
     TextState* state,
     TextObjectState* object_state,

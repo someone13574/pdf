@@ -1,27 +1,32 @@
 #pragma once
 
-typedef struct {
-    double x;
-    double y;
-} PathPoint;
+#include "geom/vec2.h"
 
 typedef struct {
-    PathPoint control;
-    PathPoint end;
+    GeomVec2 control;
+    GeomVec2 end;
 } PathQuadBezier;
+
+typedef struct {
+    GeomVec2 control_a;
+    GeomVec2 control_b;
+    GeomVec2 end;
+} PathCubicBezier;
 
 typedef struct {
     enum {
         PATH_CONTOUR_SEGMENT_TYPE_START,
         PATH_CONTOUR_SEGMENT_TYPE_LINE,
-        PATH_CONTOUR_SEGMENT_TYPE_BEZIER
+        PATH_CONTOUR_SEGMENT_TYPE_QUAD_BEZIER,
+        PATH_CONTOUR_SEGMENT_TYPE_CUBIC_BEZIER
     } type;
 
     union {
-        PathPoint start;
-        PathPoint line;
-        PathQuadBezier bezier;
-    } data;
+        GeomVec2 start;
+        GeomVec2 line;
+        PathQuadBezier quad_bezier;
+        PathCubicBezier cubic_bezier;
+    } value;
 } PathContourSegment;
 
 #define DVEC_NAME PathContour
