@@ -124,6 +124,15 @@ PdfError* pdf_deserialize_page(
                 PdfOpInteger,
                 PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
             )
+        ),
+        PDF_FIELD(
+            PdfPage,
+            "Group",
+            group,
+            PDF_OPTIONAL_FIELD(
+                PdfOpDict,
+                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+            )
         )
     };
 

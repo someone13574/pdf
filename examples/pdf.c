@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
 
     size_t buffer_size;
     char* buffer =
-        load_file_to_buffer(arena, "test-files/embedded.pdf", &buffer_size);
+        load_file_to_buffer(arena, "test-files/wiki.pdf", &buffer_size);
 
     PdfResolver* resolver;
     PDF_REQUIRE(
