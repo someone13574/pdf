@@ -4,6 +4,7 @@
 
 #include "deserialize.h"
 #include "logger/log.h"
+#include "pdf/content_stream.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/resources.h"
@@ -81,15 +82,30 @@ PdfError* pdf_deserialize_form_xobject(
         PDF_UNIMPLEMENTED_FIELD("Name")
     };
 
+    PdfObject resolved;
+    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved));
+    if (resolved.type != PDF_OBJECT_TYPE_STREAM) {
+        return PDF_ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "Expected xobject to be a stream"
+        );
+    }
+
     PDF_PROPAGATE(pdf_deserialize_object(
         deserialized,
-        object,
+        resolved.data.stream.stream_dict->raw_dict,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         arena,
         resolver,
         true,
         "PdfFormXObject"
+    ));
+
+    PDF_PROPAGATE(pdf_deserialize_content_stream(
+        &resolved.data.stream,
+        arena,
+        &deserialized->content_stream
     ));
 
     if (deserialized->type.discriminant
@@ -143,7 +159,7 @@ PdfError* pdf_deserialize_xobject(
         );
     }
 
-    deserialized->raw_stream = resolved.data.stream;
+    deserialized->raw_object = object;
 
     XObjectUntyped untyped = {0};
     PDF_PROPAGATE(pdf_deserialize_object(
@@ -160,7 +176,7 @@ PdfError* pdf_deserialize_xobject(
     if (strcmp(untyped.subtype, "Form") == 0) {
         deserialized->type = PDF_XOBJECT_FORM;
         PDF_PROPAGATE(pdf_deserialize_form_xobject(
-            resolved.data.stream.stream_dict->raw_dict,
+            object,
             arena,
             resolver,
             &deserialized->data.form

@@ -50,6 +50,7 @@ static PdfError* select_one_or_two_byte_operator(
 
     if (pdf_error_free_is_ok(error) && peeked == second_byte) {
         *selected = two_byte_operator;
+        PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, NULL));
         return NULL;
     }
 

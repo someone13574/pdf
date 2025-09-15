@@ -27,6 +27,8 @@ typedef struct {
 } PdfObjectFieldData;
 
 typedef struct {
+    // TODO: can this just be a pointer to the field? We have the object we are
+    // deserializing into, so why not just a void pointer?
     size_t object_ref_offset;
 } PdfRefFieldData;
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "pdf/content_stream.h"
 #include "pdf/deserde_types.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
@@ -86,6 +87,8 @@ typedef struct {
     /// subdictionary of the current resource dictionary (see 7.8.3, "Resource
     /// Dictionaries").
     PdfUnimplemented name;
+
+    PdfContentStream content_stream;
 } PdfFormXObject;
 
 typedef struct {
@@ -94,7 +97,8 @@ typedef struct {
         PdfFormXObject form;
     } data;
 
-    PdfStream raw_stream;
+    // Raw stream object or reference to stream object
+    const PdfObject* raw_object;
 } PdfXObject;
 
 PdfError* pdf_deserialize_xobject(

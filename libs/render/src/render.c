@@ -39,6 +39,28 @@ static GraphicsState* current_graphics_state(RenderState* state) {
     return gstate;
 }
 
+static void save_graphics_state(RenderState* state) {
+    RELEASE_ASSERT(state);
+
+    graphics_state_stack_push_front(
+        state->graphics_state_stack,
+        *current_graphics_state(state)
+    );
+}
+
+static PdfError* restore_graphics_state(RenderState* state) {
+    RELEASE_ASSERT(state);
+
+    if (!graphics_state_stack_pop_front(state->graphics_state_stack, NULL)) {
+        return PDF_ERROR(
+            PDF_ERR_RENDER_GSTATE_CANNOT_RESTORE,
+            "GState stack underflow"
+        );
+    }
+
+    return NULL;
+}
+
 static PdfError* process_content_stream(
     Arena* arena,
     RenderState* state,
@@ -63,23 +85,11 @@ static PdfError* process_content_stream(
 
         switch (op.kind) {
             case PDF_CONTENT_OP_SAVE_GSTATE: {
-                graphics_state_stack_push_front(
-                    state->graphics_state_stack,
-                    *current_graphics_state(state)
-                );
+                save_graphics_state(state);
                 break;
             }
             case PDF_CONTENT_OP_RESTORE_GSTATE: {
-                if (!graphics_state_stack_pop_front(
-                        state->graphics_state_stack,
-                        NULL
-                    )) {
-                    return PDF_ERROR(
-                        PDF_ERR_RENDER_GSTATE_CANNOT_RESTORE,
-                        "GState stack underflow"
-                    );
-                }
-
+                PDF_PROPAGATE(restore_graphics_state(state));
                 break;
             }
             case PDF_CONTENT_OP_SET_CTM: {
@@ -204,7 +214,12 @@ static PdfError* process_content_stream(
                         LOG_TODO();
                     }
                     case PDF_XOBJECT_FORM: {
-                        LOG_TODO();
+                        // PdfFormXObject* form = &xobject.data.form;
+
+                        save_graphics_state(state);
+                        // TODO: apply matrix, clip with bbox
+
+                        PDF_PROPAGATE(restore_graphics_state(state));
                     }
                 }
 
