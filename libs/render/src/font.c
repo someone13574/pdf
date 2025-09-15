@@ -231,3 +231,64 @@ PdfError* render_glyph(
 
     return NULL;
 }
+
+PdfError* cid_to_width(PdfFont* font, uint32_t cid, PdfInteger* width_out) {
+    RELEASE_ASSERT(font);
+    RELEASE_ASSERT(width_out);
+
+    switch (font->type) {
+        case PDF_FONT_TYPE0: {
+            // TODO: Make this process of getting the descendent font a
+            // function...
+            void* descendent_font_void_ptr = NULL;
+            RELEASE_ASSERT(pdf_void_vec_get(
+                font->data.type0.descendant_fonts.elements,
+                0,
+                &descendent_font_void_ptr
+            ));
+
+            PdfCIDFont* cid_font = descendent_font_void_ptr;
+            PdfFont descendent_font = {
+                .type =
+                    (strcmp(cid_font->subtype, "CIDFontType0") == 0
+                         ? PDF_FONT_CIDTYPE0
+                         : PDF_FONT_CIDTYPE2),
+                .data.cid = *cid_font
+            };
+
+            // Call recursively
+            PDF_PROPAGATE(cid_to_width(&descendent_font, cid, width_out));
+            return NULL;
+            break;
+        }
+        case PDF_FONT_CIDTYPE0: {
+            PdfCIDFont* cid_font = &font->data.cid;
+
+            if (cid_font->w.discriminant) {
+                PdfFontWidthEntry width_entry;
+                if (pdf_font_width_vec_get(
+                        cid_font->w.value.cid_to_width,
+                        cid,
+                        &width_entry
+                    )
+                    && width_entry.has_value) {
+                    *width_out = width_entry.width;
+                    return NULL;
+                }
+            }
+
+            if (cid_font->dw.discriminant) {
+                *width_out = cid_font->dw.value;
+                return NULL;
+            }
+
+            *width_out = 1000;
+            break;
+        }
+        default: {
+            LOG_TODO("CID width for font type %d", font->type);
+        }
+    }
+
+    return NULL;
+}

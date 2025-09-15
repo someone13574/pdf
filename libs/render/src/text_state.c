@@ -98,7 +98,11 @@ PdfError* text_state_render(
         ));
 
         // TODO: support vertical fonts
-        double t_x = ((double)500.0 * state->text_font_size
+        // TODO: Use font matrix
+        PdfInteger glyph_width;
+        PDF_PROPAGATE(cid_to_width(&state->text_font, cid, &glyph_width));
+
+        double t_x = ((double)glyph_width * state->text_font_size
                       + state->character_spacing + state->word_spacing)
                    * state->horizontal_spacing * 0.001;
         object_state->text_matrix = geom_mat3_mul(

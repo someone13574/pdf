@@ -7,6 +7,8 @@
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
 
+// TODO: Ideally this would be entirely within the PDF library
+
 /// Returns the next CID in the data stream, advancing `offset` and setting
 /// `finished` if this is the last CID in the stream.
 PdfError* next_cid(
@@ -34,3 +36,6 @@ PdfError* render_glyph(
     Canvas* canvas,
     GeomMat3 transform
 );
+
+/// Gets the width for a CID.
+PdfError* cid_to_width(PdfFont* font, uint32_t cid, PdfInteger* width_out);

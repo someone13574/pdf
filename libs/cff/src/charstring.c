@@ -810,25 +810,6 @@ static PdfError* cff_charstr2_subr(
             LOG_TODO("4 byte twos complement");
         }
 
-        GeomMat3 transform =
-            geom_mat3_new(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 500.0, 1000.0, 0.0);
-        Arena* temp_arena = arena_new(4096);
-        Canvas* temp_canvas =
-            canvas_new_scalable(temp_arena, 1500, 1500, 0xffffffff);
-        PathBuilder* path_copy =
-            path_builder_clone(temp_arena, state->path_builder);
-        path_builder_apply_transform(path_copy, transform);
-        canvas_draw_path(temp_canvas, path_copy);
-        canvas_draw_circle(
-            temp_canvas,
-            geom_vec2_transform(state->current_point, transform).x,
-            geom_vec2_transform(state->current_point, transform).y,
-            10.0,
-            0xff0000ff
-        );
-        RELEASE_ASSERT(canvas_write_file(temp_canvas, "glyph.svg"));
-        arena_free(temp_arena);
-
         if (endchar) {
             *endchar_out = true;
             break;
