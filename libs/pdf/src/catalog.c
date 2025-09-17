@@ -29,7 +29,7 @@ PdfError* pdf_deserialize_catalog(
     };
 
     deserialized->raw_dict = object;
-    PDF_PROPAGATE(pdf_deserialize_object(
+    PDF_PROPAGATE(pdf_deserialize_dict(
         deserialized,
         object,
         fields,

@@ -37,6 +37,11 @@ DVEC_NAME* DVEC_FN(new)(Arena* arena);
 // Pushes an element to the vector
 DVEC_TYPE* DVEC_FN(push)(DVEC_NAME* vec, DVEC_TYPE element);
 
+// Creates an uninitialized element at the back of the vector and returns a
+// void-pointer to it. If the vector (which is behind a double pointer) is
+// uninitialized, it will be initialized on the arena.
+void* DVEC_FN(push_uninit)(void* ptr_to_vec_ptr, Arena* arena);
+
 // Gets the element stored at index `idx`, storing the element in `out` and
 // returning a bool indicating whether the operation was successful.
 bool DVEC_FN(get)(const DVEC_NAME* vec, size_t idx, DVEC_TYPE* out);
