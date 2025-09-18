@@ -253,6 +253,8 @@ PdfError* pdf_deserialize_operands(
         }                                                                      \
         PdfObject resolved;                                                    \
         PDF_PROPAGATE(pdf_resolve_ref(resolver, resolvable.ref, &resolved));   \
+        resolvable.resolved =                                                  \
+            arena_alloc(pdf_resolver_arena(resolver), sizeof(base_type));      \
         PDF_PROPAGATE(deserde_fn(                                              \
             &resolved,                                                         \
             resolvable.resolved,                                               \

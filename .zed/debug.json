@@ -54,7 +54,7 @@
       "args": [],
       "cwd": "$ZED_WORKTREE_ROOT",
       "env": {
-        "DEBUG_TEST_FUNCTION": "test_cff_index_seek_offset_size_2"
+        "DEBUG_TEST_FUNCTION": "test_deserialize_primitive_arrays"
       }
     },
     "program": "$ZED_WORKTREE_ROOT/build/libs/test/pdf-test-main",
