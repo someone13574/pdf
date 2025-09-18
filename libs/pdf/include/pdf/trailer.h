@@ -18,20 +18,20 @@ typedef struct {
     PdfCatalogRef root;
 
     /// The document’s information dictionary.
-    PdfOpDict info;
+    PdfDictOptional info;
 
     /// An array of two byte-strings constituting a file identifier (see 14.4,
     /// "File Identifiers") for the file. If there is an Encrypt entry this
     /// array and the two byte-strings shall be direct objects and shall be
     /// unencrypted.
-    PdfOpArray id;
+    PdfArrayOptional id;
 
     const PdfObject* raw_dict;
 } PdfTrailer;
 
 PdfError* pdf_deserialize_trailer(
     const PdfObject* object,
-    Arena* arena,
+    PdfTrailer* target_ptr,
     PdfOptionalResolver resolver,
-    PdfTrailer* deserialized
+    Arena* arena
 );

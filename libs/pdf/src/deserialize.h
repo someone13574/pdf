@@ -71,16 +71,16 @@ struct PdfDeserdeInfo {
 
         /// Indicates that this struct contains information for deserializing to
         /// an array.
-        PDF_DESERDE_ARRAY,
+        PDF_DESERDE_TYPE_ARRAY,
 
         /// Indicates that this struct contains information for deserializing to
         /// an array, and singular objects will be treated as a sole array
         /// element.
-        PDF_DESERDE_AS_ARRAY,
+        PDF_DESERDE_TYPE_AS_ARRAY,
 
         /// Indicates that this struct contains information for deserializing a
         /// custom type.
-        PDF_DESERDE_CUSTOM
+        PDF_DESERDE_TYPE_CUSTOM
     } type;
 
     union {
@@ -103,7 +103,7 @@ typedef struct {
     void* target_ptr;
 
     /// Information required to deserialize this field.
-    PdfDeserdeInfo deserialization_info;
+    PdfDeserdeInfo deserde_info;
 
     /// Additional debug info for logging and errors indicating the source of
     /// the field information.
@@ -125,6 +125,39 @@ PdfError* pdf_deserialize_dict(
     const char* debug_name
 );
 
+typedef struct {
+    /// A pointer to the variable to which this operand should be deserialized
+    /// into.
+    void* target_ptr;
+
+    /// Information required to deserialize this operand.
+    PdfDeserdeInfo deserde_info;
+
+    /// Additional debug info for logging and errors indicating the source of
+    /// the deserialization information.
+    struct {
+        const char* file;
+        unsigned long line;
+    } debug_info;
+} PdfOperandDescriptor;
+
+/// Deserializes an array of objects. Note that this will not attempt to resolve
+/// references.
+PdfError* pdf_deserialize_operands(
+    const PdfObjectVec* operands,
+    void* target_ptr,
+    const PdfOperandDescriptor* descriptors,
+    size_t num_descriptors,
+    Arena* arena
+);
+
+#define PDF_OPERAND(ptr_to_variable, operand_information)                      \
+    {                                                                          \
+        .target_ptr = (ptr_to_variable),                                       \
+        .deserde_info = (operand_information),                                 \
+        .debug_info.file = RELATIVE_FILE_PATH, .debug_info.line = __LINE__     \
+    }
+
 /// Declares a new dictionary field which should be deserialized.
 ///
 /// - `pdf_key_name`: A literal string representing the name key in the
@@ -134,16 +167,18 @@ PdfError* pdf_deserialize_dict(
 /// - `field_information`: The deserialization information for this field.
 #define PDF_FIELD(pdf_key_name, ptr_to_field, field_information)               \
     {                                                                          \
-        .key = (pdf_key_name), .field_ptr = (ptr_to_field),                    \
-        .field_info = (field_information), .debug.file = RELATIVE_FILE_PATH,   \
-        .debug.line = __LINE__ \                                               \
+        .key = (pdf_key_name), .target_ptr = (ptr_to_field),                   \
+        .deserde_info = (field_information),                                   \
+        .debug_info.file = RELATIVE_FILE_PATH, .debug_info.line = __LINE__     \
     }
 
 /// Marks that deserialization hasn't been implemented for this yet.
-#define PDF_DESERDE_UNIMPLEMENTED                                              \
-    (PdfFieldInfo) {                                                           \
-        .type = PDF_FIELD_TYPE_UNIMPLEMENTED                                   \
-    }
+#define PDF_UNIMPLEMENTED_FIELD(pdf_key_name)                                  \
+    PDF_FIELD(                                                                 \
+        pdf_key_name,                                                          \
+        NULL,                                                                  \
+        (PdfDeserdeInfo) {.type = PDF_DESERDE_TYPE_UNIMPLEMENTED}              \
+    )
 
 #define PDF_DESERDE_OBJECT(object_type)                                        \
     (PdfDeserdeInfo) {                                                         \
@@ -184,4 +219,56 @@ PdfError* pdf_deserialize_dict(
     (PdfDeserdeInfo) {                                                         \
         .type = PDF_DESERDE_TYPE_CUSTOM,                                       \
         .value.custom_fn = (deserialization_fn)                                \
+    }
+
+#define DESERDE_IMPL_OPTIONAL(new_type, init_fn)                               \
+    void* init_fn(void* ptr_to_optional, _Bool has_value) {                    \
+        new_type* optional = ptr_to_optional;                                  \
+        optional->has_value = has_value;                                       \
+        return &optional->value;                                               \
+    }
+
+#define DESERDE_IMPL_RESOLVABLE(                                               \
+    new_type,                                                                  \
+    base_type,                                                                 \
+    init_fn,                                                                   \
+    resolve_fn,                                                                \
+    deserde_fn                                                                 \
+)                                                                              \
+    void init_fn(void* ptr_to_resolvable, PdfIndirectRef ref) {                \
+        new_type* resolvable = ptr_to_resolvable;                              \
+        resolvable->ref = ref;                                                 \
+        resolvable->resolved = NULL;                                           \
+    }                                                                          \
+    PdfError* resolve_fn(                                                      \
+        new_type resolvable,                                                   \
+        PdfResolver* resolver,                                                 \
+        base_type* resolved_out                                                \
+    ) {                                                                        \
+        RELEASE_ASSERT(resolver);                                              \
+        RELEASE_ASSERT(resolved_out);                                          \
+        if (resolvable.resolved) {                                             \
+            *resolved_out = *resolvable.resolved;                              \
+            return NULL;                                                       \
+        }                                                                      \
+        PdfObject resolved;                                                    \
+        PDF_PROPAGATE(pdf_resolve_ref(resolver, resolvable.ref, &resolved));   \
+        PDF_PROPAGATE(deserde_fn(                                              \
+            &resolved,                                                         \
+            resolvable.resolved,                                               \
+            pdf_op_resolver_some(resolver),                                    \
+            pdf_resolver_arena(resolver)                                       \
+        ));                                                                    \
+        *resolved_out = *resolvable.resolved;                                  \
+        return NULL;                                                           \
+    }
+
+#define DESERDE_IMPL_TRAMPOLINE(trampoline_fn, deserde_fn)                     \
+    PdfError* trampoline_fn(                                                   \
+        const PdfObject* object,                                               \
+        void* target_ptr,                                                      \
+        PdfOptionalResolver resolver,                                          \
+        Arena* arena                                                           \
+    ) {                                                                        \
+        return deserde_fn(object, target_ptr, resolver, arena);                \
     }

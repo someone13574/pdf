@@ -12,7 +12,7 @@ PdfError* pdf_decode_filtered_stream(
     Arena* arena,
     const uint8_t* encoded,
     size_t length,
-    PdfOpNameArray filters,
+    PdfNameVecOptional filters,
     uint8_t** decoded,
     size_t* decoded_len
 ) {
@@ -21,22 +21,17 @@ PdfError* pdf_decode_filtered_stream(
     RELEASE_ASSERT(decoded);
     RELEASE_ASSERT(decoded_len);
 
-    if (filters.discriminant && pdf_void_vec_len(filters.value.elements) != 0) {
+    if (filters.has_value && pdf_name_vec_len(filters.value) != 0) {
         Arena* local_arena = arena_new(1024);
         uint8_t* temp = (uint8_t*)encoded;
         size_t temp_len = length;
 
-        for (size_t idx = 0; idx < pdf_void_vec_len(filters.value.elements);
-             idx++) {
-            void* void_ptr = NULL;
-            RELEASE_ASSERT(
-                pdf_void_vec_get(filters.value.elements, idx, &void_ptr)
-            );
+        for (size_t idx = 0; idx < pdf_name_vec_len(filters.value); idx++) {
+            PdfName name;
+            RELEASE_ASSERT(pdf_name_vec_get(filters.value, idx, &name));
+            LOG_DIAG(DEBUG, OBJECT, "Decoding stream with \"%s\"", name);
 
-            PdfName* name_ptr = void_ptr;
-            LOG_DIAG(DEBUG, OBJECT, "Decoding stream with \"%s\"", *name_ptr);
-
-            if (strcmp(*name_ptr, "ASCIIHexDecode") == 0) {
+            if (strcmp(name, "ASCIIHexDecode") == 0) {
                 uint8_t* out;
                 size_t out_len;
 
@@ -50,7 +45,7 @@ PdfError* pdf_decode_filtered_stream(
 
                 temp = out;
                 temp_len = out_len;
-            } else if (strcmp(*name_ptr, "FlateDecode") == 0) {
+            } else if (strcmp(name, "FlateDecode") == 0) {
                 Uint8Array* out = NULL;
                 PDF_PROPAGATE(
                     decode_zlib_data(local_arena, temp, temp_len, &out)
@@ -58,7 +53,7 @@ PdfError* pdf_decode_filtered_stream(
 
                 temp = uint8_array_get_raw(out, &temp_len);
             } else {
-                LOG_TODO("Unimplemented filter: \"%s\"", *name_ptr);
+                LOG_TODO("Unimplemented filter: \"%s\"", name);
             }
         }
 

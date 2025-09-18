@@ -15,7 +15,6 @@
 #include "pdf/fonts/font.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf/types.h"
 #include "pdf/xobject.h"
 #include "pdf_error/error.h"
 #include "text_state.h"
@@ -65,7 +64,7 @@ static PdfError* process_content_stream(
     Arena* arena,
     RenderState* state,
     PdfContentStream* content_stream,
-    const PdfOpResources* resources,
+    const PdfResourcesOptional* resources,
     PdfOptionalResolver resolver,
     Canvas* canvas
 ) {
@@ -119,9 +118,9 @@ static PdfError* process_content_stream(
                     pdf_number_as_real(op.data.set_font.size)
                 );
 
-                RELEASE_ASSERT(resources->discriminant
+                RELEASE_ASSERT(resources->has_value
                 ); // TODO: This should be an error, and ideally a function
-                RELEASE_ASSERT(resources->value.font.discriminant);
+                RELEASE_ASSERT(resources->value.font.has_value);
 
                 PdfObject* font_object = pdf_dict_get(
                     &resources->value.font.value,
@@ -130,9 +129,9 @@ static PdfError* process_content_stream(
 
                 PDF_PROPAGATE(pdf_deserialize_font(
                     font_object,
-                    arena,
+                    &current_graphics_state(state)->text_state.text_font,
                     resolver,
-                    &current_graphics_state(state)->text_state.text_font
+                    arena
                 ));
                 current_graphics_state(state)->text_state.text_font_size =
                     pdf_number_as_real(op.data.set_font.size);
@@ -193,8 +192,8 @@ static PdfError* process_content_stream(
                 break;
             }
             case PDF_CONTENT_OP_PAINT_XOBJECT: {
-                RELEASE_ASSERT(resources->discriminant);
-                RELEASE_ASSERT(resources->value.xobject.discriminant);
+                RELEASE_ASSERT(resources->has_value);
+                RELEASE_ASSERT(resources->value.xobject.has_value);
 
                 PdfObject* xobject_object = pdf_dict_get(
                     &resources->value.xobject.value,
@@ -204,9 +203,9 @@ static PdfError* process_content_stream(
                 PdfXObject xobject;
                 PDF_PROPAGATE(pdf_deserialize_xobject(
                     xobject_object,
-                    arena,
+                    &xobject,
                     resolver,
-                    &xobject
+                    arena
                 ));
 
                 switch (xobject.type) {
@@ -290,21 +289,27 @@ PdfError* render_page(
         0xffffffff
     );
 
-    if (page->contents.discriminant) {
+    if (page->contents.has_value) {
         for (size_t contents_idx = 0;
-             contents_idx < pdf_void_vec_len(page->contents.value.elements);
+             contents_idx
+             < pdf_content_stream_ref_vec_len(page->contents.value);
              contents_idx++) {
-            void* content_ptr;
-            RELEASE_ASSERT(pdf_void_vec_get(
-                page->contents.value.elements,
+            PdfContentStreamRef stream_ref;
+            RELEASE_ASSERT(pdf_content_stream_ref_vec_get(
+                page->contents.value,
                 contents_idx,
-                &content_ptr
+                &stream_ref
             ));
-            PdfStream* content = content_ptr;
+
+            RELEASE_ASSERT(resolver.present);
+            RELEASE_ASSERT(resolver.resolver);
 
             PdfContentStream stream;
-            PDF_REQUIRE(pdf_deserialize_content_stream(content, arena, &stream)
-            );
+            PDF_PROPAGATE(pdf_resolve_content_stream(
+                stream_ref,
+                resolver.resolver,
+                &stream
+            ));
 
             PDF_PROPAGATE(process_content_stream(
                 arena,

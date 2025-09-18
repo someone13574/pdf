@@ -10,76 +10,68 @@
 
 PdfError* pdf_deserialize_stream_dict(
     const PdfObject* object,
-    Arena* arena,
-    PdfStreamDict* deserialized
+    PdfStreamDict* target_ptr,
+    Arena* arena
 ) {
     RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
     RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(deserialized);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
-            PdfStreamDict,
             "Length",
-            length,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+            &target_ptr->length,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         ),
         PDF_FIELD(
-            PdfStreamDict,
             "Filter",
-            filter,
-            PDF_OPTIONAL_FIELD(
-                PdfOpNameArray,
-                PDF_AS_ARRAY_FIELD(
-                    PdfNameArray,
-                    PdfName,
-                    PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+            &target_ptr->filter,
+            PDF_DESERDE_OPTIONAL(
+                pdf_name_vec_op_init,
+                PDF_DESERDE_AS_ARRAY(
+                    pdf_name_vec_push_uninit,
+                    PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
                 )
             )
         ),
         PDF_FIELD(
-            PdfStreamDict,
             "Length1",
-            length1,
-            PDF_OPTIONAL_FIELD(
-                PdfOpInteger,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+            &target_ptr->length1,
+            PDF_DESERDE_OPTIONAL(
+                pdf_integer_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
             )
         ),
         PDF_FIELD(
-            PdfStreamDict,
             "Length2",
-            length2,
-            PDF_OPTIONAL_FIELD(
-                PdfOpInteger,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+            &target_ptr->length2,
+            PDF_DESERDE_OPTIONAL(
+                pdf_integer_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
             )
         ),
         PDF_FIELD(
-            PdfStreamDict,
             "Length3",
-            length3,
-            PDF_OPTIONAL_FIELD(
-                PdfOpInteger,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+            &target_ptr->length3,
+            PDF_DESERDE_OPTIONAL(
+                pdf_integer_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
             )
         ),
         PDF_FIELD(
-            PdfStreamDict,
             "Subtype",
-            subtype,
-            PDF_OPTIONAL_FIELD(
-                PdfOpName,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+            &target_ptr->subtype,
+            PDF_DESERDE_OPTIONAL(
+                pdf_name_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
             )
         ),
         PDF_FIELD(
-            PdfStreamDict,
             "Metadata",
-            metadata,
-            PDF_OPTIONAL_FIELD(
-                PdfOpStream,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STREAM)
+            &target_ptr->metadata,
+            PDF_DESERDE_OPTIONAL(
+                pdf_stream_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STREAM)
             )
         ),
         // Panic if we find any of these fields
@@ -94,7 +86,7 @@ PdfError* pdf_deserialize_stream_dict(
     // object.
     PdfObject* copied_object = arena_alloc(arena, sizeof(PdfObject));
     memcpy(copied_object, object, sizeof(PdfObject));
-    deserialized->raw_dict = copied_object;
+    target_ptr->raw_dict = copied_object;
 
     LOG_DIAG(
         INFO,
@@ -103,18 +95,17 @@ PdfError* pdf_deserialize_stream_dict(
         pdf_fmt_object(arena, copied_object)
     );
 
-    PDF_PROPAGATE(pdf_deserialize_object(
-        deserialized,
+    PDF_PROPAGATE(pdf_deserialize_dict(
         copied_object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
-        arena,
-        pdf_op_resolver_none(false),
         true,
+        pdf_op_resolver_none(false),
+        arena,
         "PdfStreamDict"
     ));
 
-    RELEASE_ASSERT(deserialized->length != 0);
+    RELEASE_ASSERT(target_ptr->length != 0);
 
     return NULL;
 }

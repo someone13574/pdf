@@ -1,16 +1,14 @@
 #pragma once
 
 #include "pdf/content_stream.h"
-#include "pdf/deserde_types.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/resources.h"
-#include "pdf/types.h"
 
 typedef struct {
     /// The type of PDF object that this dictionary describes; if present, shall
     /// be XObject for a form XObject.
-    PdfOpName type;
+    PdfNameOptional type;
 
     /// The type of XObject that this dictionary describes; shall be Form for a
     /// form XObject.
@@ -18,7 +16,7 @@ typedef struct {
 
     /// A code identifying the type of form XObject that this dictionary
     /// describes. The only valid value is 1. Default value: 1.
-    PdfOpInteger form_type;
+    PdfIntegerOptional form_type;
 
     /// An array of four numbers in the form coordinate system (see above),
     /// giving the coordinates of the left, bottom, right, and top edges,
@@ -33,7 +31,7 @@ typedef struct {
 
     /// A dictionary specifying any resources (such as fonts and images)
     /// required by the form XObject (see 7.8, "Content Streams and Resources").
-    PdfOpResources resources;
+    PdfResourcesOptional resources;
 
     /// A group attributes dictionary indicating that the contents of the form
     /// XObject shall be treated as a group and specifying the attributes of
@@ -41,7 +39,7 @@ typedef struct {
     /// present, the group attributes shall also apply to the external page
     /// imported by that entry, which allows such an imported page to be treated
     /// as a group without further modification.
-    PdfOpDict group;
+    PdfDictOptional group;
 
     /// A reference dictionary identifying a page to be imported from another
     /// PDF file, and for which the form XObject serves as a proxy (see 8.10.4,
@@ -103,7 +101,7 @@ typedef struct {
 
 PdfError* pdf_deserialize_xobject(
     const PdfObject* object,
-    Arena* arena,
+    PdfXObject* target_ptr,
     PdfOptionalResolver resolver,
-    PdfXObject* deserialized
+    Arena* arena
 );

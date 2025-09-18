@@ -28,21 +28,17 @@ typedef struct {
     const PdfObject* raw_dict;
 } PdfFontWidths;
 
-typedef struct {
-    bool discriminant;
-    PdfFontWidths value;
-} PdfOpFontWidths;
+DESERDE_DECL_OPTIONAL(
+    PdfFontWidthsOptional,
+    PdfFontWidths,
+    pdf_font_widths_op_init
+)
 
 PdfError* pdf_deserialize_font_widths(
     const PdfObject* object,
-    Arena* arena,
+    PdfFontWidths* deserialized,
     PdfOptionalResolver resolver,
-    PdfFontWidths* deserialized
+    Arena* arena
 );
 
-PdfError* pdf_deserialize_font_widths_wrapper(
-    const PdfObject* object,
-    Arena* arena,
-    PdfOptionalResolver resolver,
-    void* deserialized
-);
+DESERDE_DECL_TRAMPOLINE(pdf_deserialize_font_widths_trampoline)

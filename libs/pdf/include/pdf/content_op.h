@@ -1,7 +1,6 @@
 #pragma once
 
 #include "pdf/object.h"
-#include "pdf/types.h"
 
 typedef enum {
     PDF_CONTENT_OP_SET_LINE_WIDTH, // w

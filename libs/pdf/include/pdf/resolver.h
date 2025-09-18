@@ -1,10 +1,17 @@
 #pragma once
 
+#include <stdint.h>
+
 #include "arena/arena.h"
-#include "pdf/object.h"
 #include "pdf_error/error.h"
 
+typedef struct {
+    size_t object_id;
+    size_t generation;
+} PdfIndirectRef;
+
 typedef struct PdfResolver PdfResolver;
+typedef struct PdfObject PdfObject;
 
 typedef struct {
     bool present;

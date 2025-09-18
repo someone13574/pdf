@@ -20,69 +20,51 @@
 
 PdfError* pdf_deserialize_cid_system_info(
     const PdfObject* object,
-    Arena* arena,
+    PdfCIDSystemInfo* target_ptr,
     PdfOptionalResolver resolver,
-    PdfCIDSystemInfo* deserialized
+    Arena* arena
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(target_ptr);
     RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(deserialized);
+    RELEASE_ASSERT(arena);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
-            PdfCIDSystemInfo,
             "Registry",
-            registry,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STRING)
+            &target_ptr->registry,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
         ),
         PDF_FIELD(
-            PdfCIDSystemInfo,
             "Ordering",
-            ordering,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STRING)
+            &target_ptr->ordering,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
         ),
         PDF_FIELD(
-            PdfCIDSystemInfo,
             "Supplement",
-            supplement,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+            &target_ptr->supplement,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         )
     };
 
-    deserialized->raw_dict = object;
-    PDF_PROPAGATE(pdf_deserialize_object(
-        deserialized,
+    target_ptr->raw_dict = object;
+    PDF_PROPAGATE(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
-        arena,
-        resolver,
         false,
+        resolver,
+        arena,
         "PdfCIDSystemInfo"
     ));
 
     return NULL;
 }
 
-PdfError* pdf_deserialize_cid_system_info_wrapper(
-    const PdfObject* object,
-    Arena* arena,
-    PdfOptionalResolver resolver,
-    void* deserialized
-) {
-    RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(deserialized);
-
-    return pdf_deserialize_cid_system_info(
-        object,
-        arena,
-        resolver,
-        deserialized
-    );
-}
+DESERDE_IMPL_TRAMPOLINE(
+    pdf_deserialize_cid_system_info_trampoline,
+    pdf_deserialize_cid_system_info
+)
 
 typedef struct {
     size_t start_code;

@@ -12,63 +12,57 @@
 
 PdfError* pdf_deserialize_form_xobject(
     const PdfObject* object,
-    Arena* arena,
+    PdfFormXObject* target_ptr,
     PdfOptionalResolver resolver,
-    PdfFormXObject* deserialized
+    Arena* arena
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(target_ptr);
     RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(deserialized);
+    RELEASE_ASSERT(arena);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
-            PdfFormXObject,
             "Type",
-            type,
-            PDF_OPTIONAL_FIELD(
-                PdfOpName,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+            &target_ptr->type,
+            PDF_DESERDE_OPTIONAL(
+                pdf_name_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
             )
         ),
         PDF_FIELD(
-            PdfFormXObject,
             "Subtype",
-            subtype,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+            &target_ptr->subtype,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
         ),
         PDF_FIELD(
-            PdfFormXObject,
             "FormType",
-            form_type,
-            PDF_OPTIONAL_FIELD(
-                PdfOpInteger,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+            &target_ptr->form_type,
+            PDF_DESERDE_OPTIONAL(
+                pdf_integer_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
             )
         ),
         PDF_FIELD(
-            PdfFormXObject,
             "BBox",
-            bbox,
-            PDF_CUSTOM_FIELD(pdf_deserialize_rectangle_wrapper)
+            &target_ptr->bbox,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_rectangle_trampoline)
         ),
         PDF_UNIMPLEMENTED_FIELD("Matrix"),
         PDF_FIELD(
-            PdfFormXObject,
             "Resources",
-            resources,
-            PDF_OPTIONAL_FIELD(
-                PdfOpResources,
-                PDF_CUSTOM_FIELD(pdf_deserialize_resources_wrapper)
+            &target_ptr->resources,
+            PDF_DESERDE_OPTIONAL(
+                pdf_resources_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_resources_trampoline)
             )
         ),
         PDF_FIELD(
-            PdfFormXObject,
             "Group",
-            group,
-            PDF_OPTIONAL_FIELD(
-                PdfOpDict,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+            &target_ptr->group,
+            PDF_DESERDE_OPTIONAL(
+                pdf_dict_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         ),
         PDF_UNIMPLEMENTED_FIELD("Ref"),
@@ -91,37 +85,37 @@ PdfError* pdf_deserialize_form_xobject(
         );
     }
 
-    PDF_PROPAGATE(pdf_deserialize_object(
-        deserialized,
+    PDF_PROPAGATE(pdf_deserialize_dict(
         resolved.data.stream.stream_dict->raw_dict,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
-        arena,
-        resolver,
         true,
+        resolver,
+        arena,
         "PdfFormXObject"
     ));
 
     PDF_PROPAGATE(pdf_deserialize_content_stream(
-        &resolved.data.stream,
-        arena,
-        &deserialized->content_stream
+        &resolved,
+        &target_ptr->content_stream,
+        resolver,
+        arena
     ));
 
-    if (deserialized->type.discriminant
-        && strcmp(deserialized->type.value, "XObject") != 0) {
+    if (target_ptr->type.has_value
+        && strcmp(target_ptr->type.value, "XObject") != 0) {
         return PDF_ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "Incorrect type `%s`",
-            deserialized->subtype
+            target_ptr->subtype
         );
     }
 
-    if (strcmp(deserialized->subtype, "Form") != 0) {
+    if (strcmp(target_ptr->subtype, "Form") != 0) {
         return PDF_ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "Incorrect subtype `%s`",
-            deserialized->subtype
+            target_ptr->subtype
         );
     }
 
@@ -134,20 +128,20 @@ typedef struct {
 
 PdfError* pdf_deserialize_xobject(
     const PdfObject* object,
-    Arena* arena,
+    PdfXObject* target_ptr,
     PdfOptionalResolver resolver,
-    PdfXObject* deserialized
+    Arena* arena
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(target_ptr);
     RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(deserialized);
+    RELEASE_ASSERT(arena);
 
+    XObjectUntyped untyped = {0};
     PdfFieldDescriptor fields[] = {PDF_FIELD(
-        XObjectUntyped,
         "Subtype",
-        subtype,
-        PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+        &untyped.subtype,
+        PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
     )};
 
     PdfObject resolved;
@@ -159,27 +153,24 @@ PdfError* pdf_deserialize_xobject(
         );
     }
 
-    deserialized->raw_object = object;
-
-    XObjectUntyped untyped = {0};
-    PDF_PROPAGATE(pdf_deserialize_object(
-        &untyped,
+    target_ptr->raw_object = object;
+    PDF_PROPAGATE(pdf_deserialize_dict(
         resolved.data.stream.stream_dict->raw_dict,
         fields,
-        sizeof(fields) / sizeof(PdfFieldDescriptor),
-        arena,
-        resolver,
         true,
+        sizeof(fields) / sizeof(PdfFieldDescriptor),
+        resolver,
+        arena,
         "XObjectUntyped"
     ));
 
     if (strcmp(untyped.subtype, "Form") == 0) {
-        deserialized->type = PDF_XOBJECT_FORM;
+        target_ptr->type = PDF_XOBJECT_FORM;
         PDF_PROPAGATE(pdf_deserialize_form_xobject(
             object,
-            arena,
+            &target_ptr->data.form,
             resolver,
-            &deserialized->data.form
+            arena
         ));
     } else if (strcmp(untyped.subtype, "Image") == 0) {
         LOG_TODO();

@@ -76,14 +76,17 @@ int main(int argc, char** argv) {
 
     PdfPageTreeNode page_tree_root;
     PDF_REQUIRE(
-        pdf_resolve_page_tree_node(&catalog.pages, resolver, &page_tree_root)
+        pdf_resolve_page_tree_node(catalog.pages, resolver, &page_tree_root)
     );
 
-    for (size_t idx = 0; idx < pdf_void_vec_len(page_tree_root.kids); idx++) {
-        void* page_ptr;
-        RELEASE_ASSERT(pdf_void_vec_get(page_tree_root.kids, idx, &page_ptr));
+    for (size_t idx = 0; idx < pdf_page_ref_vec_len(page_tree_root.kids);
+         idx++) {
+        PdfPageRef page_ref;
+        RELEASE_ASSERT(pdf_page_ref_vec_get(page_tree_root.kids, idx, &page_ref)
+        );
+
         PdfPage page;
-        PDF_REQUIRE(pdf_resolve_page(page_ptr, resolver, &page));
+        PDF_REQUIRE(pdf_resolve_page(page_ref, resolver, &page));
 
         printf("%s\n", pdf_fmt_object(arena, page.raw_dict));
 

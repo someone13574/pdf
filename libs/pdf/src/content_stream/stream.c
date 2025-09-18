@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "../ctx.h"
+#include "../deserialize.h"
 #include "../object.h"
 #include "arena/arena.h"
 #include "logger/log.h"
@@ -9,16 +10,27 @@
 #include "operator.h"
 #include "pdf/content_stream.h"
 #include "pdf/object.h"
+#include "pdf/resolver.h"
 #include "pdf_error/error.h"
 
 PdfError* pdf_deserialize_content_stream(
-    const PdfStream* stream,
-    Arena* arena,
-    PdfContentStream* deserialized
+    const PdfObject* object,
+    PdfContentStream* deserialized,
+    PdfOptionalResolver resolver,
+    Arena* arena
 ) {
-    RELEASE_ASSERT(stream);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(object);
     RELEASE_ASSERT(deserialized);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(arena);
+
+    PdfObject resolved;
+    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved));
+    if (resolved.type != PDF_OBJECT_TYPE_STREAM) {
+        return PDF_ERROR(PDF_ERR_INCORRECT_TYPE, "Expected a stream");
+    }
+
+    PdfStream* stream = &resolved.data.stream;
 
     PdfCtx* ctx =
         pdf_ctx_new(arena, stream->stream_bytes, stream->decoded_stream_len);
@@ -76,3 +88,21 @@ PdfError* pdf_deserialize_content_stream(
 
     return NULL;
 }
+
+DESERDE_IMPL_RESOLVABLE(
+    PdfContentStreamRef,
+    PdfContentStream,
+    pdf_content_stream_ref_init,
+    pdf_resolve_content_stream,
+    pdf_deserialize_content_stream
+)
+
+#define DVEC_NAME PdfContentStreamRefVec
+#define DVEC_LOWERCASE_NAME pdf_content_stream_ref_vec
+#define DVEC_TYPE PdfContentStreamRef
+#include "arena/dvec_impl.h"
+
+DESERDE_IMPL_OPTIONAL(
+    PdfContentsStreamRefVecOptional,
+    pdf_content_stream_ref_vec_op_init
+)

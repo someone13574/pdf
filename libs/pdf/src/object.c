@@ -808,7 +808,7 @@ PdfError* pdf_parse_stream(
     // Deserialize stream dict
     PdfStreamDict stream_dict;
     PDF_REQUIRE(
-        pdf_deserialize_stream_dict(stream_dict_obj, arena, &stream_dict)
+        pdf_deserialize_stream_dict(stream_dict_obj, &stream_dict, arena)
     );
 
     if (stream_dict.length < 0) {

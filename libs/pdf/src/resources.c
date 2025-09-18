@@ -7,101 +7,92 @@
 
 PdfError* pdf_deserialize_resources(
     const PdfObject* object,
-    Arena* arena,
+    PdfResources* target_ptr,
     PdfOptionalResolver resolver,
-    PdfResources* deserialized
+    Arena* arena
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(target_ptr);
     RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(deserialized);
+    RELEASE_ASSERT(arena);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
-            PdfResources,
             "ExtGState",
-            ext_gstate,
-            PDF_OPTIONAL_FIELD(
-                PdfOpDict,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+            &target_ptr->ext_gstate,
+            PDF_DESERDE_OPTIONAL(
+                pdf_dict_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         ),
         PDF_FIELD(
-            PdfResources,
             "ColorSpace",
-            color_space,
-            PDF_OPTIONAL_FIELD(
-                PdfOpDict,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+            &target_ptr->color_space,
+            PDF_DESERDE_OPTIONAL(
+                pdf_dict_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         ),
         PDF_FIELD(
-            PdfResources,
             "Pattern",
-            pattern,
-            PDF_OPTIONAL_FIELD(
-                PdfOpDict,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+            &target_ptr->pattern,
+            PDF_DESERDE_OPTIONAL(
+                pdf_dict_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         ),
         PDF_FIELD(
-            PdfResources,
             "Shading",
-            shading,
-            PDF_OPTIONAL_FIELD(
-                PdfOpDict,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+            &target_ptr->shading,
+            PDF_DESERDE_OPTIONAL(
+                pdf_dict_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         ),
         PDF_FIELD(
-            PdfResources,
             "XObject",
-            xobject,
-            PDF_OPTIONAL_FIELD(
-                PdfOpDict,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+            &target_ptr->xobject,
+            PDF_DESERDE_OPTIONAL(
+                pdf_dict_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         ),
         PDF_FIELD(
-            PdfResources,
             "Font",
-            font,
-            PDF_OPTIONAL_FIELD(
-                PdfOpDict,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+            &target_ptr->font,
+            PDF_DESERDE_OPTIONAL(
+                pdf_dict_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         ),
         PDF_FIELD(
-            PdfResources,
             "ProcSet",
-            proc_set,
-            PDF_OPTIONAL_FIELD(
-                PdfOpNameArray,
-                PDF_ARRAY_FIELD(
-                    PdfNameArray,
-                    PdfName,
-                    PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+            &target_ptr->proc_set,
+            PDF_DESERDE_OPTIONAL(
+                pdf_name_vec_op_init,
+                PDF_DESERDE_ARRAY(
+                    pdf_name_vec_push_uninit,
+                    PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
                 )
             )
         )
     };
 
-    deserialized->raw_dict = object;
     PDF_PROPAGATE(pdf_deserialize_dict(
-        deserialized,
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
-        arena,
-        resolver,
         false,
+        resolver,
+        arena,
         "PdfResources"
     ));
 
     return NULL;
 }
 
-PDF_UNTYPED_DESERIALIZER_WRAPPER(
-    pdf_deserialize_resources,
-    pdf_deserialize_resources_wrapper
+DESERDE_IMPL_TRAMPOLINE(
+    pdf_deserialize_resources_trampoline,
+    pdf_deserialize_resources
 )
+DESERDE_IMPL_OPTIONAL(PdfResourcesOptional, pdf_resources_op_init)

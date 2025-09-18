@@ -120,9 +120,9 @@ PdfError* pdf_get_trailer(PdfResolver* resolver, PdfTrailer* trailer) {
 
     PDF_PROPAGATE(pdf_deserialize_trailer(
         trailer_dict,
-        resolver->arena,
+        trailer,
         pdf_op_resolver_some(resolver),
-        trailer
+        resolver->arena
     ));
 
     resolver->trailer = arena_alloc(resolver->arena, sizeof(PdfTrailer));
@@ -142,7 +142,7 @@ PdfError* pdf_get_catalog(PdfResolver* resolver, PdfCatalog* catalog) {
 
     PdfTrailer trailer;
     PDF_PROPAGATE(pdf_get_trailer(resolver, &trailer));
-    PDF_PROPAGATE(pdf_resolve_catalog(&trailer.root, resolver, catalog));
+    PDF_PROPAGATE(pdf_resolve_catalog(trailer.root, resolver, catalog));
 
     resolver->catalog = arena_alloc(resolver->arena, sizeof(PdfCatalog));
     *resolver->catalog = *catalog;

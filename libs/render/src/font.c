@@ -75,20 +75,19 @@ PdfError* cid_to_gid(
     switch (font->type) {
         case PDF_FONT_TYPE0: {
             // Get descendent font (bound checked by deserialized)
-            void* descendent_font_void_ptr = NULL;
-            RELEASE_ASSERT(pdf_void_vec_get(
-                font->data.type0.descendant_fonts.elements,
+            PdfCIDFont cid_font;
+            RELEASE_ASSERT(pdf_cid_font_vec_get(
+                font->data.type0.descendant_fonts,
                 0,
-                &descendent_font_void_ptr
+                &cid_font
             ));
 
-            PdfCIDFont* cid_font = descendent_font_void_ptr;
             PdfFont descendent_font = {
                 .type =
-                    (strcmp(cid_font->subtype, "CIDFontType0") == 0
+                    (strcmp(cid_font.subtype, "CIDFontType0") == 0
                          ? PDF_FONT_CIDTYPE0
                          : PDF_FONT_CIDTYPE2),
-                .data.cid = *cid_font
+                .data.cid = cid_font
             };
 
             // Call recursively
@@ -98,18 +97,18 @@ PdfError* cid_to_gid(
         case PDF_FONT_CIDTYPE0: {
             PdfFontDescriptor font_descriptor;
             PDF_PROPAGATE(pdf_resolve_font_descriptor(
-                &font->data.cid.font_descriptor,
+                font->data.cid.font_descriptor,
                 resolver.resolver,
                 &font_descriptor
             ));
 
-            if (font_descriptor.font_file.discriminant) {
+            if (font_descriptor.font_file.has_value) {
                 LOG_TODO("Embedded Type1 font");
-            } else if (font_descriptor.font_file2.discriminant) {
+            } else if (font_descriptor.font_file2.has_value) {
                 LOG_TODO("Embedded Type2 font");
-            } else if (font_descriptor.font_file3.discriminant) {
+            } else if (font_descriptor.font_file3.has_value) {
                 if (!font_descriptor.font_file3.value.stream_dict->subtype
-                         .discriminant) {
+                         .has_value) {
                     return PDF_ERROR(
                         PDF_ERR_MISSING_DICT_KEY,
                         "Subtype field in stream-dict is required if referenced from FontFile3 in a FontDescriptor"
@@ -152,20 +151,20 @@ PdfError* render_glyph(
 
     switch (font->type) {
         case PDF_FONT_TYPE0: {
-            void* descendent_font_void_ptr = NULL;
-            RELEASE_ASSERT(pdf_void_vec_get(
-                font->data.type0.descendant_fonts.elements,
+            // Get descendent font (bound checked by deserialized)
+            PdfCIDFont cid_font;
+            RELEASE_ASSERT(pdf_cid_font_vec_get(
+                font->data.type0.descendant_fonts,
                 0,
-                &descendent_font_void_ptr
+                &cid_font
             ));
 
-            PdfCIDFont* cid_font = descendent_font_void_ptr;
             PdfFont descendent_font = {
                 .type =
-                    (strcmp(cid_font->subtype, "CIDFontType0") == 0
+                    (strcmp(cid_font.subtype, "CIDFontType0") == 0
                          ? PDF_FONT_CIDTYPE0
                          : PDF_FONT_CIDTYPE2),
-                .data.cid = *cid_font
+                .data.cid = cid_font
             };
 
             // Call recursively
@@ -177,18 +176,18 @@ PdfError* render_glyph(
         case PDF_FONT_CIDTYPE0: {
             PdfFontDescriptor font_descriptor;
             PDF_PROPAGATE(pdf_resolve_font_descriptor(
-                &font->data.cid.font_descriptor,
+                font->data.cid.font_descriptor,
                 resolver.resolver,
                 &font_descriptor
             ));
 
-            if (font_descriptor.font_file.discriminant) {
+            if (font_descriptor.font_file.has_value) {
                 LOG_TODO("Embedded Type1 font");
-            } else if (font_descriptor.font_file2.discriminant) {
+            } else if (font_descriptor.font_file2.has_value) {
                 LOG_TODO("Embedded Type2 font");
-            } else if (font_descriptor.font_file3.discriminant) {
+            } else if (font_descriptor.font_file3.has_value) {
                 if (!font_descriptor.font_file3.value.stream_dict->subtype
-                         .discriminant) {
+                         .has_value) {
                     return PDF_ERROR(
                         PDF_ERR_MISSING_DICT_KEY,
                         "Subtype field in stream-dict is required if referenced from FontFile3 in a FontDescriptor"
@@ -239,20 +238,19 @@ PdfError* cid_to_width(PdfFont* font, uint32_t cid, PdfInteger* width_out) {
         case PDF_FONT_TYPE0: {
             // TODO: Make this process of getting the descendent font a
             // function...
-            void* descendent_font_void_ptr = NULL;
-            RELEASE_ASSERT(pdf_void_vec_get(
-                font->data.type0.descendant_fonts.elements,
+            PdfCIDFont cid_font;
+            RELEASE_ASSERT(pdf_cid_font_vec_get(
+                font->data.type0.descendant_fonts,
                 0,
-                &descendent_font_void_ptr
+                &cid_font
             ));
 
-            PdfCIDFont* cid_font = descendent_font_void_ptr;
             PdfFont descendent_font = {
                 .type =
-                    (strcmp(cid_font->subtype, "CIDFontType0") == 0
+                    (strcmp(cid_font.subtype, "CIDFontType0") == 0
                          ? PDF_FONT_CIDTYPE0
                          : PDF_FONT_CIDTYPE2),
-                .data.cid = *cid_font
+                .data.cid = cid_font
             };
 
             // Call recursively
@@ -263,7 +261,7 @@ PdfError* cid_to_width(PdfFont* font, uint32_t cid, PdfInteger* width_out) {
         case PDF_FONT_CIDTYPE0: {
             PdfCIDFont* cid_font = &font->data.cid;
 
-            if (cid_font->w.discriminant) {
+            if (cid_font->w.has_value) {
                 PdfFontWidthEntry width_entry;
                 if (pdf_font_width_vec_get(
                         cid_font->w.value.cid_to_width,
@@ -276,7 +274,7 @@ PdfError* cid_to_width(PdfFont* font, uint32_t cid, PdfInteger* width_out) {
                 }
             }
 
-            if (cid_font->dw.discriminant) {
+            if (cid_font->dw.has_value) {
                 *width_out = cid_font->dw.value;
                 return NULL;
             }

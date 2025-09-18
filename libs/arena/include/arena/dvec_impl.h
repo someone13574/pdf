@@ -147,7 +147,7 @@ void* DVEC_FN(push_uninit)(void* ptr_to_vec_ptr, Arena* arena) {
 
     DVEC_NAME* vec_ptr = *ptr_to_vec_ptr_typed;
 
-    DVEC_TYPE uninit_element;
+    DVEC_TYPE uninit_element = {0};
     return DVEC_FN(push)(vec_ptr, uninit_element);
 }
 

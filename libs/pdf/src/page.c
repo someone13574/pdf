@@ -7,148 +7,155 @@
 #include "pdf/resources.h"
 #include "pdf_error/error.h"
 
-PDF_DESERIALIZABLE_REF_IMPL(
-    PdfPageTreeNode,
-    page_tree_node,
-    pdf_deserialize_page_tree_node
-)
-
-PdfError* pdf_deserialize_page_tree_node(
-    const PdfObject* object,
-    Arena* arena,
-    PdfOptionalResolver resolver,
-    PdfPageTreeNode* deserialized
-) {
-    RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(deserialized);
-
-    PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            PdfPageTreeNode,
-            "Type",
-            type,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_FIELD(
-            PdfPageTreeNode,
-            "Parent",
-            parent,
-            PDF_OPTIONAL_FIELD(
-                PdfOpDict,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
-            )
-        ),
-        PDF_FIELD(
-            PdfPageTreeNode,
-            "Kids",
-            kids,
-            PDF_ARRAY_FIELD(PdfPageArray, PdfPageRef, PDF_REF_FIELD(PdfPageRef))
-        ),
-        PDF_FIELD(
-            PdfPageTreeNode,
-            "Count",
-            count,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
-        )
-    };
-
-    deserialized->raw_dict = object;
-    PDF_PROPAGATE(pdf_deserialize_object(
-        deserialized,
-        object,
-        fields,
-        sizeof(fields) / sizeof(PdfFieldDescriptor),
-        arena,
-        resolver,
-        false,
-        "PdfPageTreeNode"
-    ));
-
-    return NULL;
-}
+#define DVEC_NAME PdfPageRefVec
+#define DVEC_LOWERCASE_NAME pdf_page_ref_vec
+#define DVEC_TYPE PdfPageRef
+#include "arena/dvec_impl.h"
 
 PdfError* pdf_deserialize_page(
     const PdfObject* object,
-    Arena* arena,
+    PdfPage* target_ptr,
     PdfOptionalResolver resolver,
-    PdfPage* deserialized
+    Arena* arena
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(target_ptr);
     RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(deserialized);
+    RELEASE_ASSERT(arena);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
-            PdfPage,
             "Type",
-            type,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+            &target_ptr->type,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
         ),
-        PDF_FIELD(PdfPage, "Parent", parent, PDF_REF_FIELD(PdfPageTreeNodeRef)),
         PDF_FIELD(
-            PdfPage,
+            "Parent",
+            &target_ptr->parent,
+            PDF_DESERDE_RESOLVABLE(pdf_page_tree_node_ref_init)
+        ),
+        PDF_FIELD(
             "Resources",
-            resources,
-            PDF_OPTIONAL_FIELD(
-                PdfOpResources,
-                PDF_CUSTOM_FIELD(pdf_deserialize_resources_wrapper)
+            &target_ptr->resources,
+            PDF_DESERDE_OPTIONAL(
+                pdf_resources_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_resources_trampoline)
             )
         ),
         PDF_FIELD(
-            PdfPage,
             "MediaBox",
-            media_box,
-            PDF_CUSTOM_FIELD(pdf_deserialize_rectangle_wrapper)
+            &target_ptr->media_box,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_rectangle_trampoline)
         ),
         PDF_FIELD(
-            PdfPage,
             "Contents",
-            contents,
-            PDF_OPTIONAL_FIELD(
-                PdfOpContentsArray,
-                PDF_AS_ARRAY_FIELD(
-                    PdfContentsArray,
-                    PdfStream,
-                    PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STREAM)
+            &target_ptr->contents,
+            PDF_DESERDE_OPTIONAL(
+                pdf_content_stream_ref_vec_op_init,
+                PDF_DESERDE_AS_ARRAY(
+                    pdf_content_stream_ref_vec_push_uninit,
+                    PDF_DESERDE_RESOLVABLE(pdf_content_stream_ref_init)
                 )
             )
         ),
         PDF_FIELD(
-            PdfPage,
             "Rotate",
-            rotate,
-            PDF_OPTIONAL_FIELD(
-                PdfOpInteger,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+            &target_ptr->rotate,
+            PDF_DESERDE_OPTIONAL(
+                pdf_integer_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
             )
         ),
         PDF_FIELD(
-            PdfPage,
             "Group",
-            group,
-            PDF_OPTIONAL_FIELD(
-                PdfOpDict,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+            &target_ptr->group,
+            PDF_DESERDE_OPTIONAL(
+                pdf_dict_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         )
     };
 
-    deserialized->raw_dict = object;
-    PDF_PROPAGATE(pdf_deserialize_object(
-        deserialized,
+    target_ptr->raw_dict = object;
+    PDF_PROPAGATE(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
-        arena,
-        resolver,
         false,
+        resolver,
+        arena,
         "PdfPage"
     ));
 
     return NULL;
 }
 
-PDF_DESERIALIZABLE_REF_IMPL(PdfPage, page, pdf_deserialize_page)
+DESERDE_IMPL_RESOLVABLE(
+    PdfPageRef,
+    PdfPage,
+    pdf_page_ref_init,
+    pdf_resolve_page,
+    pdf_deserialize_page
+)
+
+PdfError* pdf_deserialize_page_tree_node(
+    const PdfObject* object,
+    PdfPageTreeNode* target_ptr,
+    PdfOptionalResolver resolver,
+    Arena* arena
+) {
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(arena);
+
+    PdfFieldDescriptor fields[] = {
+        PDF_FIELD(
+            "Type",
+            &target_ptr->type,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+        ),
+        PDF_FIELD(
+            "Parent",
+            &target_ptr->parent,
+            PDF_DESERDE_OPTIONAL(
+                pdf_dict_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
+            )
+        ),
+        PDF_FIELD(
+            "Kids",
+            &target_ptr->kids,
+            PDF_DESERDE_ARRAY(
+                pdf_page_ref_vec_push_uninit,
+                PDF_DESERDE_RESOLVABLE(pdf_page_ref_init)
+            )
+        ),
+        PDF_FIELD(
+            "Count",
+            &target_ptr->count,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+        )
+    };
+
+    target_ptr->raw_dict = object;
+    PDF_PROPAGATE(pdf_deserialize_dict(
+        object,
+        fields,
+        sizeof(fields) / sizeof(PdfFieldDescriptor),
+        false,
+        resolver,
+        arena,
+        "PdfPageTreeNode"
+    ));
+
+    return NULL;
+}
+
+DESERDE_IMPL_RESOLVABLE(
+    PdfPageTreeNodeRef,
+    PdfPageTreeNode,
+    pdf_page_tree_node_ref_init,
+    pdf_resolve_page_tree_node,
+    pdf_deserialize_page_tree_node
+)

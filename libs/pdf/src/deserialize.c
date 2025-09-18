@@ -155,7 +155,7 @@ static PdfError* deserialize_resolvable(
     return NULL;
 }
 
-static PdfError* deseriaize_array(
+static PdfError* deserialize_array(
     const PdfObject* object,
     void* target_ptr, // Represents a pointer to the vec pointer
     PdfDeserdeArrayInfo deserde_info,
@@ -251,7 +251,7 @@ static PdfError* deserialize_as_array(
     // Fall-back to normal array deserialization. Reuse allocated
     // `element_target_ptr`.
     PDF_PROPAGATE(pdf_error_conditional_context(
-        deseriaize_array(
+        deserialize_array(
             object,
             target_ptr,
             deserde_info,
@@ -309,8 +309,8 @@ static PdfError* deserialize(
             ));
             break;
         }
-        case PDF_DESERDE_ARRAY: {
-            PDF_PROPAGATE(deseriaize_array(
+        case PDF_DESERDE_TYPE_ARRAY: {
+            PDF_PROPAGATE(deserialize_array(
                 object,
                 target_ptr,
                 deserde_info.value.array_info,
@@ -320,7 +320,7 @@ static PdfError* deserialize(
             ));
             break;
         }
-        case PDF_DESERDE_AS_ARRAY: {
+        case PDF_DESERDE_TYPE_AS_ARRAY: {
             PDF_PROPAGATE(deserialize_as_array(
                 object,
                 target_ptr,
@@ -330,7 +330,7 @@ static PdfError* deserialize(
             ));
             break;
         }
-        case PDF_DESERDE_CUSTOM: {
+        case PDF_DESERDE_TYPE_CUSTOM: {
             PDF_PROPAGATE(deserde_info.value
                               .custom_fn(object, target_ptr, resolver, arena));
             break;
@@ -439,8 +439,7 @@ PdfError* pdf_deserialize_dict(
                 continue;
             }
 
-            if (field->deserialization_info.type
-                == PDF_DESERDE_TYPE_UNIMPLEMENTED) {
+            if (field->deserde_info.type == PDF_DESERDE_TYPE_UNIMPLEMENTED) {
                 LOG_PANIC(
                     "Unimplemented field `%s` (\x1b[4m%s:%lu\x1b[0m)",
                     field->key,
@@ -453,7 +452,7 @@ PdfError* pdf_deserialize_dict(
                 deserialize(
                     entry.value,
                     field->target_ptr,
-                    field->deserialization_info,
+                    field->deserde_info,
                     resolver,
                     arena
                 ),
@@ -468,12 +467,12 @@ PdfError* pdf_deserialize_dict(
         }
 
         if (!found) {
-            if (field->deserialization_info.type == PDF_DESERDE_TYPE_OPTIONAL) {
+            if (field->deserde_info.type == PDF_DESERDE_TYPE_OPTIONAL) {
                 set_none_optional(
                     field->target_ptr,
-                    field->deserialization_info.value.optional_info
+                    field->deserde_info.value.optional_info
                 );
-            } else if (field->deserialization_info.type != PDF_DESERDE_TYPE_UNIMPLEMENTED) {
+            } else if (field->deserde_info.type != PDF_DESERDE_TYPE_UNIMPLEMENTED) {
                 return PDF_ERROR(
                     PDF_ERR_MISSING_DICT_KEY,
                     "Missing key `%s`",
@@ -484,6 +483,54 @@ PdfError* pdf_deserialize_dict(
     }
 
     LOG_DIAG(TRACE, DESERDE, "Finished deserializing dictionary object");
+
+    return NULL;
+}
+
+PdfError* pdf_deserialize_operands(
+    const PdfObjectVec* operands,
+    void* target_ptr,
+    const PdfOperandDescriptor* descriptors,
+    size_t num_descriptors,
+    Arena* arena
+) {
+    RELEASE_ASSERT(operands);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(descriptors);
+    RELEASE_ASSERT(arena);
+
+    if (num_descriptors > pdf_object_vec_len(operands)) {
+        return PDF_ERROR(
+            PDF_ERR_MISSING_OPERAND,
+            "Incorrect number of operands. Expected %zu, found %zu",
+            num_descriptors,
+            pdf_object_vec_len(operands)
+        );
+    }
+
+    if (num_descriptors < pdf_object_vec_len(operands)) {
+        return PDF_ERROR(
+            PDF_ERR_EXCESS_OPERAND,
+            "Incorrect number of operands. Expected %zu, found %zu",
+            num_descriptors,
+            pdf_object_vec_len(operands)
+        );
+    }
+
+    for (size_t idx = 0; idx < num_descriptors; idx++) {
+        PdfOperandDescriptor descriptor = descriptors[idx];
+
+        PdfObject* operand = NULL;
+        RELEASE_ASSERT(pdf_object_vec_get(operands, idx, &operand));
+
+        PDF_PROPAGATE(deserialize(
+            operand,
+            descriptor.target_ptr,
+            descriptor.deserde_info,
+            pdf_op_resolver_none(true),
+            arena
+        ));
+    }
 
     return NULL;
 }
@@ -547,55 +594,55 @@ PdfError* pdf_deserialize_dict(
 //             TestDeserializeObjectsStruct,
 //             "Boolean",
 //             boolean,
-//             PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_BOOLEAN)
+//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
 //         ),
 //         PDF_FIELD(
 //             TestDeserializeObjectsStruct,
 //             "Integer",
 //             integer,
-//             PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
 //         ),
 //         PDF_FIELD(
 //             TestDeserializeObjectsStruct,
 //             "Real",
 //             real,
-//             PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_REAL)
+//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_REAL)
 //         ),
 //         PDF_FIELD(
 //             TestDeserializeObjectsStruct,
 //             "String",
 //             string,
-//             PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STRING)
+//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
 //         ),
 //         PDF_FIELD(
 //             TestDeserializeObjectsStruct,
 //             "Name",
 //             name,
-//             PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
 //         ),
 //         PDF_FIELD(
 //             TestDeserializeObjectsStruct,
 //             "Array",
 //             array,
-//             PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_ARRAY)
+//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_ARRAY)
 //         ),
 //         PDF_FIELD(
 //             TestDeserializeObjectsStruct,
 //             "Dict",
 //             dict,
-//             PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_DICT)
+//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
 //         ),
 //         PDF_FIELD(
 //             TestDeserializeObjectsStruct,
 //             "Stream",
 //             stream,
-//             PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STREAM)
+//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STREAM)
 //         ),
 //         PDF_FIELD(
 //             TestDeserializeObjectsStruct,
 //             "IndirectRef",
 //             indirect_ref,
-//             PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INDIRECT_REF)
+//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INDIRECT_REF)
 //         )
 //     };
 
@@ -702,13 +749,13 @@ PdfError* pdf_deserialize_dict(
 //             TestDeserializeInnerStruct,
 //             "Hello",
 //             hello,
-//             PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
 //         ),
 //         PDF_FIELD(
 //             TestDeserializeInnerStruct,
 //             "World",
 //             world,
-//             PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
 //         )
 //     };
 
@@ -800,7 +847,7 @@ PdfError* pdf_deserialize_dict(
 //         TestDeserializeInlineStruct,
 //         "Inner",
 //         inner,
-//         PDF_CUSTOM_FIELD(deserialize_test_inner_struct_untyped)
+//         PDF_DESERDE_CUSTOM(deserialize_test_inner_struct_untyped)
 //     )};
 
 //     DESERIALIZER_IMPL_HELPER();
@@ -862,9 +909,9 @@ PdfError* pdf_deserialize_dict(
 //         TestDeserializeInlineOptional,
 //         "Inner",
 //         inner,
-//         PDF_OPTIONAL_FIELD(
+//         PDF_DESERDE_OPTIONAL(
 //             TestDeserializeInnerOptional,
-//             PDF_CUSTOM_FIELD(deserialize_test_inner_struct_untyped)
+//             PDF_DESERDE_CUSTOM(deserialize_test_inner_struct_untyped)
 //         )
 //     )};
 
@@ -943,7 +990,7 @@ PdfError* pdf_deserialize_dict(
 //             PDF_ARRAY_FIELD(
 //                 DeserializeTestStringArray,
 //                 PdfString,
-//                 PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STRING)
+//                 PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
 //             )
 //         ),
 //         PDF_FIELD(
@@ -953,7 +1000,7 @@ PdfError* pdf_deserialize_dict(
 //             PDF_ARRAY_FIELD(
 //                 DeserializeTestIntegerArray,
 //                 PdfInteger,
-//                 PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+//                 PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
 //             )
 //         )
 //     };
@@ -1024,7 +1071,7 @@ PdfError* pdf_deserialize_dict(
 //         PDF_ARRAY_FIELD(
 //             DeserializeTestStructArray,
 //             TestDeserializeInnerStruct,
-//             PDF_CUSTOM_FIELD(deserialize_test_inner_struct_untyped)
+//             PDF_DESERDE_CUSTOM(deserialize_test_inner_struct_untyped)
 //         )
 //     )};
 

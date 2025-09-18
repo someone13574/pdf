@@ -9,38 +9,46 @@
 
 PdfError* pdf_deserialize_catalog(
     const PdfObject* object,
-    Arena* arena,
+    PdfCatalog* target_ptr,
     PdfOptionalResolver resolver,
-    PdfCatalog* deserialized
+    Arena* arena
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(target_ptr);
     RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(deserialized);
+    RELEASE_ASSERT(arena);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
-            PdfCatalog,
             "Type",
-            type,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+            &target_ptr->type,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
         ),
-        PDF_FIELD(PdfCatalog, "Pages", pages, PDF_REF_FIELD(PdfPageTreeNodeRef))
+        PDF_FIELD(
+            "Pages",
+            &target_ptr->pages,
+            PDF_DESERDE_RESOLVABLE(pdf_page_tree_node_ref_init)
+        )
     };
 
-    deserialized->raw_dict = object;
+    target_ptr->raw_dict = object;
     PDF_PROPAGATE(pdf_deserialize_dict(
-        deserialized,
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
-        arena,
-        resolver,
         false,
+        resolver,
+        arena,
         "PdfCatelog"
     ));
 
     return NULL;
 }
 
-PDF_DESERIALIZABLE_REF_IMPL(PdfCatalog, catalog, pdf_deserialize_catalog)
+DESERDE_IMPL_RESOLVABLE(
+    PdfCatalogRef,
+    PdfCatalog,
+    pdf_catalog_ref_init,
+    pdf_resolve_catalog,
+    pdf_deserialize_catalog
+)
