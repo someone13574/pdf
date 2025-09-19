@@ -52,3 +52,8 @@ typedef struct {
 } GraphicsState;
 
 GraphicsState graphics_state_default(void);
+
+#define DLINKED_NAME GraphicsStateStack
+#define DLINKED_LOWERCASE_NAME graphics_state_stack
+#define DLINKED_TYPE GraphicsState
+#include "arena/dlinked_decl.h"

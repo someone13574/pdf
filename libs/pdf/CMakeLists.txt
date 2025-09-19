@@ -12,7 +12,6 @@ add_library(pdf
     src/fonts/font_widths.c
     src/fonts/cmap.c
     src/fonts/cmap_paths.c
-    src/deserde_types.c
     src/object.c
     src/page.c
     src/pdf.c
@@ -21,6 +20,7 @@ add_library(pdf
     src/ctx.c
     src/deserialize.c
     src/test_helpers.c
+    src/xobject.c
     src/xref.c)
 target_include_directories(pdf PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(pdf PUBLIC arena pdf-error)

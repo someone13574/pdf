@@ -20,23 +20,16 @@ typedef struct {
     /// the character collection. This value shall not be used in determining
     /// compatibility between character collections.
     PdfInteger supplement;
-
-    const PdfObject* raw_dict;
 } PdfCIDSystemInfo;
 
 PdfError* pdf_deserialize_cid_system_info(
     const PdfObject* object,
-    Arena* arena,
+    PdfCIDSystemInfo* target_ptr,
     PdfOptionalResolver resolver,
-    PdfCIDSystemInfo* deserialized
+    Arena* arena
 );
 
-PdfError* pdf_deserialize_cid_system_info_wrapper(
-    const PdfObject* object,
-    Arena* arena,
-    PdfOptionalResolver resolver,
-    void* deserialized
-);
+DESERDE_DECL_TRAMPOLINE(pdf_deserialize_cid_system_info_trampoline)
 
 typedef struct PdfCMap PdfCMap;
 

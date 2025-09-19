@@ -4,6 +4,11 @@
 #include "geom/mat3.h"
 #include "text_state.h"
 
+#define DLINKED_NAME GraphicsStateStack
+#define DLINKED_LOWERCASE_NAME graphics_state_stack
+#define DLINKED_TYPE GraphicsState
+#include "arena/dlinked_impl.h"
+
 GraphicsState graphics_state_default(void) {
     return (GraphicsState
     ) {.ctm = geom_mat3_identity(),

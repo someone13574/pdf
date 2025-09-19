@@ -1,5 +1,7 @@
 #include "render/render.h"
 
+#include <stdio.h>
+
 #include "arena/arena.h"
 #include "canvas/canvas.h"
 #include "geom/mat3.h"
@@ -13,24 +15,55 @@
 #include "pdf/fonts/font.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf/types.h"
 #include "pdf_error/error.h"
 #include "text_state.h"
 
 #define SCALE (25.4 / 72.0) // TODO: Load user-space units for conversion factor
 
 typedef struct {
-    GraphicsState graphics_state;
+    GraphicsStateStack* graphics_state_stack; // idx 0 == top
     TextObjectState text_object_state;
 
     PdfCMapCache* cmap_cache;
 } RenderState;
 
+static GraphicsState* current_graphics_state(RenderState* state) {
+    RELEASE_ASSERT(state);
+
+    GraphicsState* gstate = NULL;
+    RELEASE_ASSERT(
+        graphics_state_stack_get_ptr(state->graphics_state_stack, 0, &gstate)
+    );
+    return gstate;
+}
+
+static void save_graphics_state(RenderState* state) {
+    RELEASE_ASSERT(state);
+
+    graphics_state_stack_push_front(
+        state->graphics_state_stack,
+        *current_graphics_state(state)
+    );
+}
+
+static PdfError* restore_graphics_state(RenderState* state) {
+    RELEASE_ASSERT(state);
+
+    if (!graphics_state_stack_pop_front(state->graphics_state_stack, NULL)) {
+        return PDF_ERROR(
+            PDF_ERR_RENDER_GSTATE_CANNOT_RESTORE,
+            "GState stack underflow"
+        );
+    }
+
+    return NULL;
+}
+
 static PdfError* process_content_stream(
     Arena* arena,
     RenderState* state,
     PdfContentStream* content_stream,
-    const PdfOpResources* resources,
+    const PdfResourcesOptional* resources,
     PdfOptionalResolver resolver,
     Canvas* canvas
 ) {
@@ -49,14 +82,22 @@ static PdfError* process_content_stream(
         );
 
         switch (op.kind) {
+            case PDF_CONTENT_OP_SAVE_GSTATE: {
+                save_graphics_state(state);
+                break;
+            }
+            case PDF_CONTENT_OP_RESTORE_GSTATE: {
+                PDF_PROPAGATE(restore_graphics_state(state));
+                break;
+            }
             case PDF_CONTENT_OP_SET_CTM: {
-                state->graphics_state.ctm = geom_mat3_new_pdf(
-                    pdf_number_as_real(op.data.set_matrix.a),
-                    pdf_number_as_real(op.data.set_matrix.b),
-                    pdf_number_as_real(op.data.set_matrix.c),
-                    pdf_number_as_real(op.data.set_matrix.d),
-                    pdf_number_as_real(op.data.set_matrix.e),
-                    pdf_number_as_real(op.data.set_matrix.f)
+                current_graphics_state(state)->ctm = geom_mat3_new_pdf(
+                    pdf_number_as_real(op.data.set_ctm.a),
+                    pdf_number_as_real(op.data.set_ctm.b),
+                    pdf_number_as_real(op.data.set_ctm.c),
+                    pdf_number_as_real(op.data.set_ctm.d),
+                    pdf_number_as_real(op.data.set_ctm.e),
+                    pdf_number_as_real(op.data.set_ctm.f)
                 );
                 break;
             }
@@ -76,8 +117,9 @@ static PdfError* process_content_stream(
                     pdf_number_as_real(op.data.set_font.size)
                 );
 
-                RELEASE_ASSERT(resources->discriminant);
-                RELEASE_ASSERT(resources->value.font.discriminant);
+                RELEASE_ASSERT(resources->has_value
+                ); // TODO: This should be an error, and ideally a function
+                RELEASE_ASSERT(resources->value.font.has_value);
 
                 PdfObject* font_object = pdf_dict_get(
                     &resources->value.font.value,
@@ -86,45 +128,45 @@ static PdfError* process_content_stream(
 
                 PDF_PROPAGATE(pdf_deserialize_font(
                     font_object,
-                    arena,
+                    &current_graphics_state(state)->text_state.text_font,
                     resolver,
-                    &state->graphics_state.text_state.text_font
+                    arena
                 ));
-                state->graphics_state.text_state.text_font_size =
+                current_graphics_state(state)->text_state.text_font_size =
                     pdf_number_as_real(op.data.set_font.size);
-                state->graphics_state.text_state.font_set = true;
+                current_graphics_state(state)->text_state.font_set = true;
 
                 break;
             }
-            case PDF_CONTENT_OP_NEXT_LINE: {
-                GeomMat3 transform = geom_mat3_new(
-                    1.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    1.0,
-                    0.0,
-                    pdf_number_as_real(op.data.next_line.t_x),
-                    pdf_number_as_real(op.data.next_line.t_y),
-                    1.0
-                );
+            // case PDF_CONTENT_OP_NEXT_LINE: {
+            //     GeomMat3 transform = geom_mat3_new(
+            //         1.0,
+            //         0.0,
+            //         0.0,
+            //         0.0,
+            //         1.0,
+            //         0.0,
+            //         pdf_number_as_real(op.data.next_line.t_x),
+            //         pdf_number_as_real(op.data.next_line.t_y),
+            //         1.0
+            //     );
 
-                state->text_object_state.text_matrix = geom_mat3_mul(
-                    transform,
-                    state->text_object_state.text_line_matrix
-                );
-                state->text_object_state.text_line_matrix =
-                    state->text_object_state.text_matrix;
-                break;
-            }
-            case PDF_CONTENT_OP_SET_TM: {
+            //     state->text_object_state.text_matrix = geom_mat3_mul(
+            //         transform,
+            //         state->text_object_state.text_line_matrix
+            //     );
+            //     state->text_object_state.text_line_matrix =
+            //         state->text_object_state.text_matrix;
+            //     break;
+            // }
+            case PDF_CONTENT_OP_SET_TEXT_MATRIX: {
                 state->text_object_state.text_matrix = geom_mat3_new_pdf(
-                    pdf_number_as_real(op.data.set_matrix.a),
-                    pdf_number_as_real(op.data.set_matrix.b),
-                    pdf_number_as_real(op.data.set_matrix.c),
-                    pdf_number_as_real(op.data.set_matrix.d),
-                    pdf_number_as_real(op.data.set_matrix.e),
-                    pdf_number_as_real(op.data.set_matrix.f)
+                    pdf_number_as_real(op.data.set_text_matrix.a),
+                    pdf_number_as_real(op.data.set_text_matrix.b),
+                    pdf_number_as_real(op.data.set_text_matrix.c),
+                    pdf_number_as_real(op.data.set_text_matrix.d),
+                    pdf_number_as_real(op.data.set_text_matrix.e),
+                    pdf_number_as_real(op.data.set_text_matrix.f)
                 );
                 state->text_object_state.text_line_matrix =
                     state->text_object_state.text_matrix;
@@ -136,10 +178,10 @@ static PdfError* process_content_stream(
                     canvas,
                     resolver,
                     state->cmap_cache,
-                    state->graphics_state.ctm,
-                    &state->graphics_state.text_state,
+                    current_graphics_state(state)->ctm,
+                    &current_graphics_state(state)->text_state,
                     &state->text_object_state,
-                    op.data.show_text.text
+                    op.data.show_text
                 ));
 
                 break;
@@ -148,8 +190,41 @@ static PdfError* process_content_stream(
                 // TODO: colors
                 break;
             }
+            // case PDF_CONTENT_OP_PAINT_XOBJECT: {
+            //     RELEASE_ASSERT(resources->has_value);
+            //     RELEASE_ASSERT(resources->value.xobject.has_value);
+
+            //     PdfObject* xobject_object = pdf_dict_get(
+            //         &resources->value.xobject.value,
+            //         op.data.paint_xobject.xobject
+            //     );
+
+            //     PdfXObject xobject;
+            //     PDF_PROPAGATE(pdf_deserialize_xobject(
+            //         xobject_object,
+            //         &xobject,
+            //         resolver,
+            //         arena
+            //     ));
+
+            //     switch (xobject.type) {
+            //         case PDF_XOBJECT_IMAGE: {
+            //             LOG_TODO();
+            //         }
+            //         case PDF_XOBJECT_FORM: {
+            //             // PdfFormXObject* form = &xobject.data.form;
+
+            //             save_graphics_state(state);
+            //             // TODO: apply matrix, clip with bbox
+
+            //             PDF_PROPAGATE(restore_graphics_state(state));
+            //         }
+            //     }
+
+            //     break;
+            // }
             default: {
-                LOG_TODO("Unimplemented content operation %d", op.kind);
+                LOG_TODO("Unimplemented render content operation %d", op.kind);
             }
         }
     }
@@ -181,12 +256,17 @@ PdfError* render_page(
     );
 
     RenderState state = {
-        .graphics_state = graphics_state_default(),
+        .graphics_state_stack = graphics_state_stack_new(arena),
         .text_object_state = text_object_state_default(),
         .cmap_cache = pdf_cmap_cache_new(arena)
     };
 
-    state.graphics_state.ctm = geom_mat3_mul(
+    graphics_state_stack_push_back(
+        state.graphics_state_stack,
+        graphics_state_default()
+    );
+
+    current_graphics_state(&state)->ctm = geom_mat3_mul(
         geom_mat3_translate(-rect.min.x * SCALE, -rect.min.y * SCALE),
         geom_mat3_new(
             SCALE,
@@ -208,21 +288,27 @@ PdfError* render_page(
         0xffffffff
     );
 
-    if (page->contents.discriminant) {
+    if (page->contents.has_value) {
         for (size_t contents_idx = 0;
-             contents_idx < pdf_void_vec_len(page->contents.value.elements);
+             contents_idx
+             < pdf_content_stream_ref_vec_len(page->contents.value);
              contents_idx++) {
-            void* content_ptr;
-            RELEASE_ASSERT(pdf_void_vec_get(
-                page->contents.value.elements,
+            PdfContentStreamRef stream_ref;
+            RELEASE_ASSERT(pdf_content_stream_ref_vec_get(
+                page->contents.value,
                 contents_idx,
-                &content_ptr
+                &stream_ref
             ));
-            PdfStream* content = content_ptr;
+
+            RELEASE_ASSERT(resolver.present);
+            RELEASE_ASSERT(resolver.resolver);
 
             PdfContentStream stream;
-            PDF_REQUIRE(pdf_deserialize_content_stream(content, arena, &stream)
-            );
+            PDF_PROPAGATE(pdf_resolve_content_stream(
+                stream_ref,
+                resolver.resolver,
+                &stream
+            ));
 
             PDF_PROPAGATE(process_content_stream(
                 arena,

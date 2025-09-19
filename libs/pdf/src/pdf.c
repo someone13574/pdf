@@ -120,9 +120,9 @@ PdfError* pdf_get_trailer(PdfResolver* resolver, PdfTrailer* trailer) {
 
     PDF_PROPAGATE(pdf_deserialize_trailer(
         trailer_dict,
-        resolver->arena,
+        trailer,
         pdf_op_resolver_some(resolver),
-        trailer
+        resolver->arena
     ));
 
     resolver->trailer = arena_alloc(resolver->arena, sizeof(PdfTrailer));
@@ -142,7 +142,7 @@ PdfError* pdf_get_catalog(PdfResolver* resolver, PdfCatalog* catalog) {
 
     PdfTrailer trailer;
     PDF_PROPAGATE(pdf_get_trailer(resolver, &trailer));
-    PDF_PROPAGATE(pdf_resolve_catalog(&trailer.root, resolver, catalog));
+    PDF_PROPAGATE(pdf_resolve_catalog(trailer.root, resolver, catalog));
 
     resolver->catalog = arena_alloc(resolver->arena, sizeof(PdfCatalog));
     *resolver->catalog = *catalog;
@@ -174,6 +174,44 @@ PdfError* pdf_resolve_ref(
     );
     *resolved = *entry->object;
 
+    return NULL;
+}
+
+PdfError* pdf_resolve_object(
+    PdfOptionalResolver resolver,
+    const PdfObject* object,
+    PdfObject* resolved
+) {
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(resolved);
+
+    if (object->type == PDF_OBJECT_TYPE_INDIRECT_OBJECT
+        && resolver.unwrap_indirect_objs) {
+        LOG_DIAG(TRACE, PDF, "Unwrapping indirect object");
+        return pdf_resolve_object(
+            resolver,
+            object->data.indirect_object.object,
+            resolved
+        );
+    }
+
+    if (object->type == PDF_OBJECT_TYPE_INDIRECT_REF && resolver.present) {
+        LOG_DIAG(TRACE, PDF, "Resolving indirect reference");
+
+        PdfObject indirect_object;
+        PDF_PROPAGATE(pdf_resolve_ref(
+            resolver.resolver,
+            object->data.indirect_ref,
+            &indirect_object
+        ));
+
+        return pdf_resolve_object(resolver, &indirect_object, resolved);
+    }
+
+    LOG_DIAG(TRACE, PDF, "Resolved type is %d", object->type);
+
+    *resolved = *object;
     return NULL;
 }
 

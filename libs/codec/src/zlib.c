@@ -110,6 +110,7 @@ PdfError* decode_zlib_data(
     printf("%.*s\n", (int)decoded_len, raw_decoded);
 
     Adler32Sum stored_checksum;
+    bitstream_align_byte(&bitstream);
     PDF_PROPAGATE(bitstream_read_n(&bitstream, 32, &stored_checksum));
     adler32_swap_endianness(&stored_checksum);
 
