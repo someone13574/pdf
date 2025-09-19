@@ -153,7 +153,6 @@ PdfError* pdf_deserialize_xobject(
         );
     }
 
-    target_ptr->raw_object = object;
     PDF_PROPAGATE(pdf_deserialize_dict(
         resolved.data.stream.stream_dict->raw_dict,
         fields,

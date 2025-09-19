@@ -74,7 +74,6 @@ PdfError* pdf_deserialize_cid_font(
         )
     };
 
-    target_ptr->raw_dict = object;
     PDF_PROPAGATE(pdf_deserialize_dict(
         object,
         fields,
@@ -151,7 +150,6 @@ PdfError* pdf_deserialize_type0_font(
         )
     };
 
-    target_ptr->raw_dict = object;
     PDF_PROPAGATE(pdf_deserialize_dict(
         object,
         fields,

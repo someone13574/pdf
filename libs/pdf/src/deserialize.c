@@ -216,6 +216,10 @@ static PdfError* deserialize_array(
             element_target_ptr = first_element_ptr;
             first_element_ptr = NULL;
         } else {
+            if (idx == 0) {
+                *(void**)target_ptr = NULL;
+            }
+
             element_target_ptr =
                 deserde_info.vec_push_uninit(target_ptr, arena);
         }
@@ -252,21 +256,20 @@ static PdfError* deserialize_as_array(
 
     LOG_DIAG(TRACE, DESERDE, "Deserializing as-array");
 
+    *(void**)target_ptr = NULL;
+
     // Attempt unwrapped-element deserialization first
     void* element_target_ptr = deserde_info.vec_push_uninit(target_ptr, arena);
-    PdfError* unwrapped_deserde_err = PDF_ERROR_ADD_CONTEXT(deserialize(
+    PdfError* unwrapped_deserde_err = deserialize(
         object,
         element_target_ptr,
         *deserde_info.element_deserde_info,
         resolver,
         arena
-    ));
+    );
 
     if (!unwrapped_deserde_err) {
         LOG_DIAG(TRACE, DESERDE, "Deserialized single element as array");
-
-        // Unwrapped-element deserialization was successful.
-        pdf_error_free(unwrapped_deserde_err);
         return NULL;
     }
 
@@ -513,13 +516,11 @@ PdfError* pdf_deserialize_dict(
 
 PdfError* pdf_deserialize_operands(
     const PdfObjectVec* operands,
-    void* target_ptr,
     const PdfOperandDescriptor* descriptors,
     size_t num_descriptors,
     Arena* arena
 ) {
     RELEASE_ASSERT(operands);
-    RELEASE_ASSERT(target_ptr);
     RELEASE_ASSERT(descriptors);
     RELEASE_ASSERT(arena);
 
@@ -568,7 +569,6 @@ PdfError* pdf_deserialize_operands(
 
 #define DESERIALIZER_IMPL_HELPER()                                             \
     do {                                                                       \
-        deserialized->raw_dict = object;                                       \
         PDF_PROPAGATE(pdf_deserialize_dict(                                    \
             object,                                                            \
             fields,                                                            \
@@ -603,7 +603,6 @@ typedef struct {
     PdfDict dict;
     PdfStream stream;
     PdfIndirectRef indirect_ref;
-    const PdfObject* raw_dict;
 } TestDeserializeObjectsStruct;
 
 PdfError* deserialize_test_objects_struct(
@@ -745,7 +744,6 @@ TEST_FUNC(test_deserialize_objects) {
 typedef struct {
     PdfName hello;
     PdfInteger world;
-    const PdfObject* raw_dict;
 } TestDeserializeInnerStruct;
 
 PdfError* deserialize_test_inner_struct(
@@ -792,7 +790,6 @@ DESERDE_IMPL_RESOLVABLE(
 
 typedef struct {
     TestDeserializeInnerStructRef reference;
-    const PdfObject* raw_dict;
 } TestDeserializeRefStruct;
 
 PdfError* deserialize_test_ref_struct(
@@ -845,7 +842,6 @@ TEST_FUNC(test_deserialize_ref) {
 
 typedef struct {
     TestDeserializeInnerStruct inner;
-    const PdfObject* raw_dict;
 } TestDeserializeInlineStruct;
 
 PdfError* deserialize_test_inline_struct(
@@ -912,7 +908,6 @@ DESERDE_IMPL_OPTIONAL(
 
 typedef struct {
     TestDeserializeInnerOptional inner;
-    const PdfObject* raw_dict;
 } TestDeserializeInlineOptional;
 
 PdfError* deserialize_test_inline_optional(
@@ -995,7 +990,6 @@ TEST_FUNC(test_deserialize_inline_optional_none) {
 typedef struct {
     DeserializeTestStringArray* strings;
     DeserializeTestIntegerArray* integers;
-    const PdfObject* raw_dict;
 } TestDeserializePrimitiveArrays;
 
 PdfError* deserialize_test_primitive_arrays(
@@ -1091,7 +1085,6 @@ TEST_FUNC(test_deserialize_primitive_arrays) {
 
 typedef struct {
     DeserializeTestStructArray* inners;
-    const PdfObject* raw_dict;
 } TestDeserializeTestComplexArray;
 
 PdfError* deserialize_test_complex_array(

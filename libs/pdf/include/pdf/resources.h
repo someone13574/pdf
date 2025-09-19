@@ -36,8 +36,6 @@ typedef struct {
     /// (Optional) An array of predefined procedure set names (see 14.2,
     /// "Procedure Sets").
     PdfNameVecOptional proc_set;
-
-    const PdfObject* raw_dict;
 } PdfResources;
 
 PdfError* pdf_deserialize_resources(

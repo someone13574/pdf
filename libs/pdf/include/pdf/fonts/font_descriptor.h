@@ -104,8 +104,6 @@ typedef struct {
     /// only indication of a font subset shall be the subset tag in the FontName
     /// entry (see 9.6.4, "Font Subsets").
     PdfStringOptional char_set;
-
-    const PdfObject* raw_dict;
 } PdfFontDescriptor;
 
 PdfError* pdf_deserialize_font_descriptor(

@@ -145,7 +145,6 @@ typedef struct {
 /// references.
 PdfError* pdf_deserialize_operands(
     const PdfObjectVec* operands,
-    void* target_ptr,
     const PdfOperandDescriptor* descriptors,
     size_t num_descriptors,
     Arena* arena

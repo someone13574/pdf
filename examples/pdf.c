@@ -8,7 +8,6 @@
 #include "canvas/canvas.h"
 #include "logger/log.h"
 #include "pdf/catalog.h"
-#include "pdf/object.h"
 #include "pdf/page.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
@@ -62,7 +61,8 @@ int main(int argc, char** argv) {
 
     size_t buffer_size;
     char* buffer =
-        load_file_to_buffer(arena, "test-files/wiki.pdf", &buffer_size);
+        load_file_to_buffer(arena, "test-files/embedded.pdf", &buffer_size);
+    RELEASE_ASSERT(buffer);
 
     PdfResolver* resolver;
     PDF_REQUIRE(
@@ -71,8 +71,6 @@ int main(int argc, char** argv) {
 
     PdfCatalog catalog;
     PDF_REQUIRE(pdf_get_catalog(resolver, &catalog));
-
-    printf("%s\n", pdf_fmt_object(arena, catalog.raw_dict));
 
     PdfPageTreeNode page_tree_root;
     PDF_REQUIRE(
@@ -87,8 +85,6 @@ int main(int argc, char** argv) {
 
         PdfPage page;
         PDF_REQUIRE(pdf_resolve_page(page_ref, resolver, &page));
-
-        printf("%s\n", pdf_fmt_object(arena, page.raw_dict));
 
         Canvas* canvas = NULL;
         PDF_REQUIRE(

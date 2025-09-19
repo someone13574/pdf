@@ -24,8 +24,6 @@ typedef struct {
 typedef struct {
     /// Lookup table for widths by CID
     PdfFontWidthVec* cid_to_width;
-
-    const PdfObject* raw_dict;
 } PdfFontWidths;
 
 DESERDE_DECL_OPTIONAL(

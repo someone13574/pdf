@@ -21,8 +21,6 @@ typedef struct {
     PdfContentsStreamRefVecOptional contents;
     PdfIntegerOptional rotate;
     PdfDictOptional group;
-
-    const PdfObject* raw_dict;
 } PdfPage;
 
 PdfError* pdf_deserialize_page(
@@ -50,8 +48,6 @@ struct PdfPageTreeNode {
     PdfPageRefVec*
         kids; // TODO: Proper tree (support page tree node nodes, inheritance)
     PdfInteger count;
-
-    const PdfObject* raw_dict;
 };
 
 PdfError* pdf_deserialize_page_tree_node(

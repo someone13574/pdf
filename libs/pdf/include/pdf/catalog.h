@@ -9,7 +9,6 @@
 typedef struct {
     PdfName type;
     PdfPageTreeNodeRef pages;
-    const PdfObject* raw_dict;
 } PdfCatalog;
 
 PdfError* pdf_deserialize_catalog(

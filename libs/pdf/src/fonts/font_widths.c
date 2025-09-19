@@ -28,8 +28,6 @@ PdfError* pdf_deserialize_font_widths(
         deserialized->cid_to_width = pdf_font_width_vec_new(arena);
     }
 
-    deserialized->raw_dict = object;
-
     PdfObject resolved_object;
     pdf_resolve_object(resolver, object, &resolved_object);
 

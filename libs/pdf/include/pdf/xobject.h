@@ -94,9 +94,6 @@ typedef struct {
     union {
         PdfFormXObject form;
     } data;
-
-    // Raw stream object or reference to stream object
-    const PdfObject* raw_object;
 } PdfXObject;
 
 PdfError* pdf_deserialize_xobject(

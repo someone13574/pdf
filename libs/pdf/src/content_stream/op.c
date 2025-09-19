@@ -1,5 +1,8 @@
 #include "op.h"
 
+#include <stdbool.h>
+
+#include "../deserialize.h"
 #include "arena/arena.h"
 #include "logger/log.h"
 #include "operator.h"
@@ -12,381 +15,183 @@
 #define DVEC_TYPE PdfContentOp
 #include "arena/dvec_impl.h"
 
-// static PdfContentOp*
-// new_queue_op(PdfContentOpVec* operation_queue, PdfContentOpKind op) {
-//     return pdf_content_op_vec_push(
-//         operation_queue,
-//         (PdfContentOp) {.kind = op}
-//     );
-// }
+static PdfContentOp*
+new_queue_op(PdfContentOpVec* operation_queue, PdfContentOpKind op) {
+    return pdf_content_op_vec_push(
+        operation_queue,
+        (PdfContentOp) {.kind = op}
+    );
+}
 
-// static PdfError* pdf_deserialize_set_line_width_op(
-//     const PdfObjectVec* operands,
-//     Arena* arena,
-//     PdfContentOpSetLineWidth* deserialized
-// ) {
-//     RELEASE_ASSERT(operands);
-//     RELEASE_ASSERT(arena);
-//     RELEASE_ASSERT(deserialized);
+static PdfError* deserialize_set_matrix(
+    PdfMatrix* target,
+    const PdfObjectVec* operands,
+    Arena* arena
+) {
+    RELEASE_ASSERT(target);
+    RELEASE_ASSERT(operands);
+    RELEASE_ASSERT(arena);
 
-//     PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
-//         PdfContentOpSetLineWidth,
-//         width,
-//         PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//     )};
-//     return pdf_deserialize_operands(
-//         deserialized,
-//         descriptors,
-//         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-//         operands,
-//         arena
-//     );
-// }
+    PdfOperandDescriptor descriptors[] = {
+        PDF_OPERAND(
+            &target->a,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+        ),
+        PDF_OPERAND(
+            &target->b,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+        ),
+        PDF_OPERAND(
+            &target->c,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+        ),
+        PDF_OPERAND(
+            &target->d,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+        ),
+        PDF_OPERAND(
+            &target->e,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+        ),
+        PDF_OPERAND(
+            &target->f,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+        )
+    };
 
-// static PdfError* pdf_deserialize_set_gstate_op(
-//     const PdfObjectVec* operands,
-//     Arena* arena,
-//     PdfContentOpSetGState* deserialized
-// ) {
-//     RELEASE_ASSERT(operands);
-//     RELEASE_ASSERT(arena);
-//     RELEASE_ASSERT(deserialized);
+    PDF_PROPAGATE(pdf_deserialize_operands(
+        operands,
+        descriptors,
+        sizeof(descriptors) / sizeof(PdfOperandDescriptor),
+        arena
+    ));
 
-//     PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
-//         PdfContentOpSetGState,
-//         name,
-//         PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-//     )};
-//     return pdf_deserialize_operands(
-//         deserialized,
-//         descriptors,
-//         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-//         operands,
-//         arena
-//     );
-// }
+    return NULL;
+}
 
-// static PdfError* pdf_deserialize_set_matrix_op(
-//     const PdfObjectVec* operands,
-//     Arena* arena,
-//     PdfContentOpSetMatrix* deserialized
-// ) {
-//     RELEASE_ASSERT(operands);
-//     RELEASE_ASSERT(arena);
-//     RELEASE_ASSERT(deserialized);
+static PdfError* deserialize_set_font(
+    PdfContentOpVec* operation_queue,
+    const PdfObjectVec* operands,
+    Arena* arena
+) {
+    RELEASE_ASSERT(operation_queue);
+    RELEASE_ASSERT(operands);
+    RELEASE_ASSERT(arena);
 
-//     PdfOperandDescriptor descriptors[] = {
-//         PDF_OPERAND(
-//             PdfContentOpSetMatrix,
-//             a,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         ),
-//         PDF_OPERAND(
-//             PdfContentOpSetMatrix,
-//             b,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         ),
-//         PDF_OPERAND(
-//             PdfContentOpSetMatrix,
-//             c,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         ),
-//         PDF_OPERAND(
-//             PdfContentOpSetMatrix,
-//             d,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         ),
-//         PDF_OPERAND(
-//             PdfContentOpSetMatrix,
-//             e,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         ),
-//         PDF_OPERAND(
-//             PdfContentOpSetMatrix,
-//             f,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         )
-//     };
-//     return pdf_deserialize_operands(
-//         deserialized,
-//         descriptors,
-//         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-//         operands,
-//         arena
-//     );
-// }
+    PdfContentOp* queue_op =
+        new_queue_op(operation_queue, PDF_CONTENT_OP_SET_FONT);
 
-// static PdfError* pdf_deserialize_draw_rect_op(
-//     const PdfObjectVec* operands,
-//     Arena* arena,
-//     PdfContentOpDrawRect* deserialized
-// ) {
-//     RELEASE_ASSERT(operands);
-//     RELEASE_ASSERT(arena);
-//     RELEASE_ASSERT(deserialized);
+    PdfOperandDescriptor descriptors[] = {
+        PDF_OPERAND(
+            &queue_op->data.set_font.font,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+        ),
+        PDF_OPERAND(
+            &queue_op->data.set_gray.gray,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+        )
+    };
 
-//     PdfOperandDescriptor descriptors[] = {
-//         PDF_OPERAND(
-//             PdfContentOpDrawRect,
-//             x,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         ),
-//         PDF_OPERAND(
-//             PdfContentOpDrawRect,
-//             y,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         ),
-//         PDF_OPERAND(
-//             PdfContentOpDrawRect,
-//             width,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         ),
-//         PDF_OPERAND(
-//             PdfContentOpDrawRect,
-//             height,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         )
-//     };
-//     return pdf_deserialize_operands(
-//         deserialized,
-//         descriptors,
-//         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-//         operands,
-//         arena
-//     );
-// }
+    PDF_PROPAGATE(pdf_deserialize_operands(
+        operands,
+        descriptors,
+        sizeof(descriptors) / sizeof(PdfOperandDescriptor),
+        arena
+    ));
 
-// static PdfError* pdf_deserialize_set_font_op(
-//     const PdfObjectVec* operands,
-//     Arena* arena,
-//     PdfContentOpSetFont* deserialized
-// ) {
-//     RELEASE_ASSERT(operands);
-//     RELEASE_ASSERT(arena);
-//     RELEASE_ASSERT(deserialized);
+    return NULL;
+}
 
-//     PdfOperandDescriptor descriptors[] = {
-//         PDF_OPERAND(
-//             PdfContentOpSetFont,
-//             font,
-//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-//         ),
-//         PDF_OPERAND(
-//             PdfContentOpSetFont,
-//             size,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         )
-//     };
-//     return pdf_deserialize_operands(
-//         deserialized,
-//         descriptors,
-//         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-//         operands,
-//         arena
-//     );
-// }
+static PdfError* deserialize_positioned_text_op(
+    const PdfObjectVec* operands,
+    PdfContentOpVec* operation_queue
+) {
+    RELEASE_ASSERT(operands);
+    RELEASE_ASSERT(operation_queue);
 
-// static PdfError* pdf_deserialize_next_line_op(
-//     const PdfObjectVec* operands,
-//     Arena* arena,
-//     PdfContentOpNextLine* deserialized
-// ) {
-//     RELEASE_ASSERT(operands);
-//     RELEASE_ASSERT(arena);
-//     RELEASE_ASSERT(deserialized);
+    if (pdf_object_vec_len(operands) < 1) {
+        return PDF_ERROR(PDF_ERR_MISSING_OPERAND);
+    } else if (pdf_object_vec_len(operands) > 1) {
+        return PDF_ERROR(PDF_ERR_EXCESS_OPERAND);
+    }
 
-//     PdfOperandDescriptor descriptors[] = {
-//         PDF_OPERAND(
-//             PdfContentOpNextLine,
-//             t_x,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         ),
-//         PDF_OPERAND(
-//             PdfContentOpNextLine,
-//             t_y,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         )
-//     };
-//     return pdf_deserialize_operands(
-//         deserialized,
-//         descriptors,
-//         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-//         operands,
-//         arena
-//     );
-// }
+    PdfObject* array_object = NULL;
+    RELEASE_ASSERT(pdf_object_vec_get(operands, 0, &array_object));
 
-// static PdfError* pdf_deserialize_single_show_text_op(
-//     const PdfObjectVec* operands,
-//     Arena* arena,
-//     PdfContentOpShowText* deserialized
-// ) {
-//     RELEASE_ASSERT(operands);
-//     RELEASE_ASSERT(arena);
-//     RELEASE_ASSERT(deserialized);
+    if (array_object->type != PDF_OBJECT_TYPE_ARRAY) {
+        return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+    }
 
-//     PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
-//         PdfContentOpShowText,
-//         text,
-//         PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
-//     )};
-//     return pdf_deserialize_operands(
-//         deserialized,
-//         descriptors,
-//         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-//         operands,
-//         arena
-//     );
-// }
+    for (size_t idx = 0;
+         idx < pdf_object_vec_len(array_object->data.array.elements);
+         idx++) {
+        PdfObject* element = NULL;
+        RELEASE_ASSERT(
+            pdf_object_vec_get(array_object->data.array.elements, idx, &element)
+        );
 
-// static PdfError* pdf_deserialize_show_positioned_text_op(
-//     const PdfObjectVec* operands,
-//     PdfContentOpVec* operation_queue
-// ) {
-//     RELEASE_ASSERT(operands);
-//     RELEASE_ASSERT(operation_queue);
+        switch (element->type) {
+            case PDF_OBJECT_TYPE_STRING: {
+                PdfContentOp* new_op =
+                    new_queue_op(operation_queue, PDF_CONTENT_OP_SHOW_TEXT);
+                new_op->data.show_text = element->data.string;
+                break;
+            }
+            case PDF_OBJECT_TYPE_INTEGER: {
+                PdfContentOp* new_op =
+                    new_queue_op(operation_queue, PDF_CONTENT_OP_POSITION_TEXT);
+                new_op->data.position_text.type = PDF_NUMBER_TYPE_INTEGER;
+                new_op->data.position_text.value.integer =
+                    element->data.integer;
+                break;
+            }
+            case PDF_OBJECT_TYPE_REAL: {
+                PdfContentOp* new_op =
+                    new_queue_op(operation_queue, PDF_CONTENT_OP_POSITION_TEXT);
+                new_op->data.position_text.type = PDF_NUMBER_TYPE_REAL;
+                new_op->data.position_text.value.real = element->data.real;
+                break;
+            }
+            default: {
+                return PDF_ERROR(
+                    PDF_ERR_INCORRECT_TYPE,
+                    "Expected a string or number in positioned text array"
+                );
+            }
+        }
+    }
 
-//     if (pdf_object_vec_len(operands) < 1) {
-//         return PDF_ERROR(PDF_ERR_MISSING_OPERAND);
-//     } else if (pdf_object_vec_len(operands) > 1) {
-//         return PDF_ERROR(PDF_ERR_EXCESS_OPERAND);
-//     }
+    return NULL;
+}
 
-//     PdfObject* array_object = NULL;
-//     RELEASE_ASSERT(pdf_object_vec_get(operands, 0, &array_object));
+static PdfError* deserialize_set_gray(
+    bool stroking,
+    PdfContentOpVec* operation_queue,
+    const PdfObjectVec* operands,
+    Arena* arena
+) {
+    RELEASE_ASSERT(operation_queue);
+    RELEASE_ASSERT(operands);
+    RELEASE_ASSERT(arena);
 
-//     if (array_object->type != PDF_OBJECT_TYPE_ARRAY) {
-//         return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
-//     }
+    PdfContentOp* queue_op =
+        new_queue_op(operation_queue, PDF_CONTENT_OP_SET_GRAY);
+    queue_op->data.set_gray.stroking = stroking;
 
-//     for (size_t idx = 0;
-//          idx < pdf_object_vec_len(array_object->data.array.elements);
-//          idx++) {
-//         PdfObject* element = NULL;
-//         RELEASE_ASSERT(
-//             pdf_object_vec_get(array_object->data.array.elements, idx,
-//             &element)
-//         );
+    PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
+        &queue_op->data.set_gray.gray,
+        PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+    )};
 
-//         switch (element->type) {
-//             case PDF_OBJECT_TYPE_STRING: {
-//                 PdfContentOp* new_op =
-//                     new_queue_op(operation_queue, PDF_CONTENT_OP_SHOW_TEXT);
-//                 new_op->data.show_text.text = element->data.string;
-//                 break;
-//             }
-//             case PDF_OBJECT_TYPE_INTEGER: {
-//                 PdfContentOp* new_op =
-//                     new_queue_op(operation_queue,
-//                     PDF_CONTENT_OP_POSITION_TEXT);
-//                 new_op->data.position_text.translation.type =
-//                     PDF_NUMBER_TYPE_INTEGER;
-//                 new_op->data.position_text.translation.value.integer =
-//                     element->data.integer;
-//                 break;
-//             }
-//             case PDF_OBJECT_TYPE_REAL: {
-//                 PdfContentOp* new_op =
-//                     new_queue_op(operation_queue,
-//                     PDF_CONTENT_OP_POSITION_TEXT);
-//                 new_op->data.position_text.translation.type =
-//                     PDF_NUMBER_TYPE_REAL;
-//                 new_op->data.position_text.translation.value.real =
-//                     element->data.real;
-//                 break;
-//             }
-//             default: {
-//                 return PDF_ERROR(
-//                     PDF_ERR_INCORRECT_TYPE,
-//                     "Expected a string or number in positioned text array"
-//                 );
-//             }
-//         }
-//     }
+    PDF_PROPAGATE(pdf_deserialize_operands(
+        operands,
+        descriptors,
+        sizeof(descriptors) / sizeof(PdfOperandDescriptor),
+        arena
+    ));
 
-//     return NULL;
-// }
-
-// static PdfError* pdf_deserialize_set_gray_op(
-//     const PdfObjectVec* operands,
-//     Arena* arena,
-//     PdfContentOpSetGray* deserialized
-// ) {
-//     RELEASE_ASSERT(operands);
-//     RELEASE_ASSERT(arena);
-//     RELEASE_ASSERT(deserialized);
-
-//     PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
-//         PdfContentOpSetGray,
-//         gray,
-//         PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//     )};
-//     return pdf_deserialize_operands(
-//         deserialized,
-//         descriptors,
-//         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-//         operands,
-//         arena
-//     );
-// }
-
-// static PdfError* pdf_deserialize_set_rgb_op(
-//     const PdfObjectVec* operands,
-//     Arena* arena,
-//     PdfContentOpSetRGB* deserialized
-// ) {
-//     RELEASE_ASSERT(operands);
-//     RELEASE_ASSERT(arena);
-//     RELEASE_ASSERT(deserialized);
-
-//     PdfOperandDescriptor descriptors[] = {
-//         PDF_OPERAND(
-//             PdfContentOpSetRGB,
-//             r,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         ),
-//         PDF_OPERAND(
-//             PdfContentOpSetRGB,
-//             g,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         ),
-//         PDF_OPERAND(
-//             PdfContentOpSetRGB,
-//             b,
-//             PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-//         )
-//     };
-//     return pdf_deserialize_operands(
-//         deserialized,
-//         descriptors,
-//         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-//         operands,
-//         arena
-//     );
-// }
-
-// static PdfError* pdf_deserialize_paint_xobject_op(
-//     const PdfObjectVec* operands,
-//     Arena* arena,
-//     PdfContentOpPaintXObject* deserialized
-// ) {
-//     RELEASE_ASSERT(operands);
-//     RELEASE_ASSERT(arena);
-//     RELEASE_ASSERT(deserialized);
-
-//     PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
-//         PdfContentOpPaintXObject,
-//         xobject,
-//         PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-//     )};
-//     return pdf_deserialize_operands(
-//         deserialized,
-//         descriptors,
-//         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-//         operands,
-//         arena
-//     );
-// }
+    return NULL;
+}
 
 PdfError* pdf_deserialize_content_op(
     PdfOperator op,
@@ -398,162 +203,63 @@ PdfError* pdf_deserialize_content_op(
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(operation_queue);
 
-    (void)op;
-    LOG_TODO();
-
-    // switch (op) {
-    //     case PDF_OPERATOR_w: {
-    //         PdfContentOp* new_op =
-    //             new_queue_op(operation_queue, PDF_CONTENT_OP_SET_LINE_WIDTH);
-    //         LOG_TODO();
-    //         // return pdf_deserialize_set_line_width_op(
-    //         //     operands,
-    //         //     arena,
-    //         //     &new_op->data.set_line_width
-    //         // );
-    //     }
-    //     case PDF_OPERATOR_gs: {
-    //         PdfContentOp* new_op =
-    //             new_queue_op(operation_queue, PDF_CONTENT_OP_SET_GSTATE);
-    //         LOG_TODO();
-    //         // return pdf_deserialize_set_gstate_op(
-    //         //     operands,
-    //         //     arena,
-    //         //     &new_op->data.set_gstate
-    //         // );
-    //     }
-    //     case PDF_OPERATOR_q: {
-    //         new_queue_op(operation_queue, PDF_CONTENT_OP_SAVE_GSTATE);
-    //         return NULL;
-    //     }
-    //     case PDF_OPERATOR_Q: {
-    //         new_queue_op(operation_queue, PDF_CONTENT_OP_RESTORE_GSTATE);
-    //         return NULL;
-    //     }
-    //     case PDF_OPERATOR_cm: {
-    //         PdfContentOp* new_op =
-    //             new_queue_op(operation_queue, PDF_CONTENT_OP_SET_CTM);
-    //         LOG_TODO();
-    //         // return pdf_deserialize_set_matrix_op(
-    //         //     operands,
-    //         //     arena,
-    //         //     &new_op->data.set_matrix
-    //         // );
-    //     }
-    //     case PDF_OPERATOR_re: {
-    //         PdfContentOp* new_op =
-    //             new_queue_op(operation_queue, PDF_CONTENT_OP_DRAW_RECT);
-    //         LOG_TODO();
-    //         // return pdf_deserialize_draw_rect_op(
-    //         //     operands,
-    //         //     arena,
-    //         //     &new_op->data.draw_rect
-    //         // );
-    //     }
-    //     case PDF_OPERATOR_f: {
-    //         new_queue_op(operation_queue, PDF_CONTENT_OP_FILL);
-    //         return NULL;
-    //     }
-    //     case PDF_OPERATOR_BT: {
-    //         new_queue_op(operation_queue, PDF_CONTENT_OP_BEGIN_TEXT);
-    //         return NULL;
-    //     };
-    //     case PDF_OPERATOR_ET: {
-    //         new_queue_op(operation_queue, PDF_CONTENT_OP_END_TEXT);
-    //         return NULL;
-    //     };
-    //     case PDF_OPERATOR_Tf: {
-    //         PdfContentOp* new_op =
-    //             new_queue_op(operation_queue, PDF_CONTENT_OP_SET_FONT);
-    //         LOG_TODO();
-    //         // return pdf_deserialize_set_font_op(
-    //         //     operands,
-    //         //     arena,
-    //         //     &new_op->data.set_font
-    //         // );
-    //     }
-    //     case PDF_OPERATOR_Td: {
-    //         PdfContentOp* new_op =
-    //             new_queue_op(operation_queue, PDF_CONTENT_OP_NEXT_LINE);
-    //         LOG_TODO();
-    //         // return pdf_deserialize_next_line_op(
-    //         //     operands,
-    //         //     arena,
-    //         //     &new_op->data.next_line
-    //         // );
-    //     }
-    //     case PDF_OPERATOR_Tm: {
-    //         PdfContentOp* new_op =
-    //             new_queue_op(operation_queue, PDF_CONTENT_OP_SET_TM);
-    //         LOG_TODO();
-    //         // return pdf_deserialize_set_matrix_op(
-    //         //     operands,
-    //         //     arena,
-    //         //     &new_op->data.set_matrix
-    //         // );
-    //     }
-    //     case PDF_OPERATOR_Tj: {
-    //         PdfContentOp* new_op =
-    //             new_queue_op(operation_queue, PDF_CONTENT_OP_SHOW_TEXT);
-    //         LOG_TODO();
-    //         // return pdf_deserialize_single_show_text_op(
-    //         //     operands,
-    //         //     arena,
-    //         //     &new_op->data.show_text
-    //         // );
-    //     }
-    //     case PDF_OPERATOR_TJ: {
-    //         LOG_TODO();
-    //         // return pdf_deserialize_show_positioned_text_op(
-    //         //     operands,
-    //         //     operation_queue
-    //         // );
-    //     }
-    //     case PDF_OPERATOR_g: {
-    //         PdfContentOp* new_op =
-    //             new_queue_op(operation_queue, PDF_CONTENT_OP_SET_GRAY);
-    //         LOG_TODO();
-    //         new_op->data.set_gray.stroking = false;
-    //         // return pdf_deserialize_set_gray_op(
-    //         //     operands,
-    //         //     arena,
-    //         //     &new_op->data.set_gray
-    //         // );
-    //     }
-    //     case PDF_OPERATOR_RG: {
-    //         PdfContentOp* new_op =
-    //             new_queue_op(operation_queue, PDF_CONTENT_OP_SET_RGB);
-    //         LOG_TODO();
-    //         new_op->data.set_rgb.stroking = true;
-    //         // return pdf_deserialize_set_rgb_op(
-    //         //     operands,
-    //         //     arena,
-    //         //     &new_op->data.set_rgb
-    //         // );
-    //     }
-    //     case PDF_OPERATOR_rg: {
-    //         PdfContentOp* new_op =
-    //             new_queue_op(operation_queue, PDF_CONTENT_OP_SET_RGB);
-    //         LOG_TODO();
-    //         new_op->data.set_rgb.stroking = false;
-    //         // return pdf_deserialize_set_rgb_op(
-    //         //     operands,
-    //         //     arena,
-    //         //     &new_op->data.set_rgb
-    //         // );
-    //     }
-    //     case PDF_OPERATOR_Do: {
-    //         PdfContentOp* new_op =
-    //             new_queue_op(operation_queue, PDF_CONTENT_OP_PAINT_XOBJECT);
-    //         LOG_TODO();
-    //         // return pdf_deserialize_paint_xobject_op(
-    //         //     operands,
-    //         //     arena,
-    //         //     &new_op->data.paint_xobject
-    //         // );
-    //     }
-    //     default: {
-    //         LOG_TODO("Unimplemented content stream operation: %d", op);
-    //     }
-    // }
+    switch (op) {
+        case PDF_OPERATOR_q: {
+            new_queue_op(operation_queue, PDF_CONTENT_OP_SAVE_GSTATE);
+            return NULL;
+        }
+        case PDF_OPERATOR_Q: {
+            new_queue_op(operation_queue, PDF_CONTENT_OP_RESTORE_GSTATE);
+            return NULL;
+        }
+        case PDF_OPERATOR_cm: {
+            PdfContentOp* queue_op =
+                new_queue_op(operation_queue, PDF_CONTENT_OP_SET_CTM);
+            PDF_PROPAGATE(
+                deserialize_set_matrix(&queue_op->data.set_ctm, operands, arena)
+            );
+            return NULL;
+        }
+        case PDF_OPERATOR_BT: {
+            new_queue_op(operation_queue, PDF_CONTENT_OP_BEGIN_TEXT);
+            return NULL;
+        };
+        case PDF_OPERATOR_ET: {
+            new_queue_op(operation_queue, PDF_CONTENT_OP_END_TEXT);
+            return NULL;
+        };
+        case PDF_OPERATOR_Tf: {
+            PDF_PROPAGATE(deserialize_set_font(operation_queue, operands, arena)
+            );
+            return NULL;
+        }
+        case PDF_OPERATOR_Tm: {
+            PdfContentOp* queue_op =
+                new_queue_op(operation_queue, PDF_CONTENT_OP_SET_TEXT_MATRIX);
+            PDF_PROPAGATE(deserialize_set_matrix(
+                &queue_op->data.set_text_matrix,
+                operands,
+                arena
+            ));
+            return NULL;
+        }
+        case PDF_OPERATOR_TJ: {
+            PDF_PROPAGATE(
+                deserialize_positioned_text_op(operands, operation_queue)
+            );
+            return NULL;
+        }
+        case PDF_OPERATOR_g: {
+            PDF_PROPAGATE(
+                deserialize_set_gray(false, operation_queue, operands, arena)
+            );
+            return NULL;
+        }
+        default: {
+            LOG_TODO(
+                "Unimplemented deserialization for content stream operation: %d",
+                op
+            );
+        }
+    }
 }

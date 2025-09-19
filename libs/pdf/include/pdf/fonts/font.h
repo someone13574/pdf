@@ -38,8 +38,6 @@ typedef struct {
 
     // A description of the widths for the glyphs in the CIDFont.
     PdfFontWidthsOptional w;
-
-    const PdfObject* raw_dict;
 } PdfCIDFont;
 
 PdfError* pdf_deserialize_cid_font(
@@ -86,8 +84,6 @@ typedef struct {
     /// A stream containing a CMap file that maps character codes to Unicode
     /// values.
     PdfStreamOptional to_unicode;
-
-    const PdfObject* raw_dict;
 } PdfType0font;
 
 PdfError* pdf_deserialize_type0_font(

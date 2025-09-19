@@ -47,7 +47,6 @@ PdfError* pdf_deserialize_cid_system_info(
         )
     };
 
-    target_ptr->raw_dict = object;
     PDF_PROPAGATE(pdf_deserialize_dict(
         object,
         fields,

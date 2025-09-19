@@ -15,7 +15,6 @@
 #include "pdf/fonts/font.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf/xobject.h"
 #include "pdf_error/error.h"
 #include "text_state.h"
 
@@ -93,12 +92,12 @@ static PdfError* process_content_stream(
             }
             case PDF_CONTENT_OP_SET_CTM: {
                 current_graphics_state(state)->ctm = geom_mat3_new_pdf(
-                    pdf_number_as_real(op.data.set_matrix.a),
-                    pdf_number_as_real(op.data.set_matrix.b),
-                    pdf_number_as_real(op.data.set_matrix.c),
-                    pdf_number_as_real(op.data.set_matrix.d),
-                    pdf_number_as_real(op.data.set_matrix.e),
-                    pdf_number_as_real(op.data.set_matrix.f)
+                    pdf_number_as_real(op.data.set_ctm.a),
+                    pdf_number_as_real(op.data.set_ctm.b),
+                    pdf_number_as_real(op.data.set_ctm.c),
+                    pdf_number_as_real(op.data.set_ctm.d),
+                    pdf_number_as_real(op.data.set_ctm.e),
+                    pdf_number_as_real(op.data.set_ctm.f)
                 );
                 break;
             }
@@ -139,35 +138,35 @@ static PdfError* process_content_stream(
 
                 break;
             }
-            case PDF_CONTENT_OP_NEXT_LINE: {
-                GeomMat3 transform = geom_mat3_new(
-                    1.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    1.0,
-                    0.0,
-                    pdf_number_as_real(op.data.next_line.t_x),
-                    pdf_number_as_real(op.data.next_line.t_y),
-                    1.0
-                );
+            // case PDF_CONTENT_OP_NEXT_LINE: {
+            //     GeomMat3 transform = geom_mat3_new(
+            //         1.0,
+            //         0.0,
+            //         0.0,
+            //         0.0,
+            //         1.0,
+            //         0.0,
+            //         pdf_number_as_real(op.data.next_line.t_x),
+            //         pdf_number_as_real(op.data.next_line.t_y),
+            //         1.0
+            //     );
 
-                state->text_object_state.text_matrix = geom_mat3_mul(
-                    transform,
-                    state->text_object_state.text_line_matrix
-                );
-                state->text_object_state.text_line_matrix =
-                    state->text_object_state.text_matrix;
-                break;
-            }
-            case PDF_CONTENT_OP_SET_TM: {
+            //     state->text_object_state.text_matrix = geom_mat3_mul(
+            //         transform,
+            //         state->text_object_state.text_line_matrix
+            //     );
+            //     state->text_object_state.text_line_matrix =
+            //         state->text_object_state.text_matrix;
+            //     break;
+            // }
+            case PDF_CONTENT_OP_SET_TEXT_MATRIX: {
                 state->text_object_state.text_matrix = geom_mat3_new_pdf(
-                    pdf_number_as_real(op.data.set_matrix.a),
-                    pdf_number_as_real(op.data.set_matrix.b),
-                    pdf_number_as_real(op.data.set_matrix.c),
-                    pdf_number_as_real(op.data.set_matrix.d),
-                    pdf_number_as_real(op.data.set_matrix.e),
-                    pdf_number_as_real(op.data.set_matrix.f)
+                    pdf_number_as_real(op.data.set_text_matrix.a),
+                    pdf_number_as_real(op.data.set_text_matrix.b),
+                    pdf_number_as_real(op.data.set_text_matrix.c),
+                    pdf_number_as_real(op.data.set_text_matrix.d),
+                    pdf_number_as_real(op.data.set_text_matrix.e),
+                    pdf_number_as_real(op.data.set_text_matrix.f)
                 );
                 state->text_object_state.text_line_matrix =
                     state->text_object_state.text_matrix;
@@ -182,7 +181,7 @@ static PdfError* process_content_stream(
                     current_graphics_state(state)->ctm,
                     &current_graphics_state(state)->text_state,
                     &state->text_object_state,
-                    op.data.show_text.text
+                    op.data.show_text
                 ));
 
                 break;
@@ -191,41 +190,41 @@ static PdfError* process_content_stream(
                 // TODO: colors
                 break;
             }
-            case PDF_CONTENT_OP_PAINT_XOBJECT: {
-                RELEASE_ASSERT(resources->has_value);
-                RELEASE_ASSERT(resources->value.xobject.has_value);
+            // case PDF_CONTENT_OP_PAINT_XOBJECT: {
+            //     RELEASE_ASSERT(resources->has_value);
+            //     RELEASE_ASSERT(resources->value.xobject.has_value);
 
-                PdfObject* xobject_object = pdf_dict_get(
-                    &resources->value.xobject.value,
-                    op.data.paint_xobject.xobject
-                );
+            //     PdfObject* xobject_object = pdf_dict_get(
+            //         &resources->value.xobject.value,
+            //         op.data.paint_xobject.xobject
+            //     );
 
-                PdfXObject xobject;
-                PDF_PROPAGATE(pdf_deserialize_xobject(
-                    xobject_object,
-                    &xobject,
-                    resolver,
-                    arena
-                ));
+            //     PdfXObject xobject;
+            //     PDF_PROPAGATE(pdf_deserialize_xobject(
+            //         xobject_object,
+            //         &xobject,
+            //         resolver,
+            //         arena
+            //     ));
 
-                switch (xobject.type) {
-                    case PDF_XOBJECT_IMAGE: {
-                        LOG_TODO();
-                    }
-                    case PDF_XOBJECT_FORM: {
-                        // PdfFormXObject* form = &xobject.data.form;
+            //     switch (xobject.type) {
+            //         case PDF_XOBJECT_IMAGE: {
+            //             LOG_TODO();
+            //         }
+            //         case PDF_XOBJECT_FORM: {
+            //             // PdfFormXObject* form = &xobject.data.form;
 
-                        save_graphics_state(state);
-                        // TODO: apply matrix, clip with bbox
+            //             save_graphics_state(state);
+            //             // TODO: apply matrix, clip with bbox
 
-                        PDF_PROPAGATE(restore_graphics_state(state));
-                    }
-                }
+            //             PDF_PROPAGATE(restore_graphics_state(state));
+            //         }
+            //     }
 
-                break;
-            }
+            //     break;
+            // }
             default: {
-                LOG_TODO("Unimplemented content operation %d", op.kind);
+                LOG_TODO("Unimplemented render content operation %d", op.kind);
             }
         }
     }

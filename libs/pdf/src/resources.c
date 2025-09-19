@@ -72,7 +72,7 @@ PdfError* pdf_deserialize_resources(
                 pdf_name_vec_op_init,
                 PDF_DESERDE_ARRAY(
                     pdf_name_vec_push_uninit,
-                    PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+                    PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
                 )
             )
         )

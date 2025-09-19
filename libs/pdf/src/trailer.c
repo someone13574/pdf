@@ -48,7 +48,6 @@ PdfError* pdf_deserialize_trailer(
         )
     };
 
-    target_ptr->raw_dict = object;
     PDF_PROPAGATE(pdf_deserialize_dict(
         object,
         fields,

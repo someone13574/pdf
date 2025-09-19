@@ -91,7 +91,7 @@ typedef struct {
     );
 
 /// Placeholder type for unimplemented deserialization fields. Choice is
-/// arbitary.
+/// arbitrary.
 typedef int PdfUnimplemented;
 
 typedef struct {

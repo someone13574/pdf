@@ -25,8 +25,6 @@ typedef struct {
     /// array and the two byte-strings shall be direct objects and shall be
     /// unencrypted.
     PdfArrayOptional id;
-
-    const PdfObject* raw_dict;
 } PdfTrailer;
 
 PdfError* pdf_deserialize_trailer(
