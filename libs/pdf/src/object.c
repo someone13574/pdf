@@ -25,6 +25,9 @@
 #include "arena/dvec_impl.h"
 
 PdfObject* pdf_dict_get(const PdfDict* dict, PdfName key) {
+    RELEASE_ASSERT(dict);
+    RELEASE_ASSERT(key);
+
     for (size_t idx = 0; idx < pdf_dict_entry_vec_len(dict->entries); idx++) {
         PdfDictEntry entry;
         RELEASE_ASSERT(pdf_dict_entry_vec_get(dict->entries, idx, &entry));
@@ -393,8 +396,6 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
             "String literal parenthesis was not closed."
         );
     }
-
-    PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular));
 
     // Parse
     const uint8_t* raw = pdf_ctx_get_raw(ctx) + start_offset;

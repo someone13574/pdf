@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pdf/content_stream.h"
+#include "pdf/content_stream/stream.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/resources.h"

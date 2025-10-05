@@ -2,6 +2,7 @@
 // but I'm not sure if it will stay in object or not.
 #include "arena/arena.h"
 #include "deserialize.h"
+#include "geom/mat3.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
@@ -45,6 +46,29 @@ DESERDE_IMPL_TRAMPOLINE(
     pdf_deserialize_number
 )
 DESERDE_IMPL_OPTIONAL(PdfNumberOptional, pdf_number_op_init)
+
+PdfError* pdf_deserialize_num_as_real(
+    const PdfObject* object,
+    PdfReal* target_ptr,
+    PdfOptionalResolver resolver,
+    Arena* arena
+) {
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(arena);
+
+    PdfNumber num;
+    PDF_PROPAGATE(pdf_deserialize_number(object, &num, resolver, arena));
+    *target_ptr = pdf_number_as_real(num);
+
+    return NULL;
+}
+
+DESERDE_IMPL_TRAMPOLINE(
+    pdf_deserialize_num_as_real_trampoline,
+    pdf_deserialize_num_as_real
+)
 
 PdfReal pdf_number_as_real(PdfNumber number) {
     switch (number.type) {
@@ -139,6 +163,71 @@ DESERDE_IMPL_TRAMPOLINE(
     pdf_deserialize_rectangle
 )
 DESERDE_IMPL_OPTIONAL(PdfRectangleOptional, pdf_rectangle_op_init)
+
+PdfError* pdf_deserialize_geom_mat3(
+    const PdfObject* object,
+    GeomMat3* target_ptr,
+    PdfOptionalResolver resolver,
+    Arena* arena
+) {
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(arena);
+
+    switch (object->type) {
+        case PDF_OBJECT_TYPE_ARRAY: {
+            if (pdf_object_vec_len(object->data.array.elements) != 6) {
+                return PDF_ERROR(
+                    PDF_ERR_INCORRECT_TYPE,
+                    "Incorrect number of elements in matrix array (expected 6)"
+                );
+            }
+
+            PdfReal array[6] = {0};
+            for (size_t idx = 0; idx < 6; idx++) {
+                PdfObject* element = NULL;
+                RELEASE_ASSERT(pdf_object_vec_get(
+                    object->data.array.elements,
+                    idx,
+                    &element
+                ));
+
+                PdfNumber number;
+                PDF_PROPAGATE(
+                    pdf_deserialize_number(element, &number, resolver, arena)
+                );
+
+                array[idx] = pdf_number_as_real(number);
+            }
+
+            *target_ptr = geom_mat3_new_pdf(
+                array[0],
+                array[1],
+                array[2],
+                array[3],
+                array[4],
+                array[5]
+            );
+            break;
+        }
+        default: {
+            return PDF_ERROR(
+                PDF_ERR_INCORRECT_TYPE,
+                "Rectangles must be an array"
+            );
+        }
+    }
+
+    return NULL;
+}
+
+DESERDE_IMPL_TRAMPOLINE(
+    pdf_deserialize_geom_mat3_trampoline,
+    pdf_deserialize_geom_mat3
+)
+
+DESERDE_IMPL_OPTIONAL(PdfGeomMat3Optional, pdf_geom_mat3_op_init)
 
 #define DVEC_NAME PdfNameVec
 #define DVEC_LOWERCASE_NAME pdf_name_vec

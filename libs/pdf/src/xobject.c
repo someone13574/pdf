@@ -4,7 +4,6 @@
 
 #include "deserialize.h"
 #include "logger/log.h"
-#include "pdf/content_stream.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/resources.h"
@@ -48,7 +47,14 @@ PdfError* pdf_deserialize_form_xobject(
             &target_ptr->bbox,
             PDF_DESERDE_CUSTOM(pdf_deserialize_rectangle_trampoline)
         ),
-        PDF_UNIMPLEMENTED_FIELD("Matrix"),
+        PDF_FIELD(
+            "Matrix",
+            &target_ptr->matrix,
+            PDF_DESERDE_OPTIONAL(
+                pdf_geom_mat3_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_geom_mat3_trampoline)
+            )
+        ),
         PDF_FIELD(
             "Resources",
             &target_ptr->resources,
@@ -95,12 +101,15 @@ PdfError* pdf_deserialize_form_xobject(
         "PdfFormXObject"
     ));
 
-    PDF_PROPAGATE(pdf_deserialize_content_stream(
-        &resolved,
-        &target_ptr->content_stream,
-        resolver,
-        arena
-    ));
+    PDF_PROPAGATE(
+        pdf_deserialize_content_stream(
+            &resolved,
+            &target_ptr->content_stream,
+            resolver,
+            arena
+        ),
+        "Failed to deserialize form context stream"
+    );
 
     if (target_ptr->type.has_value
         && strcmp(target_ptr->type.value, "XObject") != 0) {

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "arena/arena.h"
-#include "pdf/content_op.h"
+#include "pdf/content_stream/operation.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"

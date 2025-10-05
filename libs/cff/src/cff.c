@@ -139,40 +139,6 @@ PdfError* cff_parse_fontset(
             font->charstr_index.count,
             &font->charset
         ));
-
-        // for (CffCard16 idx = 0; idx < charstring_index.count; idx++) {
-        //     size_t charstring_size;
-        //     PDF_PROPAGATE(cff_index_seek_object(
-        //         &charstring_index,
-        //         &fontset.parser,
-        //         idx,
-        //         &charstring_size
-        //     ));
-
-        //     Canvas* canvas = canvas_new_scalable(arena, 1500, 1500,
-        //     0xffffffff); GeomMat3 transform = geom_mat3_new(
-        //         1.0,
-        //         0.0,
-        //         0.0,
-        //         0.0,
-        //         -1.0,
-        //         0.0,
-        //         500.0,
-        //         1000.0,
-        //         0.0
-        //     );
-        //     PDF_PROPAGATE(cff_charstr2_render(
-        //         &parser,
-        //         fontset.global_subr_index,
-        //         subrs_index,
-        //         charstring_size,
-        //         canvas,
-        //         transform
-        //     ));
-        //     RELEASE_ASSERT(canvas_write_file(canvas, "glyph.svg"));
-
-        //     usleep(150000);
-        // }
     }
 
     *cff_font_out = arena_alloc(arena, sizeof(CffFontSet));

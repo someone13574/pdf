@@ -1,7 +1,7 @@
 #pragma once
 
-#include "operator.h"
-#include "pdf/content_op.h"
+#include "pdf/content_stream/operation.h"
+#include "pdf/content_stream/operator.h"
 #include "pdf/object.h"
 #include "pdf_error/error.h"
 

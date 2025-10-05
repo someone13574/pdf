@@ -1,3 +1,5 @@
+#include "pdf/content_stream/stream.h"
+
 #include <stdio.h>
 #include <string.h>
 
@@ -6,9 +8,8 @@
 #include "../object.h"
 #include "arena/arena.h"
 #include "logger/log.h"
-#include "op.h"
+#include "operation.h"
 #include "operator.h"
-#include "pdf/content_stream.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"

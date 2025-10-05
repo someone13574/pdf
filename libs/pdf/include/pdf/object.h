@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "geom/vec3.h"
+#include "logger/log.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
 
@@ -11,7 +13,10 @@ typedef struct PdfObject PdfObject;
 
 typedef bool PdfBoolean;
 typedef int32_t PdfInteger;
-typedef double PdfReal;
+typedef double PdfReal; // Be *very* careful if you change this to anything
+                        // other than double, since sometimes we deserialize
+                        // directly into a non-typedef'ed double, such as into
+                        // GeomMat3 members.
 typedef char* PdfName;
 
 typedef struct {
@@ -113,6 +118,14 @@ PdfError* pdf_deserialize_number(
 );
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_number_trampoline)
 
+PdfError* pdf_deserialize_num_as_real(
+    const PdfObject* object,
+    PdfReal* target_ptr,
+    PdfOptionalResolver resolver,
+    Arena* arena
+);
+DESERDE_DECL_TRAMPOLINE(pdf_deserialize_num_as_real_trampoline)
+
 PdfReal pdf_number_as_real(PdfNumber number);
 
 typedef struct {
@@ -132,6 +145,16 @@ PdfError* pdf_deserialize_rectangle(
 );
 
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_rectangle_trampoline)
+
+PdfError* pdf_deserialize_geom_mat3(
+    const PdfObject* object,
+    GeomMat3* target_ptr,
+    PdfOptionalResolver resolver,
+    Arena* arena
+);
+
+DESERDE_DECL_TRAMPOLINE(pdf_deserialize_geom_mat3_trampoline)
+DESERDE_DECL_OPTIONAL(PdfGeomMat3Optional, GeomMat3, pdf_geom_mat3_op_init)
 
 #define DVEC_NAME PdfNameVec
 #define DVEC_LOWERCASE_NAME pdf_name_vec

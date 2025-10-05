@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pdf/content_stream.h"
+#include "pdf/content_stream/stream.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/resources.h"
@@ -27,7 +27,7 @@ typedef struct {
     /// An array of six numbers specifying the form matrix, which maps form
     /// space into user space (see 8.3.4, "Transformation Matrices"). Default
     /// value: the identity matrix [ 1 0 0 1 0 0 ].
-    PdfUnimplemented matrix;
+    GeomMat3 matrix;
 
     /// A dictionary specifying any resources (such as fonts and images)
     /// required by the form XObject (see 7.8, "Content Streams and Resources").
