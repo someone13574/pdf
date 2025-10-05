@@ -22,6 +22,8 @@ static bool char_to_hex(uint8_t c, int* out) {
     }
 }
 
+// TODO: Merge the three different implementations of this (this one, the
+// postscript one, and I think there is one in the charstring2 implementation)
 PdfError* pdf_filter_ascii_hex_decode(
     Arena* arena,
     const uint8_t* stream,

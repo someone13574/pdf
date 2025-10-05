@@ -359,7 +359,10 @@ bool DLINKED_FN(pop_front)(DLINKED_NAME* linked_list, DLINKED_TYPE* out) {
         return false;
     }
 
-    *out = DLINKED_FN(remove)(linked_list, 0);
+    DLINKED_TYPE value = DLINKED_FN(remove)(linked_list, 0);
+    if (out) {
+        *out = value;
+    }
     return true;
 }
 
@@ -372,7 +375,10 @@ bool DLINKED_FN(pop_back)(DLINKED_NAME* linked_list, DLINKED_TYPE* out) {
         return false;
     }
 
-    *out = DLINKED_FN(remove)(linked_list, linked_list->len - 1);
+    DLINKED_TYPE value = DLINKED_FN(remove)(linked_list, linked_list->len - 1);
+    if (out) {
+        *out = value;
+    }
     return true;
 }
 

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "pdf/deserde_types.h"
 #include "pdf/object.h"
 #include "pdf/page.h"
 #include "pdf/resolver.h"
@@ -10,14 +9,18 @@
 typedef struct {
     PdfName type;
     PdfPageTreeNodeRef pages;
-    const PdfObject* raw_dict;
 } PdfCatalog;
 
 PdfError* pdf_deserialize_catalog(
     const PdfObject* object,
-    Arena* arena,
+    PdfCatalog* target_ptr,
     PdfOptionalResolver resolver,
-    PdfCatalog* deserialized
+    Arena* arena
 );
 
-DESERIALIZABLE_STRUCT_REF(PdfCatalog, catalog)
+DESERDE_DECL_RESOLVABLE(
+    PdfCatalogRef,
+    PdfCatalog,
+    pdf_catalog_ref_init,
+    pdf_resolve_catalog
+)

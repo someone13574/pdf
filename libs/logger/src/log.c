@@ -70,7 +70,7 @@ void logger_log(
     }
 
     int pad = 0;
-    int pad_available = 48;
+    int pad_available = 64;
 
     do {
         pad = pad_available - file_and_group_len;

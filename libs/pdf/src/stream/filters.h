@@ -3,14 +3,14 @@
 #include <stdlib.h>
 
 #include "arena/arena.h"
-#include "pdf/stream/stream_dict.h"
+#include "pdf/object.h"
 #include "pdf_error/error.h"
 
 PdfError* pdf_decode_filtered_stream(
     Arena* arena,
     const uint8_t* encoded,
     size_t length,
-    PdfOpNameArray filters,
+    PdfNameVecOptional filters,
     uint8_t** decoded,
     size_t* decoded_len
 );

@@ -11,7 +11,6 @@
 #include "ctx.h"
 #include "logger/log.h"
 #include "pdf/object.h"
-#include "pdf/stream/stream_dict.h"
 #include "pdf_error/error.h"
 #include "stream/filters.h"
 
@@ -26,6 +25,9 @@
 #include "arena/dvec_impl.h"
 
 PdfObject* pdf_dict_get(const PdfDict* dict, PdfName key) {
+    RELEASE_ASSERT(dict);
+    RELEASE_ASSERT(key);
+
     for (size_t idx = 0; idx < pdf_dict_entry_vec_len(dict->entries); idx++) {
         PdfDictEntry entry;
         RELEASE_ASSERT(pdf_dict_entry_vec_get(dict->entries, idx, &entry));
@@ -394,8 +396,6 @@ pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
             "String literal parenthesis was not closed."
         );
     }
-
-    PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular));
 
     // Parse
     const uint8_t* raw = pdf_ctx_get_raw(ctx) + start_offset;
@@ -808,8 +808,8 @@ PdfError* pdf_parse_stream(
 
     // Deserialize stream dict
     PdfStreamDict stream_dict;
-    PDF_PROPAGATE(
-        pdf_deserialize_stream_dict(stream_dict_obj, arena, &stream_dict)
+    PDF_REQUIRE(
+        pdf_deserialize_stream_dict(stream_dict_obj, &stream_dict, arena)
     );
 
     if (stream_dict.length < 0) {
