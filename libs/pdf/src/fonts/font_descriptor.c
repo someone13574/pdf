@@ -35,7 +35,7 @@ PdfError* pdf_deserialize_font_descriptor(
             &target_ptr->font_family,
             PDF_DESERDE_OPTIONAL(
                 pdf_name_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
             )
         ),
         PDF_FIELD(
@@ -214,4 +214,9 @@ DESERDE_IMPL_RESOLVABLE(
     pdf_font_descriptor_ref_init,
     pdf_resolve_font_descriptor,
     pdf_deserialize_font_descriptor
+)
+
+DESERDE_IMPL_OPTIONAL(
+    PdfFontDescriptorRefOptional,
+    pdf_font_descriptor_ref_op_init
 )

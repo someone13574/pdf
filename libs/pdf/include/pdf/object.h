@@ -128,6 +128,17 @@ DESERDE_DECL_TRAMPOLINE(pdf_deserialize_num_as_real_trampoline)
 
 PdfReal pdf_number_as_real(PdfNumber number);
 
+#define DVEC_NAME PdfNumberVec
+#define DVEC_LOWERCASE_NAME pdf_number_vec
+#define DVEC_TYPE PdfNumber
+#include "arena/dvec_decl.h"
+
+DESERDE_DECL_OPTIONAL(
+    PdfNumberVecOptional,
+    PdfNumberVec*,
+    pdf_number_vec_op_init
+)
+
 typedef struct {
     PdfNumber lower_left_x;
     PdfNumber lower_left_y;
@@ -200,6 +211,7 @@ struct PdfStreamDict {
 PdfError* pdf_deserialize_stream_dict(
     const PdfObject* object,
     PdfStreamDict* deserialized,
+    PdfOptionalResolver resolver,
     Arena* arena
 );
 

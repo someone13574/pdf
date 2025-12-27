@@ -119,3 +119,9 @@ DESERDE_DECL_RESOLVABLE(
     pdf_font_descriptor_ref_init,
     pdf_resolve_font_descriptor
 )
+
+DESERDE_DECL_OPTIONAL(
+    PdfFontDescriptorRefOptional,
+    PdfFontDescriptorRef,
+    pdf_font_descriptor_ref_op_init
+)

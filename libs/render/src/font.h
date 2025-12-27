@@ -22,6 +22,7 @@ PdfError* next_cid(
 
 /// Maps a CID to a GID for the given glyph.
 PdfError* cid_to_gid(
+    Arena* arena,
     PdfFont* font,
     PdfOptionalResolver resolver,
     uint32_t cid,
@@ -30,6 +31,7 @@ PdfError* cid_to_gid(
 
 /// Renders a given glyph.
 PdfError* render_glyph(
+    Arena* arena,
     PdfFont* font,
     PdfOptionalResolver resolver,
     uint32_t gid,
@@ -38,4 +40,9 @@ PdfError* render_glyph(
 );
 
 /// Gets the width for a CID.
-PdfError* cid_to_width(PdfFont* font, uint32_t cid, PdfInteger* width_out);
+PdfError* cid_to_width(
+    PdfFont* font,
+    PdfOptionalResolver resolver,
+    uint32_t cid,
+    PdfNumber* width_out
+);

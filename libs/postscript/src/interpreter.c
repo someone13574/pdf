@@ -42,8 +42,8 @@ Arena* postscript_interpreter_get_arena(PostscriptInterpreter* interpreter) {
     return interpreter->arena;
 }
 
-static void init_default_resource_categories(PostscriptInterpreter* interpreter
-) {
+static void
+init_default_resource_categories(PostscriptInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     // TODO: non-dict categories
@@ -106,11 +106,10 @@ PostscriptInterpreter* postscript_interpreter_new(Arena* arena) {
     );
     postscript_interpreter_dict_push(
         interpreter,
-        (PostscriptObject
-        ) {.type = POSTSCRIPT_OBJECT_DICT,
-           .data.dict = postscript_object_list_new(arena),
-           .access = POSTSCRIPT_ACCESS_UNLIMITED,
-           .literal = true}
+        (PostscriptObject) {.type = POSTSCRIPT_OBJECT_DICT,
+                            .data.dict = postscript_object_list_new(arena),
+                            .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                            .literal = true}
     );
 
     return interpreter;
@@ -127,8 +126,8 @@ void postscript_interpreter_dump(PostscriptInterpreter* interpreter) {
     LOG_DIAG(INFO, PS, " ");
     LOG_DIAG(INFO, PS, "    Resources:");
     for (size_t category_idx = 0;
-         category_idx
-         < postscript_resource_category_vec_len(interpreter->resource_categories
+         category_idx < postscript_resource_category_vec_len(
+             interpreter->resource_categories
          );
          category_idx++) {
         PostscriptResourceCategory category;
@@ -230,9 +229,8 @@ void postscript_interpreter_add_operator(
     PostscriptInterpreter* interpreter,
     char* category_name,
     char* resource_name,
-    PostscriptOperator
-    operator,
-    char * operator_name
+    PostscriptOperator operator,
+    char* operator_name
 ) {
     RELEASE_ASSERT(interpreter);
     RELEASE_ASSERT(category_name);
@@ -268,7 +266,8 @@ void postscript_interpreter_add_operator(
 
 static PostscriptObjectList* get_current_object_list(
     const PostscriptInterpreter* interpreter,
-    bool* is_sink
+    bool* is_sink,
+    bool* is_dict
 ) {
     RELEASE_ASSERT(interpreter);
 
@@ -278,11 +277,17 @@ static PostscriptObjectList* get_current_object_list(
         if (is_sink) {
             *is_sink = false;
         }
+        if (is_dict) {
+            *is_dict = false;
+        }
         return interpreter->operands;
     }
 
     if (is_sink) {
         *is_sink = true;
+    }
+    if (is_dict) {
+        *is_dict = object.data.sink.type == POSTSCRIPT_SINK_DICT;
     }
     return object.data.sink.list;
 }
@@ -308,22 +313,20 @@ PdfError* postscript_interpret_token(
         case POSTSCRIPT_TOKEN_INTEGER: {
             postscript_interpreter_operand_push(
                 interpreter,
-                (PostscriptObject
-                ) {.type = POSTSCRIPT_OBJECT_INTEGER,
-                   .data.integer = token.data.integer,
-                   .access = POSTSCRIPT_ACCESS_UNLIMITED,
-                   .literal = true}
+                (PostscriptObject) {.type = POSTSCRIPT_OBJECT_INTEGER,
+                                    .data.integer = token.data.integer,
+                                    .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                                    .literal = true}
             );
             break;
         }
         case POSTSCRIPT_TOKEN_REAL: {
             postscript_interpreter_operand_push(
                 interpreter,
-                (PostscriptObject
-                ) {.type = POSTSCRIPT_OBJECT_REAL,
-                   .data.real = token.data.real,
-                   .access = POSTSCRIPT_ACCESS_UNLIMITED,
-                   .literal = true}
+                (PostscriptObject) {.type = POSTSCRIPT_OBJECT_REAL,
+                                    .data.real = token.data.real,
+                                    .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                                    .literal = true}
             );
             break;
         }
@@ -331,11 +334,10 @@ PdfError* postscript_interpret_token(
         case POSTSCRIPT_TOKEN_HEX_STRING: {
             postscript_interpreter_operand_push(
                 interpreter,
-                (PostscriptObject
-                ) {.type = POSTSCRIPT_OBJECT_STRING,
-                   .data.string = token.data.string,
-                   .access = POSTSCRIPT_ACCESS_UNLIMITED,
-                   .literal = true}
+                (PostscriptObject) {.type = POSTSCRIPT_OBJECT_STRING,
+                                    .data.string = token.data.string,
+                                    .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                                    .literal = true}
             );
             break;
         }
@@ -358,28 +360,25 @@ PdfError* postscript_interpret_token(
             if (is_true || is_false) {
                 postscript_interpreter_operand_push(
                     interpreter,
-                    (PostscriptObject
-                    ) {.type = POSTSCRIPT_OBJECT_BOOLEAN,
-                       .data.boolean = is_true,
-                       .access = POSTSCRIPT_ACCESS_UNLIMITED,
-                       .literal = true}
+                    (PostscriptObject) {.type = POSTSCRIPT_OBJECT_BOOLEAN,
+                                        .data.boolean = is_true,
+                                        .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                                        .literal = true}
                 );
             } else if (is_null) {
                 postscript_interpreter_operand_push(
                     interpreter,
-                    (PostscriptObject
-                    ) {.type = POSTSCRIPT_OBJECT_NAME,
-                       .access = POSTSCRIPT_ACCESS_UNLIMITED,
-                       .literal = true}
+                    (PostscriptObject) {.type = POSTSCRIPT_OBJECT_NAME,
+                                        .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                                        .literal = true}
                 );
             } else {
                 postscript_interpreter_operand_push(
                     interpreter,
-                    (PostscriptObject
-                    ) {.type = POSTSCRIPT_OBJECT_NAME,
-                       .data.name = token.data.name,
-                       .access = POSTSCRIPT_ACCESS_UNLIMITED,
-                       .literal = true}
+                    (PostscriptObject) {.type = POSTSCRIPT_OBJECT_NAME,
+                                        .data.name = token.data.name,
+                                        .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                                        .literal = true}
                 );
             }
             break;
@@ -389,13 +388,12 @@ PdfError* postscript_interpret_token(
                 postscript_object_list_new(interpreter->arena);
             postscript_interpreter_operand_push(
                 interpreter,
-                (PostscriptObject
-                ) {.type = POSTSCRIPT_OBJECT_SINK,
-                   .data.sink.list = array,
-                   .data.sink.type = POSTSCRIPT_SINK_ARRAY,
-                   .data.sink.sink_name = "array",
-                   .access = POSTSCRIPT_ACCESS_UNLIMITED,
-                   .literal = true}
+                (PostscriptObject) {.type = POSTSCRIPT_OBJECT_SINK,
+                                    .data.sink.list = array,
+                                    .data.sink.type = POSTSCRIPT_SINK_ARRAY,
+                                    .data.sink.sink_name = "array",
+                                    .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                                    .literal = true}
             );
             break;
         }
@@ -417,11 +415,56 @@ PdfError* postscript_interpret_token(
 
             postscript_interpreter_operand_push(
                 interpreter,
-                (PostscriptObject
-                ) {.type = POSTSCRIPT_OBJECT_ARRAY,
-                   .data.array = sink.data.sink.list,
-                   .access = POSTSCRIPT_ACCESS_UNLIMITED,
-                   .literal = true}
+                (PostscriptObject) {.type = POSTSCRIPT_OBJECT_ARRAY,
+                                    .data.array = sink.data.sink.list,
+                                    .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                                    .literal = true}
+            );
+            break;
+        }
+        case POSTSCRIPT_TOKEN_START_DICT: {
+            PostscriptObjectList* dict =
+                postscript_object_list_new(interpreter->arena);
+            postscript_interpreter_operand_push(
+                interpreter,
+                (PostscriptObject) {.type = POSTSCRIPT_OBJECT_SINK,
+                                    .data.sink.list = dict,
+                                    .data.sink.type = POSTSCRIPT_SINK_DICT,
+                                    .data.sink.sink_name = "dict",
+                                    .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                                    .literal = true}
+            );
+            break;
+        }
+        case POSTSCRIPT_TOKEN_END_DICT: {
+            PostscriptObject sink;
+            PDF_PROPAGATE(postscript_interpreter_pop_operand_typed(
+                interpreter,
+                POSTSCRIPT_OBJECT_SINK,
+                true,
+                &sink
+            ));
+
+            if (sink.data.sink.type != POSTSCRIPT_SINK_DICT) {
+                return PDF_ERROR(
+                    PDF_ERR_POSTSCRIPT_OPERAND_TYPE,
+                    "Wrong sink type"
+                );
+            }
+
+            if (postscript_object_list_len(sink.data.sink.list) % 2 != 0) {
+                return PDF_ERROR(
+                    PDF_ERR_POSTSCRIPT_OPERAND_TYPE,
+                    "Invalid number of object in dict"
+                );
+            }
+
+            postscript_interpreter_operand_push(
+                interpreter,
+                (PostscriptObject) {.type = POSTSCRIPT_OBJECT_DICT,
+                                    .data.dict = sink.data.sink.list,
+                                    .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                                    .literal = true}
             );
             break;
         }
@@ -494,8 +537,15 @@ void postscript_interpreter_operand_push(
     RELEASE_ASSERT(interpreter);
 
     bool is_sink;
+    bool is_dict;
     PostscriptObjectList* current_object_list =
-        get_current_object_list(interpreter, &is_sink);
+        get_current_object_list(interpreter, &is_sink, &is_dict);
+    if (is_dict && object.type == POSTSCRIPT_OBJECT_STRING) {
+        object.type = POSTSCRIPT_OBJECT_NAME;
+        object.data.name =
+            postscript_string_as_cstr(object.data.string, interpreter->arena);
+    }
+
     postscript_object_list_push_back(current_object_list, object);
 
     if (is_sink) {

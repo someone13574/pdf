@@ -65,6 +65,13 @@ PdfError* pdf_deserialize_num_as_real(
     return NULL;
 }
 
+#define DVEC_NAME PdfNumberVec
+#define DVEC_LOWERCASE_NAME pdf_number_vec
+#define DVEC_TYPE PdfNumber
+#include "arena/dvec_impl.h"
+
+DESERDE_IMPL_OPTIONAL(PdfNumberVecOptional, pdf_number_vec_op_init)
+
 DESERDE_IMPL_TRAMPOLINE(
     pdf_deserialize_num_as_real_trampoline,
     pdf_deserialize_num_as_real

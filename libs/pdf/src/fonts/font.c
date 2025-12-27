@@ -4,6 +4,7 @@
 
 #include "../deserialize.h"
 #include "logger/log.h"
+#include "pdf/fonts/encoding.h"
 #include "pdf/fonts/font_descriptor.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
@@ -90,7 +91,8 @@ PdfError* pdf_deserialize_cid_font(
             "`Type` key must be `Font`, found `%s`",
             target_ptr->type
         );
-    } else if (strcmp(target_ptr->subtype, "CIDFontType0") != 0 && strcmp(target_ptr->subtype, "CIDFontType2") != 0) {
+    } else if (strcmp(target_ptr->subtype, "CIDFontType0") != 0
+               && strcmp(target_ptr->subtype, "CIDFontType2") != 0) {
         return PDF_ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "`Subtype` key must be `CIDFontType0` or `CIDFontType2`"
@@ -186,6 +188,112 @@ PdfError* pdf_deserialize_type0_font(
     return NULL;
 }
 
+PdfError* pdf_deserialize_truetype_font_dict(
+    const PdfObject* object,
+    PdfTrueTypeFont* target_ptr,
+    PdfOptionalResolver resolver,
+    Arena* arena
+) {
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(arena);
+
+    PdfFieldDescriptor fields[] = {
+        PDF_FIELD(
+            "Type",
+            &target_ptr->type,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+        ),
+        PDF_FIELD(
+            "Subtype",
+            &target_ptr->subtype,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+        ),
+        PDF_FIELD(
+            "BaseFont",
+            &target_ptr->base_font,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+        ),
+        PDF_FIELD(
+            "FirstChar",
+            &target_ptr->first_char,
+            PDF_DESERDE_OPTIONAL(
+                pdf_integer_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            )
+        ),
+        PDF_FIELD(
+            "LastChar",
+            &target_ptr->last_char,
+            PDF_DESERDE_OPTIONAL(
+                pdf_integer_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            )
+        ),
+        PDF_FIELD(
+            "Widths",
+            &target_ptr->widths,
+            PDF_DESERDE_OPTIONAL(
+                pdf_number_vec_op_init,
+                PDF_DESERDE_ARRAY(
+                    pdf_number_vec_push_uninit,
+                    PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+                )
+            )
+        ),
+        PDF_FIELD(
+            "FontDescriptor",
+            &target_ptr->font_descriptor,
+            PDF_DESERDE_OPTIONAL(
+                pdf_font_descriptor_ref_op_init,
+                PDF_DESERDE_RESOLVABLE(pdf_font_descriptor_ref_init)
+            )
+        ),
+        PDF_FIELD(
+            "Encoding",
+            &target_ptr->encoding,
+            PDF_DESERDE_OPTIONAL(
+                pdf_encoding_dict_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_encoding_dict_trampoline)
+            )
+        ),
+        PDF_FIELD(
+            "ToUnicode",
+            &target_ptr->to_unicode,
+            PDF_DESERDE_OPTIONAL(
+                pdf_stream_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STREAM)
+            )
+        )
+    };
+
+    PDF_PROPAGATE(pdf_deserialize_dict(
+        object,
+        fields,
+        sizeof(fields) / sizeof(PdfFieldDescriptor),
+        false,
+        resolver,
+        arena,
+        "PdfTrueTypeFont"
+    ));
+
+    if (strcmp(target_ptr->type, "Font") != 0) {
+        return PDF_ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "`Type` key must be `Font`, found `%s`",
+            target_ptr->type
+        );
+    } else if (strcmp(target_ptr->subtype, "TrueType") != 0) {
+        return PDF_ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "`Subtype` key must be `TrueType`"
+        );
+    }
+
+    return NULL;
+}
+
 typedef struct {
     PdfName type;
     PdfName subtype;
@@ -253,7 +361,12 @@ PdfError* pdf_deserialize_font(
         LOG_TODO("Type3 font dictionaries");
     } else if (strcmp(font_info.subtype, "TrueType") == 0) {
         target_ptr->type = PDF_FONT_TRUETYPE;
-        LOG_TODO("TrueType font dictionaries");
+        PDF_PROPAGATE(pdf_deserialize_truetype_font_dict(
+            object,
+            &target_ptr->data.true_type,
+            resolver,
+            arena
+        ));
     } else if (strcmp(font_info.subtype, "CIDFontType0") == 0) {
         target_ptr->type = PDF_FONT_CIDTYPE0;
         PDF_PROPAGATE(pdf_deserialize_cid_font(

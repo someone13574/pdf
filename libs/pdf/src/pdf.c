@@ -114,9 +114,13 @@ PdfError* pdf_get_trailer(PdfResolver* resolver, PdfTrailer* trailer) {
     PDF_PROPAGATE(pdf_ctx_seek_next_line(resolver->ctx));
 
     PdfObject* trailer_dict = arena_alloc(resolver->arena, sizeof(PdfObject));
-    PDF_PROPAGATE(
-        pdf_parse_object(resolver->arena, resolver->ctx, trailer_dict, false)
-    );
+    PDF_PROPAGATE(pdf_parse_object(
+        resolver->arena,
+        resolver->ctx,
+        pdf_op_resolver_some(resolver),
+        trailer_dict,
+        false
+    ));
 
     PDF_PROPAGATE(pdf_deserialize_trailer(
         trailer_dict,
@@ -169,9 +173,13 @@ PdfError* pdf_resolve_ref(
     PDF_PROPAGATE(pdf_ctx_seek(resolver->ctx, entry->offset));
 
     entry->object = arena_alloc(resolver->arena, sizeof(PdfObject));
-    PDF_PROPAGATE(
-        pdf_parse_object(resolver->arena, resolver->ctx, entry->object, false)
-    );
+    PDF_PROPAGATE(pdf_parse_object(
+        resolver->arena,
+        resolver->ctx,
+        pdf_op_resolver_some(resolver),
+        entry->object,
+        false
+    ));
     *resolved = *entry->object;
 
     return NULL;

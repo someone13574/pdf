@@ -30,11 +30,14 @@ PdfError* postscript_object_execute(
             LOG_DIAG(DEBUG, PS, "Executing `%s`", object->data.name);
 
             PostscriptObject dict_object;
-            PDF_PROPAGATE(postscript_interpreter_dict_entry(
-                interpreter,
-                object,
-                &dict_object
-            ));
+            PDF_PROPAGATE(
+                postscript_interpreter_dict_entry(
+                    interpreter,
+                    object,
+                    &dict_object
+                ),
+                "Couldn't find item to execute"
+            );
 
             if (dict_object.literal) {
                 postscript_interpreter_operand_push(interpreter, dict_object);

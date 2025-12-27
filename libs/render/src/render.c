@@ -100,7 +100,8 @@ static PdfError* process_content_stream(
                 break;
             }
             case PDF_OPERATOR_gs: {
-                RELEASE_ASSERT(resources->has_value
+                RELEASE_ASSERT(
+                    resources->has_value
                 ); // TODO: Make this an error
                 RELEASE_ASSERT(resources->value.ext_gstate.has_value);
 
@@ -133,7 +134,10 @@ static PdfError* process_content_stream(
                 break;
             }
             case PDF_OPERATOR_cm: {
-                current_graphics_state(state)->ctm = op.data.set_ctm;
+                current_graphics_state(state)->ctm = geom_mat3_mul(
+                    op.data.set_ctm,
+                    current_graphics_state(state)->ctm
+                );
                 break;
             }
             case PDF_OPERATOR_m: {
@@ -172,7 +176,8 @@ static PdfError* process_content_stream(
                     op.data.set_font.size
                 );
 
-                RELEASE_ASSERT(resources->has_value
+                RELEASE_ASSERT(
+                    resources->has_value
                 ); // TODO: This should be an error, and ideally a function
                 RELEASE_ASSERT(resources->value.font.has_value);
 
@@ -213,6 +218,17 @@ static PdfError* process_content_stream(
             // //         state->text_object_state.text_matrix;
             // //     break;
             // // }
+            case PDF_OPERATOR_Td: {
+                GeomMat3 transform = geom_mat3_translate(
+                    op.data.text_offset.x,
+                    op.data.text_offset.y
+                );
+                state->text_object_state.text_matrix = geom_mat3_mul(
+                    state->text_object_state.text_matrix,
+                    transform
+                );
+                break;
+            }
             case PDF_OPERATOR_Tm: {
                 state->text_object_state.text_matrix = op.data.set_text_matrix;
                 state->text_object_state.text_line_matrix =
@@ -234,7 +250,20 @@ static PdfError* process_content_stream(
                     ));
 
                     if (element.type == POSITIONED_TEXT_ELEMENT_OFFSET) {
-                        LOG_TODO();
+                        TextState* text_state =
+                            &current_graphics_state(state)->text_state;
+                        double tx = -(element.value.offset / 1000.0)
+                                  * text_state->text_font_size;
+                        LOG_DIAG(INFO, RENDER, "element offsetting: %f", tx);
+
+                        GeomMat3 transform = geom_mat3_translate(
+                            tx, // TODO: vertical
+                            0.0
+                        );
+                        state->text_object_state.text_matrix = geom_mat3_mul(
+                            state->text_object_state.text_matrix,
+                            transform
+                        );
                     } else {
                         PDF_PROPAGATE(text_state_render(
                             arena,

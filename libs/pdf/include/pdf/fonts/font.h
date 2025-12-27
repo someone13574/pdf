@@ -2,6 +2,7 @@
 
 #include "arena/arena.h"
 #include "pdf/fonts/cmap.h"
+#include "pdf/fonts/encoding.h"
 #include "pdf/fonts/font_descriptor.h"
 #include "pdf/fonts/font_widths.h"
 #include "pdf/object.h"
@@ -93,6 +94,82 @@ PdfError* pdf_deserialize_type0_font(
     Arena* arena
 );
 
+typedef struct {
+    /// Required) The type of PDF object that this dictionary describes; shall
+    /// be Font for a font dictionary.
+    PdfName type;
+
+    /// (Required) The type of font; shall be TrueType.
+    PdfName subtype;
+
+    /// (Required) The PostScript name for the value of BaseFont may be
+    /// determined in one of two ways: If the TrueType font program's “name”
+    /// table contains a PostScript name, it shall be used. In the absence of
+    /// such an entry in the “name” table, a PostScript name shall be derived
+    /// from the name by which the font is known in the host operating system.On
+    /// a Windows system, the name shall be based on the lfFaceName field in a
+    /// LOGFONT structure; in the Mac OS, it shall be based on the name of the
+    /// FOND resource.If the name contains any SPACEs, the SPACEs shall be
+    /// removed.
+    PdfName base_font;
+
+    /// (Required except for the standard 14 fonts) The first character code
+    /// defined in the font’s Widths array. Beginning with PDF 1.5, the special
+    /// treatment given to the standard 14 fonts is deprecated. Conforming
+    /// writers should represent all fonts using a complete font descriptor. For
+    /// backwards capability, conforming readers shall still provide the special
+    /// treatment identified for the standard 14 fonts.
+    PdfIntegerOptional first_char;
+
+    /// (Required except for the standard 14 fonts) The last character code
+    /// defined in the font’s Widths array. Beginning with PDF 1.5, the special
+    /// treatment given to the standard 14 fonts is deprecated. Conforming
+    /// writers should represent all fonts using a complete font descriptor. For
+    /// backwards capability, conforming readers shall still provide the special
+    /// treatment identified for the standard 14 fonts.
+    PdfIntegerOptional last_char;
+
+    /// (Required except for the standard 14 fonts; indirect reference
+    /// preferred) An array of (LastChar − FirstChar + 1) widths, each element
+    /// being the glyph width for the character code that equals FirstChar plus
+    /// the array index. For character codes outside the range FirstChar to
+    /// LastChar, the value of MissingWidth from the FontDescriptor entry for
+    /// this font shall be used. The glyph widths shall be measured in units in
+    /// which 1000 units correspond to 1 unit in text space. These widths shall
+    /// be consistent with the actual widths given in the font program. For more
+    /// information on glyph widths and other glyph metrics, see 9.2.4, "Glyph
+    /// Positioning and Metrics".
+    PdfNumberVecOptional widths;
+
+    /// (Required except for the standard 14 fonts; shall be an indirect
+    /// reference) A font descriptor describing the font’s metrics other than
+    /// its glyph widths (see 9.8, "Font Descriptors"”\). For the standard 14
+    /// fonts, the entries FirstChar, LastChar, Widths, and FontDescriptor shall
+    /// either all be present or all be absent. Ordinarily, these dictionary
+    /// keys may be absent; specifying them enables a standard font to be
+    /// overridden; see 9.6.2.2, "Standard Type 1 Fonts (Standard 14 Fonts)".
+    PdfFontDescriptorRefOptional font_descriptor;
+
+    /// (Optional) A specification of the font’s character encoding if different
+    /// from its built-in encoding. The value of Encoding shall be either the
+    /// name of a predefined encoding (MacRomanEncoding, MacExpertEncoding, or
+    /// WinAnsiEncoding, as described in Annex D) or an encoding dictionary that
+    /// shall specify differences from the font’s built-in encoding or from a
+    /// specified predefined encoding (see 9.6.6, "Character Encoding").
+    PdfEncodingDictOptional encoding;
+
+    /// (Optional; PDF 1.2) A stream containing a CMap file that maps character
+    /// codes to Unicode values (see 9.10, "Extraction of Text Content").
+    PdfStreamOptional to_unicode;
+} PdfTrueTypeFont;
+
+PdfError* pdf_deserialize_truetype_font_dict(
+    const PdfObject* object,
+    PdfTrueTypeFont* target_ptr,
+    PdfOptionalResolver resolver,
+    Arena* arena
+);
+
 typedef enum {
     /// A composite font—a font composed of glyphs from a
     /// descendant CIDFont
@@ -128,6 +205,7 @@ typedef struct {
     union {
         PdfType0font type0;
         PdfCIDFont cid;
+        PdfTrueTypeFont true_type;
     } data;
 } PdfFont;
 

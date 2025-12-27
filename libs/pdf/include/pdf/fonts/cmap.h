@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 #include "arena/arena.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
@@ -35,6 +37,9 @@ typedef struct PdfCMap PdfCMap;
 
 PdfError*
 pdf_cmap_get_cid(PdfCMap* cmap, uint32_t codepoint, uint32_t* cid_out);
+
+PdfError*
+pdf_cmap_get_unicode(PdfCMap* cmap, uint32_t cid, uint32_t* unicode_out);
 
 PdfError* pdf_parse_cmap(
     Arena* arena,

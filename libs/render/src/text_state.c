@@ -6,23 +6,22 @@
 
 #include "font.h"
 #include "geom/mat3.h"
+#include "geom/vec2.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
 
 TextState text_state_default(void) {
-    return (TextState
-    ) {.font_set = false,
-       .character_spacing = 0.0,
-       .word_spacing = 0.0,
-       .horizontal_spacing = 1.0};
+    return (TextState) {.font_set = false,
+                        .character_spacing = 0.0,
+                        .word_spacing = 0.0,
+                        .horizontal_spacing = 1.0};
 }
 
 TextObjectState text_object_state_default(void) {
-    return (TextObjectState
-    ) {.text_matrix = geom_mat3_identity(),
-       .text_line_matrix = geom_mat3_identity()};
+    return (TextObjectState) {.text_matrix = geom_mat3_identity(),
+                              .text_line_matrix = geom_mat3_identity()};
 }
 
 PdfError* text_state_render(
@@ -68,7 +67,9 @@ PdfError* text_state_render(
 
         // Get GID
         uint32_t gid;
-        PDF_PROPAGATE(cid_to_gid(&state->text_font, resolver, cid, &gid));
+        PDF_PROPAGATE(
+            cid_to_gid(arena, &state->text_font, resolver, cid, &gid)
+        );
 
         // Render
         GeomMat3 render_matrix = geom_mat3_mul(
@@ -89,7 +90,17 @@ PdfError* text_state_render(
             ctm
         );
 
+        GeomVec2 transformed =
+            geom_vec2_transform((GeomVec2) {0.0, 0.0}, render_matrix);
+        LOG_WARN(
+            RENDER,
+            "Transformed point: %f, %f",
+            transformed.x,
+            transformed.y
+        );
+
         PDF_PROPAGATE(render_glyph(
+            arena,
             &state->text_font,
             resolver,
             gid,
@@ -99,12 +110,19 @@ PdfError* text_state_render(
 
         // TODO: support vertical fonts
         // TODO: Use font matrix
-        PdfInteger glyph_width;
-        PDF_PROPAGATE(cid_to_width(&state->text_font, cid, &glyph_width));
+        PdfNumber glyph_width;
+        PDF_PROPAGATE(
+            cid_to_width(&state->text_font, resolver, cid, &glyph_width)
+        );
 
-        double t_x = ((double)glyph_width * state->text_font_size
-                      + state->character_spacing + state->word_spacing)
-                   * state->horizontal_spacing * 0.001;
+        double t_x = (pdf_number_as_real(glyph_width) * state->text_font_size);
+        LOG_DIAG(
+            INFO,
+            RENDER,
+            "translating %f, font size = %f",
+            t_x,
+            state->text_font_size
+        );
         object_state->text_matrix = geom_mat3_mul(
             object_state->text_matrix,
             geom_mat3_translate(t_x, 0.0)

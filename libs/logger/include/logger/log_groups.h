@@ -9,7 +9,7 @@
     X(ARRAY, INHERIT, ARENA)                                                   \
     X(VEC, INHERIT, ARENA)                                                     \
     X(LINKED_LIST, INHERIT, ARENA)                                             \
-    X(CODEC, INHERIT, GLOBAL)                                                  \
+    X(CODEC, OFF, GLOBAL)                                                      \
     X(CANVAS, INHERIT, GLOBAL)                                                 \
     X(DCEL, INHERIT, CANVAS)                                                   \
     X(PDF, INHERIT, GLOBAL)                                                    \
@@ -23,6 +23,6 @@
     X(PS, OFF, GLOBAL)                                                         \
     X(PS_TOKEN, INHERIT, PS)                                                   \
     X(CMAP, INHERIT, FONT)                                                     \
-    X(SFNT, INHERIT, GLOBAL)                                                   \
+    X(SFNT, OFF, GLOBAL)                                                       \
     X(SFNT_PARSE, INHERIT, SFNT)                                               \
     X(CFF, INHERIT, GLOBAL)

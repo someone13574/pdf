@@ -80,7 +80,8 @@ int main(int argc, char** argv) {
     for (size_t idx = 0; idx < pdf_page_ref_vec_len(page_tree_root.kids);
          idx++) {
         PdfPageRef page_ref;
-        RELEASE_ASSERT(pdf_page_ref_vec_get(page_tree_root.kids, idx, &page_ref)
+        RELEASE_ASSERT(
+            pdf_page_ref_vec_get(page_tree_root.kids, idx, &page_ref)
         );
 
         PdfPage page;

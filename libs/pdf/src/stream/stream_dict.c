@@ -11,10 +11,12 @@
 PdfError* pdf_deserialize_stream_dict(
     const PdfObject* object,
     PdfStreamDict* target_ptr,
+    PdfOptionalResolver resolver,
     Arena* arena
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
     RELEASE_ASSERT(arena);
 
     PdfFieldDescriptor fields[] = {
@@ -100,7 +102,7 @@ PdfError* pdf_deserialize_stream_dict(
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         true,
-        pdf_op_resolver_none(false),
+        resolver,
         arena,
         "PdfStreamDict"
     ));

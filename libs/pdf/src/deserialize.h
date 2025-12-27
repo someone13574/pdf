@@ -151,11 +151,10 @@ PdfError* pdf_deserialize_operands(
 );
 
 #define PDF_OPERAND(ptr_to_variable, operand_information)                      \
-    {                                                                          \
-        .target_ptr = (ptr_to_variable),                                       \
-        .deserde_info = (operand_information),                                 \
-        .debug_info.file = RELATIVE_FILE_PATH, .debug_info.line = __LINE__     \
-    }
+    {.target_ptr = (ptr_to_variable),                                          \
+     .deserde_info = (operand_information),                                    \
+     .debug_info.file = RELATIVE_FILE_PATH,                                    \
+     .debug_info.line = __LINE__}
 
 /// Declares a new dictionary field which should be deserialized.
 ///
@@ -165,11 +164,11 @@ PdfError* pdf_deserialize_operands(
 /// deserialized into.
 /// - `field_information`: The deserialization information for this field.
 #define PDF_FIELD(pdf_key_name, ptr_to_field, field_information)               \
-    {                                                                          \
-        .key = (pdf_key_name), .target_ptr = (ptr_to_field),                   \
-        .deserde_info = (field_information),                                   \
-        .debug_info.file = RELATIVE_FILE_PATH, .debug_info.line = __LINE__     \
-    }
+    {.key = (pdf_key_name),                                                    \
+     .target_ptr = (void*)(ptr_to_field),                                      \
+     .deserde_info = (field_information),                                      \
+     .debug_info.file = RELATIVE_FILE_PATH,                                    \
+     .debug_info.line = __LINE__}
 
 /// Marks that deserialization hasn't been implemented for this yet.
 #define PDF_UNIMPLEMENTED_FIELD(pdf_key_name)                                  \

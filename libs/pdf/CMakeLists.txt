@@ -12,6 +12,7 @@ add_library(pdf
     src/fonts/font_widths.c
     src/fonts/cmap.c
     src/fonts/cmap_paths.c
+    src/fonts/encoding.c
     src/object.c
     src/page.c
     src/pdf.c
