@@ -584,15 +584,27 @@ PdfError* pdf_deserialize_content_op(
             new_queue_op(operation_queue, PDF_OPERATOR_ET);
             return NULL;
         };
+        case PDF_OPERATOR_Tc:
+        case PDF_OPERATOR_Tw:
+        case PDF_OPERATOR_Tz:
+        case PDF_OPERATOR_TL: {
+            PdfContentOp* queue_op = new_queue_op(operation_queue, op);
+            PDF_PROPAGATE(deserialize_num_real(
+                &queue_op->data.set_text_metric,
+                operands,
+                arena
+            ));
+            return NULL;
+        };
         case PDF_OPERATOR_Tf: {
             PDF_PROPAGATE(
                 deserialize_set_font(operation_queue, operands, arena)
             );
             return NULL;
         }
-        case PDF_OPERATOR_Td: {
-            PdfContentOp* queue_op =
-                new_queue_op(operation_queue, PDF_OPERATOR_Td);
+        case PDF_OPERATOR_Td:
+        case PDF_OPERATOR_TD: {
+            PdfContentOp* queue_op = new_queue_op(operation_queue, op);
             PDF_PROPAGATE(
                 deserialize_vec2(&queue_op->data.text_offset, operands, arena)
             );
@@ -606,6 +618,10 @@ PdfError* pdf_deserialize_content_op(
                 operands,
                 arena
             ));
+            return NULL;
+        }
+        case PDF_OPERATOR_T_star: {
+            new_queue_op(operation_queue, PDF_OPERATOR_T_star);
             return NULL;
         }
         case PDF_OPERATOR_Tj: {
@@ -626,6 +642,24 @@ PdfError* pdf_deserialize_content_op(
                 operands,
                 arena
             ));
+            return NULL;
+        }
+        case PDF_OPERATOR_CS:
+        case PDF_OPERATOR_cs: {
+            PdfContentOp* queue_op = new_queue_op(operation_queue, op);
+            PDF_PROPAGATE(deserialize_name(
+                &queue_op->data.set_color_space,
+                operands,
+                arena
+            ));
+            return NULL;
+        }
+        case PDF_OPERATOR_SC:
+        case PDF_OPERATOR_SCN:
+        case PDF_OPERATOR_sc:
+        case PDF_OPERATOR_scn: {
+            PdfContentOp* queue_op = new_queue_op(operation_queue, op);
+            queue_op->data.set_color = pdf_object_vec_clone(operands);
             return NULL;
         }
         case PDF_OPERATOR_g: {

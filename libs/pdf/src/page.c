@@ -48,6 +48,14 @@ PdfError* pdf_deserialize_page(
             PDF_DESERDE_CUSTOM(pdf_deserialize_rectangle_trampoline)
         ),
         PDF_FIELD(
+            "CropBox",
+            &target_ptr->crop_box,
+            PDF_DESERDE_OPTIONAL(
+                pdf_rectangle_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_rectangle_trampoline)
+            )
+        ),
+        PDF_FIELD(
             "Contents",
             &target_ptr->contents,
             PDF_DESERDE_OPTIONAL(

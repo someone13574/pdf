@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "arena/arena.h"
 #include "logger/log.h"
@@ -247,6 +248,39 @@ bool DVEC_FN(pop)(DVEC_NAME* vec, DVEC_TYPE* out) {
 void DVEC_FN(clear)(DVEC_NAME* vec) {
     RELEASE_ASSERT(vec);
     vec->len = 0;
+}
+
+// Creates a copy of the vector in the same arena.
+DVEC_NAME* DVEC_FN(clone)(const DVEC_NAME* vec) {
+    RELEASE_ASSERT(vec);
+
+    LOG_DIAG(
+        DEBUG,
+        VEC,
+        "Creating clone of " STRINGIFY(DVEC_NAME) " (Vec<" STRINGIFY(
+            DVEC_TYPE
+        ) ">)"
+    );
+
+    DVEC_NAME* new_vec = arena_alloc(vec->arena, sizeof(DVEC_NAME));
+    new_vec->arena = vec->arena;
+    new_vec->len = vec->len;
+    new_vec->allocated_blocks = vec->allocated_blocks;
+    new_vec->blocks[0] = NULL;
+    new_vec->dbg_magic = DVEC_DEBUG_MAGIC;
+
+    for (size_t idx = 0; idx < vec->allocated_blocks; idx++) {
+        size_t block_size = 1 << idx;
+        new_vec->blocks[idx] =
+            (DVEC_TYPE*)arena_alloc(vec->arena, sizeof(DVEC_TYPE) * block_size);
+        memcpy(
+            new_vec->blocks[idx],
+            vec->blocks[idx],
+            sizeof(DVEC_TYPE) * block_size
+        );
+    }
+
+    return new_vec;
 }
 
 // Returns the length of the vector.

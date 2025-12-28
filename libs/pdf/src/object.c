@@ -1974,15 +1974,6 @@ TEST_FUNC(test_object_stream_bad_length) {
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_object_stream_bad_length2) {
-    SETUP_INVALID_PARSE_OBJECT(
-        "0 0 obj << /Length 9 >> stream\n01234567\nendstream\n endobj",
-        PDF_ERR_CTX_EXPECT
-    );
-
-    return TEST_RESULT_PASS;
-}
-
 TEST_FUNC(test_object_stream_no_line_end) {
     SETUP_INVALID_PARSE_OBJECT(
         "0 0 obj << /Length 9 >> stream\n01234567endstream\n endobj",

@@ -41,9 +41,12 @@ typedef struct {
         PdfLineJoinStyle set_join_style;
         PdfReal miter_limit;
         PdfName set_gstate;
+        PdfName set_color_space;
+        PdfObjectVec* set_color;
         GeomMat3 set_ctm;
         GeomVec2 new_subpath;
         GeomVec2 line_to;
+        PdfReal set_text_metric;
         PdfOpParamsSetFont set_font;
         GeomVec2 text_offset;
         GeomMat3 set_text_matrix;

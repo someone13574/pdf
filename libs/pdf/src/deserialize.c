@@ -307,7 +307,8 @@ static PdfError* deserialize(
     RELEASE_ASSERT(arena);
 
     switch (deserde_info.type) {
-        case PDF_DESERDE_TYPE_UNIMPLEMENTED: {
+        case PDF_DESERDE_TYPE_UNIMPLEMENTED:
+        case PDF_DESERDE_TYPE_IGNORED: {
             LOG_PANIC("Unreachable");
         }
         case PDF_DESERDE_TYPE_OBJECT: {
@@ -476,6 +477,10 @@ PdfError* pdf_deserialize_dict(
                 );
             }
 
+            if (field->deserde_info.type == PDF_DESERDE_TYPE_IGNORED) {
+                continue;
+            }
+
             PDF_PROPAGATE(
                 deserialize(
                     entry.value,
@@ -501,7 +506,9 @@ PdfError* pdf_deserialize_dict(
                     field->deserde_info.value.optional_info
                 );
             } else if (field->deserde_info.type
-                       != PDF_DESERDE_TYPE_UNIMPLEMENTED) {
+                           != PDF_DESERDE_TYPE_UNIMPLEMENTED
+                       && field->deserde_info.type
+                              != PDF_DESERDE_TYPE_IGNORED) {
                 return PDF_ERROR(
                     PDF_ERR_MISSING_DICT_KEY,
                     "Missing key `%s`",

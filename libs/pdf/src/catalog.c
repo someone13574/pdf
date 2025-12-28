@@ -28,7 +28,9 @@ PdfError* pdf_deserialize_catalog(
             "Pages",
             &target_ptr->pages,
             PDF_DESERDE_RESOLVABLE(pdf_page_tree_node_ref_init)
-        )
+        ),
+        PDF_IGNORED_FIELD("PageMode"),
+        PDF_IGNORED_FIELD("OpenAction")
     };
 
     PDF_PROPAGATE(pdf_deserialize_dict(

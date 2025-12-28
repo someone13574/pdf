@@ -57,6 +57,10 @@ struct PdfDeserdeInfo {
         /// yet.
         PDF_DESERDE_TYPE_UNIMPLEMENTED,
 
+        /// Indicates that this field is known and optional, but should be
+        /// skipped.
+        PDF_DESERDE_TYPE_IGNORED,
+
         /// Indicates that this struct contains information for deserializing a
         /// primitive type.
         PDF_DESERDE_TYPE_OBJECT,
@@ -176,6 +180,13 @@ PdfError* pdf_deserialize_operands(
         pdf_key_name,                                                          \
         NULL,                                                                  \
         (PdfDeserdeInfo) {.type = PDF_DESERDE_TYPE_UNIMPLEMENTED}              \
+    )
+
+#define PDF_IGNORED_FIELD(pdf_key_name)                                        \
+    PDF_FIELD(                                                                 \
+        pdf_key_name,                                                          \
+        NULL,                                                                  \
+        (PdfDeserdeInfo) {.type = PDF_DESERDE_TYPE_IGNORED}                    \
     )
 
 #define PDF_DESERDE_OBJECT(object_type)                                        \

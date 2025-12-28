@@ -57,6 +57,9 @@ bool DVEC_FN(pop)(DVEC_NAME* vec, DVEC_TYPE* out);
 // Clears the vector, making it's length zero. This does not free any memory.
 void DVEC_FN(clear)(DVEC_NAME* vec);
 
+// Creates a copy of the vector in the same arena.
+DVEC_NAME* DVEC_FN(clone)(const DVEC_NAME* vec);
+
 // Returns the length of the vector.
 size_t DVEC_FN(len)(const DVEC_NAME* vec);
 

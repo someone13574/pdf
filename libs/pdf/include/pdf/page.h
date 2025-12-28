@@ -18,6 +18,7 @@ typedef struct {
     PdfPageTreeNodeRef parent;
     PdfResourcesOptional resources;
     PdfRectangle media_box;
+    PdfRectangleOptional crop_box;
     PdfContentsStreamRefVecOptional contents;
     PdfIntegerOptional rotate;
     PdfDictOptional group;
