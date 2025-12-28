@@ -151,7 +151,8 @@ PdfError* pdf_parse_object(
 
     return PDF_ERROR(
         PDF_ERR_INVALID_OBJECT,
-        "There wasn't a valid signaler for the object"
+        "There wasn't a valid signaler for the object at offset %zu",
+        pdf_ctx_offset(ctx)
     );
 }
 

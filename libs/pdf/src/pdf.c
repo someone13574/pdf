@@ -19,7 +19,7 @@ struct PdfResolver {
     PdfCtx* ctx;
 
     uint8_t version;
-    size_t startxref;
+    // size_t startxref;
     XRefTable* xref;
 
     PdfTrailer* trailer;
@@ -28,6 +28,7 @@ struct PdfResolver {
 
 PdfError* pdf_parse_header(PdfCtx* ctx, uint8_t* version);
 PdfError* pdf_parse_startxref(PdfCtx* ctx, size_t* startxref);
+PdfError* pdf_get_trailer_at_offset(PdfResolver* resolver, PdfTrailer* trailer);
 
 PdfError* pdf_resolver_new(
     Arena* arena,
@@ -46,24 +47,32 @@ PdfError* pdf_resolver_new(
     PDF_PROPAGATE(pdf_parse_header(ctx, &version));
     LOG_DIAG(INFO, DOC, "File Version 1.%hhu", version);
 
-    size_t startxref;
-    PDF_PROPAGATE(pdf_parse_startxref(ctx, &startxref));
-    LOG_DIAG(DEBUG, DOC, "Startxref: %zu", startxref);
+    size_t current_xref_offset;
+    PDF_PROPAGATE(pdf_parse_startxref(ctx, &current_xref_offset));
 
-    XRefTable* xref;
-    PDF_PROPAGATE(
-        pdf_xref_new(arena, ctx, startxref, &xref),
-        "Failed to create the xref table"
-    );
-
+    XRefTable* xref = pdf_xref_init(arena, ctx);
     *resolver = arena_alloc(arena, sizeof(PdfResolver));
     (*resolver)->arena = arena;
     (*resolver)->ctx = ctx;
     (*resolver)->version = version;
-    (*resolver)->startxref = startxref;
     (*resolver)->xref = xref;
     (*resolver)->trailer = NULL;
     (*resolver)->catalog = NULL;
+
+    while (current_xref_offset != 0) {
+        PDF_PROPAGATE(
+            pdf_xref_parse_section(arena, ctx, current_xref_offset, xref)
+        );
+
+        PdfTrailer trailer;
+        PDF_PROPAGATE(pdf_get_trailer_at_offset(*resolver, &trailer));
+
+        if (trailer.prev.has_value) {
+            current_xref_offset = (size_t)trailer.prev.value;
+        } else {
+            current_xref_offset = 0;
+        }
+    }
 
     return NULL;
 }
@@ -90,6 +99,32 @@ Arena* pdf_resolver_arena(PdfResolver* resolver) {
     RELEASE_ASSERT(resolver);
 
     return resolver->arena;
+}
+
+PdfError*
+pdf_get_trailer_at_offset(PdfResolver* resolver, PdfTrailer* trailer) {
+    RELEASE_ASSERT(resolver);
+    RELEASE_ASSERT(trailer);
+
+    PDF_PROPAGATE(pdf_ctx_expect(resolver->ctx, "trailer"));
+    PDF_PROPAGATE(pdf_ctx_seek_next_line(resolver->ctx));
+
+    PdfObject trailer_object;
+    PDF_PROPAGATE(pdf_parse_object(
+        resolver->arena,
+        resolver->ctx,
+        pdf_op_resolver_some(resolver),
+        &trailer_object,
+        false
+    ));
+
+    PDF_PROPAGATE(pdf_deserialize_trailer(
+        &trailer_object,
+        trailer,
+        pdf_op_resolver_some(resolver),
+        resolver->arena
+    ));
+    return NULL;
 }
 
 PdfError* pdf_get_trailer(PdfResolver* resolver, PdfTrailer* trailer) {

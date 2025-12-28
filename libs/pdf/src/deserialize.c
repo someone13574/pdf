@@ -1,6 +1,7 @@
 #include "deserialize.h"
 
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "arena/arena.h"
@@ -670,8 +671,12 @@ TEST_FUNC(test_deserialize_objects) {
         "<< /Length 8 >> stream\n01234567\nendstream\n"
     };
 
-    char* buffer =
-        pdf_construct_deserde_test_doc(objects, 2, "<< /Size 3 >>", arena);
+    char* buffer = pdf_construct_deserde_test_doc(
+        objects,
+        2,
+        "<< /Size 3 /Root 404 0 R >>",
+        arena
+    );
 
     DESERIALIZER_TEST_HELPER();
 
@@ -815,8 +820,12 @@ TEST_FUNC(test_deserialize_ref) {
         "<< /Hello /There /World 42 >>"
     };
 
-    char* buffer =
-        pdf_construct_deserde_test_doc(objects, 2, "<< /Size 3 >>", arena);
+    char* buffer = pdf_construct_deserde_test_doc(
+        objects,
+        2,
+        "<< /Size 3 /Root 404 0 R >>",
+        arena
+    );
 
     DESERIALIZER_TEST_HELPER();
 
@@ -867,8 +876,12 @@ TEST_FUNC(test_deserialize_inline_struct) {
         "<< /Hello /There /World 42 >>"
     };
 
-    char* buffer =
-        pdf_construct_deserde_test_doc(objects, 2, "<< /Size 3 >>", arena);
+    char* buffer = pdf_construct_deserde_test_doc(
+        objects,
+        2,
+        "<< /Size 3 /Root 404 0 R >>",
+        arena
+    );
 
     PdfResolver* resolver;
     TEST_PDF_REQUIRE(
@@ -936,8 +949,12 @@ TEST_FUNC(test_deserialize_inline_optional) {
         "<< /Hello /There /World 42 >>"
     };
 
-    char* buffer =
-        pdf_construct_deserde_test_doc(objects, 2, "<< /Size 3 >>", arena);
+    char* buffer = pdf_construct_deserde_test_doc(
+        objects,
+        2,
+        "<< /Size 3 /Root 404 0 R >>",
+        arena
+    );
 
     DESERIALIZER_TEST_HELPER();
 
@@ -960,8 +977,12 @@ TEST_FUNC(test_deserialize_inline_optional_none) {
     Arena* arena = arena_new(1024);
     const char* objects[] = {"<< >>"};
 
-    char* buffer =
-        pdf_construct_deserde_test_doc(objects, 1, "<< /Size 2 >>", arena);
+    char* buffer = pdf_construct_deserde_test_doc(
+        objects,
+        1,
+        "<< /Size 2 /Root 404 0 R >>",
+        arena
+    );
 
     DESERIALIZER_TEST_HELPER();
 
@@ -1027,8 +1048,12 @@ TEST_FUNC(test_deserialize_primitive_arrays) {
         "<< /Strings [(Hello) (World)] /Integers [4 5 6] >>"
     };
 
-    char* buffer =
-        pdf_construct_deserde_test_doc(objects, 1, "<< /Size 2 >>", arena);
+    char* buffer = pdf_construct_deserde_test_doc(
+        objects,
+        1,
+        "<< /Size 2 /Root 404 0 R >>",
+        arena
+    );
 
     DESERIALIZER_TEST_HELPER();
 
@@ -1112,8 +1137,12 @@ TEST_FUNC(test_deserialize_custom_array) {
         "<< /Inners [<< /Hello /There /World 42 >> << /Hello /Example /World 5 >>] >>"
     };
 
-    char* buffer =
-        pdf_construct_deserde_test_doc(objects, 1, "<< /Size 2 >>", arena);
+    char* buffer = pdf_construct_deserde_test_doc(
+        objects,
+        1,
+        "<< /Size 2 /Root 404 0 R >>",
+        arena
+    );
 
     DESERIALIZER_TEST_HELPER();
 
