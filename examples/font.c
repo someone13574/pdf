@@ -3,52 +3,13 @@
 #include <string.h>
 
 #include "arena/arena.h"
+#include "arena/common.h"
 #include "canvas/canvas.h"
 #include "geom/mat3.h"
 #include "logger/log.h"
 #include "pdf_error/error.h"
 #include "sfnt/glyph.h"
 #include "sfnt/sfnt.h"
-
-static uint8_t*
-load_file_to_buffer(Arena* arena, const char* path, size_t* out_size) {
-    FILE* file = fopen(path, "rb");
-    *out_size = 0;
-    if (!file) {
-        return NULL;
-    }
-
-    if (fseek(file, 0, SEEK_END) != 0) {
-        fclose(file);
-        return NULL;
-    }
-
-    long len = ftell(file);
-    if (len < 0) {
-        fclose(file);
-        return NULL;
-    }
-
-    if (fseek(file, 0, SEEK_SET) != 0) {
-        fclose(file);
-        return NULL;
-    }
-
-    uint8_t* buffer = arena_alloc(arena, (size_t)len);
-    if (!buffer) {
-        fclose(file);
-        return NULL;
-    }
-
-    if (fread(buffer, 1, (size_t)len, file) != (size_t)len) {
-        fclose(file);
-        return NULL;
-    }
-    fclose(file);
-
-    *out_size = (size_t)len;
-    return buffer;
-}
 
 int main(int argc, char** argv) {
     (void)argc;
@@ -72,7 +33,7 @@ int main(int argc, char** argv) {
     Canvas* canvas = canvas_new_scalable(arena, 2000, 2000, 0xffffffff);
     GeomMat3 transform =
         geom_mat3_new(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 500.0, 1500.0, 1.0);
-    sfnt_glyph_render(canvas, &glyph, transform);
+    sfnt_glyph_render(canvas, &glyph, transform, 0x000000ff);
     canvas_write_file(canvas, "glyph.svg");
 
     LOG_DIAG(INFO, EXAMPLE, "Finished");

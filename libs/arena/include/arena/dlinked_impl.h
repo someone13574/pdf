@@ -57,8 +57,9 @@ DLINKED_NAME* DLINKED_FN(new)(Arena* arena) {
     LOG_DIAG(
         INFO,
         LINKED_LIST,
-        "Creating new " STRINGIFY(DLINKED_NAME
-        ) " (DoublyLinkedList<" STRINGIFY(DLINKED_TYPE) ">)"
+        "Creating new " STRINGIFY(DLINKED_NAME) " (DoublyLinkedList<" STRINGIFY(
+            DLINKED_TYPE
+        ) ">)"
     );
 
     DLINKED_NAME* linked_list = arena_alloc(arena, sizeof(DLINKED_NAME));
@@ -126,7 +127,8 @@ bool DLINKED_FN(get)(DLINKED_NAME* linked_list, size_t idx, DLINKED_TYPE* out) {
     LOG_DIAG(
         DEBUG,
         LINKED_LIST,
-        "Getting " STRINGIFY(DLINKED_TYPE
+        "Getting " STRINGIFY(
+            DLINKED_TYPE
         ) " element at idx %zu from " STRINGIFY(DLINKED_NAME),
         idx
     );
@@ -154,7 +156,8 @@ bool DLINKED_FN(get_ptr)(
     LOG_DIAG(
         DEBUG,
         LINKED_LIST,
-        "Getting " STRINGIFY(DLINKED_TYPE
+        "Getting " STRINGIFY(
+            DLINKED_TYPE
         ) " element ptr at idx %zu from " STRINGIFY(DLINKED_NAME),
         idx
     );
@@ -178,8 +181,9 @@ bool DLINKED_FN(back)(const DLINKED_NAME* linked_list, DLINKED_TYPE* out) {
     LOG_DIAG(
         DEBUG,
         LINKED_LIST,
-        "Getting last " STRINGIFY(DLINKED_TYPE
-        ) " element from " STRINGIFY(DLINKED_NAME)
+        "Getting last " STRINGIFY(DLINKED_TYPE) " element from " STRINGIFY(
+            DLINKED_NAME
+        )
     );
 
     if (linked_list->len == 0) {
@@ -204,8 +208,9 @@ void DLINKED_FN(set)(
     LOG_DIAG(
         DEBUG,
         LINKED_LIST,
-        "Setting " STRINGIFY(DLINKED_TYPE
-        ) " element at idx %zu in " STRINGIFY(DLINKED_NAME),
+        "Setting " STRINGIFY(DLINKED_TYPE) " element at idx %zu in " STRINGIFY(
+            DLINKED_NAME
+        ),
         idx
     );
 
@@ -225,7 +230,8 @@ void DLINKED_FN(insert)(
     LOG_DIAG(
         DEBUG,
         LINKED_LIST,
-        "Inserting " STRINGIFY(DLINKED_TYPE
+        "Inserting " STRINGIFY(
+            DLINKED_TYPE
         ) " element at idx %zu in " STRINGIFY(DLINKED_NAME),
         idx
     );
@@ -297,7 +303,8 @@ DLINKED_TYPE DLINKED_FN(remove)(DLINKED_NAME* linked_list, size_t idx) {
     LOG_DIAG(
         DEBUG,
         LINKED_LIST,
-        "Removing " STRINGIFY(DLINKED_TYPE
+        "Removing " STRINGIFY(
+            DLINKED_TYPE
         ) " element from idx %zu in " STRINGIFY(DLINKED_NAME),
         idx
     );
@@ -359,7 +366,10 @@ bool DLINKED_FN(pop_front)(DLINKED_NAME* linked_list, DLINKED_TYPE* out) {
         return false;
     }
 
-    *out = DLINKED_FN(remove)(linked_list, 0);
+    DLINKED_TYPE value = DLINKED_FN(remove)(linked_list, 0);
+    if (out) {
+        *out = value;
+    }
     return true;
 }
 
@@ -372,7 +382,10 @@ bool DLINKED_FN(pop_back)(DLINKED_NAME* linked_list, DLINKED_TYPE* out) {
         return false;
     }
 
-    *out = DLINKED_FN(remove)(linked_list, linked_list->len - 1);
+    DLINKED_TYPE value = DLINKED_FN(remove)(linked_list, linked_list->len - 1);
+    if (out) {
+        *out = value;
+    }
     return true;
 }
 
@@ -400,8 +413,9 @@ size_t DLINKED_FN(insert_sorted)(
     LOG_DIAG(
         DEBUG,
         LINKED_LIST,
-        "Inserting " STRINGIFY(DLINKED_TYPE
-        ) " element into sorted " STRINGIFY(DLINKED_TYPE) " list in %s",
+        "Inserting " STRINGIFY(DLINKED_TYPE) " element into sorted " STRINGIFY(
+            DLINKED_TYPE
+        ) " list in %s",
         ascending ? "ascending order" : "descending order"
     );
 

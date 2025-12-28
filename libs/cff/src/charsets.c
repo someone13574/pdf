@@ -46,7 +46,8 @@ PdfError* cff_parse_charset(
         }
         case 1: {
             CffCard16 glyph_idx = 0;
-            while (glyph_idx < num_glyphs - 1
+            while (
+                glyph_idx < num_glyphs - 1
             ) { // Check against `- 1` since the first glyph isn't included in
                 // all formats, despite only being documented for format0.
                 CffSID sid;
@@ -76,7 +77,8 @@ PdfError* cff_parse_charset(
         }
         case 2: {
             CffCard16 glyph_idx = 0;
-            while (glyph_idx < num_glyphs - 1
+            while (
+                glyph_idx < num_glyphs - 1
             ) { // Check against `- 1` since the first glyph isn't included in
                 // all formats, despite only being documented for format0.
                 CffSID sid;

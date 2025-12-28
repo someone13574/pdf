@@ -22,7 +22,8 @@ PdfError* sfnt_parse_hhea(SfntParser* parser, SfntHhea* hhea) {
     PDF_PROPAGATE(sfnt_parser_read_fword(parser, &hhea->line_gap));
     PDF_PROPAGATE(sfnt_parser_read_ufword(parser, &hhea->advance_width_max));
     PDF_PROPAGATE(sfnt_parser_read_fword(parser, &hhea->min_left_side_bearing));
-    PDF_PROPAGATE(sfnt_parser_read_fword(parser, &hhea->min_right_side_bearing)
+    PDF_PROPAGATE(
+        sfnt_parser_read_fword(parser, &hhea->min_right_side_bearing)
     );
     PDF_PROPAGATE(sfnt_parser_read_fword(parser, &hhea->x_max_extent));
     PDF_PROPAGATE(sfnt_parser_read_int16(parser, &hhea->caret_slope_rise));

@@ -11,9 +11,8 @@
 
 static void push_operator(
     PostscriptObjectList* dict,
-    PostscriptOperator
-    operator,
-    char * name
+    PostscriptOperator operator,
+    char* name
 ) {
     RELEASE_ASSERT(dict);
     RELEASE_ASSERT(operator);
@@ -23,20 +22,18 @@ static void push_operator(
 
     postscript_object_list_push_back(
         dict,
-        (PostscriptObject
-        ) {.type = POSTSCRIPT_OBJECT_NAME,
-           .data.name = name,
-           .access = POSTSCRIPT_ACCESS_UNLIMITED,
-           .literal = true}
+        (PostscriptObject) {.type = POSTSCRIPT_OBJECT_NAME,
+                            .data.name = name,
+                            .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                            .literal = true}
     );
 
     postscript_object_list_push_back(
         dict,
-        (PostscriptObject
-        ) {.type = POSTSCRIPT_OBJECT_OPERATOR,
-           .data.operator= operator,
-           .access = POSTSCRIPT_ACCESS_EXECUTE_ONLY,
-           .literal = false}
+        (PostscriptObject) {.type = POSTSCRIPT_OBJECT_OPERATOR,
+                            .data.operator = operator,
+                            .access = POSTSCRIPT_ACCESS_EXECUTE_ONLY,
+                            .literal = false}
     );
 }
 
@@ -103,13 +100,12 @@ PdfError* postscript_op_dict(PostscriptInterpreter* interpreter) {
 
     postscript_interpreter_operand_push(
         interpreter,
-        (PostscriptObject
-        ) {.type = POSTSCRIPT_OBJECT_DICT,
-           .data.dict = postscript_object_list_new(
-               postscript_interpreter_get_arena(interpreter)
-           ),
-           .access = POSTSCRIPT_ACCESS_UNLIMITED,
-           .literal = true}
+        (PostscriptObject) {.type = POSTSCRIPT_OBJECT_DICT,
+                            .data.dict = postscript_object_list_new(
+                                postscript_interpreter_get_arena(interpreter)
+                            ),
+                            .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                            .literal = true}
     );
 
     return NULL;

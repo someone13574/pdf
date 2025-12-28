@@ -24,7 +24,8 @@ PdfError* sfnt_parse_maxp(SfntParser* parser, SfntMaxp* maxp) {
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &maxp->max_points));
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &maxp->max_contours));
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &maxp->max_component_points));
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &maxp->max_component_contours)
+    PDF_PROPAGATE(
+        sfnt_parser_read_uint16(parser, &maxp->max_component_contours)
     );
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &maxp->max_zones));
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &maxp->max_twilight_points));
@@ -35,7 +36,8 @@ PdfError* sfnt_parse_maxp(SfntParser* parser, SfntMaxp* maxp) {
     PDF_PROPAGATE(
         sfnt_parser_read_uint16(parser, &maxp->max_size_of_instructions)
     );
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &maxp->max_component_elements)
+    PDF_PROPAGATE(
+        sfnt_parser_read_uint16(parser, &maxp->max_component_elements)
     );
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &maxp->max_component_depth));
 

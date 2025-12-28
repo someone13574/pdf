@@ -64,9 +64,8 @@ PdfError* cff_parse_fontset(
     fontset.fonts = cff_font_array_new_init(
         arena,
         fontset.name_index.count,
-        (CffFont
-        ) {.top_dict = cff_top_dict_default(),
-           .private_dict = cff_private_dict_default()}
+        (CffFont) {.top_dict = cff_top_dict_default(),
+                   .private_dict = cff_private_dict_default()}
     );
     for (CffCard16 font_idx = 0; font_idx < fontset.name_index.count;
          font_idx++) {
@@ -139,40 +138,6 @@ PdfError* cff_parse_fontset(
             font->charstr_index.count,
             &font->charset
         ));
-
-        // for (CffCard16 idx = 0; idx < charstring_index.count; idx++) {
-        //     size_t charstring_size;
-        //     PDF_PROPAGATE(cff_index_seek_object(
-        //         &charstring_index,
-        //         &fontset.parser,
-        //         idx,
-        //         &charstring_size
-        //     ));
-
-        //     Canvas* canvas = canvas_new_scalable(arena, 1500, 1500,
-        //     0xffffffff); GeomMat3 transform = geom_mat3_new(
-        //         1.0,
-        //         0.0,
-        //         0.0,
-        //         0.0,
-        //         -1.0,
-        //         0.0,
-        //         500.0,
-        //         1000.0,
-        //         0.0
-        //     );
-        //     PDF_PROPAGATE(cff_charstr2_render(
-        //         &parser,
-        //         fontset.global_subr_index,
-        //         subrs_index,
-        //         charstring_size,
-        //         canvas,
-        //         transform
-        //     ));
-        //     RELEASE_ASSERT(canvas_write_file(canvas, "glyph.svg"));
-
-        //     usleep(150000);
-        // }
     }
 
     *cff_font_out = arena_alloc(arena, sizeof(CffFontSet));
@@ -185,7 +150,8 @@ PdfError* cff_render_glyph(
     CffFontSet* fontset,
     uint32_t gid,
     Canvas* canvas,
-    GeomMat3 transform
+    GeomMat3 transform,
+    uint32_t color_rgba
 ) {
     RELEASE_ASSERT(fontset);
     RELEASE_ASSERT(canvas);
@@ -211,8 +177,22 @@ PdfError* cff_render_glyph(
         font.subrs_index,
         charstr_len,
         canvas,
-        transform
+        transform,
+        color_rgba
     ));
 
     return NULL;
+}
+
+GeomMat3 cff_font_matrix(CffFontSet* fontset) {
+    RELEASE_ASSERT(fontset);
+
+    if (cff_font_array_len(fontset->fonts) != 1) {
+        LOG_TODO("Fontsets");
+    }
+
+    CffFont font;
+    RELEASE_ASSERT(cff_font_array_get(fontset->fonts, 0, &font));
+
+    return font.top_dict.font_matrix;
 }

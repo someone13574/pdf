@@ -4,13 +4,19 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "geom/vec3.h"
+#include "logger/log.h"
+#include "pdf/resolver.h"
 #include "pdf_error/error.h"
 
 typedef struct PdfObject PdfObject;
 
 typedef bool PdfBoolean;
 typedef int32_t PdfInteger;
-typedef double PdfReal;
+typedef double PdfReal; // Be *very* careful if you change this to anything
+                        // other than double, since sometimes we deserialize
+                        // directly into a non-typedef'ed double, such as into
+                        // GeomMat3 members.
 typedef char* PdfName;
 
 typedef struct {
@@ -18,6 +24,8 @@ typedef struct {
     size_t len;
 } PdfString;
 
+// TODO: Can this somehow have non-pointer elements? May need to add a variable
+// so that the dvec doesn't forward declare.
 #define DVEC_NAME PdfObjectVec
 #define DVEC_LOWERCASE_NAME pdf_object_vec
 #define DVEC_TYPE PdfObject*
@@ -60,29 +68,152 @@ typedef struct {
     PdfObject* object;
 } PdfIndirectObject;
 
-typedef struct {
-    size_t object_id;
-    size_t generation;
-} PdfIndirectRef;
-
-#define DECL_OPTIONAL_TYPE(type)                                               \
+#define DESERDE_DECL_OPTIONAL(new_type, base_type, init_fn)                    \
     typedef struct {                                                           \
-        bool discriminant;                                                     \
-        Pdf##type value;                                                       \
-    } PdfOp##type;
+        _Bool has_value;                                                       \
+        base_type value;                                                       \
+    } new_type;                                                                \
+    void* init_fn(void* ptr_to_optional, _Bool has_value);
 
-DECL_OPTIONAL_TYPE(Boolean)
-DECL_OPTIONAL_TYPE(Integer)
-DECL_OPTIONAL_TYPE(Real)
-DECL_OPTIONAL_TYPE(String)
-DECL_OPTIONAL_TYPE(Name)
-DECL_OPTIONAL_TYPE(Array)
-DECL_OPTIONAL_TYPE(Dict)
-DECL_OPTIONAL_TYPE(Stream)
-DECL_OPTIONAL_TYPE(IndirectObject)
-DECL_OPTIONAL_TYPE(IndirectRef)
+#define DESERDE_DECL_RESOLVABLE(new_type, base_type, init_fn, resolve_fn)      \
+    typedef struct {                                                           \
+        PdfIndirectRef ref;                                                    \
+        base_type* resolved;                                                   \
+    } new_type;                                                                \
+    void init_fn(void* ptr_to_resolvable, PdfIndirectRef ref);                 \
+    PdfError* resolve_fn(                                                      \
+        new_type resolvable,                                                   \
+        PdfResolver* resolver,                                                 \
+        base_type* resolved_out                                                \
+    );
 
-#undef DECL_OPTIONAL_TYPE
+#define DESERDE_DECL_TRAMPOLINE(trampoline_name)                               \
+    PdfError* trampoline_name(                                                 \
+        const PdfObject* object,                                               \
+        void* target_ptr,                                                      \
+        PdfOptionalResolver resolver,                                          \
+        Arena* arena                                                           \
+    );
+
+/// Placeholder type for unimplemented deserialization fields. Choice is
+/// arbitrary.
+typedef int PdfUnimplemented;
+
+typedef struct {
+    enum { PDF_NUMBER_TYPE_INTEGER, PDF_NUMBER_TYPE_REAL } type;
+
+    union {
+        PdfInteger integer;
+        PdfReal real;
+    } value;
+} PdfNumber;
+
+DESERDE_DECL_OPTIONAL(PdfNumberOptional, PdfNumber, pdf_number_op_init)
+
+PdfError* pdf_deserialize_number(
+    const PdfObject* object,
+    PdfNumber* target_ptr,
+    PdfOptionalResolver resolver,
+    Arena* arena
+);
+DESERDE_DECL_TRAMPOLINE(pdf_deserialize_number_trampoline)
+
+PdfError* pdf_deserialize_num_as_real(
+    const PdfObject* object,
+    PdfReal* target_ptr,
+    PdfOptionalResolver resolver,
+    Arena* arena
+);
+DESERDE_DECL_TRAMPOLINE(pdf_deserialize_num_as_real_trampoline)
+
+PdfReal pdf_number_as_real(PdfNumber number);
+
+#define DVEC_NAME PdfNumberVec
+#define DVEC_LOWERCASE_NAME pdf_number_vec
+#define DVEC_TYPE PdfNumber
+#include "arena/dvec_decl.h"
+
+DESERDE_DECL_OPTIONAL(
+    PdfNumberVecOptional,
+    PdfNumberVec*,
+    pdf_number_vec_op_init
+)
+
+typedef struct {
+    PdfNumber lower_left_x;
+    PdfNumber lower_left_y;
+    PdfNumber upper_right_x;
+    PdfNumber upper_right_y;
+} PdfRectangle;
+
+DESERDE_DECL_OPTIONAL(PdfRectangleOptional, PdfRectangle, pdf_rectangle_op_init)
+
+PdfError* pdf_deserialize_rectangle(
+    const PdfObject* object,
+    PdfRectangle* target_ptr,
+    PdfOptionalResolver resolver,
+    Arena* arena
+);
+
+DESERDE_DECL_TRAMPOLINE(pdf_deserialize_rectangle_trampoline)
+
+PdfError* pdf_deserialize_geom_mat3(
+    const PdfObject* object,
+    GeomMat3* target_ptr,
+    PdfOptionalResolver resolver,
+    Arena* arena
+);
+
+DESERDE_DECL_TRAMPOLINE(pdf_deserialize_geom_mat3_trampoline)
+DESERDE_DECL_OPTIONAL(PdfGeomMat3Optional, GeomMat3, pdf_geom_mat3_op_init)
+
+#define DVEC_NAME PdfNameVec
+#define DVEC_LOWERCASE_NAME pdf_name_vec
+#define DVEC_TYPE PdfName
+#include "arena/dvec_decl.h"
+DESERDE_DECL_OPTIONAL(PdfNameVecOptional, PdfNameVec*, pdf_name_vec_op_init)
+
+DESERDE_DECL_OPTIONAL(PdfBooleanOptional, PdfBoolean, pdf_boolean_op_init)
+DESERDE_DECL_OPTIONAL(PdfIntegerOptional, PdfInteger, pdf_integer_op_init)
+DESERDE_DECL_OPTIONAL(PdfRealOptional, PdfReal, pdf_real_op_init)
+DESERDE_DECL_OPTIONAL(PdfStringOptional, PdfString, pdf_string_op_init)
+DESERDE_DECL_OPTIONAL(PdfNameOptional, PdfName, pdf_name_op_init)
+DESERDE_DECL_OPTIONAL(PdfArrayOptional, PdfArray, pdf_array_op_init)
+DESERDE_DECL_OPTIONAL(PdfDictOptional, PdfDict, pdf_dict_op_init)
+DESERDE_DECL_OPTIONAL(PdfStreamOptional, PdfStream, pdf_stream_op_init)
+DESERDE_DECL_OPTIONAL(
+    PdfIndirectObjectOptional,
+    PdfIndirectObject,
+    pdf_indirect_object_op_init
+)
+DESERDE_DECL_OPTIONAL(
+    PdfIndirectRefOptional,
+    PdfIndirectRef,
+    pdf_indirect_ref_op_init
+)
+
+// TODO: unfuck the include hierarchy
+struct PdfStreamDict {
+    PdfInteger length;
+    PdfNameVecOptional filter;
+
+    // Additional entries in an embedded font stream dictionary. TODO: Since
+    // unknown fields are now allowed, this should be a different structure.
+    PdfIntegerOptional length1;
+    PdfIntegerOptional length2;
+    PdfIntegerOptional length3;
+    PdfNameOptional subtype;
+    PdfStreamOptional metadata;
+
+    const PdfObject* raw_dict;
+};
+
+PdfError* pdf_deserialize_stream_dict(
+    const PdfObject* object,
+    PdfStreamDict* deserialized,
+    PdfOptionalResolver resolver,
+    Arena* arena
+);
 
 typedef enum {
     PDF_OBJECT_TYPE_BOOLEAN,

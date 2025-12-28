@@ -106,7 +106,7 @@ DVEC_TYPE* DVEC_FN(push)(DVEC_NAME* vec, DVEC_TYPE element) {
 
         size_t block_size = (size_t)1 << block_idx;
         vec->blocks[block_idx] =
-            arena_alloc(vec->arena, block_size * sizeof(DVEC_TYPE));
+            (DVEC_TYPE*)arena_alloc(vec->arena, block_size * sizeof(DVEC_TYPE));
 
         vec->allocated_blocks++;
     }
@@ -127,6 +127,30 @@ DVEC_TYPE* DVEC_FN(push)(DVEC_NAME* vec, DVEC_TYPE element) {
     return &vec->blocks[block_idx][offset];
 }
 
+// Creates an uninitialized element at the back of the vector and returns a
+// void-pointer to it. If the vector (which is behind a double pointer) is
+// uninitialized, it will be initialized on the arena.
+void* DVEC_FN(push_uninit)(void* ptr_to_vec_ptr, Arena* arena) {
+    RELEASE_ASSERT(ptr_to_vec_ptr);
+    RELEASE_ASSERT(arena);
+
+    LOG_DIAG(
+        TRACE,
+        VEC,
+        "Pushing uninitialized element to " STRINGIFY(DVEC_NAME) " vec."
+    );
+
+    DVEC_NAME** ptr_to_vec_ptr_typed = (DVEC_NAME**)ptr_to_vec_ptr;
+    if (!*ptr_to_vec_ptr_typed) {
+        *ptr_to_vec_ptr_typed = DVEC_FN(new)(arena);
+    }
+
+    DVEC_NAME* vec_ptr = *ptr_to_vec_ptr_typed;
+
+    DVEC_TYPE uninit_element = {0};
+    return (void*)DVEC_FN(push)(vec_ptr, uninit_element);
+}
+
 // Gets the element stored at index `idx`, storing the element in `out` and
 // returning a bool indicating whether the operation was successful.
 bool DVEC_FN(get)(const DVEC_NAME* vec, size_t idx, DVEC_TYPE* out) {
@@ -136,7 +160,8 @@ bool DVEC_FN(get)(const DVEC_NAME* vec, size_t idx, DVEC_TYPE* out) {
     LOG_DIAG(
         DEBUG,
         VEC,
-        "Getting " STRINGIFY(DVEC_TYPE
+        "Getting " STRINGIFY(
+            DVEC_TYPE
         ) " element at idx %zu from vec " STRINGIFY(DVEC_NAME),
         idx
     );
@@ -169,7 +194,8 @@ bool DVEC_FN(get_ptr)(const DVEC_NAME* vec, size_t idx, DVEC_TYPE** out) {
     LOG_DIAG(
         DEBUG,
         VEC,
-        "Getting " STRINGIFY(DVEC_TYPE
+        "Getting " STRINGIFY(
+            DVEC_TYPE
         ) " element ptr at idx %zu from vec " STRINGIFY(DVEC_NAME),
         idx
     );

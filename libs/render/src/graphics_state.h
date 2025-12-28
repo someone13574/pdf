@@ -1,19 +1,9 @@
 #pragma once
 
+#include "pdf/content_stream/operation.h"
 #include "pdf/object.h"
+#include "pdf/resources.h"
 #include "text_state.h"
-
-typedef enum {
-    LINE_CAP_STYLE_BUTT,
-    LINE_CAP_STYLE_ROUND,
-    LINE_CAP_STYLE_PROJECTING
-} LineCapStyle;
-
-typedef enum {
-    LINE_JOIN_STYLE_MITER,
-    LINE_JOIN_STYLE_ROUND,
-    LINE_JOIN_STYLE_BEVEL
-} LineJoinStyle;
 
 typedef enum {
     /// true
@@ -28,18 +18,20 @@ typedef struct {
     GeomMat3 ctm;
     // clipping_path
     // color_space
-    // color
+    PdfOpParamsSetRGB stroking_rgb;
+    PdfOpParamsSetRGB nonstroking_rgb;
     TextState text_state;
     PdfReal line_width;
-    LineCapStyle line_cap;
-    LineJoinStyle line_join;
+    PdfLineCapStyle line_cap;
+    PdfLineJoinStyle line_join;
     PdfReal miter_limit;
     // dash_pattern
     // rendering_intent
     bool stroke_adjustment;
     // blend_mode
     // soft_mask
-    double alpha_constant;
+    double stroking_alpha;
+    double nonstroking_alpha;
     AlphaSource alpha_source;
     bool overprint;
     OverprintMode overprint_mode;
@@ -52,3 +44,9 @@ typedef struct {
 } GraphicsState;
 
 GraphicsState graphics_state_default(void);
+void graphics_state_apply_params(GraphicsState* gstate, PdfGStateParams params);
+
+#define DLINKED_NAME GraphicsStateStack
+#define DLINKED_LOWERCASE_NAME graphics_state_stack
+#define DLINKED_TYPE GraphicsState
+#include "arena/dlinked_decl.h"

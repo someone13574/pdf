@@ -151,23 +151,24 @@ TEST_FUNC(test_cff_index_empty_seek_object) {
 }
 
 TEST_FUNC(test_cff_index_seek_offset_size_1) {
-    uint8_t buffer[] = {// size = 3
-                        0x00,
-                        0x03,
-                        // offset size = 1
-                        0x01,
-                        // offsets = [1, 4, 6, 7]
-                        0x01,
-                        0x04,
-                        0x06,
-                        0x07,
-                        // data
-                        'a',
-                        'b',
-                        'c',
-                        4,
-                        2,
-                        '@'
+    uint8_t buffer[] = {
+        // size = 3
+        0x00,
+        0x03,
+        // offset size = 1
+        0x01,
+        // offsets = [1, 4, 6, 7]
+        0x01,
+        0x04,
+        0x06,
+        0x07,
+        // data
+        'a',
+        'b',
+        'c',
+        4,
+        2,
+        '@'
     };
     CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
 
@@ -196,27 +197,28 @@ TEST_FUNC(test_cff_index_seek_offset_size_1) {
 }
 
 TEST_FUNC(test_cff_index_seek_offset_size_2) {
-    uint8_t buffer[] = {// size = 3
-                        0x00,
-                        0x03,
-                        // offset size = 2
-                        0x02,
-                        // offsets = [1, 4, 6, 7]
-                        0x00,
-                        0x01,
-                        0x00,
-                        0x04,
-                        0x00,
-                        0x06,
-                        0x00,
-                        0x07,
-                        // data
-                        'a',
-                        'b',
-                        'c',
-                        4,
-                        2,
-                        '@'
+    uint8_t buffer[] = {
+        // size = 3
+        0x00,
+        0x03,
+        // offset size = 2
+        0x02,
+        // offsets = [1, 4, 6, 7]
+        0x00,
+        0x01,
+        0x00,
+        0x04,
+        0x00,
+        0x06,
+        0x00,
+        0x07,
+        // data
+        'a',
+        'b',
+        'c',
+        4,
+        2,
+        '@'
     };
     CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
 
@@ -245,23 +247,24 @@ TEST_FUNC(test_cff_index_seek_offset_size_2) {
 }
 
 TEST_FUNC(test_cff_index_skip_size_1) {
-    uint8_t buffer[] = {// size = 3
-                        0x00,
-                        0x03,
-                        // offset size = 1
-                        0x01,
-                        // offsets = [1, 4, 6, 7]
-                        0x01,
-                        0x04,
-                        0x06,
-                        0x07,
-                        // data
-                        'a',
-                        'b',
-                        'c',
-                        4,
-                        2,
-                        '@'
+    uint8_t buffer[] = {
+        // size = 3
+        0x00,
+        0x03,
+        // offset size = 1
+        0x01,
+        // offsets = [1, 4, 6, 7]
+        0x01,
+        0x04,
+        0x06,
+        0x07,
+        // data
+        'a',
+        'b',
+        'c',
+        4,
+        2,
+        '@'
     };
     CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
 

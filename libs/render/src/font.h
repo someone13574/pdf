@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "canvas/canvas.h"
+#include "geom/mat3.h"
 #include "pdf/fonts/font.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
@@ -22,6 +23,7 @@ PdfError* next_cid(
 
 /// Maps a CID to a GID for the given glyph.
 PdfError* cid_to_gid(
+    Arena* arena,
     PdfFont* font,
     PdfOptionalResolver resolver,
     uint32_t cid,
@@ -30,12 +32,27 @@ PdfError* cid_to_gid(
 
 /// Renders a given glyph.
 PdfError* render_glyph(
+    Arena* arena,
     PdfFont* font,
     PdfOptionalResolver resolver,
     uint32_t gid,
     Canvas* canvas,
-    GeomMat3 transform
+    GeomMat3 transform,
+    uint32_t color_rgba
 );
 
 /// Gets the width for a CID.
-PdfError* cid_to_width(PdfFont* font, uint32_t cid, PdfInteger* width_out);
+PdfError* cid_to_width(
+    PdfFont* font,
+    PdfOptionalResolver resolver,
+    uint32_t cid,
+    PdfNumber* width_out
+);
+
+/// Get the font matrix for a font
+PdfError* get_font_matrix(
+    Arena* arena,
+    PdfOptionalResolver resolver,
+    PdfFont* font,
+    GeomMat3* font_matrix_out
+);

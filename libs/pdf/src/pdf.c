@@ -71,15 +71,15 @@ PdfError* pdf_resolver_new(
 PdfOptionalResolver pdf_op_resolver_some(PdfResolver* resolver) {
     RELEASE_ASSERT(resolver);
 
-    return (PdfOptionalResolver
-    ) {.present = true, .unwrap_indirect_objs = true, .resolver = resolver};
+    return (PdfOptionalResolver) {.present = true,
+                                  .unwrap_indirect_objs = true,
+                                  .resolver = resolver};
 }
 
 PdfOptionalResolver pdf_op_resolver_none(bool unwrap_indirect_objs) {
-    return (PdfOptionalResolver
-    ) {.present = false,
-       .unwrap_indirect_objs = unwrap_indirect_objs,
-       .resolver = NULL};
+    return (PdfOptionalResolver) {.present = false,
+                                  .unwrap_indirect_objs = unwrap_indirect_objs,
+                                  .resolver = NULL};
 }
 
 bool pdf_op_resolver_valid(PdfOptionalResolver resolver) {
@@ -101,7 +101,8 @@ PdfError* pdf_get_trailer(PdfResolver* resolver, PdfTrailer* trailer) {
         return NULL;
     }
 
-    PDF_PROPAGATE(pdf_ctx_seek(resolver->ctx, pdf_ctx_buffer_len(resolver->ctx))
+    PDF_PROPAGATE(
+        pdf_ctx_seek(resolver->ctx, pdf_ctx_buffer_len(resolver->ctx))
     );
     PDF_PROPAGATE(pdf_ctx_seek_line_start(resolver->ctx));
 
@@ -114,15 +115,19 @@ PdfError* pdf_get_trailer(PdfResolver* resolver, PdfTrailer* trailer) {
     PDF_PROPAGATE(pdf_ctx_seek_next_line(resolver->ctx));
 
     PdfObject* trailer_dict = arena_alloc(resolver->arena, sizeof(PdfObject));
-    PDF_PROPAGATE(
-        pdf_parse_object(resolver->arena, resolver->ctx, trailer_dict, false)
-    );
+    PDF_PROPAGATE(pdf_parse_object(
+        resolver->arena,
+        resolver->ctx,
+        pdf_op_resolver_some(resolver),
+        trailer_dict,
+        false
+    ));
 
     PDF_PROPAGATE(pdf_deserialize_trailer(
         trailer_dict,
-        resolver->arena,
+        trailer,
         pdf_op_resolver_some(resolver),
-        trailer
+        resolver->arena
     ));
 
     resolver->trailer = arena_alloc(resolver->arena, sizeof(PdfTrailer));
@@ -142,7 +147,7 @@ PdfError* pdf_get_catalog(PdfResolver* resolver, PdfCatalog* catalog) {
 
     PdfTrailer trailer;
     PDF_PROPAGATE(pdf_get_trailer(resolver, &trailer));
-    PDF_PROPAGATE(pdf_resolve_catalog(&trailer.root, resolver, catalog));
+    PDF_PROPAGATE(pdf_resolve_catalog(trailer.root, resolver, catalog));
 
     resolver->catalog = arena_alloc(resolver->arena, sizeof(PdfCatalog));
     *resolver->catalog = *catalog;
@@ -169,11 +174,53 @@ PdfError* pdf_resolve_ref(
     PDF_PROPAGATE(pdf_ctx_seek(resolver->ctx, entry->offset));
 
     entry->object = arena_alloc(resolver->arena, sizeof(PdfObject));
-    PDF_PROPAGATE(
-        pdf_parse_object(resolver->arena, resolver->ctx, entry->object, false)
-    );
+    PDF_PROPAGATE(pdf_parse_object(
+        resolver->arena,
+        resolver->ctx,
+        pdf_op_resolver_some(resolver),
+        entry->object,
+        false
+    ));
     *resolved = *entry->object;
 
+    return NULL;
+}
+
+PdfError* pdf_resolve_object(
+    PdfOptionalResolver resolver,
+    const PdfObject* object,
+    PdfObject* resolved
+) {
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(resolved);
+
+    if (object->type == PDF_OBJECT_TYPE_INDIRECT_OBJECT
+        && resolver.unwrap_indirect_objs) {
+        LOG_DIAG(TRACE, PDF, "Unwrapping indirect object");
+        return pdf_resolve_object(
+            resolver,
+            object->data.indirect_object.object,
+            resolved
+        );
+    }
+
+    if (object->type == PDF_OBJECT_TYPE_INDIRECT_REF && resolver.present) {
+        LOG_DIAG(TRACE, PDF, "Resolving indirect reference");
+
+        PdfObject indirect_object;
+        PDF_PROPAGATE(pdf_resolve_ref(
+            resolver.resolver,
+            object->data.indirect_ref,
+            &indirect_object
+        ));
+
+        return pdf_resolve_object(resolver, &indirect_object, resolved);
+    }
+
+    LOG_DIAG(TRACE, PDF, "Resolved type is %d", object->type);
+
+    *resolved = *object;
     return NULL;
 }
 

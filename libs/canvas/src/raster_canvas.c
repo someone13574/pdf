@@ -345,7 +345,13 @@ void raster_canvas_draw_bezier(
     );
 }
 
-void raster_canvas_draw_path(RasterCanvas* canvas, const PathBuilder* path) {
+void raster_canvas_draw_path(
+    RasterCanvas* canvas,
+    const PathBuilder* path,
+    uint32_t rgba
+) {
+    (void)rgba;
+
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(path);
 

@@ -15,20 +15,18 @@
 
 PdfError* pdf_deserialize_font_widths(
     const PdfObject* object,
-    Arena* arena,
+    PdfFontWidths* deserialized,
     PdfOptionalResolver resolver,
-    PdfFontWidths* deserialized
+    Arena* arena
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
     RELEASE_ASSERT(deserialized);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(arena);
 
     if (!deserialized->cid_to_width) {
         deserialized->cid_to_width = pdf_font_width_vec_new(arena);
     }
-
-    deserialized->raw_dict = object;
 
     PdfObject resolved_object;
     pdf_resolve_object(resolver, object, &resolved_object);
@@ -168,16 +166,8 @@ PdfError* pdf_deserialize_font_widths(
     return NULL;
 }
 
-PdfError* pdf_deserialize_font_widths_wrapper(
-    const PdfObject* object,
-    Arena* arena,
-    PdfOptionalResolver resolver,
-    void* deserialized
-) {
-    RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(deserialized);
-
-    return pdf_deserialize_font_widths(object, arena, resolver, deserialized);
-}
+DESERDE_IMPL_TRAMPOLINE(
+    pdf_deserialize_font_widths_trampoline,
+    pdf_deserialize_font_widths
+)
+DESERDE_IMPL_OPTIONAL(PdfFontWidthsOptional, pdf_font_widths_op_init)

@@ -122,6 +122,11 @@ PdfError* sfnt_font_new(
     return NULL;
 }
 
+SfntHead sfnt_font_head(SfntFont* font) {
+    RELEASE_ASSERT(font);
+    return font->head;
+}
+
 PdfError* sfnt_get_glyph(SfntFont* font, uint32_t cid, SfntGlyph* glyph) {
     RELEASE_ASSERT(font);
     RELEASE_ASSERT(glyph);
@@ -138,7 +143,8 @@ PdfError* sfnt_get_glyph(SfntFont* font, uint32_t cid, SfntGlyph* glyph) {
     // TODO: Make metrics optional, since hhea.num_of_long_for_metrics isn't
     // always the number of glyphs
     SfntLongHorMetric metrics;
-    RELEASE_ASSERT(sfnt_hmetrics_array_get(font->hmtx.h_metrics, gid, &metrics)
+    RELEASE_ASSERT(
+        sfnt_hmetrics_array_get(font->hmtx.h_metrics, gid, &metrics)
     );
     glyph->advance_width = metrics.advance_width;
     glyph->left_side_bearing = metrics.left_side_bearing;

@@ -117,8 +117,9 @@ void logger_log(
 #define RELEASE_ASSERT(cond, ...)                                              \
     do {                                                                       \
         if (!(cond)) {                                                         \
-            LOG_PANIC("Assertion failed: RELEASE_ASSERT(" #cond                \
-                      ")" __VA_ARGS__);                                        \
+            LOG_PANIC(                                                         \
+                "Assertion failed: RELEASE_ASSERT(" #cond ")" __VA_ARGS__      \
+            );                                                                 \
         }                                                                      \
     } while (0)
 

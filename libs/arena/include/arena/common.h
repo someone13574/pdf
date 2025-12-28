@@ -2,6 +2,10 @@
 
 #include <stdint.h>
 
+#include "arena/arena.h"
+
+uint8_t* load_file_to_buffer(Arena* arena, const char* path, size_t* out_size);
+
 #define DVEC_NAME Uint8Vec
 #define DVEC_LOWERCASE_NAME uint8_vec
 #define DVEC_TYPE uint8_t

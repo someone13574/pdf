@@ -4,3 +4,6 @@
 [submodule "assets/cmap-resources"]
 	path = assets/cmap-resources
 	url = https://github.com/adobe-type-tools/cmap-resources.git
+[submodule "assets/agl-aglfn"]
+	path = assets/agl-aglfn
+	url = https://github.com/adobe-type-tools/agl-aglfn

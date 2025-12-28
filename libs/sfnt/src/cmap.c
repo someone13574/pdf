@@ -141,7 +141,8 @@ parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data) {
     PDF_PROPAGATE(sfnt_parser_read_uint16_array(parser, data->start_code));
     PDF_PROPAGATE(sfnt_parser_read_uint16_array(parser, data->id_delta));
     PDF_PROPAGATE(sfnt_parser_read_uint16_array(parser, data->id_range_offset));
-    PDF_PROPAGATE(sfnt_parser_read_uint16_array(parser, data->glyph_index_array)
+    PDF_PROPAGATE(
+        sfnt_parser_read_uint16_array(parser, data->glyph_index_array)
     );
 
     if (reserved_pad != 0) {
@@ -196,7 +197,8 @@ uint16_t cmap_format4_map(const SfntCmapFormat4* subtable, uint16_t cid) {
         RELEASE_ASSERT(
             uint16_array_get(subtable->start_code, seg_idx, &start_code)
         );
-        RELEASE_ASSERT(uint16_array_get(subtable->end_code, seg_idx, &end_code)
+        RELEASE_ASSERT(
+            uint16_array_get(subtable->end_code, seg_idx, &end_code)
         );
 
         if (cid >= start_code && cid <= end_code) {

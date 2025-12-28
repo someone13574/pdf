@@ -15,6 +15,25 @@
 #define DVEC_TYPE PathContour*
 #include "arena/dvec_impl.h"
 
+GeomVec2 path_contour_segment_end(PathContourSegment segment) {
+    switch (segment.type) {
+        case PATH_CONTOUR_SEGMENT_TYPE_START: {
+            return segment.value.start;
+        }
+        case PATH_CONTOUR_SEGMENT_TYPE_LINE: {
+            return segment.value.line;
+        }
+        case PATH_CONTOUR_SEGMENT_TYPE_QUAD_BEZIER: {
+            return segment.value.quad_bezier.end;
+        }
+        case PATH_CONTOUR_SEGMENT_TYPE_CUBIC_BEZIER: {
+            return segment.value.cubic_bezier.end;
+        }
+    }
+
+    return geom_vec2_new(0.0, 0.0);
+}
+
 PathBuilder* path_builder_new(Arena* arena) {
     RELEASE_ASSERT(arena);
 
@@ -67,11 +86,40 @@ void path_builder_new_contour(PathBuilder* builder, GeomVec2 point) {
     PathContour* contour = path_contour_new(builder->arena);
     path_contour_push(
         contour,
-        (PathContourSegment
-        ) {.type = PATH_CONTOUR_SEGMENT_TYPE_START, .value.start = point}
+        (PathContourSegment) {.type = PATH_CONTOUR_SEGMENT_TYPE_START,
+                              .value.start = point}
     );
 
     path_contour_vec_push(builder->contours, contour);
+}
+
+void path_builder_close_contour(PathBuilder* builder) {
+    RELEASE_ASSERT(builder);
+
+    size_t num_contours = path_contour_vec_len(builder->contours);
+    RELEASE_ASSERT(num_contours != 0, "No active contour");
+
+    PathContour* contour = NULL;
+    RELEASE_ASSERT(
+        path_contour_vec_get(builder->contours, num_contours - 1, &contour)
+    );
+
+    size_t contour_len = path_contour_len(contour);
+    if (contour_len == 0) {
+        return;
+    }
+
+    PathContourSegment segment;
+    RELEASE_ASSERT(path_contour_get(contour, contour_len - 1, &segment));
+
+    PathContour* new_contour = path_contour_new(builder->arena);
+    path_contour_push(
+        new_contour,
+        (PathContourSegment) {.type = PATH_CONTOUR_SEGMENT_TYPE_START,
+                              .value.start = path_contour_segment_end(segment)}
+    );
+
+    path_contour_vec_push(builder->contours, new_contour);
 }
 
 void path_builder_line_to(PathBuilder* builder, GeomVec2 point) {
@@ -87,8 +135,8 @@ void path_builder_line_to(PathBuilder* builder, GeomVec2 point) {
 
     path_contour_push(
         contour,
-        (PathContourSegment
-        ) {.type = PATH_CONTOUR_SEGMENT_TYPE_LINE, .value.line = point}
+        (PathContourSegment) {.type = PATH_CONTOUR_SEGMENT_TYPE_LINE,
+                              .value.line = point}
     );
 }
 
@@ -137,8 +185,9 @@ void path_builder_cubic_bezier_to(
         contour,
         (PathContourSegment) {
             .type = PATH_CONTOUR_SEGMENT_TYPE_CUBIC_BEZIER,
-            .value.cubic_bezier = (PathCubicBezier
-            ) {.control_a = control_a, .control_b = control_b, .end = end}
+            .value.cubic_bezier = (PathCubicBezier) {.control_a = control_a,
+                                                     .control_b = control_b,
+                                                     .end = end}
     }
     );
 }
@@ -157,7 +206,8 @@ void path_builder_apply_transform(PathBuilder* path, GeomMat3 transform) {
         for (size_t segment_idx = 0; segment_idx < path_contour_len(contour);
              segment_idx++) {
             PathContourSegment* segment = NULL;
-            RELEASE_ASSERT(path_contour_get_ptr(contour, segment_idx, &segment)
+            RELEASE_ASSERT(
+                path_contour_get_ptr(contour, segment_idx, &segment)
             );
 
             switch (segment->type) {

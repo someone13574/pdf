@@ -20,8 +20,7 @@ PostscriptResource postscript_resource_new_dict(Arena* arena, char* name);
 /// Add a new operator to the dictionary resource.
 void postscript_resource_add_op(
     PostscriptResource* resource,
-    PostscriptOperator
-    operator,
+    PostscriptOperator operator,
     char * name
 );
 

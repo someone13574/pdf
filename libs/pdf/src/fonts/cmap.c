@@ -20,69 +20,50 @@
 
 PdfError* pdf_deserialize_cid_system_info(
     const PdfObject* object,
-    Arena* arena,
+    PdfCIDSystemInfo* target_ptr,
     PdfOptionalResolver resolver,
-    PdfCIDSystemInfo* deserialized
+    Arena* arena
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(target_ptr);
     RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(deserialized);
+    RELEASE_ASSERT(arena);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
-            PdfCIDSystemInfo,
             "Registry",
-            registry,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STRING)
+            &target_ptr->registry,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
         ),
         PDF_FIELD(
-            PdfCIDSystemInfo,
             "Ordering",
-            ordering,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STRING)
+            &target_ptr->ordering,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
         ),
         PDF_FIELD(
-            PdfCIDSystemInfo,
             "Supplement",
-            supplement,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+            &target_ptr->supplement,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         )
     };
 
-    deserialized->raw_dict = object;
-    PDF_PROPAGATE(pdf_deserialize_object(
-        deserialized,
+    PDF_PROPAGATE(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
-        arena,
-        resolver,
         false,
+        resolver,
+        arena,
         "PdfCIDSystemInfo"
     ));
 
     return NULL;
 }
 
-PdfError* pdf_deserialize_cid_system_info_wrapper(
-    const PdfObject* object,
-    Arena* arena,
-    PdfOptionalResolver resolver,
-    void* deserialized
-) {
-    RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(deserialized);
-
-    return pdf_deserialize_cid_system_info(
-        object,
-        arena,
-        resolver,
-        deserialized
-    );
-}
+DESERDE_IMPL_TRAMPOLINE(
+    pdf_deserialize_cid_system_info_trampoline,
+    pdf_deserialize_cid_system_info
+)
 
 typedef struct {
     size_t start_code;
@@ -96,9 +77,20 @@ typedef struct {
 #define DVEC_TYPE CMapTable
 #include "arena/dvec_impl.h"
 
+typedef struct {
+    uint64_t src;
+    uint64_t dst; // TODO: allow names
+} CMapBfEntry;
+
+#define DVEC_NAME CMapBfEntryVec
+#define DVEC_LOWERCASE_NAME cmap_bf_entry_vec
+#define DVEC_TYPE CMapBfEntry
+#include "arena/dvec_impl.h"
+
 struct PdfCMap {
     Arena* arena;
     CMapTableVec* tables;
+    CMapBfEntryVec* bfchar;
 
     PdfCMap* use_cmap;
 };
@@ -162,6 +154,28 @@ pdf_cmap_get_cid(PdfCMap* cmap, uint32_t codepoint, uint32_t* cid_out) {
     return NULL;
 }
 
+PdfError*
+pdf_cmap_get_unicode(PdfCMap* cmap, uint32_t cid, uint32_t* unicode_out) {
+    RELEASE_ASSERT(cmap);
+    RELEASE_ASSERT(unicode_out);
+
+    for (size_t idx = 0; idx < cmap_bf_entry_vec_len(cmap->bfchar); idx++) {
+        CMapBfEntry entry;
+        RELEASE_ASSERT(cmap_bf_entry_vec_get(cmap->bfchar, idx, &entry));
+
+        if (entry.src == cid) {
+            *unicode_out = (uint32_t)entry.dst;
+            return NULL;
+        }
+    }
+
+    return PDF_ERROR(
+        PDF_ERR_CMAP_INVALID_CODEPOINT,
+        "Couldn't find unicode for cid %u",
+        cid
+    );
+}
+
 typedef struct {
     PdfCMap* cmap;
     size_t curr_sink_len;
@@ -214,8 +228,8 @@ static PdfError* cidinit_usecmap(PostscriptInterpreter* interpreter) {
     return NULL;
 }
 
-static PdfError* cidinit_begincodespacerange(PostscriptInterpreter* interpreter
-) {
+static PdfError*
+cidinit_begincodespacerange(PostscriptInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     CMapPostscriptUserData* user_data = NULL;
@@ -239,15 +253,14 @@ static PdfError* cidinit_begincodespacerange(PostscriptInterpreter* interpreter
 
     postscript_interpreter_operand_push(
         interpreter,
-        (PostscriptObject
-        ) {.type = POSTSCRIPT_OBJECT_SINK,
-           .data.sink.list = postscript_object_list_new(
-               postscript_interpreter_get_arena(interpreter)
-           ),
-           .data.sink.type = POSTSCRIPT_SINK_CUSTOM,
-           .data.sink.sink_name = "codespacerange",
-           .access = POSTSCRIPT_ACCESS_UNLIMITED,
-           .literal = true}
+        (PostscriptObject) {.type = POSTSCRIPT_OBJECT_SINK,
+                            .data.sink.list = postscript_object_list_new(
+                                postscript_interpreter_get_arena(interpreter)
+                            ),
+                            .data.sink.type = POSTSCRIPT_SINK_CUSTOM,
+                            .data.sink.sink_name = "codespacerange",
+                            .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                            .literal = true}
     );
 
     user_data->curr_sink_len = (size_t)length.data.integer;
@@ -324,14 +337,13 @@ static PdfError* cidinit_endcodespacerange(PostscriptInterpreter* interpreter) {
         size_t len = (size_t)(end - start) + 1;
         cmap_table_vec_push(
             user_data->cmap->tables,
-            (CMapTable
-            ) {.start_code = (size_t)start,
-               .len = len,
-               .map = uint32_array_new_init(
-                   user_data->cmap->arena,
-                   len,
-                   UINT32_MAX
-               )}
+            (CMapTable) {.start_code = (size_t)start,
+                         .len = len,
+                         .map = uint32_array_new_init(
+                             user_data->cmap->arena,
+                             len,
+                             UINT32_MAX
+                         )}
         );
     }
 
@@ -362,15 +374,14 @@ static PdfError* cidinit_begincidrange(PostscriptInterpreter* interpreter) {
 
     postscript_interpreter_operand_push(
         interpreter,
-        (PostscriptObject
-        ) {.type = POSTSCRIPT_OBJECT_SINK,
-           .data.sink.list = postscript_object_list_new(
-               postscript_interpreter_get_arena(interpreter)
-           ),
-           .data.sink.type = POSTSCRIPT_SINK_CUSTOM,
-           .data.sink.sink_name = "cidrange",
-           .access = POSTSCRIPT_ACCESS_UNLIMITED,
-           .literal = true}
+        (PostscriptObject) {.type = POSTSCRIPT_OBJECT_SINK,
+                            .data.sink.list = postscript_object_list_new(
+                                postscript_interpreter_get_arena(interpreter)
+                            ),
+                            .data.sink.type = POSTSCRIPT_SINK_CUSTOM,
+                            .data.sink.sink_name = "cidrange",
+                            .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                            .literal = true}
     );
 
     user_data->curr_sink_len = (size_t)length.data.integer;
@@ -478,6 +489,123 @@ static PdfError* cidinit_endcidrange(PostscriptInterpreter* interpreter) {
     return NULL;
 }
 
+static PdfError* cidinit_beginbfchar(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    CMapPostscriptUserData* user_data = NULL;
+    PDF_PROPAGATE(postscript_interpreter_user_data(
+        interpreter,
+        "cmap",
+        (void**)&user_data
+    ));
+
+    PostscriptObject length;
+    PDF_PROPAGATE(postscript_interpreter_pop_operand_typed(
+        interpreter,
+        POSTSCRIPT_OBJECT_INTEGER,
+        true,
+        &length
+    ));
+
+    if (length.data.integer < 0) {
+        return PDF_ERROR(PDF_ERR_POSTSCRIPT_INVALID_LENGTH);
+    }
+
+    postscript_interpreter_operand_push(
+        interpreter,
+        (PostscriptObject) {.type = POSTSCRIPT_OBJECT_SINK,
+                            .data.sink.list = postscript_object_list_new(
+                                postscript_interpreter_get_arena(interpreter)
+                            ),
+                            .data.sink.type = POSTSCRIPT_SINK_CUSTOM,
+                            .data.sink.sink_name = "bfchar",
+                            .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                            .literal = true}
+    );
+
+    user_data->curr_sink_len = (size_t)length.data.integer;
+
+    return NULL;
+}
+
+static PdfError* cidinit_endbfchar(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+
+    // Get user data
+    CMapPostscriptUserData* user_data = NULL;
+    PDF_PROPAGATE(postscript_interpreter_user_data(
+        interpreter,
+        "cmap",
+        (void**)&user_data
+    ));
+
+    // Get sink
+    PostscriptObject sink;
+    PDF_PROPAGATE(postscript_interpreter_pop_operand_typed(
+        interpreter,
+        POSTSCRIPT_OBJECT_SINK,
+        true,
+        &sink
+    ));
+
+    if (sink.data.sink.type != POSTSCRIPT_SINK_CUSTOM
+        || strcmp("bfchar", sink.data.sink.sink_name) != 0) {
+        return PDF_ERROR(
+            PDF_ERR_POSTSCRIPT_OPERAND_TYPE,
+            "cidrange sink had wrong name"
+        );
+    }
+
+    if (postscript_object_list_len(sink.data.sink.list)
+        != user_data->curr_sink_len * 2) {
+        return PDF_ERROR(
+            PDF_ERR_POSTSCRIPT_OPERAND_TYPE,
+            "bfchar sink had incorrect number of elements"
+        );
+    }
+
+    // Read table
+    for (size_t idx = 0; idx < user_data->curr_sink_len * 2; idx += 2) {
+        PostscriptObject key_str;
+        PostscriptObject value_str;
+        RELEASE_ASSERT(
+            postscript_object_list_get(sink.data.sink.list, idx, &key_str)
+        );
+        RELEASE_ASSERT(
+            postscript_object_list_get(sink.data.sink.list, idx + 1, &value_str)
+        );
+
+        if (key_str.type != POSTSCRIPT_OBJECT_STRING) {
+            return PDF_ERROR(
+                PDF_ERR_POSTSCRIPT_OPERAND_TYPE,
+                "bfchar key must be a string"
+            );
+        }
+
+        if (value_str.type != POSTSCRIPT_OBJECT_STRING) {
+            // TODO: allow names as well
+            return PDF_ERROR(
+                PDF_ERR_POSTSCRIPT_OPERAND_TYPE,
+                "bfchar value must be a string"
+            );
+        }
+
+        uint64_t key_int;
+        PDF_PROPAGATE(postscript_string_as_uint(key_str.data.string, &key_int));
+        uint64_t value_int;
+        PDF_PROPAGATE(
+            postscript_string_as_uint(value_str.data.string, &value_int)
+        );
+
+        cmap_bf_entry_vec_push(
+            user_data->cmap->bfchar,
+            (CMapBfEntry) {.src = key_int, .dst = value_int}
+        );
+    }
+
+    return NULL;
+}
+
 PdfError* pdf_parse_cmap(
     Arena* arena,
     const char* data,
@@ -489,6 +617,7 @@ PdfError* pdf_parse_cmap(
     *cmap_out = arena_alloc(arena, sizeof(PdfCMap));
     (*cmap_out)->arena = arena;
     (*cmap_out)->tables = cmap_table_vec_new(arena);
+    (*cmap_out)->bfchar = cmap_bf_entry_vec_new(arena);
     (*cmap_out)->use_cmap = NULL;
 
     Arena* interpreter_arena = arena_new(1024);
@@ -546,6 +675,20 @@ PdfError* pdf_parse_cmap(
         cidinit_endcidrange,
         "endcidrange"
     );
+    postscript_interpreter_add_operator(
+        interpreter,
+        "ProcSet",
+        "CIDInit",
+        cidinit_beginbfchar,
+        "beginbfchar"
+    );
+    postscript_interpreter_add_operator(
+        interpreter,
+        "ProcSet",
+        "CIDInit",
+        cidinit_endbfchar,
+        "endbfchar"
+    );
 
     // Push user data
     CMapPostscriptUserData user_data = {.cmap = *cmap_out, .curr_sink_len = 0};
@@ -570,46 +713,6 @@ PdfError* pdf_parse_cmap(
     return NULL;
 }
 
-static char*
-load_file_to_buffer(Arena* arena, const char* path, size_t* out_size) {
-    FILE* file = fopen(path, "rb");
-    *out_size = 0;
-    if (!file) {
-        return NULL;
-    }
-
-    if (fseek(file, 0, SEEK_END) != 0) {
-        fclose(file);
-        return NULL;
-    }
-
-    long len = ftell(file);
-    if (len < 0) {
-        fclose(file);
-        return NULL;
-    }
-
-    if (fseek(file, 0, SEEK_SET) != 0) {
-        fclose(file);
-        return NULL;
-    }
-
-    char* buffer = arena_alloc(arena, (size_t)len);
-    if (!buffer) {
-        fclose(file);
-        return NULL;
-    }
-
-    if (fread(buffer, 1, (size_t)len, file) != (size_t)len) {
-        fclose(file);
-        return NULL;
-    }
-    fclose(file);
-
-    *out_size = (size_t)len;
-    return buffer;
-}
-
 PdfError* pdf_load_cmap(Arena* arena, char* name, PdfCMap** cmap_out) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(name);
@@ -621,7 +724,7 @@ PdfError* pdf_load_cmap(Arena* arena, char* name, PdfCMap** cmap_out) {
     Arena* file_arena = arena_new(1);
 
     size_t file_len;
-    char* file = load_file_to_buffer(file_arena, cmap_path, &file_len);
+    char* file = (char*)load_file_to_buffer(file_arena, cmap_path, &file_len);
 
     PDF_PROPAGATE(pdf_parse_cmap(arena, file, file_len, cmap_out));
 

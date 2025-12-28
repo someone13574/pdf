@@ -12,17 +12,15 @@
 #include "pdf_error/error.h"
 
 TextState text_state_default(void) {
-    return (TextState
-    ) {.font_set = false,
-       .character_spacing = 0.0,
-       .word_spacing = 0.0,
-       .horizontal_spacing = 1.0};
+    return (TextState) {.font_set = false,
+                        .character_spacing = 0.0,
+                        .word_spacing = 0.0,
+                        .horizontal_scaling = 1.0};
 }
 
 TextObjectState text_object_state_default(void) {
-    return (TextObjectState
-    ) {.text_matrix = geom_mat3_identity(),
-       .text_line_matrix = geom_mat3_identity()};
+    return (TextObjectState) {.text_matrix = geom_mat3_identity(),
+                              .text_line_matrix = geom_mat3_identity()};
 }
 
 PdfError* text_state_render(
@@ -33,7 +31,8 @@ PdfError* text_state_render(
     GeomMat3 ctm,
     TextState* state,
     TextObjectState* object_state,
-    PdfString text
+    PdfString text,
+    uint32_t color_rgba
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(canvas);
@@ -68,21 +67,32 @@ PdfError* text_state_render(
 
         // Get GID
         uint32_t gid;
-        PDF_PROPAGATE(cid_to_gid(&state->text_font, resolver, cid, &gid));
+        PDF_PROPAGATE(
+            cid_to_gid(arena, &state->text_font, resolver, cid, &gid)
+        );
+
+        // Get font matrix
+        GeomMat3 font_matrix;
+        PDF_PROPAGATE(
+            get_font_matrix(arena, resolver, &state->text_font, &font_matrix)
+        );
 
         // Render
         GeomMat3 render_matrix = geom_mat3_mul(
             geom_mat3_mul(
-                geom_mat3_new(
-                    state->text_font_size * state->horizontal_spacing * 0.001,
-                    0.0,
-                    0.0,
-                    0.0,
-                    state->text_font_size * 0.001,
-                    0.0,
-                    0.0,
-                    state->text_rise,
-                    1.0
+                geom_mat3_mul(
+                    geom_mat3_new(
+                        state->text_font_size * state->horizontal_scaling,
+                        0.0,
+                        0.0,
+                        0.0,
+                        state->text_font_size,
+                        0.0,
+                        0.0,
+                        state->text_rise,
+                        1.0
+                    ),
+                    font_matrix
                 ),
                 object_state->text_matrix
             ),
@@ -90,24 +100,34 @@ PdfError* text_state_render(
         );
 
         PDF_PROPAGATE(render_glyph(
+            arena,
             &state->text_font,
             resolver,
             gid,
             canvas,
-            render_matrix
+            render_matrix,
+            color_rgba
         ));
 
-        // TODO: support vertical fonts
-        // TODO: Use font matrix
-        PdfInteger glyph_width;
-        PDF_PROPAGATE(cid_to_width(&state->text_font, cid, &glyph_width));
+        PdfNumber glyph_width;
+        PDF_PROPAGATE(
+            cid_to_width(&state->text_font, resolver, cid, &glyph_width)
+        );
 
-        double t_x = ((double)glyph_width * state->text_font_size
-                      + state->character_spacing + state->word_spacing)
-                   * state->horizontal_spacing * 0.001;
+        double tx =
+            (pdf_number_as_real(glyph_width) * 0.001 * state->text_font_size
+             + state->character_spacing + state->word_spacing)
+            * state->horizontal_scaling;
+        LOG_DIAG(
+            INFO,
+            RENDER,
+            "translating %f, font size = %f",
+            tx,
+            state->text_font_size
+        );
         object_state->text_matrix = geom_mat3_mul(
-            object_state->text_matrix,
-            geom_mat3_translate(t_x, 0.0)
+            geom_mat3_translate(tx, 0.0),
+            object_state->text_matrix
         );
     }
 

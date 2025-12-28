@@ -48,7 +48,8 @@ DARRAY_NAME* DARRAY_FN(new)(Arena* arena, size_t num_elements) {
     LOG_DIAG(
         DEBUG,
         ARRAY,
-        "Creating new " STRINGIFY(DARRAY_NAME) " (Array<" STRINGIFY(DARRAY_TYPE
+        "Creating new " STRINGIFY(DARRAY_NAME) " (Array<" STRINGIFY(
+            DARRAY_TYPE
         ) ", %zu>)",
         num_elements
     );
@@ -104,7 +105,8 @@ bool DARRAY_FN(get)(const DARRAY_NAME* array, size_t idx, DARRAY_TYPE* out) {
     LOG_DIAG(
         DEBUG,
         ARRAY,
-        "Getting " STRINGIFY(DARRAY_TYPE
+        "Getting " STRINGIFY(
+            DARRAY_TYPE
         ) " element at idx %zu from array " STRINGIFY(DARRAY_NAME),
         idx
     );
@@ -130,7 +132,8 @@ bool DARRAY_FN(get_ptr)(
     LOG_DIAG(
         DEBUG,
         ARRAY,
-        "Getting reference to " STRINGIFY(DARRAY_TYPE
+        "Getting reference to " STRINGIFY(
+            DARRAY_TYPE
         ) " element at idx %zu from array " STRINGIFY(DARRAY_NAME),
         idx
     );

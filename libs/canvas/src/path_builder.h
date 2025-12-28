@@ -29,6 +29,8 @@ typedef struct {
     } value;
 } PathContourSegment;
 
+GeomVec2 path_contour_segment_end(PathContourSegment segment);
+
 #define DVEC_NAME PathContour
 #define DVEC_LOWERCASE_NAME path_contour
 #define DVEC_TYPE PathContourSegment

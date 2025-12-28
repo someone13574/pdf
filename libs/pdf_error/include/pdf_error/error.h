@@ -13,6 +13,7 @@ typedef enum {
     PDF_ERR_XREF_GENERATION_MISMATCH,
     PDF_ERR_INVALID_OBJECT,
     PDF_ERR_INVALID_NUMBER,
+    PDF_ERR_INVALID_SUBTYPE,
     PDF_ERR_NUMBER_LIMIT,
     PDF_ERR_UNBALANCED_STR,
     PDF_ERR_NAME_UNESCAPED_CHAR,
@@ -74,6 +75,7 @@ typedef enum {
     PDF_ERR_ZLIB_INVALID_CHECKSUM,
     PDF_ERR_CODEC_BITSTREAM_EOD,
     PDF_ERR_RENDER_FONT_NOT_SET,
+    PDF_ERR_RENDER_GSTATE_CANNOT_RESTORE,
     PDF_ERR_POSTSCRIPT_EOF,
     PDF_ERR_POSTSCRIPT_INVALID_CHAR,
     PDF_ERR_POSTSCRIPT_LIMITCHECK,
@@ -108,8 +110,11 @@ PdfError* pdf_error_add_context(
 PdfErrorCode pdf_error_code(const PdfError* error);
 
 void pdf_error_print(const PdfError* error);
-void pdf_error_unwrap(PdfError* error, const char* file, unsigned long line)
-    NORETURN_ATTR;
+void pdf_error_unwrap(
+    PdfError* error,
+    const char* file,
+    unsigned long line
+) NORETURN_ATTR;
 bool pdf_error_free_is_ok(PdfError* error);
 
 #if defined(SOURCE_PATH_SIZE)

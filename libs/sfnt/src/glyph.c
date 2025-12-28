@@ -220,7 +220,8 @@ PdfError* sfnt_parse_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
 void sfnt_glyph_render(
     Canvas* canvas,
     const SfntGlyph* glyph,
-    GeomMat3 transform
+    GeomMat3 transform,
+    uint32_t color_rgba
 ) {
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(glyph);
@@ -293,23 +294,27 @@ void sfnt_glyph_render(
                 if (!has_curve_start && point.on_curve) {
                     has_curve_start = true;
                     path_builder_new_contour(path, position);
-                } else if (has_curve_start && !has_curve_control && !point.on_curve) {
+                } else if (has_curve_start && !has_curve_control
+                           && !point.on_curve) {
                     has_curve_control = true;
                     curve_control = position;
-                } else if (has_curve_start && !has_curve_control && point.on_curve) {
+                } else if (has_curve_start && !has_curve_control
+                           && point.on_curve) {
                     path_builder_line_to(path, position);
 
                     if (pass != 0) {
                         break;
                     }
-                } else if (has_curve_start && has_curve_control && point.on_curve) {
+                } else if (has_curve_start && has_curve_control
+                           && point.on_curve) {
                     path_builder_quad_bezier_to(path, position, curve_control);
 
                     has_curve_control = false;
                     if (pass != 0) {
                         break;
                     }
-                } else if (has_curve_start && has_curve_control && !point.on_curve) {
+                } else if (has_curve_start && has_curve_control
+                           && !point.on_curve) {
                     double mid_x = (curve_control.x + position.x) / 2.0;
                     double mid_y = (curve_control.y + position.y) / 2.0;
 
@@ -331,6 +336,6 @@ void sfnt_glyph_render(
         y_coord = contour_end_y;
     }
 
-    canvas_draw_path(canvas, path);
+    canvas_draw_path(canvas, path, color_rgba);
     arena_free(temp_arena);
 }

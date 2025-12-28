@@ -97,9 +97,11 @@ DcelVertex* dcel_add_vertex(Dcel* dcel, double x, double y) {
 
     DcelVertex* vertex = dcel_vertices_push(
         dcel->vertices,
-        (DcelVertex
-        ) {.x = x, .y = y, .incident_edge = NULL, .merge = false, .split = false
-        }
+        (DcelVertex) {.x = x,
+                      .y = y,
+                      .incident_edge = NULL,
+                      .merge = false,
+                      .split = false}
     );
     dcel_event_queue_insert_sorted(
         dcel->event_queue,
@@ -118,22 +120,20 @@ DcelHalfEdge* dcel_add_edge(Dcel* dcel, DcelVertex* a, DcelVertex* b) {
 
     DcelHalfEdge* half_edge_a = dcel_half_edges_push(
         dcel->half_edges,
-        (DcelHalfEdge
-        ) {.origin = a,
-           .twin = NULL,
-           .next = NULL,
-           .prev = NULL,
-           .rendered = false}
+        (DcelHalfEdge) {.origin = a,
+                        .twin = NULL,
+                        .next = NULL,
+                        .prev = NULL,
+                        .rendered = false}
     );
 
     DcelHalfEdge* half_edge_b = dcel_half_edges_push(
         dcel->half_edges,
-        (DcelHalfEdge
-        ) {.origin = b,
-           .twin = NULL,
-           .next = NULL,
-           .prev = NULL,
-           .rendered = false}
+        (DcelHalfEdge) {.origin = b,
+                        .twin = NULL,
+                        .next = NULL,
+                        .prev = NULL,
+                        .rendered = false}
     );
 
     half_edge_a->twin = half_edge_b;
@@ -219,9 +219,11 @@ static void rewire_incident_angles(
         size_t idx_b = (idx_a + 1) % incident_angles_list_len(incident_angles);
         IncidentAngle edge_a;
         IncidentAngle edge_b;
-        RELEASE_ASSERT(incident_angles_list_get(incident_angles, idx_a, &edge_a)
+        RELEASE_ASSERT(
+            incident_angles_list_get(incident_angles, idx_a, &edge_a)
         );
-        RELEASE_ASSERT(incident_angles_list_get(incident_angles, idx_b, &edge_b)
+        RELEASE_ASSERT(
+            incident_angles_list_get(incident_angles, idx_b, &edge_b)
         );
 
         edge_a.half_edge->twin->next = edge_b.half_edge;

@@ -60,7 +60,11 @@ typedef struct {
     PostscriptObjectList* list;
 
     /// Restricts the final size of the buffer.
-    enum { POSTSCRIPT_SINK_ARRAY, POSTSCRIPT_SINK_CUSTOM } type;
+    enum {
+        POSTSCRIPT_SINK_ARRAY,
+        POSTSCRIPT_SINK_DICT,
+        POSTSCRIPT_SINK_CUSTOM
+    } type;
 
     /// If this sink is a `POSTSCRIPT_SINK_CUSTOM`, then set the name here so it
     /// can be type-checked when consumed.

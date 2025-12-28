@@ -6,204 +6,181 @@
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf/types.h"
 #include "pdf_error/error.h"
 
 PdfError* pdf_deserialize_font_descriptor(
     const PdfObject* object,
-    Arena* arena,
+    PdfFontDescriptor* target_ptr,
     PdfOptionalResolver resolver,
-    PdfFontDescriptor* deserialized
+    Arena* arena
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(target_ptr);
     RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(deserialized);
+    RELEASE_ASSERT(arena);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
-            PdfFontDescriptor,
             "Type",
-            type,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+            &target_ptr->type,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "FontName",
-            font_name,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+            &target_ptr->font_name,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "FontFamily",
-            font_family,
-            PDF_OPTIONAL_FIELD(
-                PdfOpName,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+            &target_ptr->font_family,
+            PDF_DESERDE_OPTIONAL(
+                pdf_name_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
             )
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "FontStretch",
-            font_stretch,
-            PDF_OPTIONAL_FIELD(
-                PdfOpName,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_NAME)
+            &target_ptr->font_stretch,
+            PDF_DESERDE_OPTIONAL(
+                pdf_name_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
             )
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "FontWeight",
-            font_weight,
-            PDF_OPTIONAL_FIELD(
-                PdfOpNumber,
-                PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+            &target_ptr->font_weight,
+            PDF_DESERDE_OPTIONAL(
+                pdf_name_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
             )
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "Flags",
-            flags,
-            PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_INTEGER)
+            &target_ptr->flags,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "FontBBox",
-            font_bbox,
-            PDF_OPTIONAL_FIELD(
-                PdfOpRectangle,
-                PDF_CUSTOM_FIELD(pdf_deserialize_rectangle_wrapper)
+            &target_ptr->font_bbox,
+            PDF_DESERDE_OPTIONAL(
+                pdf_rectangle_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_rectangle_trampoline)
             )
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "ItalicAngle",
-            italic_angle,
-            PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+            &target_ptr->italic_angle,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "Ascent",
-            ascent,
-            PDF_OPTIONAL_FIELD(
-                PdfOpNumber,
-                PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+            &target_ptr->ascent,
+            PDF_DESERDE_OPTIONAL(
+                pdf_number_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
             )
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "Descent",
-            descent,
-            PDF_OPTIONAL_FIELD(
-                PdfOpNumber,
-                PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+            &target_ptr->descent,
+            PDF_DESERDE_OPTIONAL(
+                pdf_number_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
             )
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "Leading",
-            leading,
-            PDF_OPTIONAL_FIELD(
-                PdfOpNumber,
-                PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+            &target_ptr->leading,
+            PDF_DESERDE_OPTIONAL(
+                pdf_number_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
             )
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "CapHeight",
-            cap_height,
-            PDF_OPTIONAL_FIELD(
-                PdfOpNumber,
-                PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+            &target_ptr->cap_height,
+            PDF_DESERDE_OPTIONAL(
+                pdf_number_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
             )
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "StemV",
-            stem_v,
-            PDF_OPTIONAL_FIELD(
-                PdfOpNumber,
-                PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+            &target_ptr->stem_v,
+            PDF_DESERDE_OPTIONAL(
+                pdf_number_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
             )
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "StemH",
-            stem_h,
-            PDF_OPTIONAL_FIELD(
-                PdfOpNumber,
-                PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+            &target_ptr->stem_h,
+            PDF_DESERDE_OPTIONAL(
+                pdf_number_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
             )
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "AvgWidth",
-            avg_width,
-            PDF_OPTIONAL_FIELD(
-                PdfOpNumber,
-                PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+            &target_ptr->avg_width,
+            PDF_DESERDE_OPTIONAL(
+                pdf_number_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
             )
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "MaxWidth",
-            max_width,
-            PDF_OPTIONAL_FIELD(
-                PdfOpNumber,
-                PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+            &target_ptr->max_width,
+            PDF_DESERDE_OPTIONAL(
+                pdf_number_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
             )
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "MissingWidth",
-            missing_width,
-            PDF_OPTIONAL_FIELD(
-                PdfOpNumber,
-                PDF_CUSTOM_FIELD(pdf_deserialize_number_wrapper)
+            &target_ptr->missing_width,
+            PDF_DESERDE_OPTIONAL(
+                pdf_number_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
             )
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "FontFile",
-            font_file,
-            PDF_OPTIONAL_FIELD(
-                PdfOpStream,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STREAM)
+            &target_ptr->font_file,
+            PDF_DESERDE_OPTIONAL(
+                pdf_stream_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STREAM)
             )
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "FontFile2",
-            font_file2,
-            PDF_OPTIONAL_FIELD(
-                PdfOpStream,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STREAM)
+            &target_ptr->font_file2,
+            PDF_DESERDE_OPTIONAL(
+                pdf_stream_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STREAM)
             )
         ),
         PDF_FIELD(
-            PdfFontDescriptor,
             "FontFile3",
-            font_file3,
-            PDF_OPTIONAL_FIELD(
-                PdfOpStream,
-                PDF_OBJECT_FIELD(PDF_OBJECT_TYPE_STREAM)
+            &target_ptr->font_file3,
+            PDF_DESERDE_OPTIONAL(
+                pdf_stream_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STREAM)
             )
         )
     };
 
-    deserialized->raw_dict = object;
-    PDF_PROPAGATE(pdf_deserialize_object(
-        deserialized,
+    PDF_PROPAGATE(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
-        arena,
-        resolver,
         false,
+        resolver,
+        arena,
         "PdfFontDescriptor"
     ));
 
-    if (strcmp(deserialized->type, "FontDescriptor") != 0) {
+    if (strcmp(target_ptr->type, "FontDescriptor") != 0) {
         return PDF_ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "`Type` must be `FontDescriptor`"
@@ -211,13 +188,13 @@ PdfError* pdf_deserialize_font_descriptor(
     }
 
     size_t num_font_files = 0;
-    if (deserialized->font_file.discriminant) {
+    if (target_ptr->font_file.has_value) {
         num_font_files++;
     }
-    if (deserialized->font_file2.discriminant) {
+    if (target_ptr->font_file2.has_value) {
         num_font_files++;
     }
-    if (deserialized->font_file3.discriminant) {
+    if (target_ptr->font_file3.has_value) {
         num_font_files++;
     }
 
@@ -231,8 +208,15 @@ PdfError* pdf_deserialize_font_descriptor(
     return NULL;
 }
 
-PDF_DESERIALIZABLE_REF_IMPL(
+DESERDE_IMPL_RESOLVABLE(
+    PdfFontDescriptorRef,
     PdfFontDescriptor,
-    font_descriptor,
+    pdf_font_descriptor_ref_init,
+    pdf_resolve_font_descriptor,
     pdf_deserialize_font_descriptor
+)
+
+DESERDE_IMPL_OPTIONAL(
+    PdfFontDescriptorRefOptional,
+    pdf_font_descriptor_ref_op_init
 )

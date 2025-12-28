@@ -23,7 +23,7 @@ typedef struct {
 
     PdfReal character_spacing;   // T_c
     PdfReal word_spacing;        // T_w
-    PdfReal horizontal_spacing;  // T_h
+    PdfReal horizontal_scaling;  // T_h
     PdfReal leading;             // T_l
     PdfFont text_font;           // T_f
     PdfReal text_font_size;      // T_fs
@@ -49,5 +49,6 @@ PdfError* text_state_render(
     GeomMat3 ctm,
     TextState* state,
     TextObjectState* object_state,
-    PdfString text
+    PdfString text,
+    uint32_t color_rgba
 );

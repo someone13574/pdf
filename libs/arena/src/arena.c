@@ -174,7 +174,8 @@ void* arena_alloc_align(Arena* arena, size_t size, size_t align) {
     arena->num_blocks++;
 
     size_t block_size = arena->next_block_size;
-    while (block_size < size + (align == ALIGN_MAX ? 0 : align)
+    while (
+        block_size < size + (align == ALIGN_MAX ? 0 : align)
     ) { // Ensure there is enough space
         RELEASE_ASSERT(
             block_size < MAX_BLOCK_SIZE / 2,

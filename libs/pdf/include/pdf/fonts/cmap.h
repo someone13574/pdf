@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 #include "arena/arena.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
@@ -20,28 +22,24 @@ typedef struct {
     /// the character collection. This value shall not be used in determining
     /// compatibility between character collections.
     PdfInteger supplement;
-
-    const PdfObject* raw_dict;
 } PdfCIDSystemInfo;
 
 PdfError* pdf_deserialize_cid_system_info(
     const PdfObject* object,
-    Arena* arena,
+    PdfCIDSystemInfo* target_ptr,
     PdfOptionalResolver resolver,
-    PdfCIDSystemInfo* deserialized
+    Arena* arena
 );
 
-PdfError* pdf_deserialize_cid_system_info_wrapper(
-    const PdfObject* object,
-    Arena* arena,
-    PdfOptionalResolver resolver,
-    void* deserialized
-);
+DESERDE_DECL_TRAMPOLINE(pdf_deserialize_cid_system_info_trampoline)
 
 typedef struct PdfCMap PdfCMap;
 
 PdfError*
 pdf_cmap_get_cid(PdfCMap* cmap, uint32_t codepoint, uint32_t* cid_out);
+
+PdfError*
+pdf_cmap_get_unicode(PdfCMap* cmap, uint32_t cid, uint32_t* unicode_out);
 
 PdfError* pdf_parse_cmap(
     Arena* arena,

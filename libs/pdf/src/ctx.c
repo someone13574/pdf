@@ -360,8 +360,8 @@ PdfError* pdf_ctx_parse_int(
     uint64_t acc = 0;
     uint32_t processed_length = 0;
 
-    while (!(error = pdf_ctx_peek_and_advance(ctx, &peeked)) && isdigit(peeked)
-    ) {
+    while (!(error = pdf_ctx_peek_and_advance(ctx, &peeked))
+           && isdigit(peeked)) {
         uint64_t digit = (uint64_t)(peeked - '0');
         processed_length++;
 
@@ -630,7 +630,8 @@ TEST_FUNC(test_ctx_parse_int) {
     uint32_t expected_len = 3;
     uint32_t actual_len = 3;
     TEST_PDF_REQUIRE(pdf_ctx_seek(ctx, 10));
-    TEST_PDF_REQUIRE(pdf_ctx_parse_int(ctx, &expected_len, &value, &actual_len)
+    TEST_PDF_REQUIRE(
+        pdf_ctx_parse_int(ctx, &expected_len, &value, &actual_len)
     );
     TEST_ASSERT_EQ((uint64_t)120, value);
     TEST_ASSERT_EQ((uint32_t)3, actual_len);
