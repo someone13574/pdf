@@ -69,41 +69,97 @@ PdfError* sfnt_parse_cmap(Arena* arena, SfntParser* parser, SfntCmap* cmap) {
     return NULL;
 }
 
+/// Select the best subtable, following
+/// https://github.com/harfbuzz/harfbuzz/blob/e3d0aeab7a0657e99667291ae6f75bab3455244f/src/hb-ot-cmap-table.hh#L1953
 size_t sfnt_cmap_select_encoding(SfntCmap* cmap) {
     RELEASE_ASSERT(cmap);
 
-    bool found_unicode = false;
-    bool found_non_bmp_unicode = false;
-    size_t encoding_idx = 0;
+    int best_score = -1;
+    size_t selected_idx = 0;
 
     for (size_t idx = 0; idx < (size_t)cmap->num_subtables; idx++) {
         SfntCmapHeader subtable;
         RELEASE_ASSERT(sfnt_cmap_header_vec_get(cmap->headers, idx, &subtable));
 
+        int score = -1;
         if (subtable.platform_id == 0) {
-            found_unicode = true;
-
-            if (subtable.platform_specific_id == 3 && found_non_bmp_unicode) {
-                continue;
+            switch (subtable.platform_specific_id) {
+                case 0: {
+                    score = 3;
+                    break;
+                }
+                case 1: {
+                    score = 4;
+                    break;
+                }
+                case 2: {
+                    score = 5;
+                    break;
+                }
+                case 3: {
+                    score = 6;
+                    break;
+                }
+                case 4: {
+                    score = 8;
+                    break;
+                }
+                case 6: {
+                    score = 9;
+                    break;
+                }
+                default: {
+                    LOG_TODO(
+                        "Platform specific id %d",
+                        subtable.platform_specific_id
+                    );
+                }
             }
-
-            if (subtable.platform_specific_id != 3) {
-                found_non_bmp_unicode = true;
+        } else if (subtable.platform_id == 1) {
+            switch (subtable.platform_specific_id) {
+                case 0: {
+                    score = 2;
+                    break;
+                }
+                default: {
+                    score = 1;
+                    break;
+                }
             }
+        } else if (subtable.platform_id == 3) {
+            switch (subtable.platform_specific_id) {
+                case 0: {
+                    score = 11;
+                    break;
+                }
+                case 1: {
+                    score = 7;
+                    break;
+                }
+                case 10: {
+                    score = 10;
+                    break;
+                }
+                default: {
+                    LOG_TODO(
+                        "Platform specific id %d",
+                        subtable.platform_specific_id
+                    );
+                }
+            }
+        } else {
+            LOG_TODO("Platform id %d", subtable.platform_id);
+        }
 
-            encoding_idx = idx;
-        } else if (found_unicode) {
-            continue;
+        if (score > best_score) {
+            best_score = score;
+            selected_idx = idx;
         }
     }
 
-    if (!found_unicode) {
-        LOG_TODO("Non-unicode");
-    }
+    LOG_DIAG(INFO, SFNT, "Selected cmap encoding table %zu", selected_idx);
 
-    LOG_DIAG(INFO, SFNT, "Selected cmap encoding table %zu", encoding_idx);
-
-    return encoding_idx;
+    return selected_idx;
 }
 
 static PdfError*

@@ -293,7 +293,7 @@ PdfError* render_glyph(
             ));
 
             SfntFont* sfnt_font = NULL;
-            if (font_descriptor.font_file2.has_value && false) {
+            if (font_descriptor.font_file2.has_value) {
                 PDF_PROPAGATE(sfnt_font_new(
                     arena,
                     font_descriptor.font_file2.value.stream_bytes,
@@ -522,7 +522,7 @@ PdfError* get_font_matrix(
             ));
 
             SfntFont* sfnt_font = NULL;
-            if (font_descriptor.font_file2.has_value && false) {
+            if (font_descriptor.font_file2.has_value) {
                 PDF_PROPAGATE(sfnt_font_new(
                     arena,
                     font_descriptor.font_file2.value.stream_bytes,
