@@ -14,6 +14,12 @@ typedef struct {
     /// defined to be missing by a conforming reader.
     PdfInteger size;
 
+    /// Present only if the file has more than one cross-reference section;
+    /// shall be an indirect reference) The byte offset in the decoded stream
+    /// from the beginning of the file to the beginning of the previous
+    /// cross-reference section.
+    PdfIntegerOptional prev;
+
     /// The catalog dictionary for the PDF document contained in the file.
     PdfCatalogRef root;
 

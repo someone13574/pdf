@@ -1,10 +1,12 @@
 #include "pdf/pdf.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "arena/arena.h"
 #include "ctx.h"
+#include "deserialize.h"
 #include "logger/log.h"
 #include "object.h"
 #include "pdf/catalog.h"
@@ -14,20 +16,60 @@
 #include "pdf_error/error.h"
 #include "xref.h"
 
+typedef struct {
+    PdfIntegerOptional prev;
+} StubTrailer;
+
+static PdfError* deserialize_stub_trailer(
+    const PdfObject* object,
+    StubTrailer* target_ptr,
+    PdfOptionalResolver resolver,
+    Arena* arena
+) {
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(target_ptr);
+
+    PdfFieldDescriptor fields[] = {PDF_FIELD(
+        "Prev",
+        &target_ptr->prev,
+        PDF_DESERDE_OPTIONAL(
+            pdf_integer_op_init,
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+        )
+    )};
+
+    PDF_PROPAGATE(pdf_deserialize_dict(
+        object,
+        fields,
+        sizeof(fields) / sizeof(PdfFieldDescriptor),
+        true,
+        resolver,
+        arena,
+        "PdfTrailer (prev-only)"
+    ));
+
+    return NULL;
+}
+
 struct PdfResolver {
     Arena* arena;
     PdfCtx* ctx;
 
     uint8_t version;
-    size_t startxref;
+    // size_t startxref;
     XRefTable* xref;
 
-    PdfTrailer* trailer;
+    PdfTrailer trailer;
     PdfCatalog* catalog;
 };
 
-PdfError* pdf_parse_header(PdfCtx* ctx, uint8_t* version);
-PdfError* pdf_parse_startxref(PdfCtx* ctx, size_t* startxref);
+static PdfError* parse_header(PdfCtx* ctx, uint8_t* version);
+static PdfError* parse_startxref(PdfCtx* ctx, size_t* startxref);
+static PdfError*
+parse_stub_trailer(PdfResolver* resolver, StubTrailer* trailer);
+static PdfError* parse_trailer(PdfResolver* resolver, PdfTrailer* trailer);
 
 PdfError* pdf_resolver_new(
     Arena* arena,
@@ -43,27 +85,46 @@ PdfError* pdf_resolver_new(
     PdfCtx* ctx = pdf_ctx_new(arena, buffer, buffer_size);
 
     uint8_t version;
-    PDF_PROPAGATE(pdf_parse_header(ctx, &version));
+    PDF_PROPAGATE(parse_header(ctx, &version));
     LOG_DIAG(INFO, DOC, "File Version 1.%hhu", version);
 
-    size_t startxref;
-    PDF_PROPAGATE(pdf_parse_startxref(ctx, &startxref));
-    LOG_DIAG(DEBUG, DOC, "Startxref: %zu", startxref);
+    size_t current_xref_offset;
+    PDF_PROPAGATE(parse_startxref(ctx, &current_xref_offset));
 
-    XRefTable* xref;
-    PDF_PROPAGATE(
-        pdf_xref_new(arena, ctx, startxref, &xref),
-        "Failed to create the xref table"
-    );
-
+    XRefTable* xref = pdf_xref_init(arena, ctx);
     *resolver = arena_alloc(arena, sizeof(PdfResolver));
     (*resolver)->arena = arena;
     (*resolver)->ctx = ctx;
     (*resolver)->version = version;
-    (*resolver)->startxref = startxref;
     (*resolver)->xref = xref;
-    (*resolver)->trailer = NULL;
     (*resolver)->catalog = NULL;
+
+    size_t first_trailer_offset = SIZE_MAX;
+    while (current_xref_offset != 0) {
+        PDF_PROPAGATE(
+            pdf_xref_parse_section(arena, ctx, current_xref_offset, xref)
+        );
+
+        if (first_trailer_offset == SIZE_MAX) {
+            first_trailer_offset = pdf_ctx_offset(ctx);
+        }
+
+        StubTrailer trailer;
+        PDF_PROPAGATE(parse_stub_trailer(*resolver, &trailer));
+
+        if (trailer.prev.has_value) {
+            current_xref_offset = (size_t)trailer.prev.value;
+        } else {
+            current_xref_offset = 0;
+        }
+    }
+
+    if (first_trailer_offset == SIZE_MAX) {
+        return PDF_ERROR(PDF_ERR_INVALID_TRAILER, "Trailer is missing");
+    }
+
+    PDF_PROPAGATE(pdf_ctx_seek(ctx, first_trailer_offset));
+    PDF_PROPAGATE(parse_trailer(*resolver, &(*resolver)->trailer));
 
     return NULL;
 }
@@ -92,48 +153,64 @@ Arena* pdf_resolver_arena(PdfResolver* resolver) {
     return resolver->arena;
 }
 
-PdfError* pdf_get_trailer(PdfResolver* resolver, PdfTrailer* trailer) {
+static PdfError*
+parse_stub_trailer(PdfResolver* resolver, StubTrailer* trailer) {
     RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(trailer);
 
-    if (resolver->trailer) {
-        *trailer = *resolver->trailer;
-        return NULL;
-    }
-
-    PDF_PROPAGATE(
-        pdf_ctx_seek(resolver->ctx, pdf_ctx_buffer_len(resolver->ctx))
-    );
-    PDF_PROPAGATE(pdf_ctx_seek_line_start(resolver->ctx));
-
-    while (!pdf_error_free_is_ok(pdf_ctx_expect(resolver->ctx, "trailer"))
-           && pdf_ctx_offset(resolver->ctx) != 0) {
-        PDF_PROPAGATE(pdf_ctx_shift(resolver->ctx, -1));
-        PDF_PROPAGATE(pdf_ctx_seek_line_start(resolver->ctx));
-    }
-
+    PDF_PROPAGATE(pdf_ctx_expect(resolver->ctx, "trailer"));
     PDF_PROPAGATE(pdf_ctx_seek_next_line(resolver->ctx));
 
-    PdfObject* trailer_dict = arena_alloc(resolver->arena, sizeof(PdfObject));
+    PdfObject trailer_object;
     PDF_PROPAGATE(pdf_parse_object(
         resolver->arena,
         resolver->ctx,
         pdf_op_resolver_some(resolver),
-        trailer_dict,
+        &trailer_object,
         false
     ));
 
-    PDF_PROPAGATE(pdf_deserialize_trailer(
-        trailer_dict,
+    printf("%s\n", pdf_fmt_object(resolver->arena, &trailer_object));
+
+    PDF_PROPAGATE(deserialize_stub_trailer(
+        &trailer_object,
         trailer,
         pdf_op_resolver_some(resolver),
         resolver->arena
     ));
-
-    resolver->trailer = arena_alloc(resolver->arena, sizeof(PdfTrailer));
-    *resolver->trailer = *trailer;
-
     return NULL;
+}
+
+static PdfError* parse_trailer(PdfResolver* resolver, PdfTrailer* trailer) {
+    RELEASE_ASSERT(resolver);
+    RELEASE_ASSERT(trailer);
+
+    PDF_PROPAGATE(pdf_ctx_expect(resolver->ctx, "trailer"));
+    PDF_PROPAGATE(pdf_ctx_seek_next_line(resolver->ctx));
+
+    PdfObject trailer_object;
+    PDF_PROPAGATE(pdf_parse_object(
+        resolver->arena,
+        resolver->ctx,
+        pdf_op_resolver_some(resolver),
+        &trailer_object,
+        false
+    ));
+
+    PDF_PROPAGATE(pdf_deserialize_trailer(
+        &trailer_object,
+        trailer,
+        pdf_op_resolver_some(resolver),
+        resolver->arena
+    ));
+    return NULL;
+}
+
+void pdf_get_trailer(PdfResolver* resolver, PdfTrailer* trailer) {
+    RELEASE_ASSERT(resolver);
+    RELEASE_ASSERT(trailer);
+
+    *trailer = resolver->trailer;
 }
 
 PdfError* pdf_get_catalog(PdfResolver* resolver, PdfCatalog* catalog) {
@@ -146,7 +223,7 @@ PdfError* pdf_get_catalog(PdfResolver* resolver, PdfCatalog* catalog) {
     }
 
     PdfTrailer trailer;
-    PDF_PROPAGATE(pdf_get_trailer(resolver, &trailer));
+    pdf_get_trailer(resolver, &trailer);
     PDF_PROPAGATE(pdf_resolve_catalog(trailer.root, resolver, catalog));
 
     resolver->catalog = arena_alloc(resolver->arena, sizeof(PdfCatalog));
@@ -227,7 +304,7 @@ PdfError* pdf_resolve_object(
 // The first line of a PDF file shall be a header consisting of the 5 characters
 // %PDF– followed by a version number of the form 1.N, where N is a digit
 // between 0 and 7.
-PdfError* pdf_parse_header(PdfCtx* ctx, uint8_t* version) {
+PdfError* parse_header(PdfCtx* ctx, uint8_t* version) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(version);
 
@@ -253,7 +330,7 @@ PdfError* pdf_parse_header(PdfCtx* ctx, uint8_t* version) {
 // startxref and the byte offset in the decoded stream from the beginning of the
 // file to the beginning of the xref keyword in the last cross-reference
 // section.
-PdfError* pdf_parse_startxref(PdfCtx* ctx, size_t* startxref) {
+PdfError* parse_startxref(PdfCtx* ctx, size_t* startxref) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(startxref);
 
@@ -306,7 +383,7 @@ TEST_FUNC(test_header_valid) {
     TEST_ASSERT(ctx);
 
     uint8_t version = 0;
-    TEST_PDF_REQUIRE(pdf_parse_header(ctx, &version));
+    TEST_PDF_REQUIRE(parse_header(ctx, &version));
     TEST_ASSERT_EQ((uint8_t)5, version);
 
     arena_free(arena);
@@ -322,7 +399,7 @@ TEST_FUNC(test_header_invalid) {
     TEST_ASSERT(ctx);
 
     uint8_t version;
-    TEST_PDF_REQUIRE_ERR(pdf_parse_header(ctx, &version), PDF_ERR_CTX_EXPECT);
+    TEST_PDF_REQUIRE_ERR(parse_header(ctx, &version), PDF_ERR_CTX_EXPECT);
 
     arena_free(arena);
     return TEST_RESULT_PASS;
@@ -337,10 +414,7 @@ TEST_FUNC(test_header_invalid_version) {
     TEST_ASSERT(ctx);
 
     uint8_t version;
-    TEST_PDF_REQUIRE_ERR(
-        pdf_parse_header(ctx, &version),
-        PDF_ERR_INVALID_VERSION
-    );
+    TEST_PDF_REQUIRE_ERR(parse_header(ctx, &version), PDF_ERR_INVALID_VERSION);
 
     arena_free(arena);
     return TEST_RESULT_PASS;
@@ -355,7 +429,7 @@ TEST_FUNC(test_startxref) {
     TEST_ASSERT(ctx);
 
     size_t startxref;
-    TEST_PDF_REQUIRE(pdf_parse_startxref(ctx, &startxref));
+    TEST_PDF_REQUIRE(parse_startxref(ctx, &startxref));
     TEST_ASSERT_EQ((size_t)4325, startxref);
 
     arena_free(arena);
@@ -372,7 +446,7 @@ TEST_FUNC(test_startxref_invalid) {
 
     size_t startxref;
     TEST_PDF_REQUIRE_ERR(
-        pdf_parse_startxref(ctx, &startxref),
+        parse_startxref(ctx, &startxref),
         PDF_ERR_INVALID_STARTXREF
     );
 
@@ -390,7 +464,7 @@ TEST_FUNC(test_startxref_invalid2) {
 
     size_t startxref;
     TEST_PDF_REQUIRE_ERR(
-        pdf_parse_startxref(ctx, &startxref),
+        parse_startxref(ctx, &startxref),
         PDF_ERR_INVALID_STARTXREF
     );
 
@@ -407,10 +481,7 @@ TEST_FUNC(test_startxref_invalid3) {
     TEST_ASSERT(ctx);
 
     size_t startxref;
-    TEST_PDF_REQUIRE_ERR(
-        pdf_parse_startxref(ctx, &startxref),
-        PDF_ERR_CTX_EXPECT
-    );
+    TEST_PDF_REQUIRE_ERR(parse_startxref(ctx, &startxref), PDF_ERR_CTX_EXPECT);
 
     arena_free(arena);
     return TEST_RESULT_PASS;

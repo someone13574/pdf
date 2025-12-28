@@ -13,8 +13,14 @@ typedef struct {
     PdfObject* object;
 } XRefEntry;
 
-PdfError*
-pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, XRefTable** xref);
+XRefTable* pdf_xref_init(Arena* arena, PdfCtx* ctx);
+
+PdfError* pdf_xref_parse_section(
+    Arena* arena,
+    PdfCtx* ctx,
+    size_t xrefstart,
+    XRefTable* xref
+);
 
 PdfError* pdf_xref_get_entry(
     XRefTable* xref,

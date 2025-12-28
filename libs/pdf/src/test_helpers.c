@@ -36,7 +36,7 @@ char* pdf_construct_deserde_test_doc(
 
     char* doc = "%PDF-1.1\n";
     size_t cursor = strlen(doc);
-    size_t offsets[num_objects];
+    size_t offsets[num_objects + 1];
 
     // Add objects
     for (size_t idx = 0; idx < num_objects; idx++) {

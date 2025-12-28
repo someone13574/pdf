@@ -26,6 +26,14 @@ PdfError* pdf_deserialize_trailer(
             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         ),
         PDF_FIELD(
+            "Prev",
+            &target_ptr->prev,
+            PDF_DESERDE_OPTIONAL(
+                pdf_integer_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            )
+        ),
+        PDF_FIELD(
             "Root",
             &target_ptr->root,
             PDF_DESERDE_RESOLVABLE(pdf_catalog_ref_init)
