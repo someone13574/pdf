@@ -223,7 +223,7 @@ PdfError* pdf_deserialize_operands(
     void* init_fn(void* ptr_to_optional, _Bool has_value) {                    \
         new_type* optional = ptr_to_optional;                                  \
         optional->has_value = has_value;                                       \
-        return &optional->value;                                               \
+        return (void*)&optional->value;                                        \
     }
 
 #define DESERDE_IMPL_RESOLVABLE(                                               \

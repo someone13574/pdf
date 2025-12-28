@@ -10,8 +10,8 @@ typedef struct ArenaString ArenaString;
 ArenaString* arena_string_new(Arena* arena, size_t capacity);
 
 /// Creates a new arena-backed string by preforming a format.
-ArenaString* arena_string_new_fmt(Arena* arena, const char* fmt, ...)
-    FORMAT_ATTR(2, 3);
+ArenaString*
+arena_string_new_fmt(Arena* arena, const char* fmt, ...) FORMAT_ATTR(2, 3);
 
 /// Gets the underlying null-terminated string
 const char* arena_string_buffer(const ArenaString* string);

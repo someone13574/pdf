@@ -358,7 +358,8 @@ static PdfError* decode_dyn_huffman_table_luts(
 
     while (bit_len_offset < num_lit_code_lens + num_dist_code_lens) {
         uint32_t symbol;
-        PDF_PROPAGATE(deflate_huffman_decode(bitstream, &code_len_lut, &symbol)
+        PDF_PROPAGATE(
+            deflate_huffman_decode(bitstream, &code_len_lut, &symbol)
         );
 
         if (symbol <= 15) {
@@ -517,7 +518,8 @@ static PdfError* deflate_decode_distance_code(
     // Get distance symbol
     uint32_t dist_symbol = 0;
     if (dist_lut) {
-        PDF_PROPAGATE(deflate_huffman_decode(bitstream, dist_lut, &dist_symbol)
+        PDF_PROPAGATE(
+            deflate_huffman_decode(bitstream, dist_lut, &dist_symbol)
         );
     } else {
         PDF_PROPAGATE(bitstream_read_n(bitstream, 5, &dist_symbol));
@@ -660,7 +662,8 @@ PdfError* decode_deflate_data(
                          idx < output_stream_len - distance + length;
                          idx++) {
                         uint8_t byte;
-                        RELEASE_ASSERT(uint8_vec_get(output_stream, idx, &byte)
+                        RELEASE_ASSERT(
+                            uint8_vec_get(output_stream, idx, &byte)
                         );
 
                         uint8_vec_push(output_stream, byte);
@@ -985,9 +988,20 @@ TEST_FUNC(test_deflate_fixed_overlapping_alt) {
 }
 
 TEST_FUNC(test_deflate_dyn_empty) {
-    uint8_t stream[] =
-        {0x05, 0xe1, 0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0xf8, 0xaf, 0x46
-        };
+    uint8_t stream[] = {
+        0x05,
+        0xe1,
+        0x81,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x10,
+        0xf8,
+        0xaf,
+        0x46
+    };
     BitStream bitstream =
         bitstream_new(stream, sizeof(stream) / sizeof(uint8_t));
 
@@ -1002,9 +1016,20 @@ TEST_FUNC(test_deflate_dyn_empty) {
 }
 
 TEST_FUNC(test_deflate_dyn_empty_no_dist) {
-    uint8_t stream[] =
-        {0x05, 0xc0, 0x81, 0x08, 0x00, 0x00, 0x00, 0x00, 0x20, 0x7f, 0xea, 0x2f
-        };
+    uint8_t stream[] = {
+        0x05,
+        0xc0,
+        0x81,
+        0x08,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+        0x20,
+        0x7f,
+        0xea,
+        0x2f
+    };
     BitStream bitstream =
         bitstream_new(stream, sizeof(stream) / sizeof(uint8_t));
 

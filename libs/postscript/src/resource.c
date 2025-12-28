@@ -27,19 +27,18 @@ PostscriptResource postscript_resource_new_dict(Arena* arena, char* name) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(name);
 
-    return (PostscriptResource
-    ) {.name = name,
-       .object.type = POSTSCRIPT_OBJECT_DICT,
-       .object.data.dict = postscript_object_list_new(arena),
-       .object.access = POSTSCRIPT_ACCESS_READ_ONLY,
-       .object.literal = true};
+    return (PostscriptResource) {.name = name,
+                                 .object.type = POSTSCRIPT_OBJECT_DICT,
+                                 .object.data.dict =
+                                     postscript_object_list_new(arena),
+                                 .object.access = POSTSCRIPT_ACCESS_READ_ONLY,
+                                 .object.literal = true};
 }
 
 void postscript_resource_add_op(
     PostscriptResource* resource,
-    PostscriptOperator
-    operator,
-    char * name
+    PostscriptOperator operator,
+    char* name
 ) {
     RELEASE_ASSERT(resource);
     RELEASE_ASSERT(name);
@@ -48,20 +47,18 @@ void postscript_resource_add_op(
 
     postscript_object_list_push_back(
         resource->object.data.dict,
-        (PostscriptObject
-        ) {.type = POSTSCRIPT_OBJECT_NAME,
-           .data.name = name,
-           .access = POSTSCRIPT_ACCESS_UNLIMITED,
-           .literal = true}
+        (PostscriptObject) {.type = POSTSCRIPT_OBJECT_NAME,
+                            .data.name = name,
+                            .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                            .literal = true}
     );
 
     postscript_object_list_push_back(
         resource->object.data.dict,
-        (PostscriptObject
-        ) {.type = POSTSCRIPT_OBJECT_OPERATOR,
-           .data.operator= operator,
-           .access = POSTSCRIPT_ACCESS_EXECUTE_ONLY,
-           .literal = false}
+        (PostscriptObject) {.type = POSTSCRIPT_OBJECT_OPERATOR,
+                            .data.operator = operator,
+                            .access = POSTSCRIPT_ACCESS_EXECUTE_ONLY,
+                            .literal = false}
     );
 }
 
@@ -70,7 +67,8 @@ postscript_resource_category_new(Arena* arena, char* name) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(name);
 
-    return (PostscriptResourceCategory
+    return (
+        PostscriptResourceCategory
     ) {.name = name, .resources = postscript_resource_vec_new(arena)};
 }
 

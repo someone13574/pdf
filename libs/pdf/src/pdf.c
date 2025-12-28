@@ -71,15 +71,15 @@ PdfError* pdf_resolver_new(
 PdfOptionalResolver pdf_op_resolver_some(PdfResolver* resolver) {
     RELEASE_ASSERT(resolver);
 
-    return (PdfOptionalResolver
-    ) {.present = true, .unwrap_indirect_objs = true, .resolver = resolver};
+    return (PdfOptionalResolver) {.present = true,
+                                  .unwrap_indirect_objs = true,
+                                  .resolver = resolver};
 }
 
 PdfOptionalResolver pdf_op_resolver_none(bool unwrap_indirect_objs) {
-    return (PdfOptionalResolver
-    ) {.present = false,
-       .unwrap_indirect_objs = unwrap_indirect_objs,
-       .resolver = NULL};
+    return (PdfOptionalResolver) {.present = false,
+                                  .unwrap_indirect_objs = unwrap_indirect_objs,
+                                  .resolver = NULL};
 }
 
 bool pdf_op_resolver_valid(PdfOptionalResolver resolver) {
@@ -101,7 +101,8 @@ PdfError* pdf_get_trailer(PdfResolver* resolver, PdfTrailer* trailer) {
         return NULL;
     }
 
-    PDF_PROPAGATE(pdf_ctx_seek(resolver->ctx, pdf_ctx_buffer_len(resolver->ctx))
+    PDF_PROPAGATE(
+        pdf_ctx_seek(resolver->ctx, pdf_ctx_buffer_len(resolver->ctx))
     );
     PDF_PROPAGATE(pdf_ctx_seek_line_start(resolver->ctx));
 

@@ -30,8 +30,7 @@ void postscript_interpreter_add_operator(
     PostscriptInterpreter* interpreter,
     char* category_name,
     char* resource_name,
-    PostscriptOperator
-    operator,
+    PostscriptOperator operator,
     char * operator_name
 );
 

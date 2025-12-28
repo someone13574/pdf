@@ -197,9 +197,11 @@ PdfError* cff_parse_private_dict(
         switch (token.type) {
             case CFF_TOKEN_OPERATOR: {
                 CffPrivateDictKey key;
-                PDF_PROPAGATE(
-                    cff_private_dict_interpret_key(parser, token.value.operator, & key)
-                );
+                PDF_PROPAGATE(cff_private_dict_interpret_key(
+                    parser,
+                    token.value.operator,
+                    &key
+                ));
 
                 LOG_DIAG(
                     DEBUG,

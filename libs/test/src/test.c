@@ -257,8 +257,8 @@ run_forked_test(_TestFuncEntry* test_entry, int* passed, int* failed) {
                 if (poll_fd.revents & (POLLHUP | POLLERR)) {
                     // drain any remaining bytes
                     ssize_t n;
-                    while ((n = read(pipefd[0], read_buf, sizeof(read_buf))) > 0
-                    ) {
+                    while ((n = read(pipefd[0], read_buf, sizeof(read_buf)))
+                           > 0) {
                         char* old = buffer;
                         buffer = realloc(buffer, buffer_size + (size_t)n + 1);
                         if (!buffer) {
@@ -429,7 +429,8 @@ int test_entry(void) {
     } else if (passed + failed > 1) {
         LOG_WARN(
             TEST,
-            "Multiple test functions named `" STRINGIFY(DEBUG_TEST_FUNCTION
+            "Multiple test functions named `" STRINGIFY(
+                DEBUG_TEST_FUNCTION
             ) "` found. Persistent state may persist"
         );
     }

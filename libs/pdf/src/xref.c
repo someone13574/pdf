@@ -203,11 +203,10 @@ pdf_xref_new(Arena* arena, PdfCtx* ctx, size_t xrefstart, XRefTable** xref) {
 
         xref_subsection_vec_push(
             (*xref)->subsections,
-            (XRefSubsection
-            ) {.start_offset = subsection_start,
-               .first_object = (uint32_t)first_object,
-               .num_entries = (uint32_t)num_objects,
-               .entries = NULL}
+            (XRefSubsection) {.start_offset = subsection_start,
+                              .first_object = (uint32_t)first_object,
+                              .num_entries = (uint32_t)num_objects,
+                              .entries = NULL}
         );
 
         // Seek next subsection

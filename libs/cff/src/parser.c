@@ -12,8 +12,9 @@
 CffParser cff_parser_new(const uint8_t* buffer, size_t buffer_len) {
     RELEASE_ASSERT(buffer);
 
-    return (CffParser
-    ) {.buffer = buffer, .buffer_len = buffer_len, .offset = 0};
+    return (CffParser) {.buffer = buffer,
+                        .buffer_len = buffer_len,
+                        .offset = 0};
 }
 
 PdfError* cff_parser_seek(CffParser* parser, size_t offset) {
@@ -291,7 +292,7 @@ PdfError* cff_parser_read_token(CffParser* parser, CffToken* token_out) {
 
     if (byte0 <= 21) {
         token_out->type = CFF_TOKEN_OPERATOR;
-        token_out->value.operator= byte0;
+        token_out->value.operator = byte0;
     } else if (byte0 == 30) {
         PDF_PROPAGATE(read_real_operand(parser, token_out));
     } else if (byte0 <= 27 || byte0 == 31 || byte0 == 255) {
@@ -586,7 +587,7 @@ TEST_FUNC(test_cff_parser_read_sid_eof) {
 }
 
 TEST_FUNC(test_cff_parser_read_operator) {
-    for (uint8_t operator= 0; operator<= 21; operator++) {
+    for (uint8_t operator = 0; operator <= 21; operator++) {
         uint8_t buffer[] = {operator};
         CffParser parser =
             cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));

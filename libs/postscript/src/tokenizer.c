@@ -241,8 +241,9 @@ static PdfError* read_number_or_executable_name(
         // The integer ends
         if (integer_part_read_digits != 0
             && (tokenizer->offset >= tokenizer->data_len
-                || !is_postscript_regular(tokenizer->data[tokenizer->offset])
-            )) {
+                || !is_postscript_regular(
+                    tokenizer->data[tokenizer->offset]
+                ))) {
             uint64_t max_val =
                 negative ? (uint64_t)2147483648LL : (uint64_t)2147483647;
             if (is_integer_part_int && integer_part_int > max_val) {
@@ -690,7 +691,8 @@ PdfError* postscript_next_token(
         ));
     } else if (c == '(') {
         token_out->type = POSTSCRIPT_TOKEN_LIT_STRING;
-        PDF_PROPAGATE(read_lit_string(tokenizer, &token_out->data.string, true)
+        PDF_PROPAGATE(
+            read_lit_string(tokenizer, &token_out->data.string, true)
         );
     } else if (c == '<') {
         if (tokenizer->offset >= tokenizer->data_len) {

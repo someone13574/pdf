@@ -183,7 +183,8 @@ pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object) {
         return pdf_parse_true(ctx, object);
     } else if (peeked == 'f') {
         return pdf_parse_false(ctx, object);
-    } else if (peeked == '.' || peeked == '+' || peeked == '-' || isdigit((unsigned char)peeked)) {
+    } else if (peeked == '.' || peeked == '+' || peeked == '-'
+               || isdigit((unsigned char)peeked)) {
         return pdf_parse_number(ctx, object);
     } else if (peeked == '(') {
         return pdf_parse_string_literal(arena, ctx, object);
@@ -305,7 +306,8 @@ PdfError* pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
         }
 
         LOG_DIAG(TRACE, OBJECT, "Number is integer");
-        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular)
+        PDF_PROPAGATE(
+            pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular)
         );
 
         if (!has_leading) {
@@ -835,7 +837,8 @@ PdfError* pdf_parse_stream(
     // if an error occurs during stream decoding (due to a borrowed substr)
 
     // Deserialize stream dict
-    size_t resume_offset = pdf_ctx_offset(ctx
+    size_t resume_offset = pdf_ctx_offset(
+        ctx
     ); // If there is an indirect length, we don't want the offset to move
     PdfStreamDict stream_dict;
     PDF_REQUIRE(pdf_deserialize_stream_dict(
@@ -934,7 +937,8 @@ PdfError* pdf_parse_indirect(
         LOG_DIAG(DEBUG, OBJECT, "Parsed indirect object");
 
         PDF_PROPAGATE(pdf_ctx_expect(ctx, "obj"));
-        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, false, &is_pdf_non_regular)
+        PDF_PROPAGATE(
+            pdf_ctx_require_byte_type(ctx, false, &is_pdf_non_regular)
         );
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
         *number_fallback = false;
@@ -944,7 +948,8 @@ PdfError* pdf_parse_indirect(
 
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
         PDF_PROPAGATE(pdf_ctx_expect(ctx, "endobj"));
-        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular)
+        PDF_PROPAGATE(
+            pdf_ctx_require_byte_type(ctx, true, &is_pdf_non_regular)
         );
 
         object->type = PDF_OBJECT_TYPE_INDIRECT_OBJECT;
@@ -997,7 +1002,7 @@ ArenaString* pdf_fmt_object_indented(
             }
 
             int length = indent;
-            ArenaString** item_strs =
+            ArenaString** item_strs = (ArenaString**)
                 arena_alloc(arena, sizeof(ArenaString*) * num_items);
             bool array_contains_indirect = false;
             for (size_t idx = 0; idx < num_items; idx++) {
@@ -1067,7 +1072,8 @@ ArenaString* pdf_fmt_object_indented(
                 for (size_t idx = 0; idx < pdf_dict_entry_vec_len(entries);
                      idx++) {
                     PdfDictEntry entry;
-                    RELEASE_ASSERT(pdf_dict_entry_vec_get(entries, idx, &entry)
+                    RELEASE_ASSERT(
+                        pdf_dict_entry_vec_get(entries, idx, &entry)
                     );
                     ArenaString* key_text = pdf_fmt_object_indented(
                         arena,
@@ -1619,14 +1625,16 @@ TEST_FUNC(test_object_array_nested) {
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_ARRAY, element0->type);
 
     PdfObject* element00;
-    TEST_ASSERT(pdf_object_vec_get(element0->data.array.elements, 0, &element00)
+    TEST_ASSERT(
+        pdf_object_vec_get(element0->data.array.elements, 0, &element00)
     );
     TEST_ASSERT(element00);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element00->type);
     TEST_ASSERT_EQ((int32_t)1, element00->data.integer);
 
     PdfObject* element01;
-    TEST_ASSERT(pdf_object_vec_get(element0->data.array.elements, 1, &element01)
+    TEST_ASSERT(
+        pdf_object_vec_get(element0->data.array.elements, 1, &element01)
     );
     TEST_ASSERT(element01);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element01->type);
@@ -1638,14 +1646,16 @@ TEST_FUNC(test_object_array_nested) {
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_ARRAY, element1->type);
 
     PdfObject* element10;
-    TEST_ASSERT(pdf_object_vec_get(element1->data.array.elements, 0, &element10)
+    TEST_ASSERT(
+        pdf_object_vec_get(element1->data.array.elements, 0, &element10)
     );
     TEST_ASSERT(element10);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element10->type);
     TEST_ASSERT_EQ((int32_t)3, element10->data.integer);
 
     PdfObject* element11;
-    TEST_ASSERT(pdf_object_vec_get(element1->data.array.elements, 1, &element11)
+    TEST_ASSERT(
+        pdf_object_vec_get(element1->data.array.elements, 1, &element11)
     );
     TEST_ASSERT(element11);
     TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element11->type);

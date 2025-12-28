@@ -69,7 +69,7 @@ PdfError* pdf_deserialize_content_stream(
         PDF_PROPAGATE(pdf_ctx_seek(ctx, restore_offset));
 
         // Parse operator
-        PdfOperator operator= PDF_OPERATOR_UNSET;
+        PdfOperator operator = PDF_OPERATOR_UNSET;
         PDF_PROPAGATE(pdf_error_conditional_context(
             pdf_parse_operator(ctx, &operator),
             stop_reason
@@ -77,7 +77,7 @@ PdfError* pdf_deserialize_content_stream(
         PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, is_pdf_non_regular));
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
-        RELEASE_ASSERT(operator!= PDF_OPERATOR_UNSET);
+        RELEASE_ASSERT(operator != PDF_OPERATOR_UNSET);
 
         // Deserialize operation
         PDF_PROPAGATE(

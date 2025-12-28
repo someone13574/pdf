@@ -260,9 +260,11 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
         switch (token.type) {
             case CFF_TOKEN_OPERATOR: {
                 CffTopDictKey key;
-                PDF_PROPAGATE(
-                    cff_top_dict_interpret_key(parser, token.value.operator, & key)
-                );
+                PDF_PROPAGATE(cff_top_dict_interpret_key(
+                    parser,
+                    token.value.operator,
+                    &key
+                ));
 
                 LOG_DIAG(DEBUG, CFF, "Key: %s", cff_top_dict_key_names[key]);
                 switch (key) {

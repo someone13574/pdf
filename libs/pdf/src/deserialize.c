@@ -499,7 +499,8 @@ PdfError* pdf_deserialize_dict(
                     field->target_ptr,
                     field->deserde_info.value.optional_info
                 );
-            } else if (field->deserde_info.type != PDF_DESERDE_TYPE_UNIMPLEMENTED) {
+            } else if (field->deserde_info.type
+                       != PDF_DESERDE_TYPE_UNIMPLEMENTED) {
                 return PDF_ERROR(
                     PDF_ERR_MISSING_DICT_KEY,
                     "Missing key `%s`",
