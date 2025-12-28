@@ -422,7 +422,7 @@ static PdfError* deserialize_set_rgb(
 
     PdfContentOp* queue_op = new_queue_op(
         operation_queue,
-        stroking ? PDF_OPERATOR_rg : PDF_OPERATOR_RG
+        stroking ? PDF_OPERATOR_RG : PDF_OPERATOR_rg
     );
 
     PdfOperandDescriptor descriptors[] = {

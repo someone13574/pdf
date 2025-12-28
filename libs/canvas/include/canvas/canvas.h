@@ -6,6 +6,31 @@
 #include "arena/arena.h"
 #include "canvas/path_builder.h"
 
+typedef enum CanvasLineCap {
+    CANVAS_LINECAP_BUTT,
+    CANVAS_LINECAP_ROUND,
+    CANVAS_LINECAP_SQUARE
+} CanvasLineCap;
+
+typedef enum CanvasLineJoin {
+    CANVAS_LINEJOIN_MITER,
+    CANVAS_LINEJOIN_ROUND,
+    CANVAS_LINEJOIN_BEVEL
+} CanvasLineJoin;
+
+typedef struct CanvasBrush {
+    bool enable_fill;
+    bool enable_stroke;
+
+    uint32_t fill_rgba;
+    uint32_t stroke_rgba;
+
+    double stroke_width;
+    CanvasLineCap line_cap;
+    CanvasLineJoin line_join;
+    double miter_limit;
+} CanvasBrush;
+
 typedef struct Canvas Canvas;
 
 Canvas* canvas_new_raster(
@@ -54,7 +79,11 @@ void canvas_draw_bezier(
     uint32_t rgba
 );
 
-void canvas_draw_path(Canvas* canvas, const PathBuilder* path, uint32_t rgba);
+void canvas_draw_path(
+    Canvas* canvas,
+    const PathBuilder* path,
+    CanvasBrush brush
+);
 
 /// Writes the canvas to a file. Returns `true` on success.
 bool canvas_write_file(Canvas* canvas, const char* path);

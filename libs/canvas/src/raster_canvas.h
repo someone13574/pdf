@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
+#include "canvas/canvas.h"
 #include "canvas/path_builder.h"
 
 typedef struct RasterCanvas RasterCanvas;
@@ -74,7 +75,7 @@ void raster_canvas_draw_bezier(
 void raster_canvas_draw_path(
     RasterCanvas* canvas,
     const PathBuilder* path,
-    uint32_t rgba
+    CanvasBrush brush
 );
 
 bool raster_canvas_write_file(RasterCanvas* canvas, const char* path);

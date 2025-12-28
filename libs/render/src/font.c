@@ -191,7 +191,7 @@ PdfError* render_glyph(
     uint32_t gid,
     Canvas* canvas,
     GeomMat3 transform,
-    uint32_t color_rgba
+    CanvasBrush brush
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(font);
@@ -224,7 +224,7 @@ PdfError* render_glyph(
                 gid,
                 canvas,
                 transform,
-                color_rgba
+                brush
             ));
             return NULL;
         }
@@ -268,7 +268,7 @@ PdfError* render_glyph(
                         gid,
                         canvas,
                         transform,
-                        color_rgba
+                        brush
                     ));
 
                     arena_free(local_arena);
@@ -317,7 +317,7 @@ PdfError* render_glyph(
 
             SfntGlyph glyph;
             PDF_PROPAGATE(sfnt_get_glyph(sfnt_font, gid, &glyph));
-            sfnt_glyph_render(canvas, &glyph, transform, color_rgba);
+            sfnt_glyph_render(canvas, &glyph, transform, brush);
             break;
         }
         default: {

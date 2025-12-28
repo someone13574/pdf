@@ -22,6 +22,38 @@
 #include "pdf_error/error.h"
 #include "text_state.h"
 
+static CanvasLineCap pdf_line_cap_to_canvas(PdfLineCapStyle line_cap) {
+    switch (line_cap) {
+        case PDF_LINE_CAP_STYLE_BUTT: {
+            return CANVAS_LINECAP_BUTT;
+        }
+        case PDF_LINE_CAP_STYLE_ROUND: {
+            return CANVAS_LINECAP_ROUND;
+        }
+        case PDF_LINE_CAP_STYLE_PROJECTING: {
+            return CANVAS_LINECAP_SQUARE;
+        }
+    }
+
+    LOG_PANIC("Unreachable");
+}
+
+static CanvasLineJoin pdf_line_join_to_canvas(PdfLineJoinStyle line_join) {
+    switch (line_join) {
+        case PDF_LINE_JOIN_STYLE_MITER: {
+            return CANVAS_LINEJOIN_MITER;
+        }
+        case PDF_LINE_JOIN_STYLE_ROUND: {
+            return CANVAS_LINEJOIN_ROUND;
+        }
+        case PDF_LINE_JOIN_STYLE_BEVEL: {
+            return CANVAS_LINEJOIN_BEVEL;
+        }
+    }
+
+    LOG_PANIC("Unreachable");
+}
+
 typedef struct {
     GraphicsStateStack* graphics_state_stack; // idx 0 == top
     TextObjectState text_object_state;
@@ -159,34 +191,50 @@ static PdfError* process_content_stream(
                 break;
             }
             case PDF_OPERATOR_f: {
+                CanvasBrush brush = {
+                    .enable_fill = true,
+                    .enable_stroke = false,
+                    .fill_rgba = pack_rgba(
+                        current_graphics_state(state)->nonstroking_rgb,
+                        current_graphics_state(state)->nonstroking_alpha
+                    )
+                };
+
                 path_builder_apply_transform(
                     state->path,
                     current_graphics_state(state)->ctm
                 );
-                canvas_draw_path(
-                    canvas,
-                    state->path,
-                    pack_rgba(
-                        current_graphics_state(state)->nonstroking_rgb,
-                        current_graphics_state(state)->nonstroking_alpha
-                    )
-                );
+                canvas_draw_path(canvas, state->path, brush);
                 state->path = path_builder_new(arena); // TODO: recycle
                 break;
             }
             case PDF_OPERATOR_B: {
+                CanvasBrush brush = {
+                    .enable_fill = true,
+                    .enable_stroke = true,
+                    .fill_rgba = pack_rgba(
+                        current_graphics_state(state)->nonstroking_rgb,
+                        current_graphics_state(state)->nonstroking_alpha
+                    ),
+                    .stroke_rgba = pack_rgba(
+                        current_graphics_state(state)->stroking_rgb,
+                        current_graphics_state(state)->stroking_alpha
+                    ),
+                    .stroke_width = current_graphics_state(state)->line_width,
+                    .line_cap = pdf_line_cap_to_canvas(
+                        current_graphics_state(state)->line_cap
+                    ),
+                    .line_join = pdf_line_join_to_canvas(
+                        current_graphics_state(state)->line_join
+                    ),
+                    .miter_limit = current_graphics_state(state)->miter_limit
+                };
+
                 path_builder_apply_transform(
                     state->path,
                     current_graphics_state(state)->ctm
                 );
-                canvas_draw_path(
-                    canvas,
-                    state->path,
-                    pack_rgba(
-                        current_graphics_state(state)->stroking_rgb,
-                        current_graphics_state(state)->stroking_alpha
-                    )
-                );
+                canvas_draw_path(canvas, state->path, brush);
                 state->path = path_builder_new(arena); // TODO: recycle
                 break;
             }
@@ -227,27 +275,6 @@ static PdfError* process_content_stream(
                 current_graphics_state(state)->text_state.font_set = true;
                 break;
             }
-            // // case PDF_CONTENT_OP_NEXT_LINE: {
-            // //     GeomMat3 transform = geom_mat3_new(
-            // //         1.0,
-            // //         0.0,
-            // //         0.0,
-            // //         0.0,
-            // //         1.0,
-            // //         0.0,
-            // //         pdf_number_as_real(op.data.next_line.t_x),
-            // //         pdf_number_as_real(op.data.next_line.t_y),
-            // //         1.0
-            // //     );
-
-            // //     state->text_object_state.text_matrix = geom_mat3_mul(
-            // //         transform,
-            // //         state->text_object_state.text_line_matrix
-            // //     );
-            // //     state->text_object_state.text_line_matrix =
-            // //         state->text_object_state.text_matrix;
-            // //     break;
-            // // }
             case PDF_OPERATOR_Td: {
                 GeomMat3 transform = geom_mat3_translate(
                     op.data.text_offset.x,
@@ -296,6 +323,16 @@ static PdfError* process_content_stream(
                             state->text_object_state.text_matrix
                         );
                     } else {
+                        // TODO: rendering mode
+                        CanvasBrush brush = {
+                            .enable_fill = true,
+                            .enable_stroke = false,
+                            .fill_rgba = pack_rgba(
+                                current_graphics_state(state)->nonstroking_rgb,
+                                current_graphics_state(state)->nonstroking_alpha
+                            )
+                        };
+
                         PDF_PROPAGATE(text_state_render(
                             arena,
                             canvas,
@@ -305,11 +342,7 @@ static PdfError* process_content_stream(
                             &current_graphics_state(state)->text_state,
                             &state->text_object_state,
                             element.value.str,
-                            pack_rgba(
-                                current_graphics_state(state)->stroking_rgb,
-                                current_graphics_state(state)->stroking_alpha
-                            ) // TODO: Use rendering mode
-                              // to stroke or fill
+                            brush
                         ));
                     }
                 }

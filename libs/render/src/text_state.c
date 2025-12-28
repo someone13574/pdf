@@ -32,7 +32,7 @@ PdfError* text_state_render(
     TextState* state,
     TextObjectState* object_state,
     PdfString text,
-    uint32_t color_rgba
+    CanvasBrush brush
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(canvas);
@@ -106,7 +106,7 @@ PdfError* text_state_render(
             gid,
             canvas,
             render_matrix,
-            color_rgba
+            brush
         ));
 
         PdfNumber glyph_width;

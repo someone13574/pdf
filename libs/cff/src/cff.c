@@ -151,7 +151,7 @@ PdfError* cff_render_glyph(
     uint32_t gid,
     Canvas* canvas,
     GeomMat3 transform,
-    uint32_t color_rgba
+    CanvasBrush brush
 ) {
     RELEASE_ASSERT(fontset);
     RELEASE_ASSERT(canvas);
@@ -178,7 +178,7 @@ PdfError* cff_render_glyph(
         charstr_len,
         canvas,
         transform,
-        color_rgba
+        brush
     ));
 
     return NULL;

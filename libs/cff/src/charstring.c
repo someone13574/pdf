@@ -837,7 +837,7 @@ PdfError* cff_charstr2_render(
     size_t length,
     Canvas* canvas,
     GeomMat3 transform,
-    uint32_t color_rgba
+    CanvasBrush brush
 ) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(canvas);
@@ -863,7 +863,7 @@ PdfError* cff_charstr2_render(
     ));
 
     path_builder_apply_transform(state.path_builder, transform);
-    canvas_draw_path(canvas, state.path_builder, color_rgba);
+    canvas_draw_path(canvas, state.path_builder, brush);
     arena_free(temp_arena);
 
     return NULL;

@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
+#include "canvas/canvas.h"
 #include "canvas/path_builder.h"
 
 typedef struct ScalableCanvas ScalableCanvas;
@@ -48,7 +49,7 @@ void scalable_canvas_draw_bezier(
 void scalable_canvas_draw_path(
     ScalableCanvas* canvas,
     const PathBuilder* path,
-    uint32_t rgba
+    CanvasBrush brush
 );
 
 bool scalable_canvas_write_file(ScalableCanvas* canvas, const char* path);

@@ -50,5 +50,5 @@ PdfError* text_state_render(
     TextState* state,
     TextObjectState* object_state,
     PdfString text,
-    uint32_t color_rgba
+    CanvasBrush brush
 );

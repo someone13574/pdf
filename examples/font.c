@@ -33,7 +33,14 @@ int main(int argc, char** argv) {
     Canvas* canvas = canvas_new_scalable(arena, 2000, 2000, 0xffffffff);
     GeomMat3 transform =
         geom_mat3_new(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 500.0, 1500.0, 1.0);
-    sfnt_glyph_render(canvas, &glyph, transform, 0x000000ff);
+    sfnt_glyph_render(
+        canvas,
+        &glyph,
+        transform,
+        (CanvasBrush) {.enable_fill = true,
+                       .enable_stroke = false,
+                       .fill_rgba = 0x000000ff}
+    );
     canvas_write_file(canvas, "glyph.svg");
 
     LOG_DIAG(INFO, EXAMPLE, "Finished");

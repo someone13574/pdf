@@ -221,7 +221,7 @@ void sfnt_glyph_render(
     Canvas* canvas,
     const SfntGlyph* glyph,
     GeomMat3 transform,
-    uint32_t color_rgba
+    CanvasBrush brush
 ) {
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(glyph);
@@ -336,6 +336,6 @@ void sfnt_glyph_render(
         y_coord = contour_end_y;
     }
 
-    canvas_draw_path(canvas, path, color_rgba);
+    canvas_draw_path(canvas, path, brush);
     arena_free(temp_arena);
 }

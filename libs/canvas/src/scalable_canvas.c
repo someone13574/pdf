@@ -5,6 +5,7 @@
 
 #include "arena/arena.h"
 #include "arena/string.h"
+#include "canvas/canvas.h"
 #include "logger/log.h"
 #include "path_builder.h"
 
@@ -131,7 +132,7 @@ void scalable_canvas_draw_bezier(
 void scalable_canvas_draw_path(
     ScalableCanvas* canvas,
     const PathBuilder* path,
-    uint32_t rgba
+    CanvasBrush brush
 ) {
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(path);
@@ -220,9 +221,97 @@ void scalable_canvas_draw_path(
         }
     }
 
+    // Brush
+    if (brush.enable_fill) {
+        svg_parts_vec_push(
+            canvas->parts,
+            arena_string_new_fmt(
+                canvas->arena,
+                "\" fill=\"#%08x\"",
+                brush.fill_rgba
+            )
+        );
+    } else {
+        svg_parts_vec_push(
+            canvas->parts,
+            arena_string_new_fmt(canvas->arena, "\" fill=\"none\"")
+        );
+    }
+
+    if (brush.enable_stroke) {
+        svg_parts_vec_push(
+            canvas->parts,
+            arena_string_new_fmt(
+                canvas->arena,
+                " stroke=\"#%08x\" stroke-width=\"%f\"",
+                brush.stroke_rgba,
+                brush.stroke_width
+            )
+        );
+
+        const char* line_cap = NULL;
+        switch (brush.line_cap) {
+            case CANVAS_LINECAP_BUTT: {
+                line_cap = "butt";
+                break;
+            }
+            case CANVAS_LINECAP_ROUND: {
+                line_cap = "round";
+                break;
+            }
+            case CANVAS_LINECAP_SQUARE: {
+                line_cap = "square";
+                break;
+            }
+        }
+        svg_parts_vec_push(
+            canvas->parts,
+            arena_string_new_fmt(
+                canvas->arena,
+                " stroke-linecap=\"%s\"",
+                line_cap
+            )
+        );
+
+        const char* line_join = NULL;
+        switch (brush.line_join) {
+            case CANVAS_LINEJOIN_MITER: {
+                line_join = "miter";
+                break;
+            }
+            case CANVAS_LINEJOIN_ROUND: {
+                line_join = "round";
+                break;
+            }
+            case CANVAS_LINEJOIN_BEVEL: {
+                line_join = "bevel";
+                break;
+            }
+        }
+        svg_parts_vec_push(
+            canvas->parts,
+            arena_string_new_fmt(
+                canvas->arena,
+                " stroke-linejoin=\"%s\"",
+                line_join
+            )
+        );
+
+        if (brush.line_join == CANVAS_LINEJOIN_MITER) {
+            svg_parts_vec_push(
+                canvas->parts,
+                arena_string_new_fmt(
+                    canvas->arena,
+                    " stroke-miterlimit=\"%f\"",
+                    brush.miter_limit
+                )
+            );
+        }
+    }
+
     svg_parts_vec_push(
         canvas->parts,
-        arena_string_new_fmt(canvas->arena, "\" fill=\"#%08x\"  />", rgba)
+        arena_string_new_fmt(canvas->arena, "  />")
     );
 }
 

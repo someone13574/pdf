@@ -79,5 +79,5 @@ void sfnt_glyph_render(
     Canvas* canvas,
     const SfntGlyph* glyph,
     GeomMat3 transform,
-    uint32_t color_rgba
+    CanvasBrush brush
 );

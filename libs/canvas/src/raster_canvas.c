@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "arena/arena.h"
+#include "canvas/canvas.h"
 #include "logger/log.h"
 
 #define BMP_HEADER_LEN 14
@@ -348,9 +349,9 @@ void raster_canvas_draw_bezier(
 void raster_canvas_draw_path(
     RasterCanvas* canvas,
     const PathBuilder* path,
-    uint32_t rgba
+    CanvasBrush brush
 ) {
-    (void)rgba;
+    (void)brush;
 
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(path);

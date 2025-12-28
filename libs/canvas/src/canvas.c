@@ -167,17 +167,21 @@ void canvas_draw_bezier(
     }
 }
 
-void canvas_draw_path(Canvas* canvas, const PathBuilder* path, uint32_t rgba) {
+void canvas_draw_path(
+    Canvas* canvas,
+    const PathBuilder* path,
+    CanvasBrush brush
+) {
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(path);
 
     switch (canvas->type) {
         case CANVAS_TYPE_RASTER: {
-            raster_canvas_draw_path(canvas->data.raster, path, rgba);
+            raster_canvas_draw_path(canvas->data.raster, path, brush);
             break;
         }
         case CANVAS_TYPE_SCALABLE: {
-            scalable_canvas_draw_path(canvas->data.scalable, path, rgba);
+            scalable_canvas_draw_path(canvas->data.scalable, path, brush);
             break;
         }
         default: {

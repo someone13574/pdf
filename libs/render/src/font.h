@@ -38,7 +38,7 @@ PdfError* render_glyph(
     uint32_t gid,
     Canvas* canvas,
     GeomMat3 transform,
-    uint32_t color_rgba
+    CanvasBrush brush
 );
 
 /// Gets the width for a CID.
