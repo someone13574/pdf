@@ -302,7 +302,7 @@ static PdfError* deserialize_text_op(
     PDF_PROPAGATE(pdf_deserialize_operands(operands, descriptors, 1, arena));
 
     PdfOpParamsPositionedTextElement* element =
-        pdf_op_params_positioned_text_vec_push_uninit(target_vec, arena);
+        pdf_op_params_positioned_text_vec_push_uninit((void*)target_vec, arena);
     element->type = POSITIONED_TEXT_ELEMENT_STR;
     element->value.str = string;
 
@@ -585,7 +585,8 @@ PdfError* pdf_deserialize_content_op(
             return NULL;
         };
         case PDF_OPERATOR_Tf: {
-            PDF_PROPAGATE(deserialize_set_font(operation_queue, operands, arena)
+            PDF_PROPAGATE(
+                deserialize_set_font(operation_queue, operands, arena)
             );
             return NULL;
         }

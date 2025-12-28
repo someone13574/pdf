@@ -130,7 +130,8 @@ void scalable_canvas_draw_bezier(
 
 void scalable_canvas_draw_path(
     ScalableCanvas* canvas,
-    const PathBuilder* path
+    const PathBuilder* path,
+    uint32_t rgba
 ) {
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(path);
@@ -221,7 +222,7 @@ void scalable_canvas_draw_path(
 
     svg_parts_vec_push(
         canvas->parts,
-        arena_string_new_fmt(canvas->arena, "\" fill=\"black\" />")
+        arena_string_new_fmt(canvas->arena, "\" fill=\"#%08x\"  />", rgba)
     );
 }
 

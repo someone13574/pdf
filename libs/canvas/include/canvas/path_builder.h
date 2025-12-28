@@ -10,6 +10,7 @@ PathBuilder* path_builder_new(Arena* arena);
 PathBuilder* path_builder_clone(Arena* arena, const PathBuilder* to_clone);
 
 void path_builder_new_contour(PathBuilder* builder, GeomVec2 point);
+void path_builder_close_contour(PathBuilder* builder);
 void path_builder_line_to(PathBuilder* builder, GeomVec2 point);
 void path_builder_quad_bezier_to(
     PathBuilder* builder,

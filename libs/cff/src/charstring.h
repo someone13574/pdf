@@ -12,5 +12,6 @@ PdfError* cff_charstr2_render(
     CffIndex subr_index,
     size_t length,
     Canvas* canvas,
-    GeomMat3 transform
+    GeomMat3 transform,
+    uint32_t color_rgba
 );

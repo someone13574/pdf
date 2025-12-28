@@ -1,9 +1,11 @@
 #include "render/render.h"
 
+#include <stdint.h>
 #include <stdio.h>
 
 #include "arena/arena.h"
 #include "canvas/canvas.h"
+#include "canvas/path_builder.h"
 #include "geom/mat3.h"
 #include "geom/rect.h"
 #include "geom/vec2.h"
@@ -20,11 +22,10 @@
 #include "pdf_error/error.h"
 #include "text_state.h"
 
-#define SCALE (25.4 / 72.0) // TODO: Load user-space units for conversion factor
-
 typedef struct {
     GraphicsStateStack* graphics_state_stack; // idx 0 == top
     TextObjectState text_object_state;
+    PathBuilder* path;
 
     PdfCMapCache* cmap_cache;
 } RenderState;
@@ -59,6 +60,11 @@ static PdfError* restore_graphics_state(RenderState* state) {
     }
 
     return NULL;
+}
+
+static uint32_t pack_rgba(PdfOpParamsSetRGB rgb, double a) {
+    return ((uint32_t)(rgb.r * 255.0) << 24) | ((uint32_t)(rgb.g * 255.0) << 16)
+         | ((uint32_t)(rgb.b * 255.0) << 8) | (uint32_t)(a * 255.0);
 }
 
 static PdfError* process_content_stream(
@@ -141,23 +147,47 @@ static PdfError* process_content_stream(
                 break;
             }
             case PDF_OPERATOR_m: {
-                LOG_WARN(RENDER, "TODO: Paths");
+                path_builder_new_contour(state->path, op.data.new_subpath);
                 break;
             }
             case PDF_OPERATOR_l: {
-                LOG_WARN(RENDER, "TODO: Paths");
+                path_builder_line_to(state->path, op.data.line_to);
                 break;
             }
             case PDF_OPERATOR_h: {
-                LOG_WARN(RENDER, "TODO: Paths");
+                path_builder_close_contour(state->path);
                 break;
             }
             case PDF_OPERATOR_f: {
-                LOG_WARN(RENDER, "TODO: Paths");
+                path_builder_apply_transform(
+                    state->path,
+                    current_graphics_state(state)->ctm
+                );
+                canvas_draw_path(
+                    canvas,
+                    state->path,
+                    pack_rgba(
+                        current_graphics_state(state)->nonstroking_rgb,
+                        current_graphics_state(state)->nonstroking_alpha
+                    )
+                );
+                state->path = path_builder_new(arena); // TODO: recycle
                 break;
             }
             case PDF_OPERATOR_B: {
-                LOG_WARN(RENDER, "TODO: Paths");
+                path_builder_apply_transform(
+                    state->path,
+                    current_graphics_state(state)->ctm
+                );
+                canvas_draw_path(
+                    canvas,
+                    state->path,
+                    pack_rgba(
+                        current_graphics_state(state)->stroking_rgb,
+                        current_graphics_state(state)->stroking_alpha
+                    )
+                );
+                state->path = path_builder_new(arena); // TODO: recycle
                 break;
             }
             case PDF_OPERATOR_BT: {
@@ -224,8 +254,8 @@ static PdfError* process_content_stream(
                     op.data.text_offset.y
                 );
                 state->text_object_state.text_matrix = geom_mat3_mul(
-                    state->text_object_state.text_matrix,
-                    transform
+                    transform,
+                    state->text_object_state.text_matrix
                 );
                 break;
             }
@@ -253,7 +283,8 @@ static PdfError* process_content_stream(
                         TextState* text_state =
                             &current_graphics_state(state)->text_state;
                         double tx = -(element.value.offset / 1000.0)
-                                  * text_state->text_font_size;
+                                  * text_state->text_font_size
+                                  * text_state->horizontal_scaling;
                         LOG_DIAG(INFO, RENDER, "element offsetting: %f", tx);
 
                         GeomMat3 transform = geom_mat3_translate(
@@ -261,8 +292,8 @@ static PdfError* process_content_stream(
                             0.0
                         );
                         state->text_object_state.text_matrix = geom_mat3_mul(
-                            state->text_object_state.text_matrix,
-                            transform
+                            transform,
+                            state->text_object_state.text_matrix
                         );
                     } else {
                         PDF_PROPAGATE(text_state_render(
@@ -273,21 +304,31 @@ static PdfError* process_content_stream(
                             current_graphics_state(state)->ctm,
                             &current_graphics_state(state)->text_state,
                             &state->text_object_state,
-                            element.value.str
+                            element.value.str,
+                            pack_rgba(
+                                current_graphics_state(state)->stroking_rgb,
+                                current_graphics_state(state)->stroking_alpha
+                            ) // TODO: Use rendering mode
+                              // to stroke or fill
                         ));
                     }
                 }
                 break;
             }
-            case PDF_OPERATOR_G:
+            case PDF_OPERATOR_G: {
+                current_graphics_state(state)->stroking_rgb =
+                    (PdfOpParamsSetRGB) {.r = op.data.set_gray,
+                                         .g = op.data.set_gray,
+                                         .b = op.data.set_gray};
+                break;
+            }
             case PDF_OPERATOR_RG: {
-                // TODO: Colors
-                LOG_WARN(RENDER, "Colors not implemented");
+                current_graphics_state(state)->stroking_rgb = op.data.set_rgb;
                 break;
             }
             case PDF_OPERATOR_rg: {
-                // TODO: Colors
-                LOG_WARN(RENDER, "Colors not implemented");
+                current_graphics_state(state)->nonstroking_rgb =
+                    op.data.set_rgb;
                 break;
             }
             case PDF_OPERATOR_Do: {
@@ -371,7 +412,8 @@ PdfError* render_page(
     RenderState state = {
         .graphics_state_stack = graphics_state_stack_new(arena),
         .text_object_state = text_object_state_default(),
-        .cmap_cache = pdf_cmap_cache_new(arena)
+        .cmap_cache = pdf_cmap_cache_new(arena),
+        .path = path_builder_new(arena)
     };
 
     graphics_state_stack_push_back(
@@ -379,17 +421,18 @@ PdfError* render_page(
         graphics_state_default()
     );
 
+    double scale = 1.0; // TODO: load
     current_graphics_state(&state)->ctm = geom_mat3_mul(
-        geom_mat3_translate(-rect.min.x * SCALE, -rect.min.y * SCALE),
+        geom_mat3_translate(-rect.min.x * scale, -rect.min.y * scale),
         geom_mat3_new(
-            SCALE,
+            scale,
             0.0,
             0.0,
             0.0,
-            -SCALE,
+            -scale,
             0.0,
-            -rect.min.x * SCALE,
-            rect.max.y * SCALE,
+            -rect.min.x * scale,
+            rect.max.y * scale,
             1.0
         )
     );

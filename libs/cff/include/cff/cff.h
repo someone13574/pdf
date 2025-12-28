@@ -24,5 +24,8 @@ PdfError* cff_render_glyph(
     CffFontSet* fontset,
     uint32_t gid,
     Canvas* canvas,
-    GeomMat3 transform
+    GeomMat3 transform,
+    uint32_t color_rgba
 );
+
+GeomMat3 cff_font_matrix(CffFontSet* fontset);

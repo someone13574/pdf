@@ -45,6 +45,10 @@ void scalable_canvas_draw_bezier(
     uint32_t rgba
 );
 
-void scalable_canvas_draw_path(ScalableCanvas* canvas, const PathBuilder* path);
+void scalable_canvas_draw_path(
+    ScalableCanvas* canvas,
+    const PathBuilder* path,
+    uint32_t rgba
+);
 
 bool scalable_canvas_write_file(ScalableCanvas* canvas, const char* path);

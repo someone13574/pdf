@@ -151,7 +151,7 @@ PdfError* pdf_deserialize_operands(
 );
 
 #define PDF_OPERAND(ptr_to_variable, operand_information)                      \
-    {.target_ptr = (ptr_to_variable),                                          \
+    {.target_ptr = (void*)(ptr_to_variable),                                   \
      .deserde_info = (operand_information),                                    \
      .debug_info.file = RELATIVE_FILE_PATH,                                    \
      .debug_info.line = __LINE__}

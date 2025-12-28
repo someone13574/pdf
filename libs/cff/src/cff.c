@@ -64,9 +64,8 @@ PdfError* cff_parse_fontset(
     fontset.fonts = cff_font_array_new_init(
         arena,
         fontset.name_index.count,
-        (CffFont
-        ) {.top_dict = cff_top_dict_default(),
-           .private_dict = cff_private_dict_default()}
+        (CffFont) {.top_dict = cff_top_dict_default(),
+                   .private_dict = cff_private_dict_default()}
     );
     for (CffCard16 font_idx = 0; font_idx < fontset.name_index.count;
          font_idx++) {
@@ -151,7 +150,8 @@ PdfError* cff_render_glyph(
     CffFontSet* fontset,
     uint32_t gid,
     Canvas* canvas,
-    GeomMat3 transform
+    GeomMat3 transform,
+    uint32_t color_rgba
 ) {
     RELEASE_ASSERT(fontset);
     RELEASE_ASSERT(canvas);
@@ -177,8 +177,22 @@ PdfError* cff_render_glyph(
         font.subrs_index,
         charstr_len,
         canvas,
-        transform
+        transform,
+        color_rgba
     ));
 
     return NULL;
+}
+
+GeomMat3 cff_font_matrix(CffFontSet* fontset) {
+    RELEASE_ASSERT(fontset);
+
+    if (cff_font_array_len(fontset->fonts) != 1) {
+        LOG_TODO("Fontsets");
+    }
+
+    CffFont font;
+    RELEASE_ASSERT(cff_font_array_get(fontset->fonts, 0, &font));
+
+    return font.top_dict.font_matrix;
 }

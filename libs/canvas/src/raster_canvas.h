@@ -71,6 +71,10 @@ void raster_canvas_draw_bezier(
     uint32_t rgba
 );
 
-void raster_canvas_draw_path(RasterCanvas* canvas, const PathBuilder* path);
+void raster_canvas_draw_path(
+    RasterCanvas* canvas,
+    const PathBuilder* path,
+    uint32_t rgba
+);
 
 bool raster_canvas_write_file(RasterCanvas* canvas, const char* path);

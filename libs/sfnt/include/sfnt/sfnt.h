@@ -56,4 +56,6 @@ PdfError* sfnt_font_new(
     SfntFont** font
 );
 
+SfntHead sfnt_font_head(SfntFont* font);
+
 PdfError* sfnt_get_glyph(SfntFont* font, uint32_t cid, SfntGlyph* glyph);

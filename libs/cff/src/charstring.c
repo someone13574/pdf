@@ -338,16 +338,15 @@ static CffCard16 subr_bias(CffCard16 num_subrs) {
 }
 
 static PdfError* charstring_interpret_operator(
-    CharstrOperator
-    operator,
-    CharstrState * state,
+    CharstrOperator operator,
+    CharstrState* state,
     CffParser* parser,
     CffIndex global_subr_index,
     CffIndex local_subr_index,
     bool* endchar_out,
     bool* return_out
 ) {
-    RELEASE_ASSERT(operator<70);
+    RELEASE_ASSERT(operator < 70);
     RELEASE_ASSERT(state);
     RELEASE_ASSERT(state->stack_bottom == 0);
     RELEASE_ASSERT(endchar_out);
@@ -356,7 +355,13 @@ static PdfError* charstring_interpret_operator(
     *endchar_out = false;
     *return_out = false;
 
-    LOG_DIAG(DEBUG, CFF, "Operator: %s (stack=%zu)", charstr_operator_names[operator], num_operands_available(state));
+    LOG_DIAG(
+        DEBUG,
+        CFF,
+        "Operator: %s (stack=%zu)",
+        charstr_operator_names[operator],
+        num_operands_available(state)
+    );
 
     switch (operator) {
         case CHARSTR_OPERATOR_VMOVETO: {
@@ -708,7 +713,11 @@ static PdfError* charstring_interpret_operator(
             break;
         }
         default: {
-        LOG_TODO("Operator: %s (%d)", charstr_operator_names[operator], (int)operator);
+            LOG_TODO(
+                "Operator: %s (%d)",
+                charstr_operator_names[operator],
+                (int)operator
+            );
         }
     }
 
@@ -827,19 +836,20 @@ PdfError* cff_charstr2_render(
     CffIndex local_subr_index,
     size_t length,
     Canvas* canvas,
-    GeomMat3 transform
+    GeomMat3 transform,
+    uint32_t color_rgba
 ) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(canvas);
 
     Arena* temp_arena = arena_new(4096);
-    CharstrState state = (CharstrState
-    ) {.operand_count = 0,
-       .stack_bottom = 0,
-       .width_set = false,
-       .width = 0.0,
-       .path_builder = path_builder_new(temp_arena),
-       .current_point = geom_vec2_new(0.0, 0.0)};
+    CharstrState state =
+        (CharstrState) {.operand_count = 0,
+                        .stack_bottom = 0,
+                        .width_set = false,
+                        .width = 0.0,
+                        .path_builder = path_builder_new(temp_arena),
+                        .current_point = geom_vec2_new(0.0, 0.0)};
 
     bool endchar; // We don't actually need this since we aren't actually
                   // calling a subroutine.
@@ -853,7 +863,7 @@ PdfError* cff_charstr2_render(
     ));
 
     path_builder_apply_transform(state.path_builder, transform);
-    canvas_draw_path(canvas, state.path_builder);
+    canvas_draw_path(canvas, state.path_builder, color_rgba);
     arena_free(temp_arena);
 
     return NULL;

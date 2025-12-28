@@ -18,7 +18,8 @@ typedef struct {
     GeomMat3 ctm;
     // clipping_path
     // color_space
-    // color
+    PdfOpParamsSetRGB stroking_rgb;
+    PdfOpParamsSetRGB nonstroking_rgb;
     TextState text_state;
     PdfReal line_width;
     PdfLineCapStyle line_cap;
