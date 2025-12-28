@@ -868,7 +868,8 @@ PdfError* pdf_parse_stream(
     PDF_PROPAGATE(pdf_ctx_shift(ctx, stream_dict.length));
     if (!pdf_error_free_is_ok(pdf_ctx_expect(ctx, "\nendstream"))
         && !pdf_error_free_is_ok(pdf_ctx_expect(ctx, "\r\nendstream"))
-        && !pdf_error_free_is_ok(pdf_ctx_expect(ctx, "\rendstream"))) {
+        && !pdf_error_free_is_ok(pdf_ctx_expect(ctx, "\rendstream"))
+        && !pdf_error_free_is_ok(pdf_ctx_expect(ctx, "endstream"))) {
         return PDF_ERROR(
             PDF_ERR_CTX_EXPECT,
             "Missing newline and `endstream` keyword at expected location"

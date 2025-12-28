@@ -38,7 +38,7 @@ PdfError* pdf_deserialize_catalog(
         false,
         resolver,
         arena,
-        "PdfCatelog"
+        "PdfCatalog"
     ));
 
     return NULL;

@@ -153,7 +153,11 @@ PdfError* pdf_ctx_expect(PdfCtx* ctx, const char* text) {
 
         if ((uint8_t)*text != peeked) {
             pdf_error_free_is_ok(pdf_ctx_seek(ctx, restore_offset));
-            return PDF_ERROR(PDF_ERR_CTX_EXPECT, "Unexpected character");
+            return PDF_ERROR(
+                PDF_ERR_CTX_EXPECT,
+                "Unexpected character at %zu in stream",
+                ctx->offset
+            );
         }
 
         PdfError* next_error = pdf_ctx_peek_and_advance(ctx, NULL);
