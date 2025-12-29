@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 #include "geom/mat3.h"
+#include "geom/vec3.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
 
@@ -135,6 +136,15 @@ DESERDE_DECL_OPTIONAL(
     pdf_number_vec_op_init
 )
 
+PdfError* pdf_deserialize_geom_vec3(
+    const PdfObject* object,
+    GeomVec3* target_ptr,
+    PdfResolver* resolver
+);
+
+DESERDE_DECL_TRAMPOLINE(pdf_deserialize_geom_vec3_trampoline)
+DESERDE_DECL_OPTIONAL(PdfGeomVec3Optional, GeomVec3, pdf_geom_vec3_op_init)
+
 typedef struct {
     PdfNumber lower_left_x;
     PdfNumber lower_left_y;
@@ -152,6 +162,15 @@ PdfError* pdf_deserialize_rectangle(
 
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_rectangle_trampoline)
 
+PdfError* pdf_deserialize_pdf_mat(
+    const PdfObject* object,
+    GeomMat3* target_ptr,
+    PdfResolver* resolver
+);
+
+DESERDE_DECL_TRAMPOLINE(pdf_deserialize_pdf_mat_trampoline)
+DESERDE_DECL_OPTIONAL(PdfGeomMat3Optional, GeomMat3, pdf_geom_mat3_op_init)
+
 PdfError* pdf_deserialize_geom_mat3(
     const PdfObject* object,
     GeomMat3* target_ptr,
@@ -159,7 +178,6 @@ PdfError* pdf_deserialize_geom_mat3(
 );
 
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_geom_mat3_trampoline)
-DESERDE_DECL_OPTIONAL(PdfGeomMat3Optional, GeomMat3, pdf_geom_mat3_op_init)
 
 #define DVEC_NAME PdfNameVec
 #define DVEC_LOWERCASE_NAME pdf_name_vec

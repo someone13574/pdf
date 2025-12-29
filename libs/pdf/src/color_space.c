@@ -1,0 +1,242 @@
+#include "pdf/color_space.h"
+
+#include <math.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "deserialize.h"
+#include "geom/mat3.h"
+#include "geom/vec3.h"
+#include "logger/log.h"
+#include "pdf/object.h"
+#include "pdf/resolver.h"
+#include "pdf_error/error.h"
+
+static PdfError* deserialize_cal_rgb_params(
+    const PdfObject* object,
+    PdfCalRGBParams* target_ptr,
+    PdfResolver* resolver
+) {
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    PdfFieldDescriptor fields[] = {
+        PDF_FIELD(
+            "WhitePoint",
+            &target_ptr->whitepoint,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_geom_vec3_trampoline)
+        ),
+        PDF_FIELD(
+            "BlackPoint",
+            &target_ptr->blackpoint,
+            PDF_DESERDE_OPTIONAL(
+                pdf_geom_vec3_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_geom_vec3_trampoline)
+            )
+        ),
+        PDF_FIELD(
+            "Gamma",
+            &target_ptr->gamma,
+            PDF_DESERDE_OPTIONAL(
+                pdf_geom_vec3_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_geom_vec3_trampoline)
+            )
+        ),
+        PDF_FIELD(
+            "Matrix",
+            &target_ptr->matrix,
+            PDF_DESERDE_OPTIONAL(
+                pdf_geom_mat3_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_geom_mat3_trampoline)
+            )
+        )
+    };
+
+    PDF_PROPAGATE(pdf_deserialize_dict(
+        object,
+        fields,
+        sizeof(fields) / sizeof(PdfFieldDescriptor),
+        false,
+        resolver,
+        "CalRGB"
+    ));
+    return NULL;
+}
+
+PdfError* pdf_deserialize_color_space(
+    const PdfObject* object,
+    PdfColorSpace* target_ptr,
+    PdfResolver* resolver
+) {
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    PdfObject resolved;
+    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved, true));
+
+    PdfName family = NULL;
+    if (resolved.type == PDF_OBJECT_TYPE_NAME) {
+        family = resolved.data.name;
+    } else if (resolved.type == PDF_OBJECT_TYPE_ARRAY) {
+        PdfObject* first = NULL;
+        bool has_first =
+            pdf_object_vec_get(resolved.data.array.elements, 0, &first);
+
+        if (!has_first || first->type != PDF_OBJECT_TYPE_NAME) {
+            return PDF_ERROR(
+                PDF_ERR_INCORRECT_TYPE,
+                "First element of color space array must be a name"
+            );
+        }
+
+        family = first->data.name;
+    } else {
+        return PDF_ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "Color space must be a name or array"
+        );
+    }
+
+    if (strcmp(family, "DeviceGray") == 0) {
+        target_ptr->family = PDF_COLOR_SPACE_DEVICE_GRAY;
+    } else if (strcmp(family, "DeviceRGB") == 0) {
+        target_ptr->family = PDF_COLOR_SPACE_DEVICE_RGB;
+    } else if (strcmp(family, "DeviceCMYK") == 0) {
+        target_ptr->family = PDF_COLOR_SPACE_DEVICE_CMYK;
+    } else if (strcmp(family, "CalGray") == 0) {
+        target_ptr->family = PDF_COLOR_SPACE_CAL_GRAY;
+    } else if (strcmp(family, "CalRGB") == 0) {
+        target_ptr->family = PDF_COLOR_SPACE_CAL_RGB;
+    } else if (strcmp(family, "Lab") == 0) {
+        target_ptr->family = PDF_COLOR_SPACE_LAB;
+    } else if (strcmp(family, "ICCBased") == 0) {
+        target_ptr->family = PDF_COLOR_SPACE_ICC_BASED;
+    } else if (strcmp(family, "Indexed") == 0) {
+        target_ptr->family = PDF_COLOR_SPACE_INDEXED;
+    } else if (strcmp(family, "Pattern") == 0) {
+        target_ptr->family = PDF_COLOR_SPACE_PATTERN;
+    } else if (strcmp(family, "Separation") == 0) {
+        target_ptr->family = PDF_COLOR_SPACE_SEPARATION;
+    } else if (strcmp(family, "DeviceN") == 0) {
+        target_ptr->family = PDF_COLOR_SPACE_DEVICE_N;
+    } else {
+        return PDF_ERROR(
+            PDF_ERR_INVALID_SUBTYPE,
+            "Unknown color space `%s`",
+            family
+        );
+    }
+
+    switch (target_ptr->family) {
+        case PDF_COLOR_SPACE_CAL_RGB: {
+            PdfObject* second = NULL;
+            bool has_second =
+                pdf_object_vec_get(resolved.data.array.elements, 1, &second);
+
+            if (!has_second) {
+                return PDF_ERROR(
+                    PDF_ERR_INCORRECT_TYPE,
+                    "First element of color space array must be a name"
+                );
+            }
+
+            PDF_PROPAGATE(deserialize_cal_rgb_params(
+                second,
+                &target_ptr->params.cal_rgb,
+                resolver
+            ));
+
+            break;
+        }
+        default: {
+            printf(
+                "%s\n",
+                pdf_fmt_object(pdf_resolver_arena(resolver), &resolved)
+            );
+
+            LOG_TODO("Unimplemented color space family %s", family);
+        }
+    }
+
+    return NULL;
+}
+
+/// Converts CIE xyz color to non-linear sRGB:
+/// https://www.w3.org/Graphics/Color/sRGB.html
+static GeomVec3
+cie_xyz_to_srgb(GeomVec3 xyz, GeomVec3 whitepoint, GeomVec3 blackpoint) {
+    GeomVec3 linear = geom_vec3_transform(
+        xyz,
+        geom_mat3_new(
+            3.2410,
+            -1.5374,
+            -0.4986,
+            -0.9692,
+            1.8760,
+            0.0416,
+            0.0556,
+            -0.2040,
+            1.0570
+        )
+    );
+
+    GeomVec3 non_linear = geom_vec3_new(
+        linear.x <= 0.00304 ? (linear.x * 12.92)
+                            : (1.055 * pow(linear.x, 1.0 / 2.4) - 0.055),
+        linear.y <= 0.00304 ? (linear.y * 12.92)
+                            : (1.055 * pow(linear.y, 1.0 / 2.4) - 0.055),
+        linear.z <= 0.00304 ? (linear.z * 12.92)
+                            : (1.055 * pow(linear.z, 1.0 / 2.4) - 0.055)
+    );
+
+    return geom_vec3_new(
+        (whitepoint.x - blackpoint.x) * non_linear.x + blackpoint.x,
+        (whitepoint.y - blackpoint.y) * non_linear.y + blackpoint.y,
+        (whitepoint.z - blackpoint.z) * non_linear.z + blackpoint.z
+    );
+}
+
+GeomVec3 pdf_map_color(
+    PdfReal* components,
+    size_t n_components,
+    PdfColorSpace color_space
+) {
+    RELEASE_ASSERT(components);
+
+    switch (color_space.family) {
+        case PDF_COLOR_SPACE_CAL_RGB: {
+            RELEASE_ASSERT(n_components == 3);
+
+            PdfCalRGBParams params = color_space.params.cal_rgb;
+            GeomVec3 blackpoint = params.blackpoint.has_value
+                                    ? params.blackpoint.value
+                                    : geom_vec3_new(0.0, 0.0, 0.0);
+            GeomVec3 gamma = params.gamma.has_value
+                               ? params.gamma.value
+                               : geom_vec3_new(0.0, 0.0, 0.0);
+            GeomMat3 matrix = params.matrix.has_value ? params.matrix.value
+                                                      : geom_mat3_identity();
+
+            GeomVec3 xyz = geom_vec3_new(
+                matrix.mat[0][0] * pow(components[0], gamma.x)
+                    + matrix.mat[1][0] * pow(components[1], gamma.y)
+                    + matrix.mat[2][0] * pow(components[2], gamma.z),
+                matrix.mat[0][1] * pow(components[0], gamma.x)
+                    + matrix.mat[1][1] * pow(components[1], gamma.y)
+                    + matrix.mat[2][1] * pow(components[2], gamma.z),
+                matrix.mat[0][2] * pow(components[0], gamma.x)
+                    + matrix.mat[1][2] * pow(components[1], gamma.y)
+                    + matrix.mat[2][2] * pow(components[2], gamma.z)
+            );
+
+            return cie_xyz_to_srgb(xyz, params.whitepoint, blackpoint);
+        }
+        default: {
+            LOG_TODO("Unimplemented color space %d", color_space.family);
+        }
+    }
+
+    return geom_vec3_new(0.0, 0.0, 0.0);
+}

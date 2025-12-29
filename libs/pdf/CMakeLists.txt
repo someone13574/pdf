@@ -1,5 +1,6 @@
 add_library(pdf
     src/catalog.c
+    src/color_space.c
     src/stream/stream_dict.c
     src/stream/filters.c
     src/stream/ascii.c
@@ -7,6 +8,7 @@ add_library(pdf
     src/content_stream/stream.c
     src/content_stream/operator.c
     src/resources.c
+    src/fonts/agl.c
     src/fonts/font.c
     src/fonts/font_descriptor.c
     src/fonts/font_widths.c

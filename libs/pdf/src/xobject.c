@@ -50,7 +50,7 @@ PdfError* pdf_deserialize_form_xobject(
             &target_ptr->matrix,
             PDF_DESERDE_OPTIONAL(
                 pdf_geom_mat3_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_geom_mat3_trampoline)
+                PDF_DESERDE_CUSTOM(pdf_deserialize_pdf_mat_trampoline)
             )
         ),
         PDF_FIELD(
@@ -134,13 +134,11 @@ typedef struct {
 PdfError* pdf_deserialize_xobject(
     const PdfObject* object,
     PdfXObject* target_ptr,
-    PdfResolver* resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
     RELEASE_ASSERT(resolver);
-    RELEASE_ASSERT(arena);
 
     XObjectUntyped untyped = {0};
     PdfFieldDescriptor fields[] = {PDF_FIELD(

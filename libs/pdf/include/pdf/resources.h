@@ -61,7 +61,7 @@ typedef enum {
 typedef struct {
     /// (Optional) The type of PDF object that this dictionary describes; shall
     /// be ExtGState for a graphics state parameter dictionary.
-    PdfUnimplemented name;
+    PdfNameOptional type;
 
     /// (Optional; PDF 1.3) The line width (see 8.4.3.2, "Line Width").
     PdfUnimplemented line_width;
@@ -159,11 +159,11 @@ typedef struct {
 
     /// (Optional; PDF 1.3) The smoothness tolerance (see 10.6.3, "Smoothness
     /// Tolerance").
-    PdfUnimplemented sm;
+    PdfRealOptional sm;
 
     /// (Optional) A flag specifying whether to apply automatic stroke
     /// adjustment (see 10.6.5, "Automatic Stroke Adjustment").
-    PdfUnimplemented sa;
+    PdfBooleanOptional sa;
 
     /// (Optional; PDF 1.4) The current blend mode to be used in the transparent
     /// imaging model (see 11.3.5, "Blend Mode" and 11.6.3, "Specifying Blending

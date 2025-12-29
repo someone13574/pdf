@@ -21,8 +21,10 @@ PdfError* pdf_deserialize_encoding_dict(
     PdfResolver* resolver
 );
 
-const char*
-pdf_encoding_map_cid(const PdfEncodingDict* encoding_dict, uint8_t codepoint);
+const char* pdf_encoding_map_codepoint(
+    const PdfEncodingDict* encoding_dict,
+    uint8_t codepoint
+);
 
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_encoding_dict_trampoline)
 DESERDE_DECL_OPTIONAL(

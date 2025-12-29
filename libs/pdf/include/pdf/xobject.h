@@ -99,6 +99,5 @@ typedef struct {
 PdfError* pdf_deserialize_xobject(
     const PdfObject* object,
     PdfXObject* target_ptr,
-    PdfResolver* resolver,
-    Arena* arena
+    PdfResolver* resolver
 );

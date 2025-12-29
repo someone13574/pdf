@@ -510,8 +510,10 @@ PdfError* pdf_deserialize_encoding_dict(
     return NULL;
 }
 
-const char*
-pdf_encoding_map_cid(const PdfEncodingDict* encoding_dict, uint8_t codepoint) {
+const char* pdf_encoding_map_codepoint(
+    const PdfEncodingDict* encoding_dict,
+    uint8_t codepoint
+) {
     RELEASE_ASSERT(encoding_dict);
 
     const char* base = NULL;
@@ -529,6 +531,9 @@ pdf_encoding_map_cid(const PdfEncodingDict* encoding_dict, uint8_t codepoint) {
     }
 
     RELEASE_ASSERT(base);
+    if (encoding_dict->differences.has_value) {
+        LOG_WARN(FONT, "Encoding has differences array! TODO");
+    }
     // TODO: differences array
     return base;
 }

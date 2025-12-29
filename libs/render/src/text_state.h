@@ -1,5 +1,6 @@
 #pragma once
 
+#include "cache.h"
 #include "canvas/canvas.h"
 #include "geom/mat3.h"
 #include "pdf/fonts/font.h"
@@ -45,7 +46,7 @@ PdfError* text_state_render(
     Arena* arena,
     Canvas* canvas,
     PdfResolver* resolver,
-    PdfCMapCache* cmap_cache,
+    RenderCache* cache,
     GeomMat3 ctm,
     TextState* state,
     TextObjectState* object_state,

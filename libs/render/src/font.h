@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 
+#include "cache.h"
 #include "canvas/canvas.h"
 #include "geom/mat3.h"
 #include "pdf/fonts/font.h"
@@ -14,7 +15,7 @@
 /// `finished` if this is the last CID in the stream.
 PdfError* next_cid(
     PdfFont* font,
-    PdfCMapCache* cmap_cache,
+    RenderCache* cache,
     PdfString* data,
     size_t* offset,
     bool* finished_out,
@@ -25,6 +26,7 @@ PdfError* next_cid(
 PdfError* cid_to_gid(
     Arena* arena,
     PdfFont* font,
+    RenderCache* cache,
     PdfResolver* resolver,
     uint32_t cid,
     uint32_t* gid_out

@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include "arena/arena.h"
+#include "cache.h"
 #include "canvas/canvas.h"
 #include "canvas/path_builder.h"
 #include "geom/mat3.h"
@@ -11,6 +12,7 @@
 #include "geom/vec2.h"
 #include "graphics_state.h"
 #include "logger/log.h"
+#include "pdf/color_space.h"
 #include "pdf/content_stream/operation.h"
 #include "pdf/content_stream/operator.h"
 #include "pdf/fonts/cmap.h"
@@ -59,7 +61,7 @@ typedef struct {
     TextObjectState text_object_state;
     PathBuilder* path;
 
-    PdfCMapCache* cmap_cache;
+    RenderCache cache;
 } RenderState;
 
 static GraphicsState* current_graphics_state(RenderState* state) {
@@ -94,9 +96,9 @@ static PdfError* restore_graphics_state(RenderState* state) {
     return NULL;
 }
 
-static uint32_t pack_rgba(PdfOpParamsSetRGB rgb, double a) {
-    return ((uint32_t)(rgb.r * 255.0) << 24) | ((uint32_t)(rgb.g * 255.0) << 16)
-         | ((uint32_t)(rgb.b * 255.0) << 8) | (uint32_t)(a * 255.0);
+static uint32_t pack_rgba(GeomVec3 rgb, double a) {
+    return ((uint32_t)(rgb.x * 255.0) << 24) | ((uint32_t)(rgb.y * 255.0) << 16)
+         | ((uint32_t)(rgb.z * 255.0) << 8) | (uint32_t)(a * 255.0);
 }
 
 static PdfError* process_content_stream(
@@ -243,6 +245,16 @@ static PdfError* process_content_stream(
             case PDF_OPERATOR_ET: {
                 break;
             }
+            case PDF_OPERATOR_Tc: {
+                current_graphics_state(state)->text_state.character_spacing =
+                    op.data.set_text_metric;
+                break;
+            }
+            case PDF_OPERATOR_Tw: {
+                current_graphics_state(state)->text_state.word_spacing =
+                    op.data.set_text_metric;
+                break;
+            }
             case PDF_OPERATOR_Tf: {
                 LOG_DIAG(
                     DEBUG,
@@ -334,7 +346,7 @@ static PdfError* process_content_stream(
                             arena,
                             canvas,
                             resolver,
-                            state->cmap_cache,
+                            &state->cache,
                             current_graphics_state(state)->ctm,
                             &current_graphics_state(state)->text_state,
                             &state->text_object_state,
@@ -345,20 +357,115 @@ static PdfError* process_content_stream(
                 }
                 break;
             }
+            case PDF_OPERATOR_cs: {
+                RELEASE_ASSERT(resources->has_value);
+                RELEASE_ASSERT(resources->value.color_space.has_value);
+
+                PdfObject* color_space_object = pdf_dict_get(
+                    &resources->value.color_space.value,
+                    op.data.set_color_space
+                );
+                RELEASE_ASSERT(color_space_object);
+
+                PDF_PROPAGATE(pdf_deserialize_color_space(
+                    color_space_object,
+                    &current_graphics_state(state)->nonstroking_color_space,
+                    resolver
+                ));
+
+                break;
+            }
+            case PDF_OPERATOR_sc: {
+                GraphicsState* graphics_state = current_graphics_state(state);
+
+                switch (graphics_state->nonstroking_color_space.family) {
+                    case PDF_COLOR_SPACE_CAL_RGB: {
+
+                        if (pdf_object_vec_len(op.data.set_color) != 3) {
+                            return PDF_ERROR(
+                                PDF_ERR_MISSING_OPERAND,
+                                "Expected 3 operands, found %zu",
+                                pdf_object_vec_len(op.data.set_color)
+                            );
+                        }
+
+                        PdfReal components[3];
+                        for (size_t component_idx = 0; component_idx < 3;
+                             component_idx++) {
+                            PdfObject* component = NULL;
+                            RELEASE_ASSERT(pdf_object_vec_get(
+                                op.data.set_color,
+                                component_idx,
+                                &component
+                            ));
+
+                            PDF_PROPAGATE(pdf_deserialize_num_as_real(
+                                component,
+                                &components[component_idx],
+                                resolver
+                            ));
+                        }
+
+                        graphics_state->nonstroking_rgb = pdf_map_color(
+                            components,
+                            3,
+                            graphics_state->nonstroking_color_space
+                        );
+
+                        break;
+                    }
+                    default: {
+                        LOG_TODO(
+                            "Unimplemented color space %d",
+                            graphics_state->nonstroking_color_space.family
+                        );
+                    }
+                }
+
+                break;
+            }
             case PDF_OPERATOR_G: {
-                current_graphics_state(state)->stroking_rgb =
-                    (PdfOpParamsSetRGB) {.r = op.data.set_gray,
-                                         .g = op.data.set_gray,
-                                         .b = op.data.set_gray};
+                // TODO: default color spaces
+                GraphicsState* graphics_state = current_graphics_state(state);
+                graphics_state->stroking_color_space.family =
+                    PDF_COLOR_SPACE_DEVICE_GRAY;
+
+                PdfReal components[1] = {op.data.set_gray};
+                graphics_state->stroking_rgb = pdf_map_color(
+                    components,
+                    1,
+                    graphics_state->stroking_color_space
+                );
                 break;
             }
             case PDF_OPERATOR_RG: {
-                current_graphics_state(state)->stroking_rgb = op.data.set_rgb;
+                // TODO: default color spaces
+                GraphicsState* graphics_state = current_graphics_state(state);
+                graphics_state->stroking_color_space.family =
+                    PDF_COLOR_SPACE_DEVICE_RGB;
+
+                PdfReal components[3] =
+                    {op.data.set_rgb.r, op.data.set_rgb.g, op.data.set_rgb.b};
+                graphics_state->stroking_rgb = pdf_map_color(
+                    components,
+                    3,
+                    graphics_state->stroking_color_space
+                );
                 break;
             }
             case PDF_OPERATOR_rg: {
-                current_graphics_state(state)->nonstroking_rgb =
-                    op.data.set_rgb;
+                // TODO: default color spaces
+                GraphicsState* graphics_state = current_graphics_state(state);
+                graphics_state->nonstroking_color_space.family =
+                    PDF_COLOR_SPACE_DEVICE_RGB;
+
+                PdfReal components[3] =
+                    {op.data.set_rgb.r, op.data.set_rgb.g, op.data.set_rgb.b};
+                graphics_state->nonstroking_rgb = pdf_map_color(
+                    components,
+                    3,
+                    graphics_state->nonstroking_color_space
+                );
                 break;
             }
             case PDF_OPERATOR_Do: {
@@ -369,14 +476,12 @@ static PdfError* process_content_stream(
                     &resources->value.xobject.value,
                     op.data.paint_xobject
                 );
+                RELEASE_ASSERT(xobject_object);
 
                 PdfXObject xobject;
-                PDF_PROPAGATE(pdf_deserialize_xobject(
-                    xobject_object,
-                    &xobject,
-                    resolver,
-                    arena
-                ));
+                PDF_PROPAGATE(
+                    pdf_deserialize_xobject(xobject_object, &xobject, resolver)
+                );
 
                 switch (xobject.type) {
                     case PDF_XOBJECT_IMAGE: {
@@ -442,7 +547,8 @@ PdfError* render_page(
     RenderState state = {
         .graphics_state_stack = graphics_state_stack_new(arena),
         .text_object_state = text_object_state_default(),
-        .cmap_cache = pdf_cmap_cache_new(arena),
+        .cache.cmap_cache = pdf_cmap_cache_new(arena),
+        .cache.glyph_list = NULL,
         .path = path_builder_new(arena)
     };
 

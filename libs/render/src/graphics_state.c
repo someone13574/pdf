@@ -2,7 +2,9 @@
 #include "graphics_state.h"
 
 #include "geom/mat3.h"
+#include "geom/vec3.h"
 #include "logger/log.h"
+#include "pdf/color_space.h"
 #include "text_state.h"
 
 #define DLINKED_NAME GraphicsStateStack
@@ -13,8 +15,12 @@
 GraphicsState graphics_state_default(void) {
     return (GraphicsState) {
         .ctm = geom_mat3_identity(),
-        .stroking_rgb = (PdfOpParamsSetRGB) {.r = 0.0, .g = 0.0, .b = 0.0},
-        .nonstroking_rgb = (PdfOpParamsSetRGB) {.r = 0.0, .g = 0.0, .b = 0.0},
+        .stroking_color_space =
+            (PdfColorSpace) {.family = PDF_COLOR_SPACE_DEVICE_GRAY},
+        .nonstroking_color_space =
+            (PdfColorSpace) {.family = PDF_COLOR_SPACE_DEVICE_GRAY},
+        .stroking_rgb = geom_vec3_new(0.0, 0.0, 0.0),
+        .nonstroking_rgb = geom_vec3_new(0.0, 0.0, 0.0),
         .text_state = text_state_default(),
         .line_width = 1.0,
         .line_cap = PDF_LINE_CAP_STYLE_BUTT,
@@ -37,7 +43,13 @@ void graphics_state_apply_params(
 ) {
     RELEASE_ASSERT(gstate);
 
-    LOG_WARN(RENDER, "TODO: Apply params");
+    if (params.sm.has_value) {
+        gstate->smoothness = params.sm.value;
+    }
+
+    if (params.sa.has_value) {
+        gstate->stroke_adjustment = params.sa.value;
+    }
 
     if (params.ca_stroking.has_value) {
         gstate->stroking_alpha = params.ca_stroking.value;

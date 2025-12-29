@@ -1,6 +1,6 @@
 #pragma once
 
-/// A 3x3 matrix
+/// A 3x3 matrix, stored as mat[y][x]
 typedef struct {
     double mat[3][3];
 } GeomMat3;

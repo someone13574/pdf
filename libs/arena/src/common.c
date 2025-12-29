@@ -4,7 +4,9 @@
 
 uint8_t* load_file_to_buffer(Arena* arena, const char* path, size_t* out_size) {
     FILE* file = fopen(path, "rb");
-    *out_size = 0;
+    if (out_size) {
+        *out_size = 0;
+    }
     if (!file) {
         return NULL;
     }
@@ -37,7 +39,9 @@ uint8_t* load_file_to_buffer(Arena* arena, const char* path, size_t* out_size) {
     }
     fclose(file);
 
-    *out_size = (size_t)len;
+    if (out_size) {
+        *out_size = (size_t)len;
+    }
     return buffer;
 }
 

@@ -6,10 +6,12 @@
 
 #include "arena/arena.h"
 #include "arena/common.h"
+#include "cache.h"
 #include "canvas/canvas.h"
 #include "cff/cff.h"
 #include "geom/mat3.h"
 #include "logger/log.h"
+#include "pdf/fonts/agl.h"
 #include "pdf/fonts/cmap.h"
 #include "pdf/fonts/encoding.h"
 #include "pdf/fonts/font.h"
@@ -22,14 +24,14 @@
 
 PdfError* next_cid(
     PdfFont* font,
-    PdfCMapCache* cmap_cache,
+    RenderCache* cache,
     PdfString* data,
     size_t* offset,
     bool* finished_out,
     uint32_t* cid_out
 ) {
     RELEASE_ASSERT(font);
-    RELEASE_ASSERT(cmap_cache);
+    RELEASE_ASSERT(cache);
     RELEASE_ASSERT(data);
     RELEASE_ASSERT(offset);
     RELEASE_ASSERT(finished_out);
@@ -44,9 +46,11 @@ PdfError* next_cid(
 
             // Get CMap. TODO: Check ROS against descendent font's ROS
             PdfCMap* cmap = NULL;
-            PDF_PROPAGATE(
-                pdf_cmap_cache_get(cmap_cache, font->data.type0.encoding, &cmap)
-            );
+            PDF_PROPAGATE(pdf_cmap_cache_get(
+                cache->cmap_cache,
+                font->data.type0.encoding,
+                &cmap
+            ));
 
             // Get codepoint
             RELEASE_ASSERT(*offset + 1 < data->len);
@@ -81,12 +85,14 @@ PdfError* next_cid(
 PdfError* cid_to_gid(
     Arena* arena,
     PdfFont* font,
+    RenderCache* cache,
     PdfResolver* resolver,
     uint32_t cid,
     uint32_t* gid_out
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(font);
+    RELEASE_ASSERT(cache);
     RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(gid_out);
 
@@ -109,9 +115,14 @@ PdfError* cid_to_gid(
             };
 
             // Call recursively
-            PDF_PROPAGATE(
-                cid_to_gid(arena, &descendent_font, resolver, cid, gid_out)
-            );
+            PDF_PROPAGATE(cid_to_gid(
+                arena,
+                &descendent_font,
+                cache,
+                resolver,
+                cid,
+                gid_out
+            ));
             return NULL;
         }
         case PDF_FONT_CIDTYPE0: {
@@ -152,26 +163,56 @@ PdfError* cid_to_gid(
         }
         case PDF_FONT_TRUETYPE: {
             RELEASE_ASSERT(font->data.true_type.encoding.has_value);
-            RELEASE_ASSERT(font->data.true_type.to_unicode.has_value);
             RELEASE_ASSERT(cid < 256);
 
-            const char* glyph = pdf_encoding_map_cid(
-                &font->data.true_type.encoding.value,
-                (uint8_t)cid
-            );
-            RELEASE_ASSERT(glyph);
+            if (font->data.true_type.to_unicode.has_value) {
+                PdfCMap* to_unicode = NULL;
+                PDF_PROPAGATE(pdf_parse_cmap(
+                    arena,
+                    (const char*)
+                        font->data.true_type.to_unicode.value.stream_bytes,
+                    font->data.true_type.to_unicode.value.decoded_stream_len,
+                    &to_unicode
+                ));
 
-            PdfCMap* to_unicode = NULL;
-            PDF_PROPAGATE(pdf_parse_cmap(
-                arena,
-                (const char*)font->data.true_type.to_unicode.value.stream_bytes,
-                font->data.true_type.to_unicode.value.decoded_stream_len,
-                &to_unicode
-            ));
+                uint32_t unicode;
+                PDF_PROPAGATE(pdf_cmap_get_unicode(to_unicode, cid, &unicode));
+                *gid_out = unicode;
+            } else {
+                const char* glyph = pdf_encoding_map_codepoint(
+                    &font->data.true_type.encoding.value,
+                    (uint8_t)cid
+                );
+                RELEASE_ASSERT(glyph);
 
-            uint32_t unicode;
-            PDF_PROPAGATE(pdf_cmap_get_unicode(to_unicode, cid, &unicode));
-            *gid_out = unicode;
+                if (!cache->glyph_list) {
+                    uint8_t* glyph_list = load_file_to_buffer(
+                        arena,
+                        "assets/agl-aglfn/glyphlist.txt",
+                        NULL
+                    );
+                    RELEASE_ASSERT(glyph_list);
+
+                    cache->glyph_list =
+                        pdf_parse_agl_glyphlist(arena, (char*)glyph_list);
+                }
+
+                uint16_t codepoints[4] = {0, 0, 0, 0};
+                uint8_t num_codepoints = 0;
+                PDF_PROPAGATE(pdf_agl_glyphlist_lookup(
+                    cache->glyph_list,
+                    glyph,
+                    codepoints,
+                    &num_codepoints
+                ));
+
+                RELEASE_ASSERT(
+                    num_codepoints == 1,
+                    ", TODO: Multi-codepoint glyphs"
+                );
+
+                *gid_out = codepoints[0];
+            }
 
             break;
         }

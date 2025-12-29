@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "cache.h"
 #include "font.h"
 #include "geom/mat3.h"
 #include "logger/log.h"
@@ -27,7 +28,7 @@ PdfError* text_state_render(
     Arena* arena,
     Canvas* canvas,
     PdfResolver* resolver,
-    PdfCMapCache* cmap_cache,
+    RenderCache* cache,
     GeomMat3 ctm,
     TextState* state,
     TextObjectState* object_state,
@@ -37,7 +38,7 @@ PdfError* text_state_render(
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(resolver);
-    RELEASE_ASSERT(cmap_cache);
+    RELEASE_ASSERT(cache);
     RELEASE_ASSERT(state);
     RELEASE_ASSERT(object_state);
     RELEASE_ASSERT(text.data);
@@ -52,14 +53,9 @@ PdfError* text_state_render(
         // Get CID
         bool finished = false;
         uint32_t cid;
-        PDF_PROPAGATE(next_cid(
-            &state->text_font,
-            cmap_cache,
-            &text,
-            &offset,
-            &finished,
-            &cid
-        ));
+        PDF_PROPAGATE(
+            next_cid(&state->text_font, cache, &text, &offset, &finished, &cid)
+        );
 
         if (finished) {
             break;
@@ -68,7 +64,7 @@ PdfError* text_state_render(
         // Get GID
         uint32_t gid;
         PDF_PROPAGATE(
-            cid_to_gid(arena, &state->text_font, resolver, cid, &gid)
+            cid_to_gid(arena, &state->text_font, cache, resolver, cid, &gid)
         );
 
         // Get font matrix

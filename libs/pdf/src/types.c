@@ -86,6 +86,58 @@ PdfReal pdf_number_as_real(PdfNumber number) {
     }
 }
 
+PdfError* pdf_deserialize_geom_vec3(
+    const PdfObject* object,
+    GeomVec3* target_ptr,
+    PdfResolver* resolver
+) {
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    switch (object->type) {
+        case PDF_OBJECT_TYPE_ARRAY: {
+            if (pdf_object_vec_len(object->data.array.elements) != 3) {
+                return PDF_ERROR(
+                    PDF_ERR_INCORRECT_TYPE,
+                    "Incorrect number of elements in vec array (expected 3)"
+                );
+            }
+
+            PdfReal array[3] = {0};
+            for (size_t idx = 0; idx < 3; idx++) {
+                PdfObject* element = NULL;
+                RELEASE_ASSERT(pdf_object_vec_get(
+                    object->data.array.elements,
+                    idx,
+                    &element
+                ));
+
+                PdfNumber number;
+                PDF_PROPAGATE(
+                    pdf_deserialize_number(element, &number, resolver)
+                );
+
+                array[idx] = pdf_number_as_real(number);
+            }
+
+            *target_ptr = geom_vec3_new(array[0], array[1], array[2]);
+            break;
+        }
+        default: {
+            return PDF_ERROR(PDF_ERR_INCORRECT_TYPE, "Vec must be an array");
+        }
+    }
+
+    return NULL;
+}
+
+DESERDE_IMPL_TRAMPOLINE(
+    pdf_deserialize_geom_vec3_trampoline,
+    pdf_deserialize_geom_vec3
+)
+DESERDE_IMPL_OPTIONAL(PdfGeomVec3Optional, pdf_geom_vec3_op_init)
+
 PdfError* pdf_deserialize_rectangle(
     const PdfObject* object,
     PdfRectangle* target_ptr,
@@ -147,7 +199,7 @@ PdfError* pdf_deserialize_rectangle(
         default: {
             return PDF_ERROR(
                 PDF_ERR_INCORRECT_TYPE,
-                "Rectangles must be an array"
+                "Rectangle must be an array"
             );
         }
     }
@@ -161,7 +213,7 @@ DESERDE_IMPL_TRAMPOLINE(
 )
 DESERDE_IMPL_OPTIONAL(PdfRectangleOptional, pdf_rectangle_op_init)
 
-PdfError* pdf_deserialize_geom_mat3(
+PdfError* pdf_deserialize_pdf_mat(
     const PdfObject* object,
     GeomMat3* target_ptr,
     PdfResolver* resolver
@@ -207,10 +259,70 @@ PdfError* pdf_deserialize_geom_mat3(
             break;
         }
         default: {
-            return PDF_ERROR(
-                PDF_ERR_INCORRECT_TYPE,
-                "Rectangles must be an array"
+            return PDF_ERROR(PDF_ERR_INCORRECT_TYPE, "Matrix must be an array");
+        }
+    }
+
+    return NULL;
+}
+
+DESERDE_IMPL_TRAMPOLINE(
+    pdf_deserialize_pdf_mat_trampoline,
+    pdf_deserialize_pdf_mat
+)
+
+DESERDE_IMPL_OPTIONAL(PdfGeomMat3Optional, pdf_geom_mat3_op_init)
+
+PdfError* pdf_deserialize_geom_mat3(
+    const PdfObject* object,
+    GeomMat3* target_ptr,
+    PdfResolver* resolver
+) {
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    switch (object->type) {
+        case PDF_OBJECT_TYPE_ARRAY: {
+            if (pdf_object_vec_len(object->data.array.elements) != 9) {
+                return PDF_ERROR(
+                    PDF_ERR_INCORRECT_TYPE,
+                    "Incorrect number of elements in matrix array (expected 9)"
+                );
+            }
+
+            PdfReal array[9] = {0};
+            for (size_t idx = 0; idx < 9; idx++) {
+                PdfObject* element = NULL;
+                RELEASE_ASSERT(pdf_object_vec_get(
+                    object->data.array.elements,
+                    idx,
+                    &element
+                ));
+
+                PdfNumber number;
+                PDF_PROPAGATE(
+                    pdf_deserialize_number(element, &number, resolver)
+                );
+
+                array[idx] = pdf_number_as_real(number);
+            }
+
+            *target_ptr = geom_mat3_new(
+                array[0],
+                array[1],
+                array[2],
+                array[3],
+                array[4],
+                array[5],
+                array[6],
+                array[7],
+                array[8]
             );
+            break;
+        }
+        default: {
+            return PDF_ERROR(PDF_ERR_INCORRECT_TYPE, "Matrix must be an array");
         }
     }
 
@@ -221,8 +333,6 @@ DESERDE_IMPL_TRAMPOLINE(
     pdf_deserialize_geom_mat3_trampoline,
     pdf_deserialize_geom_mat3
 )
-
-DESERDE_IMPL_OPTIONAL(PdfGeomMat3Optional, pdf_geom_mat3_op_init)
 
 #define DVEC_NAME PdfNameVec
 #define DVEC_LOWERCASE_NAME pdf_name_vec

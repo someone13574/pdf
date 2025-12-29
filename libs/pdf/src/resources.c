@@ -1,9 +1,12 @@
 #include "pdf/resources.h"
 
+#include <string.h>
+
 #include "deserialize.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf_error/error.h"
 
 PdfError* pdf_deserialize_resources(
     const PdfObject* object,
@@ -104,7 +107,14 @@ PdfError* pdf_deserialize_gstate_params(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_UNIMPLEMENTED_FIELD("Type"),
+        PDF_FIELD(
+            "Type",
+            &target_ptr->type,
+            PDF_DESERDE_OPTIONAL(
+                pdf_name_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+            )
+        ),
         PDF_UNIMPLEMENTED_FIELD("LW"),
         PDF_UNIMPLEMENTED_FIELD("LC"),
         PDF_UNIMPLEMENTED_FIELD("LJ"),
@@ -119,12 +129,26 @@ PdfError* pdf_deserialize_gstate_params(
         PDF_UNIMPLEMENTED_FIELD("BG2"),
         PDF_UNIMPLEMENTED_FIELD("UCR"),
         PDF_UNIMPLEMENTED_FIELD("UCR2"),
-        PDF_UNIMPLEMENTED_FIELD("TR"),
+        PDF_IGNORED_FIELD("TR"), // TODO: functions
         PDF_UNIMPLEMENTED_FIELD("TR2"),
         PDF_UNIMPLEMENTED_FIELD("HT"),
         PDF_UNIMPLEMENTED_FIELD("FL"),
-        PDF_UNIMPLEMENTED_FIELD("SM"),
-        PDF_UNIMPLEMENTED_FIELD("SA"),
+        PDF_FIELD(
+            "SM",
+            &target_ptr->sm,
+            PDF_DESERDE_OPTIONAL(
+                pdf_real_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            )
+        ),
+        PDF_FIELD(
+            "SA",
+            &target_ptr->sa,
+            PDF_DESERDE_OPTIONAL(
+                pdf_boolean_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+            )
+        ),
         PDF_UNIMPLEMENTED_FIELD("BM"),
         PDF_UNIMPLEMENTED_FIELD("SMask"),
         PDF_FIELD(
@@ -155,6 +179,15 @@ PdfError* pdf_deserialize_gstate_params(
         resolver,
         "PdfGStateParams"
     ));
+
+    if (target_ptr->type.has_value) {
+        if (strcmp(target_ptr->type.value, "ExtGState") != 0) {
+            return PDF_ERROR(
+                PDF_ERR_INVALID_SUBTYPE,
+                "`Type` must be `ExtGState`"
+            );
+        }
+    }
 
     return NULL;
 }
