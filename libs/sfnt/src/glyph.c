@@ -226,6 +226,10 @@ void sfnt_glyph_render(
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(glyph);
 
+    if (glyph->num_contours == 0) {
+        return;
+    }
+
     Arena* temp_arena = arena_new(4096);
     PathBuilder* path = path_builder_new(temp_arena);
 

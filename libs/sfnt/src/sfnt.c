@@ -132,13 +132,30 @@ PdfError* sfnt_get_glyph(SfntFont* font, uint32_t cid, SfntGlyph* glyph) {
     RELEASE_ASSERT(glyph);
 
     uint32_t gid = sfnt_cmap_map_cid(&font->cmap.mapping_table, cid);
-    uint32_t offset;
+    uint32_t offset, next_offset = 0;
     PDF_PROPAGATE(sfnt_loca_glyph_offset(&font->loca, gid, &offset));
+    bool next_ok = pdf_error_free_is_ok(
+        sfnt_loca_glyph_offset(&font->loca, gid + 1, &next_offset)
+    );
+    RELEASE_ASSERT(!next_ok || next_offset >= offset);
 
-    LOG_DIAG(DEBUG, SFNT, "cid=%u, gid=%u, offset=%u", cid, gid, offset);
+    LOG_DIAG(
+        DEBUG,
+        SFNT,
+        "cid=%u, gid=%u, offset=%u, next_offset=%u",
+        cid,
+        gid,
+        offset,
+        next_offset
+    );
 
-    PDF_PROPAGATE(sfnt_parser_seek(&font->glyf_parser, (size_t)offset));
-    PDF_PROPAGATE(sfnt_parse_glyph(font->arena, &font->glyf_parser, glyph));
+    if (!next_ok || next_offset - offset != 0) {
+        PDF_PROPAGATE(sfnt_parser_seek(&font->glyf_parser, (size_t)offset));
+        PDF_PROPAGATE(sfnt_parse_glyph(font->arena, &font->glyf_parser, glyph));
+    } else {
+        LOG_DIAG(DEBUG, SFNT, "Glyph is empty");
+        glyph->num_contours = 0;
+    }
 
     // TODO: Make metrics optional, since hhea.num_of_long_for_metrics isn't
     // always the number of glyphs

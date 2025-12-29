@@ -343,7 +343,7 @@ PdfError* render_glyph(
                 size_t font_file_size = 0;
                 uint8_t* font_file = load_file_to_buffer(
                     arena,
-                    "assets/fonts-urw-base35/fonts/NimbusMonoPS-Regular.ttf",
+                    "assets/fonts-urw-base35/fonts/NimbusSans-Regular.ttf",
                     &font_file_size
                 );
                 RELEASE_ASSERT(font_file);

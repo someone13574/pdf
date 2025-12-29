@@ -284,7 +284,13 @@ static PdfError* process_content_stream(
                 current_graphics_state(state)->text_state.font_set = true;
                 break;
             }
-            case PDF_OPERATOR_Td: {
+            case PDF_OPERATOR_Td:
+            case PDF_OPERATOR_TD: {
+                if (op.kind == PDF_OPERATOR_TD) {
+                    current_graphics_state(state)->text_state.leading =
+                        -op.data.text_offset.y;
+                }
+
                 GeomMat3 transform = geom_mat3_translate(
                     op.data.text_offset.x,
                     op.data.text_offset.y
@@ -299,6 +305,17 @@ static PdfError* process_content_stream(
                 state->text_object_state.text_matrix = op.data.set_text_matrix;
                 state->text_object_state.text_line_matrix =
                     state->text_object_state.text_matrix;
+                break;
+            }
+            case PDF_OPERATOR_T_star: {
+                GeomMat3 transform = geom_mat3_translate(
+                    0,
+                    -current_graphics_state(state)->text_state.leading
+                );
+                state->text_object_state.text_matrix = geom_mat3_mul(
+                    transform,
+                    state->text_object_state.text_matrix
+                );
                 break;
             }
             case PDF_OPERATOR_TJ: {
