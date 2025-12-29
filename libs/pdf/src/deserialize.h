@@ -46,8 +46,7 @@ typedef struct {
 typedef PdfError* (*PdfDeserdeFn)(
     const PdfObject* object,
     void* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 /// Gives the required information to deserialize an object.
@@ -124,8 +123,7 @@ PdfError* pdf_deserialize_dict(
     const PdfFieldDescriptor* fields,
     size_t num_fields,
     bool allow_unknown_fields,
-    PdfOptionalResolver resolver,
-    Arena* arena, // An arena is required so arrays can be allocated.
+    PdfResolver* resolver,
     const char* debug_name
 );
 
@@ -151,7 +149,7 @@ PdfError* pdf_deserialize_operands(
     const PdfObjectVec* operands,
     const PdfOperandDescriptor* descriptors,
     size_t num_descriptors,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 #define PDF_OPERAND(ptr_to_variable, operand_information)                      \
@@ -264,12 +262,7 @@ PdfError* pdf_deserialize_operands(
         PDF_PROPAGATE(pdf_resolve_ref(resolver, resolvable.ref, &resolved));   \
         resolvable.resolved =                                                  \
             arena_alloc(pdf_resolver_arena(resolver), sizeof(base_type));      \
-        PDF_PROPAGATE(deserde_fn(                                              \
-            &resolved,                                                         \
-            resolvable.resolved,                                               \
-            pdf_op_resolver_some(resolver),                                    \
-            pdf_resolver_arena(resolver)                                       \
-        ));                                                                    \
+        PDF_PROPAGATE(deserde_fn(&resolved, resolvable.resolved, resolver));   \
         *resolved_out = *resolvable.resolved;                                  \
         return NULL;                                                           \
     }
@@ -278,8 +271,7 @@ PdfError* pdf_deserialize_operands(
     PdfError* trampoline_fn(                                                   \
         const PdfObject* object,                                               \
         void* target_ptr,                                                      \
-        PdfOptionalResolver resolver,                                          \
-        Arena* arena                                                           \
+        PdfResolver* resolver                                                  \
     ) {                                                                        \
-        return deserde_fn(object, target_ptr, resolver, arena);                \
+        return deserde_fn(object, target_ptr, resolver);                       \
     }

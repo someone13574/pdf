@@ -431,17 +431,15 @@ const char* pdf_decode_adobe_standard_codepoint(uint8_t codepoint) {
 PdfError* pdf_deserialize_encoding_dict(
     const PdfObject* object,
     PdfEncodingDict* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     // Resolve
     PdfObject resolved;
-    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved));
+    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved, true));
 
     // Attempt to deserialize name
     if (resolved.type == PDF_OBJECT_TYPE_NAME) {
@@ -486,7 +484,6 @@ PdfError* pdf_deserialize_encoding_dict(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         false,
         resolver,
-        arena,
         "PdfEncodingDict"
     ));
 

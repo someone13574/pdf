@@ -12,13 +12,11 @@
 PdfError* pdf_deserialize_form_xobject(
     const PdfObject* object,
     PdfFormXObject* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
@@ -83,7 +81,7 @@ PdfError* pdf_deserialize_form_xobject(
     };
 
     PdfObject resolved;
-    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved));
+    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved, true));
     if (resolved.type != PDF_OBJECT_TYPE_STREAM) {
         return PDF_ERROR(
             PDF_ERR_INCORRECT_TYPE,
@@ -97,7 +95,6 @@ PdfError* pdf_deserialize_form_xobject(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         true,
         resolver,
-        arena,
         "PdfFormXObject"
     ));
 
@@ -105,8 +102,7 @@ PdfError* pdf_deserialize_form_xobject(
         pdf_deserialize_content_stream(
             &resolved,
             &target_ptr->content_stream,
-            resolver,
-            arena
+            resolver
         ),
         "Failed to deserialize form context stream"
     );
@@ -138,12 +134,12 @@ typedef struct {
 PdfError* pdf_deserialize_xobject(
     const PdfObject* object,
     PdfXObject* target_ptr,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     Arena* arena
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(arena);
 
     XObjectUntyped untyped = {0};
@@ -154,7 +150,7 @@ PdfError* pdf_deserialize_xobject(
     )};
 
     PdfObject resolved;
-    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved));
+    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved, true));
     if (resolved.type != PDF_OBJECT_TYPE_STREAM) {
         return PDF_ERROR(
             PDF_ERR_INCORRECT_TYPE,
@@ -168,7 +164,6 @@ PdfError* pdf_deserialize_xobject(
         true,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         resolver,
-        arena,
         "XObjectUntyped"
     ));
 
@@ -177,8 +172,7 @@ PdfError* pdf_deserialize_xobject(
         PDF_PROPAGATE(pdf_deserialize_form_xobject(
             object,
             &target_ptr->data.form,
-            resolver,
-            arena
+            resolver
         ));
     } else if (strcmp(untyped.subtype, "Image") == 0) {
         LOG_TODO();

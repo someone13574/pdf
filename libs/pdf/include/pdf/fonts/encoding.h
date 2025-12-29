@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 
-#include "arena/arena.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
@@ -19,8 +18,7 @@ typedef struct {
 PdfError* pdf_deserialize_encoding_dict(
     const PdfObject* object,
     PdfEncodingDict* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 const char*

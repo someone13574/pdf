@@ -3,7 +3,6 @@
 #include <stdbool.h>
 
 #include "../deserialize.h"
-#include "arena/arena.h"
 #include "geom/mat3.h"
 #include "logger/log.h"
 #include "operation.h"
@@ -33,11 +32,11 @@ new_queue_op(PdfContentOpVec* operation_queue, PdfOperator op) {
 static PdfError* deserialize_line_cap_style(
     PdfLineCapStyle* target_ptr,
     const PdfObjectVec* operands,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(target_ptr);
     RELEASE_ASSERT(operands);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfInteger type;
     PdfOperandDescriptor descriptors[] = {
@@ -48,7 +47,7 @@ static PdfError* deserialize_line_cap_style(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-        arena
+        resolver
     ));
 
     switch (type) {
@@ -78,11 +77,11 @@ static PdfError* deserialize_line_cap_style(
 static PdfError* deserialize_line_join_style(
     PdfLineJoinStyle* target_ptr,
     const PdfObjectVec* operands,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(target_ptr);
     RELEASE_ASSERT(operands);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfInteger type;
     PdfOperandDescriptor descriptors[] = {
@@ -93,7 +92,7 @@ static PdfError* deserialize_line_join_style(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-        arena
+        resolver
     ));
 
     switch (type) {
@@ -123,11 +122,11 @@ static PdfError* deserialize_line_join_style(
 static PdfError* deserialize_matrix(
     GeomMat3* target,
     const PdfObjectVec* operands,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(target);
     RELEASE_ASSERT(operands);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfReal a, b, c, d, e, f;
     PdfOperandDescriptor descriptors[] = {
@@ -161,7 +160,7 @@ static PdfError* deserialize_matrix(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-        arena
+        resolver
     ));
 
     *target = geom_mat3_new_pdf(a, b, c, d, e, f);
@@ -172,11 +171,11 @@ static PdfError* deserialize_matrix(
 static PdfError* deserialize_draw_rectangle(
     PdfContentOpVec* operation_queue,
     const PdfObjectVec* operands,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(operation_queue);
     RELEASE_ASSERT(operands);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfNumber x, y, width, height;
 
@@ -197,7 +196,7 @@ static PdfError* deserialize_draw_rectangle(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-        arena
+        resolver
     ));
 
     double x_real = pdf_number_as_real(x);
@@ -227,11 +226,11 @@ static PdfError* deserialize_draw_rectangle(
 static PdfError* deserialize_set_font(
     PdfContentOpVec* operation_queue,
     const PdfObjectVec* operands,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(operation_queue);
     RELEASE_ASSERT(operands);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfContentOp* queue_op = new_queue_op(operation_queue, PDF_OPERATOR_Tf);
 
@@ -250,7 +249,7 @@ static PdfError* deserialize_set_font(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-        arena
+        resolver
     ));
 
     return NULL;
@@ -259,11 +258,11 @@ static PdfError* deserialize_set_font(
 static PdfError* deserialize_vec2(
     GeomVec2* target_ptr,
     const PdfObjectVec* operands,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(target_ptr);
     RELEASE_ASSERT(operands);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfOperandDescriptor descriptors[] = {
         PDF_OPERAND(
@@ -280,7 +279,7 @@ static PdfError* deserialize_vec2(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-        arena
+        resolver
     ));
 
     return NULL;
@@ -289,20 +288,23 @@ static PdfError* deserialize_vec2(
 static PdfError* deserialize_text_op(
     PdfOpParamsPositionedTextVec** target_vec,
     const PdfObjectVec* operands,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(target_vec);
     RELEASE_ASSERT(operands);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfString string;
     PdfOperandDescriptor descriptors[] = {
         PDF_OPERAND(&string, PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING))
     };
-    PDF_PROPAGATE(pdf_deserialize_operands(operands, descriptors, 1, arena));
+    PDF_PROPAGATE(pdf_deserialize_operands(operands, descriptors, 1, resolver));
 
     PdfOpParamsPositionedTextElement* element =
-        pdf_op_params_positioned_text_vec_push_uninit((void*)target_vec, arena);
+        pdf_op_params_positioned_text_vec_push_uninit(
+            (void*)target_vec,
+            pdf_resolver_arena(resolver)
+        );
     element->type = POSITIONED_TEXT_ELEMENT_STR;
     element->value.str = string;
 
@@ -312,13 +314,11 @@ static PdfError* deserialize_text_op(
 static PdfError* deserialize_positioned_text_element(
     const PdfObject* object,
     PdfOpParamsPositionedTextElement* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     switch (object->type) {
         case PDF_OBJECT_TYPE_INTEGER: {
@@ -356,11 +356,11 @@ DESERDE_IMPL_TRAMPOLINE(
 static PdfError* deserialize_positioned_text_op(
     PdfOpParamsPositionedTextVec** target_vec,
     const PdfObjectVec* operands,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(target_vec);
     RELEASE_ASSERT(operands);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
         target_vec,
@@ -374,7 +374,7 @@ static PdfError* deserialize_positioned_text_op(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-        arena
+        resolver
     ));
 
     return NULL;
@@ -384,11 +384,11 @@ static PdfError* deserialize_set_gray(
     bool stroking,
     PdfContentOpVec* operation_queue,
     const PdfObjectVec* operands,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(operation_queue);
     RELEASE_ASSERT(operands);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfContentOp* queue_op = new_queue_op(
         operation_queue,
@@ -404,7 +404,7 @@ static PdfError* deserialize_set_gray(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-        arena
+        resolver
     ));
 
     return NULL;
@@ -414,11 +414,11 @@ static PdfError* deserialize_set_rgb(
     bool stroking,
     PdfContentOpVec* operation_queue,
     const PdfObjectVec* operands,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(operation_queue);
     RELEASE_ASSERT(operands);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfContentOp* queue_op = new_queue_op(
         operation_queue,
@@ -444,7 +444,7 @@ static PdfError* deserialize_set_rgb(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
-        arena
+        resolver
     ));
 
     return NULL;
@@ -453,31 +453,34 @@ static PdfError* deserialize_set_rgb(
 static PdfError* deserialize_num_real(
     PdfReal* target,
     const PdfObjectVec* operands,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(target);
     RELEASE_ASSERT(operands);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
         target,
         PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
     )};
-    PDF_PROPAGATE(pdf_deserialize_operands(operands, descriptors, 1, arena));
+    PDF_PROPAGATE(pdf_deserialize_operands(operands, descriptors, 1, resolver));
 
     return NULL;
 }
 
-static PdfError*
-deserialize_name(PdfName* target, const PdfObjectVec* operands, Arena* arena) {
+static PdfError* deserialize_name(
+    PdfName* target,
+    const PdfObjectVec* operands,
+    PdfResolver* resolver
+) {
     RELEASE_ASSERT(target);
     RELEASE_ASSERT(operands);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfOperandDescriptor descriptors[] = {
         PDF_OPERAND(target, PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME))
     };
-    PDF_PROPAGATE(pdf_deserialize_operands(operands, descriptors, 1, arena));
+    PDF_PROPAGATE(pdf_deserialize_operands(operands, descriptors, 1, resolver));
 
     return NULL;
 }
@@ -485,11 +488,11 @@ deserialize_name(PdfName* target, const PdfObjectVec* operands, Arena* arena) {
 PdfError* pdf_deserialize_content_op(
     PdfOperator op,
     const PdfObjectVec* operands,
-    Arena* arena,
+    PdfResolver* resolver,
     PdfContentOpVec* operation_queue
 ) {
     RELEASE_ASSERT(operands);
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(operation_queue);
 
     // TODO: For zero-operand operators, check that they have zero operands.
@@ -500,7 +503,7 @@ PdfError* pdf_deserialize_content_op(
             PDF_PROPAGATE(deserialize_num_real(
                 &queue_op->data.set_line_width,
                 operands,
-                arena
+                resolver
             ));
             return NULL;
         }
@@ -510,7 +513,7 @@ PdfError* pdf_deserialize_content_op(
             PDF_PROPAGATE(deserialize_line_cap_style(
                 &queue_op->data.set_line_cap,
                 operands,
-                arena
+                resolver
             ));
             return NULL;
         }
@@ -520,7 +523,7 @@ PdfError* pdf_deserialize_content_op(
             PDF_PROPAGATE(deserialize_line_join_style(
                 &queue_op->data.set_join_style,
                 operands,
-                arena
+                resolver
             ));
             return NULL;
         }
@@ -530,7 +533,7 @@ PdfError* pdf_deserialize_content_op(
             PDF_PROPAGATE(deserialize_num_real(
                 &queue_op->data.miter_limit,
                 operands,
-                arena
+                resolver
             ));
             return NULL;
         }
@@ -542,7 +545,7 @@ PdfError* pdf_deserialize_content_op(
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_gs);
             PDF_PROPAGATE(
-                deserialize_name(&queue_op->data.set_gstate, operands, arena)
+                deserialize_name(&queue_op->data.set_gstate, operands, resolver)
             );
             return NULL;
         }
@@ -558,13 +561,13 @@ PdfError* pdf_deserialize_content_op(
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_cm);
             PDF_PROPAGATE(
-                deserialize_matrix(&queue_op->data.set_ctm, operands, arena)
+                deserialize_matrix(&queue_op->data.set_ctm, operands, resolver)
             );
             return NULL;
         }
         case PDF_OPERATOR_re: {
             PDF_PROPAGATE(
-                deserialize_draw_rectangle(operation_queue, operands, arena)
+                deserialize_draw_rectangle(operation_queue, operands, resolver)
             );
             return NULL;
         }
@@ -592,22 +595,24 @@ PdfError* pdf_deserialize_content_op(
             PDF_PROPAGATE(deserialize_num_real(
                 &queue_op->data.set_text_metric,
                 operands,
-                arena
+                resolver
             ));
             return NULL;
         };
         case PDF_OPERATOR_Tf: {
             PDF_PROPAGATE(
-                deserialize_set_font(operation_queue, operands, arena)
+                deserialize_set_font(operation_queue, operands, resolver)
             );
             return NULL;
         }
         case PDF_OPERATOR_Td:
         case PDF_OPERATOR_TD: {
             PdfContentOp* queue_op = new_queue_op(operation_queue, op);
-            PDF_PROPAGATE(
-                deserialize_vec2(&queue_op->data.text_offset, operands, arena)
-            );
+            PDF_PROPAGATE(deserialize_vec2(
+                &queue_op->data.text_offset,
+                operands,
+                resolver
+            ));
             return NULL;
         }
         case PDF_OPERATOR_Tm: {
@@ -616,7 +621,7 @@ PdfError* pdf_deserialize_content_op(
             PDF_PROPAGATE(deserialize_matrix(
                 &queue_op->data.set_text_matrix,
                 operands,
-                arena
+                resolver
             ));
             return NULL;
         }
@@ -630,7 +635,7 @@ PdfError* pdf_deserialize_content_op(
             PDF_PROPAGATE(deserialize_text_op(
                 &queue_op->data.positioned_text,
                 operands,
-                arena
+                resolver
             ));
             return NULL;
         }
@@ -640,7 +645,7 @@ PdfError* pdf_deserialize_content_op(
             PDF_PROPAGATE(deserialize_positioned_text_op(
                 &queue_op->data.positioned_text,
                 operands,
-                arena
+                resolver
             ));
             return NULL;
         }
@@ -650,7 +655,7 @@ PdfError* pdf_deserialize_content_op(
             PDF_PROPAGATE(deserialize_name(
                 &queue_op->data.set_color_space,
                 operands,
-                arena
+                resolver
             ));
             return NULL;
         }
@@ -664,28 +669,30 @@ PdfError* pdf_deserialize_content_op(
         }
         case PDF_OPERATOR_g: {
             PDF_PROPAGATE(
-                deserialize_set_gray(false, operation_queue, operands, arena)
+                deserialize_set_gray(false, operation_queue, operands, resolver)
             );
             return NULL;
         }
         case PDF_OPERATOR_RG: {
             PDF_PROPAGATE(
-                deserialize_set_rgb(true, operation_queue, operands, arena)
+                deserialize_set_rgb(true, operation_queue, operands, resolver)
             );
             return NULL;
         }
         case PDF_OPERATOR_rg: {
             PDF_PROPAGATE(
-                deserialize_set_rgb(false, operation_queue, operands, arena)
+                deserialize_set_rgb(false, operation_queue, operands, resolver)
             );
             return NULL;
         }
         case PDF_OPERATOR_Do: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_Do);
-            PDF_PROPAGATE(
-                deserialize_name(&queue_op->data.paint_xobject, operands, arena)
-            );
+            PDF_PROPAGATE(deserialize_name(
+                &queue_op->data.paint_xobject,
+                operands,
+                resolver
+            ));
             return NULL;
         }
         default: {

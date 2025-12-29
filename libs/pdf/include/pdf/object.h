@@ -4,8 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "geom/vec3.h"
-#include "logger/log.h"
+#include "geom/mat3.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
 
@@ -91,8 +90,7 @@ typedef struct {
     PdfError* trampoline_name(                                                 \
         const PdfObject* object,                                               \
         void* target_ptr,                                                      \
-        PdfOptionalResolver resolver,                                          \
-        Arena* arena                                                           \
+        PdfResolver* resolver                                                  \
     );
 
 /// Placeholder type for unimplemented deserialization fields. Choice is
@@ -113,16 +111,14 @@ DESERDE_DECL_OPTIONAL(PdfNumberOptional, PdfNumber, pdf_number_op_init)
 PdfError* pdf_deserialize_number(
     const PdfObject* object,
     PdfNumber* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_number_trampoline)
 
 PdfError* pdf_deserialize_num_as_real(
     const PdfObject* object,
     PdfReal* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_num_as_real_trampoline)
 
@@ -151,8 +147,7 @@ DESERDE_DECL_OPTIONAL(PdfRectangleOptional, PdfRectangle, pdf_rectangle_op_init)
 PdfError* pdf_deserialize_rectangle(
     const PdfObject* object,
     PdfRectangle* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_rectangle_trampoline)
@@ -160,8 +155,7 @@ DESERDE_DECL_TRAMPOLINE(pdf_deserialize_rectangle_trampoline)
 PdfError* pdf_deserialize_geom_mat3(
     const PdfObject* object,
     GeomMat3* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_geom_mat3_trampoline)
@@ -211,8 +205,7 @@ struct PdfStreamDict {
 PdfError* pdf_deserialize_stream_dict(
     const PdfObject* object,
     PdfStreamDict* deserialized,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 typedef enum {

@@ -274,8 +274,8 @@ DVEC_NAME* DVEC_FN(clone)(const DVEC_NAME* vec) {
         new_vec->blocks[idx] =
             (DVEC_TYPE*)arena_alloc(vec->arena, sizeof(DVEC_TYPE) * block_size);
         memcpy(
-            new_vec->blocks[idx],
-            vec->blocks[idx],
+            (void*)new_vec->blocks[idx],
+            (void*)vec->blocks[idx],
             sizeof(DVEC_TYPE) * block_size
         );
     }

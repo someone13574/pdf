@@ -17,28 +17,30 @@
 PdfError* pdf_deserialize_content_stream(
     const PdfObject* object,
     PdfContentStream* deserialized,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(deserialized);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfObject resolved;
-    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved));
+    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved, true));
     if (resolved.type != PDF_OBJECT_TYPE_STREAM) {
         return PDF_ERROR(PDF_ERR_INCORRECT_TYPE, "Expected a stream");
     }
 
     PdfStream* stream = &resolved.data.stream;
 
-    PdfCtx* ctx =
-        pdf_ctx_new(arena, stream->stream_bytes, stream->decoded_stream_len);
+    PdfCtx* ctx = pdf_ctx_new(
+        pdf_resolver_arena(resolver),
+        stream->stream_bytes,
+        stream->decoded_stream_len
+    );
     PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
-    PdfObjectVec* operands = pdf_object_vec_new(arena);
-    PdfContentOpVec* operations = pdf_content_op_vec_new(arena);
+    PdfObjectVec* operands = pdf_object_vec_new(pdf_resolver_arena(resolver));
+    PdfContentOpVec* operations =
+        pdf_content_op_vec_new(pdf_resolver_arena(resolver));
 
     while (pdf_ctx_offset(ctx) != pdf_ctx_buffer_len(ctx)) {
         // Parse operands
@@ -49,7 +51,11 @@ PdfError* pdf_deserialize_content_stream(
         PdfError* stop_reason = NULL;
 
         while (true) {
-            stop_reason = pdf_parse_operand_object(arena, ctx, &operand);
+            stop_reason = pdf_parse_operand_object(
+                pdf_resolver_arena(resolver),
+                ctx,
+                &operand
+            );
             if (stop_reason) {
                 stop_reason = PDF_ERROR_ADD_CONTEXT_FMT(
                     stop_reason,
@@ -58,7 +64,8 @@ PdfError* pdf_deserialize_content_stream(
                 break;
             }
 
-            PdfObject* operand_alloc = arena_alloc(arena, sizeof(PdfObject));
+            PdfObject* operand_alloc =
+                arena_alloc(pdf_resolver_arena(resolver), sizeof(PdfObject));
             *operand_alloc = operand;
             pdf_object_vec_push(operands, operand_alloc);
 
@@ -81,7 +88,7 @@ PdfError* pdf_deserialize_content_stream(
 
         // Deserialize operation
         PDF_PROPAGATE(
-            pdf_deserialize_content_op(operator, operands, arena, operations)
+            pdf_deserialize_content_op(operator, operands, resolver, operations)
         );
     }
 

@@ -14,8 +14,7 @@ typedef struct {
 PdfError* pdf_deserialize_catalog(
     const PdfObject* object,
     PdfCatalog* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 DESERDE_DECL_RESOLVABLE(

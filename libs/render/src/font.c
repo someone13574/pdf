@@ -81,14 +81,13 @@ PdfError* next_cid(
 PdfError* cid_to_gid(
     Arena* arena,
     PdfFont* font,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     uint32_t cid,
     uint32_t* gid_out
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(font);
-    RELEASE_ASSERT(resolver.present);
-    RELEASE_ASSERT(resolver.resolver);
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(gid_out);
 
     switch (font->type) {
@@ -119,7 +118,7 @@ PdfError* cid_to_gid(
             PdfFontDescriptor font_descriptor;
             PDF_PROPAGATE(pdf_resolve_font_descriptor(
                 font->data.cid.font_descriptor,
-                resolver.resolver,
+                resolver,
                 &font_descriptor
             ));
 
@@ -187,7 +186,7 @@ PdfError* cid_to_gid(
 PdfError* render_glyph(
     Arena* arena,
     PdfFont* font,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     uint32_t gid,
     Canvas* canvas,
     GeomMat3 transform,
@@ -195,8 +194,7 @@ PdfError* render_glyph(
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(font);
-    RELEASE_ASSERT(resolver.present);
-    RELEASE_ASSERT(resolver.resolver);
+    RELEASE_ASSERT(resolver);
 
     switch (font->type) {
         case PDF_FONT_TYPE0: {
@@ -232,7 +230,7 @@ PdfError* render_glyph(
             PdfFontDescriptor font_descriptor;
             PDF_PROPAGATE(pdf_resolve_font_descriptor(
                 font->data.cid.font_descriptor,
-                resolver.resolver,
+                resolver,
                 &font_descriptor
             ));
 
@@ -283,12 +281,11 @@ PdfError* render_glyph(
         }
         case PDF_FONT_TRUETYPE: {
             RELEASE_ASSERT(font->data.true_type.font_descriptor.has_value);
-            RELEASE_ASSERT(resolver.present);
 
             PdfFontDescriptor font_descriptor;
             PDF_PROPAGATE(pdf_resolve_font_descriptor(
                 font->data.true_type.font_descriptor.value,
-                resolver.resolver,
+                resolver,
                 &font_descriptor
             ));
 
@@ -330,12 +327,12 @@ PdfError* render_glyph(
 
 PdfError* cid_to_width(
     PdfFont* font,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     uint32_t cid,
     PdfNumber* width_out
 ) {
     RELEASE_ASSERT(font);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(width_out);
 
     switch (font->type) {
@@ -402,12 +399,11 @@ PdfError* cid_to_width(
                     width_out
                 )) {
                 RELEASE_ASSERT(font->data.true_type.font_descriptor.has_value);
-                RELEASE_ASSERT(resolver.present);
 
                 PdfFontDescriptor font_descriptor;
                 PDF_PROPAGATE(pdf_resolve_font_descriptor(
                     font->data.true_type.font_descriptor.value,
-                    resolver.resolver,
+                    resolver,
                     &font_descriptor
                 ));
 
@@ -427,7 +423,7 @@ PdfError* cid_to_width(
 
 PdfError* get_font_matrix(
     Arena* arena,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     PdfFont* font,
     GeomMat3* font_matrix_out
 ) {
@@ -467,7 +463,7 @@ PdfError* get_font_matrix(
             PdfFontDescriptor font_descriptor;
             PDF_PROPAGATE(pdf_resolve_font_descriptor(
                 font->data.cid.font_descriptor,
-                resolver.resolver,
+                resolver,
                 &font_descriptor
             ));
 
@@ -512,12 +508,11 @@ PdfError* get_font_matrix(
         case PDF_FONT_TRUETYPE: {
             // TODO: proper font resolution, caching, using embedded
             RELEASE_ASSERT(font->data.true_type.font_descriptor.has_value);
-            RELEASE_ASSERT(resolver.present);
 
             PdfFontDescriptor font_descriptor;
             PDF_PROPAGATE(pdf_resolve_font_descriptor(
                 font->data.true_type.font_descriptor.value,
-                resolver.resolver,
+                resolver,
                 &font_descriptor
             ));
 

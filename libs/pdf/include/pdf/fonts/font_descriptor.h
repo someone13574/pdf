@@ -109,8 +109,7 @@ typedef struct {
 PdfError* pdf_deserialize_font_descriptor(
     const PdfObject* object,
     PdfFontDescriptor* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 DESERDE_DECL_RESOLVABLE(

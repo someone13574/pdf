@@ -14,6 +14,7 @@
 #include "pdf/resolver.h"
 #include "pdf/trailer.h"
 #include "pdf_error/error.h"
+#include "test_helpers.h"
 #include "xref.h"
 
 typedef struct {
@@ -23,12 +24,10 @@ typedef struct {
 static PdfError* deserialize_stub_trailer(
     const PdfObject* object,
     StubTrailer* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(target_ptr);
 
     PdfFieldDescriptor fields[] = {PDF_FIELD(
@@ -46,7 +45,6 @@ static PdfError* deserialize_stub_trailer(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         true,
         resolver,
-        arena,
         "PdfTrailer (prev-only)"
     ));
 
@@ -56,11 +54,9 @@ static PdfError* deserialize_stub_trailer(
 struct PdfResolver {
     Arena* arena;
     PdfCtx* ctx;
-
-    uint8_t version;
-    // size_t startxref;
     XRefTable* xref;
 
+    uint8_t version;
     PdfTrailer trailer;
     PdfCatalog* catalog;
 };
@@ -95,8 +91,8 @@ PdfError* pdf_resolver_new(
     *resolver = arena_alloc(arena, sizeof(PdfResolver));
     (*resolver)->arena = arena;
     (*resolver)->ctx = ctx;
-    (*resolver)->version = version;
     (*resolver)->xref = xref;
+    (*resolver)->version = version;
     (*resolver)->catalog = NULL;
 
     size_t first_trailer_offset = SIZE_MAX;
@@ -129,28 +125,32 @@ PdfError* pdf_resolver_new(
     return NULL;
 }
 
-PdfOptionalResolver pdf_op_resolver_some(PdfResolver* resolver) {
-    RELEASE_ASSERT(resolver);
+#ifdef TEST
+PdfResolver* pdf_fake_resolver_new(Arena* arena, PdfCtx* ctx) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(ctx);
 
-    return (PdfOptionalResolver) {.present = true,
-                                  .unwrap_indirect_objs = true,
-                                  .resolver = resolver};
-}
+    PdfResolver* resolver = arena_alloc(arena, sizeof(PdfResolver));
+    resolver->arena = arena;
+    resolver->ctx = ctx;
+    resolver->version = 0;
+    resolver->xref = NULL;
+    resolver->catalog = NULL;
 
-PdfOptionalResolver pdf_op_resolver_none(bool unwrap_indirect_objs) {
-    return (PdfOptionalResolver) {.present = false,
-                                  .unwrap_indirect_objs = unwrap_indirect_objs,
-                                  .resolver = NULL};
+    return resolver;
 }
-
-bool pdf_op_resolver_valid(PdfOptionalResolver resolver) {
-    return !resolver.present || resolver.resolver;
-}
+#endif
 
 Arena* pdf_resolver_arena(PdfResolver* resolver) {
     RELEASE_ASSERT(resolver);
 
     return resolver->arena;
+}
+
+PdfCtx* pdf_resolver_ctx(PdfResolver* resolver) {
+    RELEASE_ASSERT(resolver);
+
+    return resolver->ctx;
 }
 
 static PdfError*
@@ -162,22 +162,11 @@ parse_stub_trailer(PdfResolver* resolver, StubTrailer* trailer) {
     PDF_PROPAGATE(pdf_ctx_seek_next_line(resolver->ctx));
 
     PdfObject trailer_object;
-    PDF_PROPAGATE(pdf_parse_object(
-        resolver->arena,
-        resolver->ctx,
-        pdf_op_resolver_some(resolver),
-        &trailer_object,
-        false
-    ));
+    PDF_PROPAGATE(pdf_parse_object(resolver, &trailer_object, false));
 
     printf("%s\n", pdf_fmt_object(resolver->arena, &trailer_object));
 
-    PDF_PROPAGATE(deserialize_stub_trailer(
-        &trailer_object,
-        trailer,
-        pdf_op_resolver_some(resolver),
-        resolver->arena
-    ));
+    PDF_PROPAGATE(deserialize_stub_trailer(&trailer_object, trailer, resolver));
     return NULL;
 }
 
@@ -189,20 +178,9 @@ static PdfError* parse_trailer(PdfResolver* resolver, PdfTrailer* trailer) {
     PDF_PROPAGATE(pdf_ctx_seek_next_line(resolver->ctx));
 
     PdfObject trailer_object;
-    PDF_PROPAGATE(pdf_parse_object(
-        resolver->arena,
-        resolver->ctx,
-        pdf_op_resolver_some(resolver),
-        &trailer_object,
-        false
-    ));
+    PDF_PROPAGATE(pdf_parse_object(resolver, &trailer_object, false));
 
-    PDF_PROPAGATE(pdf_deserialize_trailer(
-        &trailer_object,
-        trailer,
-        pdf_op_resolver_some(resolver),
-        resolver->arena
-    ));
+    PDF_PROPAGATE(pdf_deserialize_trailer(&trailer_object, trailer, resolver));
     return NULL;
 }
 
@@ -251,48 +229,48 @@ PdfError* pdf_resolve_ref(
     PDF_PROPAGATE(pdf_ctx_seek(resolver->ctx, entry->offset));
 
     entry->object = arena_alloc(resolver->arena, sizeof(PdfObject));
-    PDF_PROPAGATE(pdf_parse_object(
-        resolver->arena,
-        resolver->ctx,
-        pdf_op_resolver_some(resolver),
-        entry->object,
-        false
-    ));
+    PDF_PROPAGATE(pdf_parse_object(resolver, entry->object, false));
     *resolved = *entry->object;
 
     return NULL;
 }
 
 PdfError* pdf_resolve_object(
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     const PdfObject* object,
-    PdfObject* resolved
+    PdfObject* resolved,
+    bool strip_objs
 ) {
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(resolved);
 
-    if (object->type == PDF_OBJECT_TYPE_INDIRECT_OBJECT
-        && resolver.unwrap_indirect_objs) {
+    if (object->type == PDF_OBJECT_TYPE_INDIRECT_OBJECT && strip_objs) {
         LOG_DIAG(TRACE, PDF, "Unwrapping indirect object");
         return pdf_resolve_object(
             resolver,
             object->data.indirect_object.object,
-            resolved
+            resolved,
+            strip_objs
         );
     }
 
-    if (object->type == PDF_OBJECT_TYPE_INDIRECT_REF && resolver.present) {
+    if (object->type == PDF_OBJECT_TYPE_INDIRECT_REF) {
         LOG_DIAG(TRACE, PDF, "Resolving indirect reference");
 
         PdfObject indirect_object;
         PDF_PROPAGATE(pdf_resolve_ref(
-            resolver.resolver,
+            resolver,
             object->data.indirect_ref,
             &indirect_object
         ));
 
-        return pdf_resolve_object(resolver, &indirect_object, resolved);
+        return pdf_resolve_object(
+            resolver,
+            &indirect_object,
+            resolved,
+            strip_objs
+        );
     }
 
     LOG_DIAG(TRACE, PDF, "Resolved type is %d", object->type);

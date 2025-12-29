@@ -11,13 +11,11 @@
 PdfError* pdf_deserialize_font_descriptor(
     const PdfObject* object,
     PdfFontDescriptor* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
@@ -176,7 +174,6 @@ PdfError* pdf_deserialize_font_descriptor(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         false,
         resolver,
-        arena,
         "PdfFontDescriptor"
     ));
 

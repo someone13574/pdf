@@ -1,6 +1,5 @@
 // TODO: Since PdfNumber has been moved to object, this should probably move to,
 // but I'm not sure if it will stay in object or not.
-#include "arena/arena.h"
 #include "deserialize.h"
 #include "geom/mat3.h"
 #include "logger/log.h"
@@ -11,13 +10,11 @@
 PdfError* pdf_deserialize_number(
     const PdfObject* object,
     PdfNumber* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
     (void)resolver;
-    (void)arena;
 
     switch (object->type) {
         case PDF_OBJECT_TYPE_INTEGER: {
@@ -50,16 +47,14 @@ DESERDE_IMPL_OPTIONAL(PdfNumberOptional, pdf_number_op_init)
 PdfError* pdf_deserialize_num_as_real(
     const PdfObject* object,
     PdfReal* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfNumber num;
-    PDF_PROPAGATE(pdf_deserialize_number(object, &num, resolver, arena));
+    PDF_PROPAGATE(pdf_deserialize_number(object, &num, resolver));
     *target_ptr = pdf_number_as_real(num);
 
     return NULL;
@@ -94,8 +89,7 @@ PdfReal pdf_number_as_real(PdfNumber number) {
 PdfError* pdf_deserialize_rectangle(
     const PdfObject* object,
     PdfRectangle* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
@@ -116,8 +110,7 @@ PdfError* pdf_deserialize_rectangle(
             PDF_PROPAGATE(pdf_deserialize_number(
                 ll_x,
                 &target_ptr->lower_left_x,
-                resolver,
-                arena
+                resolver
             ));
 
             PdfObject* ll_y = NULL;
@@ -127,8 +120,7 @@ PdfError* pdf_deserialize_rectangle(
             PDF_PROPAGATE(pdf_deserialize_number(
                 ll_y,
                 &target_ptr->lower_left_y,
-                resolver,
-                arena
+                resolver
             ));
 
             PdfObject* ur_x = NULL;
@@ -138,8 +130,7 @@ PdfError* pdf_deserialize_rectangle(
             PDF_PROPAGATE(pdf_deserialize_number(
                 ur_x,
                 &target_ptr->upper_right_x,
-                resolver,
-                arena
+                resolver
             ));
 
             PdfObject* ur_y = NULL;
@@ -149,8 +140,7 @@ PdfError* pdf_deserialize_rectangle(
             PDF_PROPAGATE(pdf_deserialize_number(
                 ur_y,
                 &target_ptr->upper_right_y,
-                resolver,
-                arena
+                resolver
             ));
             break;
         }
@@ -174,13 +164,11 @@ DESERDE_IMPL_OPTIONAL(PdfRectangleOptional, pdf_rectangle_op_init)
 PdfError* pdf_deserialize_geom_mat3(
     const PdfObject* object,
     GeomMat3* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     switch (object->type) {
         case PDF_OBJECT_TYPE_ARRAY: {
@@ -202,7 +190,7 @@ PdfError* pdf_deserialize_geom_mat3(
 
                 PdfNumber number;
                 PDF_PROPAGATE(
-                    pdf_deserialize_number(element, &number, resolver, arena)
+                    pdf_deserialize_number(element, &number, resolver)
                 );
 
                 array[idx] = pdf_number_as_real(number);

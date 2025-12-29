@@ -27,8 +27,7 @@ typedef struct {
 PdfError* pdf_deserialize_page(
     const PdfObject* object,
     PdfPage* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 DESERDE_DECL_RESOLVABLE(
@@ -54,6 +53,5 @@ struct PdfPageTreeNode {
 PdfError* pdf_deserialize_page_tree_node(
     const PdfObject* object,
     PdfPageTreeNode* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );

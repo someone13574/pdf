@@ -16,20 +16,19 @@
 PdfError* pdf_deserialize_font_widths(
     const PdfObject* object,
     PdfFontWidths* deserialized,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(deserialized);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     if (!deserialized->cid_to_width) {
-        deserialized->cid_to_width = pdf_font_width_vec_new(arena);
+        deserialized->cid_to_width =
+            pdf_font_width_vec_new(pdf_resolver_arena(resolver));
     }
 
     PdfObject resolved_object;
-    pdf_resolve_object(resolver, object, &resolved_object);
+    pdf_resolve_object(resolver, object, &resolved_object, true);
 
     if (resolved_object.type != PDF_OBJECT_TYPE_ARRAY) {
         return PDF_ERROR(

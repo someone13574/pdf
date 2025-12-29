@@ -11,12 +11,10 @@
 PdfError* pdf_deserialize_trailer(
     const PdfObject* object,
     PdfTrailer* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(target_ptr);
 
     PdfFieldDescriptor fields[] = {
@@ -62,7 +60,6 @@ PdfError* pdf_deserialize_trailer(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         false,
         resolver,
-        arena,
         "PdfTrailer"
     ));
 

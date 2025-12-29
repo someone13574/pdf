@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "../deserialize.h"
@@ -11,13 +9,11 @@
 PdfError* pdf_deserialize_stream_dict(
     const PdfObject* object,
     PdfStreamDict* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
@@ -86,16 +82,19 @@ PdfError* pdf_deserialize_stream_dict(
 
     // Need to do a copy since the stream will take over the original
     // object.
-    PdfObject* copied_object = arena_alloc(arena, sizeof(PdfObject));
+    PdfObject* copied_object =
+        arena_alloc(pdf_resolver_arena(resolver), sizeof(PdfObject));
     memcpy(copied_object, object, sizeof(PdfObject));
     target_ptr->raw_dict = copied_object;
 
+    Arena* temp_arena = arena_new(128);
     LOG_DIAG(
         INFO,
         DESERDE,
         "Stream dict:\n%s\n",
-        pdf_fmt_object(arena, copied_object)
+        pdf_fmt_object(temp_arena, copied_object)
     );
+    arena_free(temp_arena);
 
     PDF_PROPAGATE(pdf_deserialize_dict(
         copied_object,
@@ -103,7 +102,6 @@ PdfError* pdf_deserialize_stream_dict(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         true,
         resolver,
-        arena,
         "PdfStreamDict"
     ));
 

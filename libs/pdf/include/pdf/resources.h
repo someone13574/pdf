@@ -1,6 +1,5 @@
 #pragma once
 
-#include "arena/arena.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
@@ -41,8 +40,7 @@ typedef struct {
 PdfError* pdf_deserialize_resources(
     const PdfObject* object,
     PdfResources* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 DESERDE_DECL_OPTIONAL(PdfResourcesOptional, PdfResources, pdf_resources_op_init)
@@ -205,6 +203,5 @@ typedef struct {
 PdfError* pdf_deserialize_gstate_params(
     const PdfObject* object,
     PdfGStateParams* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );

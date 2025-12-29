@@ -104,13 +104,12 @@ static PdfError* process_content_stream(
     RenderState* state,
     PdfContentStream* content_stream,
     const PdfResourcesOptional* resources,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     Canvas* canvas
 ) {
-    RELEASE_ASSERT(arena);
     RELEASE_ASSERT(state);
     RELEASE_ASSERT(content_stream);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(canvas);
 
     for (size_t idx = 0;
@@ -153,8 +152,7 @@ static PdfError* process_content_stream(
                 PDF_PROPAGATE(pdf_deserialize_gstate_params(
                     gstate_object,
                     &params,
-                    resolver,
-                    arena
+                    resolver
                 ));
 
                 graphics_state_apply_params(
@@ -267,8 +265,7 @@ static PdfError* process_content_stream(
                 PDF_PROPAGATE(pdf_deserialize_font(
                     font_object,
                     &current_graphics_state(state)->text_state.text_font,
-                    resolver,
-                    arena
+                    resolver
                 ));
                 current_graphics_state(state)->text_state.text_font_size =
                     op.data.set_font.size;
@@ -421,12 +418,12 @@ static PdfError* process_content_stream(
 
 PdfError* render_page(
     Arena* arena,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     const PdfPage* page,
     Canvas** canvas
 ) {
     RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(page);
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(!*canvas);
@@ -489,15 +486,10 @@ PdfError* render_page(
                 &stream_ref
             ));
 
-            RELEASE_ASSERT(resolver.present);
-            RELEASE_ASSERT(resolver.resolver);
-
             PdfContentStream stream;
-            PDF_PROPAGATE(pdf_resolve_content_stream(
-                stream_ref,
-                resolver.resolver,
-                &stream
-            ));
+            PDF_PROPAGATE(
+                pdf_resolve_content_stream(stream_ref, resolver, &stream)
+            );
 
             PDF_PROPAGATE(process_content_stream(
                 arena,

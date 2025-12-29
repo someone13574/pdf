@@ -88,9 +88,7 @@ int main(int argc, char** argv) {
         PDF_REQUIRE(pdf_resolve_page(page_ref, resolver, &page));
 
         Canvas* canvas = NULL;
-        PDF_REQUIRE(
-            render_page(arena, pdf_op_resolver_some(resolver), &page, &canvas)
-        );
+        PDF_REQUIRE(render_page(arena, resolver, &page, &canvas));
         canvas_write_file(canvas, "test.svg");
     }
 

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "arena/arena.h"
 #include "pdf/content_stream/operation.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
@@ -13,8 +12,7 @@ typedef struct {
 PdfError* pdf_deserialize_content_stream(
     const PdfObject* object,
     PdfContentStream* deserialized,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 DESERDE_DECL_RESOLVABLE(

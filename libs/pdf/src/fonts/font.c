@@ -23,13 +23,11 @@ DESERDE_IMPL_TRAMPOLINE(
 PdfError* pdf_deserialize_cid_font(
     const PdfObject* object,
     PdfCIDFont* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
@@ -81,7 +79,6 @@ PdfError* pdf_deserialize_cid_font(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         false,
         resolver,
-        arena,
         "PdfCIDFont"
     ));
 
@@ -105,13 +102,11 @@ PdfError* pdf_deserialize_cid_font(
 PdfError* pdf_deserialize_type0_font(
     const PdfObject* object,
     PdfType0font* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
@@ -158,7 +153,6 @@ PdfError* pdf_deserialize_type0_font(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         false,
         resolver,
-        arena,
         "PdfType0font"
     ));
 
@@ -191,13 +185,11 @@ PdfError* pdf_deserialize_type0_font(
 PdfError* pdf_deserialize_truetype_font_dict(
     const PdfObject* object,
     PdfTrueTypeFont* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
@@ -274,7 +266,6 @@ PdfError* pdf_deserialize_truetype_font_dict(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         false,
         resolver,
-        arena,
         "PdfTrueTypeFont"
     ));
 
@@ -302,12 +293,10 @@ typedef struct {
 PdfError* pdf_deserialize_font(
     const PdfObject* object,
     PdfFont* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(target_ptr);
 
     PdfFontInfo font_info;
@@ -330,7 +319,6 @@ PdfError* pdf_deserialize_font(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         true,
         resolver,
-        arena,
         "PdfFontInfo"
     ));
 
@@ -347,8 +335,7 @@ PdfError* pdf_deserialize_font(
         PDF_PROPAGATE(pdf_deserialize_type0_font(
             object,
             &target_ptr->data.type0,
-            resolver,
-            arena
+            resolver
         ));
     } else if (strcmp(font_info.subtype, "Type1") == 0) {
         target_ptr->type = PDF_FONT_TYPE1;
@@ -364,25 +351,18 @@ PdfError* pdf_deserialize_font(
         PDF_PROPAGATE(pdf_deserialize_truetype_font_dict(
             object,
             &target_ptr->data.true_type,
-            resolver,
-            arena
+            resolver
         ));
     } else if (strcmp(font_info.subtype, "CIDFontType0") == 0) {
         target_ptr->type = PDF_FONT_CIDTYPE0;
-        PDF_PROPAGATE(pdf_deserialize_cid_font(
-            object,
-            &target_ptr->data.cid,
-            resolver,
-            arena
-        ));
+        PDF_PROPAGATE(
+            pdf_deserialize_cid_font(object, &target_ptr->data.cid, resolver)
+        );
     } else if (strcmp(font_info.subtype, "CIDFontType2") == 0) {
         target_ptr->type = PDF_FONT_CIDTYPE2;
-        PDF_PROPAGATE(pdf_deserialize_cid_font(
-            object,
-            &target_ptr->data.cid,
-            resolver,
-            arena
-        ));
+        PDF_PROPAGATE(
+            pdf_deserialize_cid_font(object, &target_ptr->data.cid, resolver)
+        );
     } else {
         return PDF_ERROR(
             PDF_ERR_INCORRECT_TYPE,

@@ -27,8 +27,7 @@ typedef struct {
 PdfError* pdf_deserialize_cid_system_info(
     const PdfObject* object,
     PdfCIDSystemInfo* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_cid_system_info_trampoline)

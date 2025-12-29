@@ -1,6 +1,5 @@
 #pragma once
 
-#include "arena/arena.h"
 #include "pdf/fonts/cmap.h"
 #include "pdf/fonts/encoding.h"
 #include "pdf/fonts/font_descriptor.h"
@@ -44,8 +43,7 @@ typedef struct {
 PdfError* pdf_deserialize_cid_font(
     const PdfObject* object,
     PdfCIDFont* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_cid_font_trampoline)
@@ -90,8 +88,7 @@ typedef struct {
 PdfError* pdf_deserialize_type0_font(
     const PdfObject* object,
     PdfType0font* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 typedef struct {
@@ -166,8 +163,7 @@ typedef struct {
 PdfError* pdf_deserialize_truetype_font_dict(
     const PdfObject* object,
     PdfTrueTypeFont* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 typedef enum {
@@ -212,6 +208,5 @@ typedef struct {
 PdfError* pdf_deserialize_font(
     const PdfObject* object,
     PdfFont* deserialized,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );

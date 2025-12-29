@@ -8,13 +8,11 @@
 PdfError* pdf_deserialize_resources(
     const PdfObject* object,
     PdfResources* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
@@ -84,7 +82,6 @@ PdfError* pdf_deserialize_resources(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         false,
         resolver,
-        arena,
         "PdfResources"
     ));
 
@@ -100,13 +97,11 @@ DESERDE_IMPL_OPTIONAL(PdfResourcesOptional, pdf_resources_op_init)
 PdfError* pdf_deserialize_gstate_params(
     const PdfObject* object,
     PdfGStateParams* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
         PDF_UNIMPLEMENTED_FIELD("Type"),
@@ -158,7 +153,6 @@ PdfError* pdf_deserialize_gstate_params(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         false,
         resolver,
-        arena,
         "PdfGStateParams"
     ));
 

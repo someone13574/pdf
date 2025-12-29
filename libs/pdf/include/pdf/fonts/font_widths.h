@@ -1,6 +1,5 @@
 #pragma once
 
-#include "arena/arena.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
@@ -35,8 +34,7 @@ DESERDE_DECL_OPTIONAL(
 PdfError* pdf_deserialize_font_widths(
     const PdfObject* object,
     PdfFontWidths* deserialized,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
 
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_font_widths_trampoline)

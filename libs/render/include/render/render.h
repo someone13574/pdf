@@ -8,7 +8,7 @@
 
 PdfError* render_page(
     Arena* arena,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     const PdfPage* page,
     Canvas** canvas
 );

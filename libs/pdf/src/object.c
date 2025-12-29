@@ -13,6 +13,7 @@
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
+#include "resolver.h"
 #include "stream/filters.h"
 
 #define DVEC_NAME PdfObjectVec
@@ -56,27 +57,25 @@ PdfError* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object);
 PdfError* pdf_parse_array(
     Arena* arena,
     PdfCtx* ctx,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     PdfObject* object
 );
 PdfError* pdf_parse_dict(
     Arena* arena,
     PdfCtx* ctx,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     PdfObject* object,
     bool in_indirect_obj
 );
 PdfError* pdf_parse_indirect(
-    Arena* arena,
-    PdfCtx* ctx,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     PdfObject* object,
     bool* number_fallback
 );
 PdfError* pdf_parse_stream(
     Arena* arena,
     PdfCtx* ctx,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     uint8_t** stream_bytes,
     size_t* decoded_len,
     PdfObject* stream_dict,
@@ -84,16 +83,15 @@ PdfError* pdf_parse_stream(
 );
 
 PdfError* pdf_parse_object(
-    Arena* arena,
-    PdfCtx* ctx,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     PdfObject* object,
     bool in_indirect_obj
 ) {
-    RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(ctx);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(object);
+
+    PdfCtx* ctx = pdf_resolver_ctx(resolver);
+    Arena* arena = pdf_resolver_arena(resolver);
 
     LOG_DIAG(INFO, OBJECT, "Parsing object at offset %zu", pdf_ctx_offset(ctx));
 
@@ -117,7 +115,7 @@ PdfError* pdf_parse_object(
         size_t restore_offset = pdf_ctx_offset(ctx);
         bool number_fallback = true;
         PdfError* error =
-            pdf_parse_indirect(arena, ctx, resolver, object, &number_fallback);
+            pdf_parse_indirect(resolver, object, &number_fallback);
 
         if (!error || !number_fallback) {
             return error;
@@ -158,6 +156,7 @@ PdfError* pdf_parse_object(
 
 PdfError*
 pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object) {
+    RELEASE_ASSERT(arena);
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(object);
 
@@ -194,15 +193,9 @@ pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     } else if (peeked == '/') {
         return pdf_parse_name(arena, ctx, object);
     } else if (peeked == '[') {
-        return pdf_parse_array(arena, ctx, pdf_op_resolver_none(false), object);
+        return pdf_parse_array(arena, ctx, NULL, object);
     } else if (peeked == '<' && peeked_next == '<') {
-        return pdf_parse_dict(
-            arena,
-            ctx,
-            pdf_op_resolver_none(false),
-            object,
-            false
-        );
+        return pdf_parse_dict(arena, ctx, NULL, object, false);
     } else if (peeked == 'n') {
         return pdf_parse_null(ctx, object);
     }
@@ -685,12 +678,11 @@ PdfError* pdf_parse_name(Arena* arena, PdfCtx* ctx, PdfObject* object) {
 PdfError* pdf_parse_array(
     Arena* arena,
     PdfCtx* ctx,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     PdfObject* object
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(ctx);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
     RELEASE_ASSERT(object);
 
     PDF_PROPAGATE(pdf_ctx_expect(ctx, "["));
@@ -701,7 +693,11 @@ PdfError* pdf_parse_array(
     uint8_t peeked;
     while (pdf_error_free_is_ok(pdf_ctx_peek(ctx, &peeked)) && peeked != ']') {
         PdfObject element;
-        PDF_PROPAGATE(pdf_parse_object(arena, ctx, resolver, &element, false));
+        if (resolver) {
+            PDF_PROPAGATE(pdf_parse_object(resolver, &element, false));
+        } else {
+            PDF_PROPAGATE(pdf_parse_operand_object(arena, ctx, &element));
+        }
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
         PdfObject* allocated = arena_alloc(arena, sizeof(PdfObject));
@@ -720,13 +716,12 @@ PdfError* pdf_parse_array(
 PdfError* pdf_parse_dict(
     Arena* arena,
     PdfCtx* ctx,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     PdfObject* object,
     bool in_indirect_obj
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(ctx);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
     RELEASE_ASSERT(object);
 
     PDF_PROPAGATE(pdf_ctx_expect(ctx, "<<"));
@@ -741,7 +736,11 @@ PdfError* pdf_parse_dict(
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
         PdfObject* value = arena_alloc(arena, sizeof(PdfObject));
-        PDF_PROPAGATE(pdf_parse_object(arena, ctx, resolver, value, false));
+        if (resolver) {
+            PDF_PROPAGATE(pdf_parse_object(resolver, value, false));
+        } else {
+            PDF_PROPAGATE(pdf_parse_operand_object(arena, ctx, value));
+        }
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
         pdf_dict_entry_vec_push(
@@ -766,7 +765,7 @@ PdfError* pdf_parse_dict(
             return NULL;
         }
 
-        uint8_t* stream_bytes;
+        uint8_t* stream_bytes = NULL;
         size_t decoded_len;
         PdfStreamDict stream_dict;
         if (!pdf_error_free_is_ok(pdf_parse_stream(
@@ -803,7 +802,7 @@ PdfError* pdf_parse_dict(
 PdfError* pdf_parse_stream(
     Arena* arena,
     PdfCtx* ctx,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     uint8_t** stream_body,
     size_t* decoded_len,
     PdfObject* stream_dict_obj,
@@ -811,7 +810,7 @@ PdfError* pdf_parse_stream(
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(ctx);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(stream_body);
     RELEASE_ASSERT(decoded_len);
     RELEASE_ASSERT(stream_dict_obj);
@@ -842,12 +841,9 @@ PdfError* pdf_parse_stream(
         ctx
     ); // If there is an indirect length, we don't want the offset to move
     PdfStreamDict stream_dict;
-    PDF_REQUIRE(pdf_deserialize_stream_dict(
-        stream_dict_obj,
-        &stream_dict,
-        resolver,
-        arena
-    ));
+    PDF_REQUIRE(
+        pdf_deserialize_stream_dict(stream_dict_obj, &stream_dict, resolver)
+    );
     pdf_ctx_seek(ctx, resume_offset);
 
     if (stream_dict.length < 0) {
@@ -882,17 +878,15 @@ PdfError* pdf_parse_stream(
 }
 
 PdfError* pdf_parse_indirect(
-    Arena* arena,
-    PdfCtx* ctx,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     PdfObject* object,
     bool* number_fallback
 ) {
-    RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(ctx);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(number_fallback);
+
+    PdfCtx* ctx = pdf_resolver_ctx(resolver);
 
     LOG_DIAG(DEBUG, OBJECT, "Parsing indirect object or reference");
 
@@ -945,8 +939,9 @@ PdfError* pdf_parse_indirect(
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
         *number_fallback = false;
 
-        PdfObject* inner = arena_alloc(arena, sizeof(PdfObject));
-        PDF_PROPAGATE(pdf_parse_object(arena, ctx, resolver, inner, true));
+        PdfObject* inner =
+            arena_alloc(pdf_resolver_arena(resolver), sizeof(PdfObject));
+        PDF_PROPAGATE(pdf_parse_object(resolver, inner, true));
 
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
         PDF_PROPAGATE(pdf_ctx_expect(ctx, "endobj"));
@@ -1199,6 +1194,7 @@ char* pdf_string_as_cstr(PdfString pdf_string, Arena* arena) {
 #include <string.h>
 
 #include "test/test.h"
+#include "test_helpers.h"
 
 #define SETUP_VALID_PARSE_OBJECT_WITH_OFFSET(                                  \
     buf,                                                                       \
@@ -1209,14 +1205,9 @@ char* pdf_string_as_cstr(PdfString pdf_string, Arena* arena) {
     uint8_t buffer[] = buf;                                                    \
     PdfCtx* ctx =                                                              \
         pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);      \
+    PdfResolver* resolver = pdf_fake_resolver_new(arena, ctx);                 \
     PdfObject object;                                                          \
-    TEST_PDF_REQUIRE(pdf_parse_object(                                         \
-        arena,                                                                 \
-        ctx,                                                                   \
-        pdf_op_resolver_none(false),                                           \
-        &object,                                                               \
-        false                                                                  \
-    ));                                                                        \
+    TEST_PDF_REQUIRE(pdf_parse_object(resolver, &object, false));              \
     TEST_ASSERT_EQ(                                                            \
         (PdfObjectType)(object_type),                                          \
         object.type,                                                           \
@@ -1236,18 +1227,10 @@ char* pdf_string_as_cstr(PdfString pdf_string, Arena* arena) {
     uint8_t buffer[] = buf;                                                    \
     PdfCtx* ctx =                                                              \
         pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);      \
+    PdfResolver* resolver = pdf_fake_resolver_new(arena, ctx);                 \
                                                                                \
     PdfObject object;                                                          \
-    TEST_PDF_REQUIRE_ERR(                                                      \
-        pdf_parse_object(                                                      \
-            arena,                                                             \
-            ctx,                                                               \
-            pdf_op_resolver_none(false),                                       \
-            &object,                                                           \
-            false                                                              \
-        ),                                                                     \
-        (err)                                                                  \
-    );
+    TEST_PDF_REQUIRE_ERR(pdf_parse_object(resolver, &object, false), (err));
 
 TEST_FUNC(test_object_bool_true) {
     SETUP_VALID_PARSE_OBJECT("true", PDF_OBJECT_TYPE_BOOLEAN);

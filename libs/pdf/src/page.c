@@ -15,13 +15,11 @@
 PdfError* pdf_deserialize_page(
     const PdfObject* object,
     PdfPage* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
@@ -90,7 +88,6 @@ PdfError* pdf_deserialize_page(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         false,
         resolver,
-        arena,
         "PdfPage"
     ));
 
@@ -108,13 +105,11 @@ DESERDE_IMPL_RESOLVABLE(
 PdfError* pdf_deserialize_page_tree_node(
     const PdfObject* object,
     PdfPageTreeNode* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
-    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
@@ -151,7 +146,6 @@ PdfError* pdf_deserialize_page_tree_node(
         sizeof(fields) / sizeof(PdfFieldDescriptor),
         false,
         resolver,
-        arena,
         "PdfPageTreeNode"
     ));
 

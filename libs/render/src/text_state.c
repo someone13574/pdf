@@ -26,7 +26,7 @@ TextObjectState text_object_state_default(void) {
 PdfError* text_state_render(
     Arena* arena,
     Canvas* canvas,
-    PdfOptionalResolver resolver,
+    PdfResolver* resolver,
     PdfCMapCache* cmap_cache,
     GeomMat3 ctm,
     TextState* state,
@@ -36,7 +36,7 @@ PdfError* text_state_render(
 ) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(canvas);
-    RELEASE_ASSERT(pdf_op_resolver_valid(resolver));
+    RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(cmap_cache);
     RELEASE_ASSERT(state);
     RELEASE_ASSERT(object_state);

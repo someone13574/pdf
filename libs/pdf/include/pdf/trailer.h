@@ -36,6 +36,5 @@ typedef struct {
 PdfError* pdf_deserialize_trailer(
     const PdfObject* object,
     PdfTrailer* target_ptr,
-    PdfOptionalResolver resolver,
-    Arena* arena
+    PdfResolver* resolver
 );
