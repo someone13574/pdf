@@ -28,7 +28,7 @@ int main(int argc, char** argv) {
     PDF_REQUIRE(sfnt_font_new(arena, buffer, buffer_len, &font));
 
     SfntGlyph glyph;
-    PDF_REQUIRE(sfnt_get_glyph(font, '%', &glyph));
+    PDF_REQUIRE(sfnt_get_glyph_for_cid(font, '%', &glyph));
 
     Canvas* canvas = canvas_new_scalable(arena, 2000, 2000, 0xffffffff);
     GeomMat3 transform =

@@ -104,6 +104,32 @@ typedef struct {
     /// only indication of a font subset shall be the subset tag in the FontName
     /// entry (see 9.6.4, "Font Subsets").
     PdfStringOptional char_set;
+
+    /// (Optional) A dictionary containing entries that describe the style of
+    /// the glyphs in the font (see 9.8.3.2, "Style").
+    PdfUnimplemented style;
+
+    /// (Optional; PDF 1.5) A name specifying the language of the font, which
+    /// may be used for encodings where the language is not implied by the
+    /// encoding itself. The value shall be one of the codes defined by Internet
+    /// RFC 3066, Tags for the Identification of Languages or (PDF 1.0)
+    /// 2-character language codes defined by ISO 639 (see the Bibliography). If
+    /// this entry is absent, the language shall be considered to be unknown.
+    PdfNameOptional lang;
+
+    /// (Optional) A dictionary whose keys identify a class of glyphs in a
+    /// CIDFont. Each value shall be a dictionary containing entries that shall
+    /// override the corresponding values in the main font descriptor dictionary
+    /// for that class of glyphs (see 9.8.3.3, "FD").
+    PdfUnimplemented fd;
+
+    /// (Optional) A stream identifying which CIDs are present in the CIDFont
+    /// file. If this entry is present, the CIDFont shall contain only a subset
+    /// of the glyphs in the character collection defined by the CIDSystemInfo
+    /// dictionary. If it is absent, the only indication of a CIDFont subset
+    /// shall be the subset tag in the FontName entry (see 9.6.4, "Font
+    /// Subsets").
+    PdfIgnored cid_set;
 } PdfFontDescriptor;
 
 PdfError* pdf_deserialize_font_descriptor(

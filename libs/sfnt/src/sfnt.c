@@ -24,6 +24,8 @@ struct SfntFont {
     SfntLoca loca;
     SfntCmap cmap;
     SfntHmtx hmtx;
+
+    bool has_cmap;
 };
 
 PdfError* new_table_parser(SfntFont* font, uint32_t tag, SfntParser* parser) {
@@ -74,6 +76,7 @@ PdfError* sfnt_font_new(
 
     *font = arena_alloc(arena, sizeof(SfntFont));
     (*font)->arena = arena;
+    (*font)->has_cmap = false;
     sfnt_parser_new(buffer, buffer_len, &(*font)->parser);
 
     PDF_PROPAGATE(
@@ -83,10 +86,6 @@ PdfError* sfnt_font_new(
     SfntParser head_parser;
     PDF_PROPAGATE(new_table_parser(*font, 0x68656164, &head_parser));
     PDF_PROPAGATE(sfnt_parse_head(&head_parser, &(*font)->head));
-
-    SfntParser cmap_parser;
-    PDF_PROPAGATE(new_table_parser(*font, 0x636d6170, &cmap_parser));
-    PDF_PROPAGATE(sfnt_parse_cmap(arena, &cmap_parser, &(*font)->cmap));
 
     SfntParser maxp_parser;
     PDF_PROPAGATE(new_table_parser(*font, 0x6d617870, &maxp_parser));
@@ -127,11 +126,27 @@ SfntHead sfnt_font_head(SfntFont* font) {
     return font->head;
 }
 
-PdfError* sfnt_get_glyph(SfntFont* font, uint32_t cid, SfntGlyph* glyph) {
+PdfError*
+sfnt_get_glyph_for_cid(SfntFont* font, uint32_t cid, SfntGlyph* glyph_out) {
     RELEASE_ASSERT(font);
-    RELEASE_ASSERT(glyph);
+    RELEASE_ASSERT(glyph_out);
+
+    if (!font->has_cmap) {
+        SfntParser cmap_parser;
+        PDF_PROPAGATE(new_table_parser(font, 0x636d6170, &cmap_parser));
+        PDF_PROPAGATE(sfnt_parse_cmap(font->arena, &cmap_parser, &font->cmap));
+    }
 
     uint32_t gid = sfnt_cmap_map_cid(&font->cmap.mapping_table, cid);
+    PDF_PROPAGATE(sfnt_get_glyph_for_gid(font, gid, glyph_out));
+    return NULL;
+}
+
+PdfError*
+sfnt_get_glyph_for_gid(SfntFont* font, uint32_t gid, SfntGlyph* glyph_out) {
+    RELEASE_ASSERT(font);
+    RELEASE_ASSERT(glyph_out);
+
     uint32_t offset, next_offset = 0;
     PDF_PROPAGATE(sfnt_loca_glyph_offset(&font->loca, gid, &offset));
     bool next_ok = pdf_error_free_is_ok(
@@ -142,8 +157,7 @@ PdfError* sfnt_get_glyph(SfntFont* font, uint32_t cid, SfntGlyph* glyph) {
     LOG_DIAG(
         DEBUG,
         SFNT,
-        "cid=%u, gid=%u, offset=%u, next_offset=%u",
-        cid,
+        "gid=%u, offset=%u, next_offset=%u",
         gid,
         offset,
         next_offset
@@ -151,10 +165,12 @@ PdfError* sfnt_get_glyph(SfntFont* font, uint32_t cid, SfntGlyph* glyph) {
 
     if (!next_ok || next_offset - offset != 0) {
         PDF_PROPAGATE(sfnt_parser_seek(&font->glyf_parser, (size_t)offset));
-        PDF_PROPAGATE(sfnt_parse_glyph(font->arena, &font->glyf_parser, glyph));
+        PDF_PROPAGATE(
+            sfnt_parse_glyph(font->arena, &font->glyf_parser, glyph_out)
+        );
     } else {
         LOG_DIAG(DEBUG, SFNT, "Glyph is empty");
-        glyph->num_contours = 0;
+        glyph_out->num_contours = 0;
     }
 
     // TODO: Make metrics optional, since hhea.num_of_long_for_metrics isn't
@@ -163,8 +179,8 @@ PdfError* sfnt_get_glyph(SfntFont* font, uint32_t cid, SfntGlyph* glyph) {
     RELEASE_ASSERT(
         sfnt_hmetrics_array_get(font->hmtx.h_metrics, gid, &metrics)
     );
-    glyph->advance_width = metrics.advance_width;
-    glyph->left_side_bearing = metrics.left_side_bearing;
+    glyph_out->advance_width = metrics.advance_width;
+    glyph_out->left_side_bearing = metrics.left_side_bearing;
 
     return NULL;
 }

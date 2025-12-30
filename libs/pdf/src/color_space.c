@@ -215,7 +215,7 @@ GeomVec3 pdf_map_color(
 
     switch (color_space.family) {
         case PDF_COLOR_SPACE_DEVICE_GRAY: {
-            RELEASE_ASSERT(n_components == 3);
+            RELEASE_ASSERT(n_components == 1);
             return geom_vec3_new(components[0], components[0], components[0]);
         }
         case PDF_COLOR_SPACE_DEVICE_RGB: {

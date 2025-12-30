@@ -122,6 +122,41 @@ void path_builder_close_contour(PathBuilder* builder) {
     path_contour_vec_push(builder->contours, new_contour);
 }
 
+GeomVec2 path_builder_position(PathBuilder* builder) {
+    RELEASE_ASSERT(builder);
+
+    size_t num_contours = path_contour_vec_len(builder->contours);
+    RELEASE_ASSERT(num_contours != 0, "No active contour");
+
+    PathContour* contour = NULL;
+    RELEASE_ASSERT(
+        path_contour_vec_get(builder->contours, num_contours - 1, &contour)
+    );
+
+    size_t num_segments = path_contour_vec_len(builder->contours);
+    RELEASE_ASSERT(num_segments != 0, "No active segment");
+
+    PathContourSegment segment;
+    RELEASE_ASSERT(path_contour_get(contour, num_segments - 1, &segment));
+
+    switch (segment.type) {
+        case PATH_CONTOUR_SEGMENT_TYPE_START: {
+            return segment.value.start;
+        }
+        case PATH_CONTOUR_SEGMENT_TYPE_LINE: {
+            return segment.value.line;
+        }
+        case PATH_CONTOUR_SEGMENT_TYPE_QUAD_BEZIER: {
+            return segment.value.quad_bezier.end;
+        }
+        case PATH_CONTOUR_SEGMENT_TYPE_CUBIC_BEZIER: {
+            return segment.value.cubic_bezier.end;
+        }
+    }
+
+    LOG_PANIC("Unreachable");
+}
+
 void path_builder_line_to(PathBuilder* builder, GeomVec2 point) {
     RELEASE_ASSERT(builder);
 

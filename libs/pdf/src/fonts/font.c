@@ -70,6 +70,16 @@ PdfError* pdf_deserialize_cid_font(
                 pdf_font_widths_op_init,
                 PDF_DESERDE_CUSTOM(pdf_deserialize_font_widths_trampoline)
             )
+        ),
+        PDF_UNIMPLEMENTED_FIELD("DW2"),
+        PDF_UNIMPLEMENTED_FIELD("W2"),
+        PDF_FIELD(
+            "CIDToGIDMap",
+            &target_ptr->cid_to_gid_map,
+            PDF_DESERDE_OPTIONAL(
+                pdf_cid_to_gid_map_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_cid_to_gid_map_trampoline)
+            )
         )
     };
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "pdf/fonts/cid_to_gid_map.h"
 #include "pdf/fonts/cmap.h"
 #include "pdf/fonts/encoding.h"
 #include "pdf/fonts/font_descriptor.h"
@@ -38,6 +39,28 @@ typedef struct {
 
     // A description of the widths for the glyphs in the CIDFont.
     PdfFontWidthsOptional w;
+
+    /// (Optional; applies only to CIDFonts used for vertical writing) An array
+    /// of two numbers specifying the default metrics for vertical writing
+    /// (see 9.7.4.3, "Glyph Metrics in CIDFonts"). Default value: [ 880 −1000
+    /// ].
+    PdfUnimplemented dw2;
+
+    /// (Optional; applies only to CIDFonts used for vertical writing) A
+    /// description of the metrics for vertical writing for the glyphs in the
+    /// CIDFont (see 9.7.4.3, "Glyph Metrics in CIDFonts"). Default value: none
+    /// (the DW2 value shall be used for all glyphs).
+    PdfUnimplemented w2;
+
+    /// (Optional; Type 2 CIDFonts only) A specification of the mapping from
+    /// CIDs to glyph indices. If the value is a stream, the bytes in the stream
+    /// shall contain the mapping from CIDs to glyph indices: the glyph index
+    /// for a particular CID value c shall be a 2-byte value stored in bytes 2 ×
+    /// c and 2 × c + 1, where the first byte shall be the high-order byte. If
+    /// the value of CIDToGIDMap is a name, it shall be Identity, indicating
+    /// that the mapping between CIDs and glyph indices is the identity mapping.
+    /// Default value: Identity.
+    PdfCIDToGIDMapOptional cid_to_gid_map;
 } PdfCIDFont;
 
 PdfError* pdf_deserialize_cid_font(

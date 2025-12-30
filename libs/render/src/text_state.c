@@ -112,7 +112,7 @@ PdfError* text_state_render(
 
         double tx =
             (pdf_number_as_real(glyph_width) * 0.001 * state->text_font_size
-             + state->character_spacing + state->word_spacing)
+             + state->character_spacing)
             * state->horizontal_scaling;
         LOG_DIAG(
             INFO,

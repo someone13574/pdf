@@ -9,6 +9,7 @@ add_library(pdf
     src/content_stream/operator.c
     src/resources.c
     src/fonts/agl.c
+    src/fonts/cid_to_gid_map.c
     src/fonts/font.c
     src/fonts/font_descriptor.c
     src/fonts/font_widths.c

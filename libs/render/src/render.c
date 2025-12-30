@@ -186,6 +186,33 @@ static PdfError* process_content_stream(
                 path_builder_line_to(state->path, op.data.line_to);
                 break;
             }
+            case PDF_OPERATOR_c: {
+                path_builder_cubic_bezier_to(
+                    state->path,
+                    op.data.cubic_bezier.end,
+                    op.data.cubic_bezier.c1,
+                    op.data.cubic_bezier.c2
+                );
+                break;
+            }
+            case PDF_OPERATOR_v: {
+                path_builder_cubic_bezier_to(
+                    state->path,
+                    op.data.part_cubic_bezier.b,
+                    path_builder_position(state->path),
+                    op.data.part_cubic_bezier.a
+                );
+                break;
+            }
+            case PDF_OPERATOR_y: {
+                path_builder_cubic_bezier_to(
+                    state->path,
+                    op.data.part_cubic_bezier.b,
+                    path_builder_position(state->path),
+                    op.data.part_cubic_bezier.b
+                );
+                break;
+            }
             case PDF_OPERATOR_h: {
                 path_builder_close_contour(state->path);
                 break;
@@ -282,6 +309,11 @@ static PdfError* process_content_stream(
             }
             case PDF_OPERATOR_Tw: {
                 current_graphics_state(state)->text_state.word_spacing =
+                    op.data.set_text_metric;
+                break;
+            }
+            case PDF_OPERATOR_TL: {
+                current_graphics_state(state)->text_state.leading =
                     op.data.set_text_metric;
                 break;
             }
@@ -408,6 +440,7 @@ static PdfError* process_content_stream(
                 RELEASE_ASSERT(resources->has_value);
                 RELEASE_ASSERT(resources->value.color_space.has_value);
 
+                GraphicsState* graphics_state = current_graphics_state(state);
                 PdfObject* color_space_object = pdf_dict_get(
                     &resources->value.color_space.value,
                     op.data.set_color_space
@@ -416,9 +449,50 @@ static PdfError* process_content_stream(
 
                 PDF_PROPAGATE(pdf_deserialize_color_space(
                     color_space_object,
-                    &current_graphics_state(state)->nonstroking_color_space,
+                    &graphics_state->nonstroking_color_space,
                     resolver
                 ));
+
+                PdfReal components[4] = {0.0, 0.0, 0.0, 0.0};
+                size_t num_components = 0;
+
+                switch (graphics_state->nonstroking_color_space.family) {
+                    case PDF_COLOR_SPACE_DEVICE_GRAY: {
+                        num_components = 1;
+                        break;
+                    }
+                    case PDF_COLOR_SPACE_DEVICE_RGB: {
+                        num_components = 3;
+                        break;
+                    }
+                    case PDF_COLOR_SPACE_DEVICE_CMYK: {
+                        num_components = 4;
+                        components[3] = 1.0;
+                        break;
+                    }
+                    case PDF_COLOR_SPACE_CAL_GRAY: {
+                        num_components = 1;
+                        break;
+                    }
+                    case PDF_COLOR_SPACE_CAL_RGB: {
+                        num_components = 3;
+                        break;
+                    }
+                    case PDF_COLOR_SPACE_LAB: {
+                        num_components = 4;
+                        break;
+                    }
+                    default: {
+                        LOG_TODO();
+                        break;
+                    }
+                }
+
+                graphics_state->nonstroking_rgb = pdf_map_color(
+                    components,
+                    num_components,
+                    graphics_state->nonstroking_color_space
+                );
 
                 break;
             }
@@ -427,7 +501,6 @@ static PdfError* process_content_stream(
 
                 switch (graphics_state->nonstroking_color_space.family) {
                     case PDF_COLOR_SPACE_CAL_RGB: {
-
                         if (pdf_object_vec_len(op.data.set_color) != 3) {
                             return PDF_ERROR(
                                 PDF_ERR_MISSING_OPERAND,
@@ -482,6 +555,20 @@ static PdfError* process_content_stream(
                     components,
                     1,
                     graphics_state->stroking_color_space
+                );
+                break;
+            }
+            case PDF_OPERATOR_g: {
+                // TODO: default color spaces
+                GraphicsState* graphics_state = current_graphics_state(state);
+                graphics_state->nonstroking_color_space.family =
+                    PDF_COLOR_SPACE_DEVICE_GRAY;
+
+                PdfReal components[1] = {op.data.set_gray};
+                graphics_state->nonstroking_rgb = pdf_map_color(
+                    components,
+                    1,
+                    graphics_state->nonstroking_color_space
                 );
                 break;
             }

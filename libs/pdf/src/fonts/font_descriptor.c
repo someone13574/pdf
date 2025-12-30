@@ -173,7 +173,18 @@ PdfError* pdf_deserialize_font_descriptor(
                 pdf_stream_op_init,
                 PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STREAM)
             )
-        )
+        ),
+        PDF_UNIMPLEMENTED_FIELD("Style"),
+        PDF_FIELD(
+            "Lang",
+            &target_ptr->lang,
+            PDF_DESERDE_OPTIONAL(
+                pdf_name_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+            )
+        ),
+        PDF_UNIMPLEMENTED_FIELD("FD"),
+        PDF_IGNORED_FIELD("CIDSet", &target_ptr->cid_set)
     };
 
     PDF_PROPAGATE(pdf_deserialize_dict(

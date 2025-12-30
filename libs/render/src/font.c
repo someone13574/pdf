@@ -12,6 +12,7 @@
 #include "geom/mat3.h"
 #include "logger/log.h"
 #include "pdf/fonts/agl.h"
+#include "pdf/fonts/cid_to_gid_map.h"
 #include "pdf/fonts/cmap.h"
 #include "pdf/fonts/encoding.h"
 #include "pdf/fonts/font.h"
@@ -160,6 +161,19 @@ PdfError* cid_to_gid(
             }
 
             return NULL;
+        }
+        case PDF_FONT_CIDTYPE2: {
+            RELEASE_ASSERT(
+                font->data.cid.cid_to_gid_map.has_value,
+                "TODO: Non-embedded cid2 fonts"
+            );
+
+            PDF_PROPAGATE(pdf_map_cid_to_gid(
+                &font->data.cid.cid_to_gid_map.value,
+                cid,
+                gid_out
+            ));
+            break;
         }
         case PDF_FONT_TRUETYPE: {
             RELEASE_ASSERT(font->data.true_type.encoding.has_value);
@@ -320,6 +334,43 @@ PdfError* render_glyph(
 
             return NULL;
         }
+        case PDF_FONT_CIDTYPE2: {
+            PdfFontDescriptor font_descriptor;
+            PDF_PROPAGATE(pdf_resolve_font_descriptor(
+                font->data.cid.font_descriptor,
+                resolver,
+                &font_descriptor
+            ));
+
+            SfntFont* sfnt_font = NULL;
+            if (font_descriptor.font_file2.has_value) {
+                PDF_PROPAGATE(sfnt_font_new(
+                    arena,
+                    font_descriptor.font_file2.value.stream_bytes,
+                    font_descriptor.font_file2.value.decoded_stream_len,
+                    &sfnt_font
+                ));
+            } else {
+                // TODO: proper resolution, caching
+                size_t font_file_size = 0;
+                uint8_t* font_file = load_file_to_buffer(
+                    arena,
+                    "assets/fonts-urw-base35/fonts/NimbusSans-Regular.ttf",
+                    &font_file_size
+                );
+                RELEASE_ASSERT(font_file);
+
+                PDF_PROPAGATE(
+                    sfnt_font_new(arena, font_file, font_file_size, &sfnt_font)
+                );
+            }
+
+            SfntGlyph glyph;
+            PDF_PROPAGATE(sfnt_get_glyph_for_gid(sfnt_font, gid, &glyph));
+            sfnt_glyph_render(canvas, &glyph, transform, brush);
+
+            return NULL;
+        }
         case PDF_FONT_TRUETYPE: {
             RELEASE_ASSERT(font->data.true_type.font_descriptor.has_value);
 
@@ -354,7 +405,7 @@ PdfError* render_glyph(
             }
 
             SfntGlyph glyph;
-            PDF_PROPAGATE(sfnt_get_glyph(sfnt_font, gid, &glyph));
+            PDF_PROPAGATE(sfnt_get_glyph_for_cid(sfnt_font, gid, &glyph));
             sfnt_glyph_render(canvas, &glyph, transform, brush);
             break;
         }
@@ -402,7 +453,8 @@ PdfError* cid_to_width(
             return NULL;
             break;
         }
-        case PDF_FONT_CIDTYPE0: {
+        case PDF_FONT_CIDTYPE0:
+        case PDF_FONT_CIDTYPE2: {
             PdfCIDFont* cid_font = &font->data.cid;
 
             if (cid_font->w.has_value) {
@@ -545,6 +597,41 @@ PdfError* get_font_matrix(
             }
 
             return NULL;
+        }
+        case PDF_FONT_CIDTYPE2: {
+            // TODO: proper font resolution, caching, using embedded
+            PdfFontDescriptor font_descriptor;
+            PDF_PROPAGATE(pdf_resolve_font_descriptor(
+                font->data.cid.font_descriptor,
+                resolver,
+                &font_descriptor
+            ));
+
+            SfntFont* sfnt_font = NULL;
+            if (font_descriptor.font_file2.has_value) {
+                PDF_PROPAGATE(sfnt_font_new(
+                    arena,
+                    font_descriptor.font_file2.value.stream_bytes,
+                    font_descriptor.font_file2.value.decoded_stream_len,
+                    &sfnt_font
+                ));
+            } else {
+                // TODO: proper resolution, caching
+                size_t font_file_size = 0;
+                uint8_t* font_file = load_file_to_buffer(
+                    arena,
+                    "assets/fonts-urw-base35/fonts/NimbusMonoPS-Regular.ttf",
+                    &font_file_size
+                );
+                RELEASE_ASSERT(font_file);
+
+                PDF_PROPAGATE(
+                    sfnt_font_new(arena, font_file, font_file_size, &sfnt_font)
+                );
+            }
+
+            units_per_em = (double)sfnt_font_head(sfnt_font).units_per_em;
+            break;
         }
         case PDF_FONT_TRUETYPE: {
             // TODO: proper font resolution, caching, using embedded

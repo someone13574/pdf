@@ -68,11 +68,11 @@ void graphics_state_apply_params(
     }
 
     if (params.ca_stroking.has_value) {
-        gstate->stroking_alpha = params.ca_stroking.value;
+        gstate->stroking_alpha *= params.ca_stroking.value;
     }
 
     if (params.ca_nonstroking.has_value) {
-        gstate->nonstroking_alpha = params.ca_nonstroking.value;
+        gstate->nonstroking_alpha *= params.ca_nonstroking.value;
     }
 
     if (params.ais.has_value) {
