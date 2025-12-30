@@ -36,7 +36,7 @@ PdfError* pdf_deserialize_page(
             &target_ptr->parent,
             PDF_DESERDE_RESOLVABLE(pdf_pages_ref_init)
         ),
-        PDF_IGNORED_FIELD("Date", &target_ptr->date),
+        PDF_IGNORED_FIELD("LastModified", &target_ptr->last_modified),
         PDF_FIELD(
             "Resources",
             &target_ptr->resources,

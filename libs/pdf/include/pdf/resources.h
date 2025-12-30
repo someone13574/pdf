@@ -35,6 +35,10 @@ typedef struct {
     /// (Optional) An array of predefined procedure set names (see 14.2,
     /// "Procedure Sets").
     PdfNameVecOptional proc_set;
+
+    /// (Optional; PDF 1.2) A dictionary that maps resource names to property
+    /// list dictionaries for marked content (see 14.6.2, "Property Lists").
+    PdfDictOptional properties;
 } PdfResources;
 
 PdfError* pdf_deserialize_resources(
@@ -93,16 +97,16 @@ typedef struct {
     /// entry shall set both parameters unless there is also an op entry in the
     /// same graphics state parameter dictionary, in which case the OP entry
     /// shall set only the overprint parameter for stroking.
-    PdfUnimplemented overprint_upper;
+    PdfBooleanOptional overprint_upper;
 
     /// (Optional; PDF 1.3) A flag specifying whether to apply overprint
     /// (see 8.6.7, "Overprint Control") for painting operations other than
     /// stroking. If this entry is absent, the OP entry, if any, shall also set
     /// this parameter.
-    PdfUnimplemented overprint_lower;
+    PdfBooleanOptional overprint_lower;
 
     /// (Optional; PDF 1.3) The overprint mode (see 8.6.7, "Overprint Control").
-    PdfUnimplemented overprint_mode;
+    PdfIntegerOptional overprint_mode;
 
     /// (Optional; PDF 1.3) An array of the form [ font size ], where font shall
     /// be an indirect reference to a font dictionary and size shall be a number
@@ -168,7 +172,7 @@ typedef struct {
     /// (Optional; PDF 1.4) The current blend mode to be used in the transparent
     /// imaging model (see 11.3.5, "Blend Mode" and 11.6.3, "Specifying Blending
     /// Colour Space and Blend Mode").
-    PdfUnimplemented bm;
+    PdfIgnored bm;
 
     /// (Optional; PDF 1.4) The current soft mask, specifying the mask shape or
     /// mask opacity values that shall be used in the transparent imaging model
@@ -178,7 +182,7 @@ typedef struct {
     /// old value with the new one, rather than intersecting the two as is done
     /// with the current clipping path parameter (see 8.5.4, "Clipping Path
     /// Operators").
-    PdfUnimplemented smask;
+    PdfIgnored smask;
 
     /// (Optional; PDF 1.4) The current stroking alpha constant, specifying the
     /// constant shape or constant opacity value that shall be used for stroking
@@ -192,7 +196,7 @@ typedef struct {
     /// (Optional; PDF 1.4) The alpha source flag (“alpha is shape”), specifying
     /// whether the current soft mask and alpha constant shall be interpreted as
     /// shape values (true) or opacity values (false).
-    PdfUnimplemented ais;
+    PdfBooleanOptional ais;
 
     /// (Optional; PDF 1.4) The text knockout flag, shall determine the
     /// behaviour of overlapping glyphs within a text object in the transparent

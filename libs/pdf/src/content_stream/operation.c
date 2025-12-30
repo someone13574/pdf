@@ -168,6 +168,90 @@ static PdfError* deserialize_matrix(
     return NULL;
 }
 
+static PdfError* deserialize_cubic_bezier(
+    PdfOpParamsCubicBezier* target_ptr,
+    const PdfObjectVec* operands,
+    PdfResolver* resolver
+) {
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(operands);
+    RELEASE_ASSERT(resolver);
+
+    PdfOperandDescriptor descriptors[] = {
+        PDF_OPERAND(
+            &target_ptr->c1.x,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+        ),
+        PDF_OPERAND(
+            &target_ptr->c1.y,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+        ),
+        PDF_OPERAND(
+            &target_ptr->c2.x,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+        ),
+        PDF_OPERAND(
+            &target_ptr->c2.y,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+        ),
+        PDF_OPERAND(
+            &target_ptr->end.x,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+        ),
+        PDF_OPERAND(
+            &target_ptr->end.y,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+        )
+    };
+
+    PDF_PROPAGATE(pdf_deserialize_operands(
+        operands,
+        descriptors,
+        sizeof(descriptors) / sizeof(PdfOperandDescriptor),
+        resolver
+    ));
+
+    return NULL;
+}
+
+static PdfError* deserialize_part_cubic_bezier(
+    PdfOpParamsPartCubicBezier* target_ptr,
+    const PdfObjectVec* operands,
+    PdfResolver* resolver
+) {
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(operands);
+    RELEASE_ASSERT(resolver);
+
+    PdfOperandDescriptor descriptors[] = {
+        PDF_OPERAND(
+            &target_ptr->a.x,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+        ),
+        PDF_OPERAND(
+            &target_ptr->a.y,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+        ),
+        PDF_OPERAND(
+            &target_ptr->b.x,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+        ),
+        PDF_OPERAND(
+            &target_ptr->b.y,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+        )
+    };
+
+    PDF_PROPAGATE(pdf_deserialize_operands(
+        operands,
+        descriptors,
+        sizeof(descriptors) / sizeof(PdfOperandDescriptor),
+        resolver
+    ));
+
+    return NULL;
+}
+
 static PdfError* deserialize_draw_rectangle(
     PdfContentOpVec* operation_queue,
     const PdfObjectVec* operands,
@@ -450,6 +534,50 @@ static PdfError* deserialize_set_rgb(
     return NULL;
 }
 
+static PdfError* deserialize_set_cmyk(
+    bool stroking,
+    PdfContentOpVec* operation_queue,
+    const PdfObjectVec* operands,
+    PdfResolver* resolver
+) {
+    RELEASE_ASSERT(operation_queue);
+    RELEASE_ASSERT(operands);
+    RELEASE_ASSERT(resolver);
+
+    PdfContentOp* queue_op = new_queue_op(
+        operation_queue,
+        stroking ? PDF_OPERATOR_K : PDF_OPERATOR_k
+    );
+
+    PdfOperandDescriptor descriptors[] = {
+        PDF_OPERAND(
+            &queue_op->data.set_cmyk.c,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+        ),
+        PDF_OPERAND(
+            &queue_op->data.set_cmyk.m,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+        ),
+        PDF_OPERAND(
+            &queue_op->data.set_cmyk.y,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+        ),
+        PDF_OPERAND(
+            &queue_op->data.set_cmyk.k,
+            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+        )
+    };
+
+    PDF_PROPAGATE(pdf_deserialize_operands(
+        operands,
+        descriptors,
+        sizeof(descriptors) / sizeof(PdfOperandDescriptor),
+        resolver
+    ));
+
+    return NULL;
+}
+
 static PdfError* deserialize_num_real(
     PdfReal* target,
     const PdfObjectVec* operands,
@@ -565,10 +693,56 @@ PdfError* pdf_deserialize_content_op(
             );
             return NULL;
         }
+        case PDF_OPERATOR_m: {
+            PdfContentOp* queue_op =
+                new_queue_op(operation_queue, PDF_OPERATOR_m);
+            PDF_PROPAGATE(deserialize_vec2(
+                &queue_op->data.new_subpath,
+                operands,
+                resolver
+            ));
+            return NULL;
+        }
+        case PDF_OPERATOR_l: {
+            PdfContentOp* queue_op =
+                new_queue_op(operation_queue, PDF_OPERATOR_l);
+            PDF_PROPAGATE(
+                deserialize_vec2(&queue_op->data.line_to, operands, resolver)
+            );
+            return NULL;
+        }
+        case PDF_OPERATOR_c: {
+            PdfContentOp* queue_op =
+                new_queue_op(operation_queue, PDF_OPERATOR_c);
+            PDF_PROPAGATE(deserialize_cubic_bezier(
+                &queue_op->data.cubic_bezier,
+                operands,
+                resolver
+            ));
+            return NULL;
+        }
+        case PDF_OPERATOR_v:
+        case PDF_OPERATOR_y: {
+            PdfContentOp* queue_op = new_queue_op(operation_queue, op);
+            PDF_PROPAGATE(deserialize_part_cubic_bezier(
+                &queue_op->data.part_cubic_bezier,
+                operands,
+                resolver
+            ));
+            return NULL;
+        }
+        case PDF_OPERATOR_h: {
+            new_queue_op(operation_queue, PDF_OPERATOR_h);
+            return NULL;
+        }
         case PDF_OPERATOR_re: {
             PDF_PROPAGATE(
                 deserialize_draw_rectangle(operation_queue, operands, resolver)
             );
+            return NULL;
+        }
+        case PDF_OPERATOR_S: {
+            new_queue_op(operation_queue, PDF_OPERATOR_S);
             return NULL;
         }
         case PDF_OPERATOR_f: {
@@ -577,6 +751,14 @@ PdfError* pdf_deserialize_content_op(
         }
         case PDF_OPERATOR_B: {
             new_queue_op(operation_queue, PDF_OPERATOR_B);
+            return NULL;
+        }
+        case PDF_OPERATOR_n: {
+            new_queue_op(operation_queue, PDF_OPERATOR_n);
+            return NULL;
+        }
+        case PDF_OPERATOR_W: {
+            LOG_WARN(PDF, "TODO: Clipping paths");
             return NULL;
         }
         case PDF_OPERATOR_BT: {
@@ -667,22 +849,38 @@ PdfError* pdf_deserialize_content_op(
             queue_op->data.set_color = pdf_object_vec_clone(operands);
             return NULL;
         }
+        case PDF_OPERATOR_G:
         case PDF_OPERATOR_g: {
-            PDF_PROPAGATE(
-                deserialize_set_gray(false, operation_queue, operands, resolver)
-            );
+            PDF_PROPAGATE(deserialize_set_gray(
+                op == PDF_OPERATOR_G,
+                operation_queue,
+                operands,
+                resolver
+            ));
             return NULL;
         }
-        case PDF_OPERATOR_RG: {
-            PDF_PROPAGATE(
-                deserialize_set_rgb(true, operation_queue, operands, resolver)
-            );
-            return NULL;
-        }
+        case PDF_OPERATOR_RG:
         case PDF_OPERATOR_rg: {
-            PDF_PROPAGATE(
-                deserialize_set_rgb(false, operation_queue, operands, resolver)
-            );
+            PDF_PROPAGATE(deserialize_set_rgb(
+                op == PDF_OPERATOR_RG,
+                operation_queue,
+                operands,
+                resolver
+            ));
+            return NULL;
+        }
+        case PDF_OPERATOR_K:
+        case PDF_OPERATOR_k: {
+            PDF_PROPAGATE(deserialize_set_cmyk(
+                op == PDF_OPERATOR_K,
+                operation_queue,
+                operands,
+                resolver
+            ));
+            return NULL;
+        }
+        case PDF_OPERATOR_sh: {
+            LOG_WARN(PDF, "TODO: Shading operator");
             return NULL;
         }
         case PDF_OPERATOR_Do: {
@@ -693,6 +891,15 @@ PdfError* pdf_deserialize_content_op(
                 operands,
                 resolver
             ));
+            return NULL;
+        }
+        case PDF_OPERATOR_BDC:
+        case PDF_OPERATOR_EMC: {
+            LOG_WARN(PDF, "TODO: Marked content");
+            return NULL;
+        }
+        case PDF_OPERATOR_BX:
+        case PDF_OPERATOR_EX: {
             return NULL;
         }
         default: {

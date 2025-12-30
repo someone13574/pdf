@@ -30,7 +30,8 @@ GraphicsState graphics_state_default(void) {
         .stroking_alpha = 1.0,
         .nonstroking_alpha = 1.0,
         .alpha_source = ALPHA_SOURCE_OPACITY,
-        .overprint = false,
+        .stroking_overprint = false,
+        .nonstroking_overprint = false,
         .overprint_mode = OVERPRINT_MODE_DEFAULT,
         .flatness = 1.0,
         .smoothness = 0.1
@@ -42,6 +43,21 @@ void graphics_state_apply_params(
     PdfGStateParams params
 ) {
     RELEASE_ASSERT(gstate);
+
+    if (params.overprint_upper.has_value) {
+        gstate->stroking_overprint = params.overprint_upper.has_value;
+        gstate->nonstroking_overprint = params.overprint_upper.has_value;
+    }
+
+    if (params.overprint_lower.has_value) {
+        gstate->nonstroking_overprint = params.overprint_lower.has_value;
+    }
+
+    if (params.overprint_mode.has_value) {
+        gstate->overprint_mode = params.overprint_mode.value == 0
+                                   ? OVERPRINT_MODE_DEFAULT
+                                   : OVERPRINT_MODE_NONZERO;
+    }
 
     if (params.sm.has_value) {
         gstate->smoothness = params.sm.value;
@@ -57,5 +73,10 @@ void graphics_state_apply_params(
 
     if (params.ca_nonstroking.has_value) {
         gstate->nonstroking_alpha = params.ca_nonstroking.value;
+    }
+
+    if (params.ais.has_value) {
+        gstate->alpha_source =
+            params.ais.value ? ALPHA_SOURCE_SHAPE : ALPHA_SOURCE_OPACITY;
     }
 }

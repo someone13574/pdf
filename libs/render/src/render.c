@@ -190,6 +190,32 @@ static PdfError* process_content_stream(
                 path_builder_close_contour(state->path);
                 break;
             }
+            case PDF_OPERATOR_S: {
+                CanvasBrush brush = {
+                    .enable_fill = false,
+                    .enable_stroke = true,
+                    .stroke_rgba = pack_rgba(
+                        current_graphics_state(state)->stroking_rgb,
+                        current_graphics_state(state)->stroking_alpha
+                    ),
+                    .stroke_width = current_graphics_state(state)->line_width,
+                    .line_cap = pdf_line_cap_to_canvas(
+                        current_graphics_state(state)->line_cap
+                    ),
+                    .line_join = pdf_line_join_to_canvas(
+                        current_graphics_state(state)->line_join
+                    ),
+                    .miter_limit = current_graphics_state(state)->miter_limit
+                };
+
+                path_builder_apply_transform(
+                    state->path,
+                    current_graphics_state(state)->ctm
+                );
+                canvas_draw_path(canvas, state->path, brush);
+                state->path = path_builder_new(arena); // TODO: recycle
+                break;
+            }
             case PDF_OPERATOR_f: {
                 CanvasBrush brush = {
                     .enable_fill = true,
@@ -235,6 +261,10 @@ static PdfError* process_content_stream(
                     current_graphics_state(state)->ctm
                 );
                 canvas_draw_path(canvas, state->path, brush);
+                state->path = path_builder_new(arena); // TODO: recycle
+                break;
+            }
+            case PDF_OPERATOR_n: {
                 state->path = path_builder_new(arena); // TODO: recycle
                 break;
             }
@@ -483,6 +513,46 @@ static PdfError* process_content_stream(
                     3,
                     graphics_state->nonstroking_color_space
                 );
+                break;
+            }
+            case PDF_OPERATOR_K: {
+                // TODO: default color spaces
+                GraphicsState* graphics_state = current_graphics_state(state);
+                graphics_state->stroking_color_space.family =
+                    PDF_COLOR_SPACE_DEVICE_CMYK;
+
+                PdfReal components[4] = {
+                    op.data.set_cmyk.c,
+                    op.data.set_cmyk.m,
+                    op.data.set_cmyk.y,
+                    op.data.set_cmyk.k
+                };
+                graphics_state->stroking_rgb = pdf_map_color(
+                    components,
+                    4,
+                    graphics_state->stroking_color_space
+                );
+
+                break;
+            }
+            case PDF_OPERATOR_k: {
+                // TODO: default color spaces
+                GraphicsState* graphics_state = current_graphics_state(state);
+                graphics_state->nonstroking_color_space.family =
+                    PDF_COLOR_SPACE_DEVICE_CMYK;
+
+                PdfReal components[4] = {
+                    op.data.set_cmyk.c,
+                    op.data.set_cmyk.m,
+                    op.data.set_cmyk.y,
+                    op.data.set_cmyk.k
+                };
+                graphics_state->nonstroking_rgb = pdf_map_color(
+                    components,
+                    4,
+                    graphics_state->nonstroking_color_space
+                );
+
                 break;
             }
             case PDF_OPERATOR_Do: {

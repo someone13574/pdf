@@ -10,6 +10,7 @@
 #include "logger/log.h"
 #include "operation.h"
 #include "operator.h"
+#include "pdf/content_stream/operator.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
@@ -38,6 +39,7 @@ PdfError* pdf_deserialize_content_stream(
     );
     PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
+    int compatibility = 0;
     PdfObjectVec* operands = pdf_object_vec_new(pdf_resolver_arena(resolver));
     PdfContentOpVec* operations =
         pdf_content_op_vec_new(pdf_resolver_arena(resolver));
@@ -77,19 +79,38 @@ PdfError* pdf_deserialize_content_stream(
 
         // Parse operator
         PdfOperator operator = PDF_OPERATOR_UNSET;
-        PDF_PROPAGATE(pdf_error_conditional_context(
-            pdf_parse_operator(ctx, &operator),
-            stop_reason
-        ));
+        PdfError* operator_error = pdf_parse_operator(ctx, &operator);
+        if (compatibility > 0 && operator_error) {
+            pdf_error_free(operator_error);
+            pdf_ctx_consume_regular(ctx);
+            operator = PDF_OPERATOR_UNSET;
+        } else {
+            RELEASE_ASSERT(operator != PDF_OPERATOR_UNSET);
+        }
+        PDF_PROPAGATE(
+            pdf_error_conditional_context(operator_error, stop_reason)
+        );
+
         PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, is_pdf_non_regular));
         PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
 
-        RELEASE_ASSERT(operator != PDF_OPERATOR_UNSET);
+        if (operator == PDF_OPERATOR_BX) {
+            compatibility++;
+            RELEASE_ASSERT(compatibility > 0);
+        } else if (operator == PDF_OPERATOR_EX) {
+            compatibility--;
+            RELEASE_ASSERT(compatibility >= 0);
+        }
 
         // Deserialize operation
-        PDF_PROPAGATE(
-            pdf_deserialize_content_op(operator, operands, resolver, operations)
-        );
+        if (operator != PDF_OPERATOR_UNSET) {
+            PDF_PROPAGATE(pdf_deserialize_content_op(
+                operator,
+                operands,
+                resolver,
+                operations
+            ));
+        }
     }
 
     deserialized->operations = operations;

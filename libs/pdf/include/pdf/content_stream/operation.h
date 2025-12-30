@@ -33,6 +33,24 @@ typedef struct {
 } PdfOpParamsSetRGB;
 
 typedef struct {
+    PdfReal c;
+    PdfReal m;
+    PdfReal y;
+    PdfReal k;
+} PdfOpParamsSetCMYK;
+
+typedef struct {
+    GeomVec2 c1;
+    GeomVec2 c2;
+    GeomVec2 end;
+} PdfOpParamsCubicBezier;
+
+typedef struct {
+    GeomVec2 a;
+    GeomVec2 b;
+} PdfOpParamsPartCubicBezier;
+
+typedef struct {
     PdfOperator kind;
 
     union {
@@ -46,6 +64,8 @@ typedef struct {
         GeomMat3 set_ctm;
         GeomVec2 new_subpath;
         GeomVec2 line_to;
+        PdfOpParamsCubicBezier cubic_bezier;
+        PdfOpParamsPartCubicBezier part_cubic_bezier;
         PdfReal set_text_metric;
         PdfOpParamsSetFont set_font;
         GeomVec2 text_offset;
@@ -53,6 +73,7 @@ typedef struct {
         PdfOpParamsPositionedTextVec* positioned_text;
         PdfReal set_gray;
         PdfOpParamsSetRGB set_rgb;
+        PdfOpParamsSetCMYK set_cmyk;
         PdfName paint_xobject;
     } data;
 } PdfContentOp;

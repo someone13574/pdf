@@ -103,6 +103,14 @@ PdfError* pdf_deserialize_font_descriptor(
             )
         ),
         PDF_FIELD(
+            "XHeight",
+            &target_ptr->x_height,
+            PDF_DESERDE_OPTIONAL(
+                pdf_number_op_init,
+                PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+            )
+        ),
+        PDF_FIELD(
             "StemV",
             &target_ptr->stem_v,
             PDF_DESERDE_OPTIONAL(

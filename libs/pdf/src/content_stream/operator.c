@@ -18,7 +18,12 @@ static PdfError* two_byte_operator(
     PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &peeked));
 
     if (peeked != second_byte) {
-        return PDF_ERROR(PDF_ERR_UNKNOWN_OPERATOR);
+        return PDF_ERROR(
+            PDF_ERR_UNKNOWN_OPERATOR,
+            "Expected char `%c`, found `%c`",
+            second_byte,
+            peeked
+        );
     }
 
     *selected = operator;
@@ -330,7 +335,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
                     return two_byte_operator(
                         ctx,
                         PDF_OPERATOR_BDC,
-                        'D',
+                        'C',
                         operator
                     );
                 }

@@ -30,6 +30,7 @@ PdfError* pdf_ctx_backscan(PdfCtx* ctx, const char* text, size_t limit);
 PdfError* pdf_ctx_seek_line_start(PdfCtx* ctx);
 PdfError* pdf_ctx_seek_next_line(PdfCtx* ctx);
 PdfError* pdf_ctx_consume_whitespace(PdfCtx* ctx);
+PdfError* pdf_ctx_consume_regular(PdfCtx* ctx);
 
 const uint8_t* pdf_ctx_get_raw(const PdfCtx* ctx);
 

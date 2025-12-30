@@ -122,7 +122,7 @@ PdfError* sfnt_parser_read_int16(SfntParser* parser, int16_t* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
-    uint16_t x;
+    uint16_t x = 0;
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &x));
     *out = (int16_t)x;
     return NULL;
@@ -148,7 +148,7 @@ PdfError* sfnt_parser_read_int32(SfntParser* parser, int32_t* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
-    uint32_t x;
+    uint32_t x = 0;
     PDF_PROPAGATE(sfnt_parser_read_uint32(parser, &x));
     *out = (int32_t)x;
     return NULL;
@@ -175,7 +175,7 @@ PdfError* sfnt_parser_read_int64(SfntParser* parser, int64_t* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
-    uint64_t x;
+    uint64_t x = 0;
     PDF_PROPAGATE(sfnt_parser_read_uint64(parser, &x));
     *out = (int64_t)x;
     return NULL;
@@ -207,7 +207,7 @@ PdfError* sfnt_parser_read_uint8_array(SfntParser* parser, Uint8Array* array) {
     RELEASE_ASSERT(array);
 
     for (size_t idx = 0; idx < uint8_array_len(array); idx++) {
-        uint8_t byte;
+        uint8_t byte = 0;
         PDF_PROPAGATE(sfnt_parser_read_uint8(parser, &byte));
         uint8_array_set(array, idx, byte);
     }
@@ -221,7 +221,7 @@ sfnt_parser_read_uint16_array(SfntParser* parser, Uint16Array* array) {
     RELEASE_ASSERT(array);
 
     for (size_t idx = 0; idx < uint16_array_len(array); idx++) {
-        uint16_t word;
+        uint16_t word = 0;
         PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &word));
         uint16_array_set(array, idx, word);
     }
@@ -233,7 +233,7 @@ PdfError* sfnt_parser_read_short_frac(SfntParser* parser, SfntShortFrac* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
-    int16_t x;
+    int16_t x = 0;
     PDF_PROPAGATE(sfnt_parser_read_int16(parser, &x));
     *out = (SfntShortFrac)x;
     return NULL;
@@ -243,7 +243,7 @@ PdfError* sfnt_parser_read_fixed(SfntParser* parser, SfntFixed* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
-    int32_t x;
+    int32_t x = 0;
     PDF_PROPAGATE(sfnt_parser_read_int32(parser, &x));
     *out = (SfntFixed)x;
     return NULL;
@@ -253,7 +253,7 @@ PdfError* sfnt_parser_read_fword(SfntParser* parser, SfntFWord* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
-    int16_t x;
+    int16_t x = 0;
     PDF_PROPAGATE(sfnt_parser_read_int16(parser, &x));
     *out = (SfntFWord)x;
     return NULL;
@@ -263,7 +263,7 @@ PdfError* sfnt_parser_read_ufword(SfntParser* parser, SfntUFWord* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
-    uint16_t x;
+    uint16_t x = 0;
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &x));
     *out = (SfntUFWord)x;
     return NULL;
@@ -274,7 +274,7 @@ sfnt_parser_read_long_date_time(SfntParser* parser, SfntLongDateTime* out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(out);
 
-    int64_t x;
+    int64_t x = 0;
     PDF_PROPAGATE(sfnt_parser_read_int64(parser, &x));
     *out = (SfntLongDateTime)x;
     return NULL;

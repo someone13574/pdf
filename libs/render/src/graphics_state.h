@@ -35,7 +35,8 @@ typedef struct {
     double stroking_alpha;
     double nonstroking_alpha;
     AlphaSource alpha_source;
-    bool overprint;
+    bool stroking_overprint;
+    bool nonstroking_overprint;
     OverprintMode overprint_mode;
     // black_generation
     // undercolor_removal

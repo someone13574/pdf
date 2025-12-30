@@ -42,7 +42,7 @@ typedef struct {
     /// the modification date shall be used to ascertain which of the
     /// application data dictionaries that it contains correspond to the current
     /// content of the page (see 14.5, "Page-Piece Dictionaries")
-    PdfObject* date;
+    PdfObject* last_modified;
 
     /// (Required; inheritable) A dictionary containing any resources required
     /// by the page (see 7.8.3, "Resource Dictionaries"). If the page requires

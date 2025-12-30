@@ -76,7 +76,15 @@ PdfError* pdf_deserialize_resources(
                     PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
                 )
             )
-        )
+        ),
+        PDF_FIELD(
+            "Properties",
+            &target_ptr->properties,
+            PDF_DESERDE_OPTIONAL(
+                pdf_dict_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
+            )
+        ),
     };
 
     PDF_PROPAGATE(pdf_deserialize_dict(
@@ -121,9 +129,30 @@ PdfError* pdf_deserialize_gstate_params(
         PDF_UNIMPLEMENTED_FIELD("ML"),
         PDF_UNIMPLEMENTED_FIELD("D"),
         PDF_UNIMPLEMENTED_FIELD("RI"),
-        PDF_UNIMPLEMENTED_FIELD("OP"),
-        PDF_UNIMPLEMENTED_FIELD("op"),
-        PDF_UNIMPLEMENTED_FIELD("OPM"),
+        PDF_FIELD(
+            "OP",
+            &target_ptr->overprint_upper,
+            PDF_DESERDE_OPTIONAL(
+                pdf_boolean_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+            )
+        ),
+        PDF_FIELD(
+            "op",
+            &target_ptr->overprint_lower,
+            PDF_DESERDE_OPTIONAL(
+                pdf_boolean_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+            )
+        ),
+        PDF_FIELD(
+            "OPM",
+            &target_ptr->overprint_mode,
+            PDF_DESERDE_OPTIONAL(
+                pdf_integer_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            )
+        ),
         PDF_UNIMPLEMENTED_FIELD("Font"),
         PDF_UNIMPLEMENTED_FIELD("BG"),
         PDF_UNIMPLEMENTED_FIELD("BG2"),
@@ -149,8 +178,8 @@ PdfError* pdf_deserialize_gstate_params(
                 PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
             )
         ),
-        PDF_UNIMPLEMENTED_FIELD("BM"),
-        PDF_UNIMPLEMENTED_FIELD("SMask"),
+        PDF_IGNORED_FIELD("BM", &target_ptr->bm),       // TODO: blend mode
+        PDF_IGNORED_FIELD("SMask", &target_ptr->smask), // TODO: masking
         PDF_FIELD(
             "CA",
             &target_ptr->ca_stroking,
@@ -167,7 +196,14 @@ PdfError* pdf_deserialize_gstate_params(
                 PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
             )
         ),
-        PDF_UNIMPLEMENTED_FIELD("AIS"),
+        PDF_FIELD(
+            "AIS",
+            &target_ptr->ais,
+            PDF_DESERDE_OPTIONAL(
+                pdf_boolean_op_init,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+            )
+        ),
         PDF_UNIMPLEMENTED_FIELD("TK")
     };
 

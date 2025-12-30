@@ -163,6 +163,27 @@ PdfError* pdf_deserialize_color_space(
     return NULL;
 }
 
+static GeomVec3 linear_srgb_to_nonlinear(
+    GeomVec3 linear,
+    GeomVec3 whitepoint,
+    GeomVec3 blackpoint
+) {
+    GeomVec3 non_linear = geom_vec3_new(
+        linear.x <= 0.00304 ? (linear.x * 12.92)
+                            : (1.055 * pow(linear.x, 1.0 / 2.4) - 0.055),
+        linear.y <= 0.00304 ? (linear.y * 12.92)
+                            : (1.055 * pow(linear.y, 1.0 / 2.4) - 0.055),
+        linear.z <= 0.00304 ? (linear.z * 12.92)
+                            : (1.055 * pow(linear.z, 1.0 / 2.4) - 0.055)
+    );
+
+    return geom_vec3_new(
+        (whitepoint.x - blackpoint.x) * non_linear.x + blackpoint.x,
+        (whitepoint.y - blackpoint.y) * non_linear.y + blackpoint.y,
+        (whitepoint.z - blackpoint.z) * non_linear.z + blackpoint.z
+    );
+}
+
 /// Converts CIE xyz color to non-linear sRGB:
 /// https://www.w3.org/Graphics/Color/sRGB.html
 static GeomVec3
@@ -182,20 +203,7 @@ cie_xyz_to_srgb(GeomVec3 xyz, GeomVec3 whitepoint, GeomVec3 blackpoint) {
         )
     );
 
-    GeomVec3 non_linear = geom_vec3_new(
-        linear.x <= 0.00304 ? (linear.x * 12.92)
-                            : (1.055 * pow(linear.x, 1.0 / 2.4) - 0.055),
-        linear.y <= 0.00304 ? (linear.y * 12.92)
-                            : (1.055 * pow(linear.y, 1.0 / 2.4) - 0.055),
-        linear.z <= 0.00304 ? (linear.z * 12.92)
-                            : (1.055 * pow(linear.z, 1.0 / 2.4) - 0.055)
-    );
-
-    return geom_vec3_new(
-        (whitepoint.x - blackpoint.x) * non_linear.x + blackpoint.x,
-        (whitepoint.y - blackpoint.y) * non_linear.y + blackpoint.y,
-        (whitepoint.z - blackpoint.z) * non_linear.z + blackpoint.z
-    );
+    return linear_srgb_to_nonlinear(linear, whitepoint, blackpoint);
 }
 
 GeomVec3 pdf_map_color(
@@ -213,6 +221,26 @@ GeomVec3 pdf_map_color(
         case PDF_COLOR_SPACE_DEVICE_RGB: {
             RELEASE_ASSERT(n_components == 3);
             return geom_vec3_new(components[0], components[1], components[2]);
+        }
+        case PDF_COLOR_SPACE_DEVICE_CMYK: {
+            RELEASE_ASSERT(n_components == 4);
+            double c = components[0];
+            double m = components[1];
+            double y = components[2];
+            double k = components[3];
+
+            // TODO: ICC profiles?
+            GeomVec3 linear = geom_vec3_new(
+                (1.0 - c) * (1.0 - k),
+                (1.0 - m) * (1.0 - k),
+                (1.0 - y) * (1.0 - k)
+            );
+
+            return linear_srgb_to_nonlinear(
+                linear,
+                geom_vec3_new(1.0, 1.0, 1.0),
+                geom_vec3_new(0.0, 0.0, 0.0)
+            );
         }
         case PDF_COLOR_SPACE_CAL_RGB: {
             RELEASE_ASSERT(n_components == 3);

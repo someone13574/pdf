@@ -340,6 +340,20 @@ PdfError* pdf_ctx_consume_whitespace(PdfCtx* ctx) {
     return NULL;
 }
 
+PdfError* pdf_ctx_consume_regular(PdfCtx* ctx) {
+    RELEASE_ASSERT(ctx);
+
+    LOG_DIAG(DEBUG, CTX, "Consuming regular");
+
+    uint8_t peeked = ' ';
+    while (pdf_error_free_is_ok(pdf_ctx_peek(ctx, &peeked))
+           && is_pdf_regular(peeked)) {
+        pdf_error_free_is_ok(pdf_ctx_peek_and_advance(ctx, NULL));
+    }
+
+    return NULL;
+}
+
 const uint8_t* pdf_ctx_get_raw(const PdfCtx* ctx) {
     RELEASE_ASSERT(ctx);
     return ctx->buffer;

@@ -18,11 +18,11 @@ int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
 
-    Arena* arena = arena_new(4096);
+    Arena* arena = arena_new(8192);
 
     size_t buffer_size;
     uint8_t* buffer =
-        load_file_to_buffer(arena, "test-files/test-2.pdf", &buffer_size);
+        load_file_to_buffer(arena, "test-files/cmyk.pdf", &buffer_size);
     RELEASE_ASSERT(buffer);
 
     PdfResolver* resolver;
