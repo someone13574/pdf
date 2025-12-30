@@ -129,7 +129,7 @@ PdfError* pdf_deserialize_gstate_params(
         PDF_UNIMPLEMENTED_FIELD("BG2"),
         PDF_UNIMPLEMENTED_FIELD("UCR"),
         PDF_UNIMPLEMENTED_FIELD("UCR2"),
-        PDF_IGNORED_FIELD("TR"), // TODO: functions
+        PDF_IGNORED_FIELD("TR", &target_ptr->tr), // TODO: functions
         PDF_UNIMPLEMENTED_FIELD("TR2"),
         PDF_UNIMPLEMENTED_FIELD("HT"),
         PDF_UNIMPLEMENTED_FIELD("FL"),

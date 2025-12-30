@@ -224,7 +224,6 @@ bool DVEC_FN(get_ptr)(const DVEC_NAME* vec, size_t idx, DVEC_TYPE** out) {
 // returning a bool indicating whether the operation was successful.
 bool DVEC_FN(pop)(DVEC_NAME* vec, DVEC_TYPE* out) {
     RELEASE_ASSERT(vec);
-    RELEASE_ASSERT(out);
 
     LOG_DIAG(
         DEBUG,
@@ -236,8 +235,11 @@ bool DVEC_FN(pop)(DVEC_NAME* vec, DVEC_TYPE* out) {
         return false;
     }
 
-    if (!DVEC_FN(get)(vec, vec->len - 1, out)) {
+    size_t idx = vec->len - 1;
+    if (idx >= vec->len) {
         return false;
+    } else if (out) {
+        RELEASE_ASSERT(DVEC_FN(get)(vec, idx, out));
     }
 
     vec->len--;

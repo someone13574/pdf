@@ -26,6 +26,11 @@ uint8_t* load_file_to_buffer(Arena* arena, const char* path, size_t* out_size);
 #define DARRAY_TYPE int32_t
 #include "arena/darray_decl.h"
 
+#define DVEC_NAME Uint32Vec
+#define DVEC_LOWERCASE_NAME uint32_vec
+#define DVEC_TYPE uint32_t
+#include "arena/dvec_decl.h"
+
 #define DARRAY_NAME Uint32Array
 #define DARRAY_LOWERCASE_NAME uint32_array
 #define DARRAY_TYPE uint32_t

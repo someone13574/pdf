@@ -172,7 +172,8 @@ PdfError* pdf_deserialize_operands(
      .debug_info.file = RELATIVE_FILE_PATH,                                    \
      .debug_info.line = __LINE__}
 
-/// Marks that deserialization hasn't been implemented for this yet.
+/// Marks that deserialization hasn't been implemented for this yet. Panics if
+/// the field is encountered.
 #define PDF_UNIMPLEMENTED_FIELD(pdf_key_name)                                  \
     PDF_FIELD(                                                                 \
         pdf_key_name,                                                          \
@@ -180,12 +181,14 @@ PdfError* pdf_deserialize_operands(
         (PdfDeserdeInfo) {.type = PDF_DESERDE_TYPE_UNIMPLEMENTED}              \
     )
 
-#define PDF_IGNORED_FIELD(pdf_key_name)                                        \
-    PDF_FIELD(                                                                 \
-        pdf_key_name,                                                          \
-        NULL,                                                                  \
-        (PdfDeserdeInfo) {.type = PDF_DESERDE_TYPE_IGNORED}                    \
-    )
+/// Marks that deserialization hasn't been implemented for this yet. Sets the
+/// object if found, sets to null otherwise.
+#define PDF_IGNORED_FIELD(pdf_key_name, ptr_to_field)                          \
+    {.key = (pdf_key_name),                                                    \
+     .target_ptr = (void*)(ptr_to_field),                                      \
+     .deserde_info = (PdfDeserdeInfo) {.type = PDF_DESERDE_TYPE_IGNORED},      \
+     .debug_info.file = RELATIVE_FILE_PATH,                                    \
+     .debug_info.line = __LINE__}
 
 #define PDF_DESERDE_OBJECT(object_type)                                        \
     (PdfDeserdeInfo) {                                                         \

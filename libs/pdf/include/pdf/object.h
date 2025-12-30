@@ -95,8 +95,13 @@ typedef struct {
     );
 
 /// Placeholder type for unimplemented deserialization fields. Choice is
-/// arbitrary.
+/// arbitrary. This is different from PdfIgnored because it is planned to be
+/// implemented in the future.
 typedef int PdfUnimplemented;
+
+/// Placeholder types for ignored deserialization fields. This is different from
+/// PdfUnimplemented because deserialization is not planned for this field.
+typedef PdfObject* PdfIgnored;
 
 typedef struct {
     enum { PDF_NUMBER_TYPE_INTEGER, PDF_NUMBER_TYPE_REAL } type;

@@ -8,7 +8,34 @@
 // Catalog
 typedef struct {
     PdfName type;
-    PdfPageTreeNodeRef pages;
+    PdfUnimplemented version;
+    PdfUnimplemented extensions;
+    PdfPagesRef pages;
+    PdfUnimplemented page_labels;
+    PdfUnimplemented names;
+    PdfIgnored dests;
+    PdfIgnored viewer_preferences;
+    PdfIgnored page_layout;
+    PdfIgnored page_mode;
+    PdfIgnored outlines;
+    PdfIgnored threads;
+    PdfIgnored open_action;
+    PdfIgnored aa;
+    PdfIgnored uri;
+    PdfIgnored acro_form;
+    PdfIgnored metadata;
+    PdfUnimplemented struct_tree_root;
+    PdfIgnored mark_info;
+    PdfIgnored lang;
+    PdfIgnored spider_info;
+    PdfUnimplemented output_intents;
+    PdfIgnored piece_info;
+    PdfIgnored oc_properties;
+    PdfUnimplemented perms;
+    PdfIgnored legal;
+    PdfUnimplemented requirements;
+    PdfUnimplemented collection;
+    PdfIgnored needs_rendering;
 } PdfCatalog;
 
 PdfError* pdf_deserialize_catalog(

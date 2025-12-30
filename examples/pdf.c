@@ -31,25 +31,21 @@ int main(int argc, char** argv) {
     PdfCatalog catalog;
     PDF_REQUIRE(pdf_get_catalog(resolver, &catalog));
 
-    PdfPageTreeNode page_tree_root;
-    PDF_REQUIRE(
-        pdf_resolve_page_tree_node(catalog.pages, resolver, &page_tree_root)
-    );
+    PdfPageIter* page_iter = NULL;
+    PDF_REQUIRE(pdf_page_iter_new(resolver, catalog.pages, &page_iter));
 
-    for (size_t idx = 0; idx < pdf_page_ref_vec_len(page_tree_root.kids);
-         idx++) {
-        PdfPageRef page_ref;
-        RELEASE_ASSERT(
-            pdf_page_ref_vec_get(page_tree_root.kids, idx, &page_ref)
-        );
-
-        PdfPage page;
-        PDF_REQUIRE(pdf_resolve_page(page_ref, resolver, &page));
+    bool iter_done = false;
+    PdfPage page;
+    while (true) {
+        PDF_REQUIRE(pdf_page_iter_next(page_iter, &page, &iter_done));
+        if (iter_done) {
+            break;
+        }
 
         Canvas* canvas = NULL;
         PDF_REQUIRE(render_page(arena, resolver, &page, &canvas));
         canvas_write_file(canvas, "test.svg");
-    }
+    };
 
     LOG_DIAG(INFO, EXAMPLE, "Finished");
 

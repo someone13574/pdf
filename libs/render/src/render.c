@@ -549,15 +549,18 @@ PdfError* render_page(
     RELEASE_ASSERT(page);
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(!*canvas);
+    RELEASE_ASSERT(page->media_box.has_value);
+
+    PdfRectangle mediabox = page->media_box.value;
 
     GeomRect rect = geom_rect_new(
         geom_vec2_new(
-            pdf_number_as_real(page->media_box.upper_right_x),
-            pdf_number_as_real(page->media_box.upper_right_y)
+            pdf_number_as_real(mediabox.upper_right_x),
+            pdf_number_as_real(mediabox.upper_right_y)
         ),
         geom_vec2_new(
-            pdf_number_as_real(page->media_box.lower_left_x),
-            pdf_number_as_real(page->media_box.lower_left_y)
+            pdf_number_as_real(mediabox.lower_left_x),
+            pdf_number_as_real(mediabox.lower_left_y)
         )
     );
 

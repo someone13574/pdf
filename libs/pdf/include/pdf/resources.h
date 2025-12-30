@@ -140,7 +140,7 @@ typedef struct {
     /// colorants) or an array of four functions (which apply to the process
     /// colorants individually). The name Identity may be used to represent the
     /// identity function.
-    PdfUnimplemented tr;
+    PdfIgnored tr;
 
     /// (Optional; PDF 1.3) Same as TR except that the value may also be the
     /// name Default, denoting the transfer function that was in effect at the
