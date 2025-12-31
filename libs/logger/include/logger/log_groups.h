@@ -17,7 +17,7 @@
     X(XREF, INHERIT, PDF)                                                      \
     X(CTX, INHERIT, PDF)                                                       \
     X(OBJECT, OFF, PDF)                                                        \
-    X(DESERDE, INFO, PDF)                                                      \
+    X(DESERDE, OFF, PDF)                                                       \
     X(RENDER, INHERIT, GLOBAL)                                                 \
     X(FONT, INHERIT, GLOBAL)                                                   \
     X(PS, OFF, GLOBAL)                                                         \

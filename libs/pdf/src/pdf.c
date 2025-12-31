@@ -158,6 +158,7 @@ parse_stub_trailer(PdfResolver* resolver, StubTrailer* trailer) {
     RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(trailer);
 
+    PDF_PROPAGATE(pdf_ctx_consume_whitespace(resolver->ctx));
     PDF_PROPAGATE(pdf_ctx_expect(resolver->ctx, "trailer"));
     PDF_PROPAGATE(pdf_ctx_seek_next_line(resolver->ctx));
 
@@ -174,6 +175,7 @@ static PdfError* parse_trailer(PdfResolver* resolver, PdfTrailer* trailer) {
     RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(trailer);
 
+    PDF_PROPAGATE(pdf_ctx_consume_whitespace(resolver->ctx));
     PDF_PROPAGATE(pdf_ctx_expect(resolver->ctx, "trailer"));
     PDF_PROPAGATE(pdf_ctx_seek_next_line(resolver->ctx));
 

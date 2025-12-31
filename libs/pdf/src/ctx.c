@@ -143,7 +143,8 @@ PdfError* pdf_ctx_expect(PdfCtx* ctx, const char* text) {
     LOG_DIAG(DEBUG, CTX, "Expecting text \"%s\"", text);
 
     size_t restore_offset = ctx->offset;
-    while (*text != 0) {
+    const char* offset_text = text;
+    while (*offset_text != 0) {
         uint8_t peeked;
         PdfError* peek_error = pdf_ctx_peek(ctx, &peeked);
         if (peek_error) {
@@ -151,12 +152,15 @@ PdfError* pdf_ctx_expect(PdfCtx* ctx, const char* text) {
             return peek_error;
         }
 
-        if ((uint8_t)*text != peeked) {
+        if ((uint8_t)*offset_text != peeked) {
             pdf_error_free_is_ok(pdf_ctx_seek(ctx, restore_offset));
             return PDF_ERROR(
                 PDF_ERR_CTX_EXPECT,
-                "Unexpected character at %zu in stream",
-                ctx->offset
+                "Unexpected character `%c` at %zu in stream (expected `%c` for `%s`)",
+                peeked,
+                ctx->offset,
+                *offset_text,
+                offset_text
             );
         }
 
@@ -166,7 +170,7 @@ PdfError* pdf_ctx_expect(PdfCtx* ctx, const char* text) {
             return next_error;
         }
 
-        text++;
+        offset_text++;
     }
 
     return NULL;

@@ -114,13 +114,6 @@ PdfError* text_state_render(
             (pdf_number_as_real(glyph_width) * 0.001 * state->text_font_size
              + state->character_spacing)
             * state->horizontal_scaling;
-        LOG_DIAG(
-            INFO,
-            RENDER,
-            "translating %f, font size = %f",
-            tx,
-            state->text_font_size
-        );
         object_state->text_matrix = geom_mat3_mul(
             geom_mat3_translate(tx, 0.0),
             object_state->text_matrix

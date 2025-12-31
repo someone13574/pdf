@@ -357,10 +357,12 @@ static PdfError* process_content_stream(
                     op.data.text_offset.x,
                     op.data.text_offset.y
                 );
-                state->text_object_state.text_matrix = geom_mat3_mul(
+                state->text_object_state.text_line_matrix = geom_mat3_mul(
                     transform,
-                    state->text_object_state.text_matrix
+                    state->text_object_state.text_line_matrix
                 );
+                state->text_object_state.text_matrix =
+                    state->text_object_state.text_line_matrix;
                 break;
             }
             case PDF_OPERATOR_Tm: {
@@ -400,7 +402,6 @@ static PdfError* process_content_stream(
                         double tx = -(element.value.offset / 1000.0)
                                   * text_state->text_font_size
                                   * text_state->horizontal_scaling;
-                        LOG_DIAG(INFO, RENDER, "element offsetting: %f", tx);
 
                         GeomMat3 transform = geom_mat3_translate(
                             tx, // TODO: vertical
