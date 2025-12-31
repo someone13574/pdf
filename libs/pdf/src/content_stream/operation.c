@@ -578,7 +578,7 @@ static PdfError* deserialize_set_cmyk(
     return NULL;
 }
 
-static PdfError* deserialize_num_real(
+static PdfError* deserialize_num_as_real(
     PdfReal* target,
     const PdfObjectVec* operands,
     PdfResolver* resolver
@@ -628,7 +628,7 @@ PdfError* pdf_deserialize_content_op(
         case PDF_OPERATOR_w: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_w);
-            PDF_PROPAGATE(deserialize_num_real(
+            PDF_PROPAGATE(deserialize_num_as_real(
                 &queue_op->data.set_line_width,
                 operands,
                 resolver
@@ -658,7 +658,7 @@ PdfError* pdf_deserialize_content_op(
         case PDF_OPERATOR_M: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_M);
-            PDF_PROPAGATE(deserialize_num_real(
+            PDF_PROPAGATE(deserialize_num_as_real(
                 &queue_op->data.miter_limit,
                 operands,
                 resolver
@@ -667,6 +667,16 @@ PdfError* pdf_deserialize_content_op(
         }
         case PDF_OPERATOR_d: {
             LOG_WARN(RENDER, "TODO: Render dashed lines");
+            return NULL;
+        }
+        case PDF_OPERATOR_i: {
+            PdfContentOp* queue_op =
+                new_queue_op(operation_queue, PDF_OPERATOR_i);
+            PDF_PROPAGATE(deserialize_num_as_real(
+                &queue_op->data.flatness,
+                operands,
+                resolver
+            ));
             return NULL;
         }
         case PDF_OPERATOR_gs: {
@@ -774,7 +784,7 @@ PdfError* pdf_deserialize_content_op(
         case PDF_OPERATOR_Tz:
         case PDF_OPERATOR_TL: {
             PdfContentOp* queue_op = new_queue_op(operation_queue, op);
-            PDF_PROPAGATE(deserialize_num_real(
+            PDF_PROPAGATE(deserialize_num_as_real(
                 &queue_op->data.set_text_metric,
                 operands,
                 resolver

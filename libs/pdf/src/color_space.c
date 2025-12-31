@@ -150,6 +150,10 @@ PdfError* pdf_deserialize_color_space(
 
             break;
         }
+        case PDF_COLOR_SPACE_ICC_BASED: {
+            LOG_WARN(PDF, "TODO: ICC Color spaces");
+            break;
+        }
         default: {
             printf(
                 "%s\n",

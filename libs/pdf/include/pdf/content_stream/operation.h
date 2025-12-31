@@ -58,6 +58,7 @@ typedef struct {
         PdfLineCapStyle set_line_cap;
         PdfLineJoinStyle set_join_style;
         PdfReal miter_limit;
+        PdfReal flatness;
         PdfName set_gstate;
         PdfName set_color_space;
         PdfObjectVec* set_color;

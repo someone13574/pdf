@@ -138,6 +138,10 @@ static PdfError* process_content_stream(
                     op.data.miter_limit;
                 break;
             }
+            case PDF_OPERATOR_i: {
+                current_graphics_state(state)->flatness = op.data.flatness;
+                break;
+            }
             case PDF_OPERATOR_gs: {
                 RELEASE_ASSERT(
                     resources->has_value
@@ -483,17 +487,23 @@ static PdfError* process_content_stream(
                         num_components = 4;
                         break;
                     }
+                    case PDF_COLOR_SPACE_ICC_BASED: {
+                        num_components = 0;
+                        break;
+                    }
                     default: {
                         LOG_TODO();
                         break;
                     }
                 }
 
-                graphics_state->nonstroking_rgb = pdf_map_color(
-                    components,
-                    num_components,
-                    graphics_state->nonstroking_color_space
-                );
+                if (num_components != 0) {
+                    graphics_state->nonstroking_rgb = pdf_map_color(
+                        components,
+                        num_components,
+                        graphics_state->nonstroking_color_space
+                    );
+                }
 
                 break;
             }
@@ -533,6 +543,16 @@ static PdfError* process_content_stream(
                             graphics_state->nonstroking_color_space
                         );
 
+                        break;
+                    }
+                    case PDF_COLOR_SPACE_ICC_BASED: {
+                        // Technically getting here is disallowed per the spec,
+                        // but some files don't care
+                        LOG_WARN(
+                            RENDER,
+                            "TODO: ICC Color spaces, %zu",
+                            pdf_object_vec_len(op.data.set_color)
+                        );
                         break;
                     }
                     default: {

@@ -107,8 +107,6 @@ PdfError* decode_zlib_data(
     Adler32Sum computed_checksum =
         adler32_compute_checksum(raw_decoded, decoded_len);
 
-    printf("%.*s\n", (int)decoded_len, raw_decoded);
-
     Adler32Sum stored_checksum;
     bitstream_align_byte(&bitstream);
     PDF_PROPAGATE(bitstream_read_n(&bitstream, 32, &stored_checksum));

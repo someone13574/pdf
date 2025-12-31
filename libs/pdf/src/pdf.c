@@ -165,8 +165,6 @@ parse_stub_trailer(PdfResolver* resolver, StubTrailer* trailer) {
     PdfObject trailer_object;
     PDF_PROPAGATE(pdf_parse_object(resolver, &trailer_object, false));
 
-    printf("%s\n", pdf_fmt_object(resolver->arena, &trailer_object));
-
     PDF_PROPAGATE(deserialize_stub_trailer(&trailer_object, trailer, resolver));
     return NULL;
 }

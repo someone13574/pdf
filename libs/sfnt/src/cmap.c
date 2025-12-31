@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
+#include "arena/common.h"
 #include "logger/log.h"
 #include "parser.h"
 #include "pdf_error/error.h"
@@ -163,7 +164,31 @@ size_t sfnt_cmap_select_encoding(SfntCmap* cmap) {
 }
 
 static PdfError*
+parse_cmap_format0(Arena* arena, SfntParser* parser, SfntCmapFormat0* data) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(data);
+
+    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->length));
+    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->language));
+    if (data->length != 262) {
+        return PDF_ERROR(
+            PDF_ERR_SFNT_INVALID_LENGTH,
+            "Cmap format0 length must be 262"
+        );
+    }
+
+    data->glyph_index_array = uint8_array_new(arena, 256);
+    PDF_PROPAGATE(
+        sfnt_parser_read_uint8_array(parser, data->glyph_index_array)
+    );
+
+    return NULL;
+}
+
+static PdfError*
 parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data) {
+    RELEASE_ASSERT(arena);
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(data);
 
@@ -211,6 +236,28 @@ parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data) {
     return NULL;
 }
 
+static PdfError*
+parse_cmap_format6(Arena* arena, SfntParser* parser, SfntCmapFormat6* data) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(data);
+
+    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->length));
+    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->language));
+    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->first_code));
+    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->entry_count));
+    if (data->length != 10 + data->entry_count * 2) {
+        return PDF_ERROR(PDF_ERR_SFNT_INVALID_LENGTH);
+    }
+
+    data->glyph_index_array = uint16_array_new(arena, data->entry_count);
+    PDF_PROPAGATE(
+        sfnt_parser_read_uint16_array(parser, data->glyph_index_array)
+    );
+
+    return NULL;
+}
+
 PdfError* sfnt_cmap_get_encoding(
     Arena* arena,
     SfntCmap* cmap,
@@ -226,21 +273,48 @@ PdfError* sfnt_cmap_get_encoding(
     RELEASE_ASSERT(sfnt_cmap_header_vec_get(cmap->headers, idx, &header));
     parser->offset = header.offset;
 
-    uint16_t format;
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &format));
+    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &subtable->format));
 
-    switch (format) {
+    switch (subtable->format) {
+        case 0: {
+            return parse_cmap_format0(arena, parser, &subtable->data.format0);
+        }
         case 4: {
-            subtable->format = format;
             return parse_cmap_format4(arena, parser, &subtable->data.format4);
         }
+        case 6: {
+            return parse_cmap_format6(arena, parser, &subtable->data.format6);
+        }
         default: {
-            LOG_TODO("Unimplemented cmap format %d", format);
+            LOG_TODO(
+                "Unimplemented cmap format %u",
+                (unsigned int)subtable->format
+            );
         }
     }
 }
 
-uint16_t cmap_format4_map(const SfntCmapFormat4* subtable, uint16_t cid) {
+static uint8_t cmap_format0_map(const SfntCmapFormat0* subtable, uint16_t cid) {
+    RELEASE_ASSERT(subtable);
+
+    if (cid >= 256) {
+        LOG_WARN(
+            SFNT,
+            "No valid glyph mapping in format0 cmap for cid %u",
+            (unsigned int)cid
+        );
+        return 0;
+    }
+
+    uint8_t gid = 0;
+    RELEASE_ASSERT(
+        uint8_array_get(subtable->glyph_index_array, (size_t)cid, &gid)
+    );
+    return gid;
+}
+
+static uint16_t
+cmap_format4_map(const SfntCmapFormat4* subtable, uint16_t cid) {
     RELEASE_ASSERT(subtable);
 
     uint16_t seg_count = subtable->seg_count_x2 / 2;
@@ -298,12 +372,43 @@ uint16_t cmap_format4_map(const SfntCmapFormat4* subtable, uint16_t cid) {
     return (uint16_t)(uncorrected_gid + id_delta);
 }
 
+static uint16_t
+cmap_format6_map(const SfntCmapFormat6* subtable, uint16_t cid) {
+    RELEASE_ASSERT(subtable);
+
+    if (cid < subtable->first_code
+        || cid >= subtable->first_code + subtable->entry_count) {
+        LOG_WARN(
+            SFNT,
+            "No valid glyph mapping in format6 cmap for cid %u",
+            (unsigned int)cid
+        );
+        return 0;
+    }
+
+    uint16_t gid = 0;
+    RELEASE_ASSERT(uint16_array_get(
+        subtable->glyph_index_array,
+        (size_t)(cid - subtable->first_code),
+        &gid
+    ));
+    return gid;
+}
+
 uint32_t sfnt_cmap_map_cid(const SfntCmapSubtable* subtable, uint32_t cid) {
     RELEASE_ASSERT(subtable);
 
     switch (subtable->format) {
+        case 0: {
+            return (
+                uint16_t
+            )cmap_format0_map(&subtable->data.format0, (uint16_t)cid);
+        }
         case 4: {
             return cmap_format4_map(&subtable->data.format4, (uint16_t)cid);
+        }
+        case 6: {
+            return cmap_format6_map(&subtable->data.format6, (uint16_t)cid);
         }
         default: {
             LOG_TODO("Unimplemented cmap format %d", subtable->format);

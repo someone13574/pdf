@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 #include "arena/arena.h"
 #include "parser.h"
 
@@ -17,6 +19,12 @@ typedef struct {
 typedef struct {
     uint16_t length;
     uint16_t language;
+    Uint8Array* glyph_index_array;
+} SfntCmapFormat0;
+
+typedef struct {
+    uint16_t length;
+    uint16_t language;
     uint16_t seg_count_x2;
     uint16_t search_range;
     uint16_t entry_selector;
@@ -29,10 +37,20 @@ typedef struct {
 } SfntCmapFormat4;
 
 typedef struct {
+    uint16_t length;
+    uint16_t language;
+    uint16_t first_code;
+    uint16_t entry_count;
+    Uint16Array* glyph_index_array;
+} SfntCmapFormat6;
+
+typedef struct {
     uint16_t format;
 
     union {
+        SfntCmapFormat0 format0;
         SfntCmapFormat4 format4;
+        SfntCmapFormat6 format6;
     } data;
 } SfntCmapSubtable;
 
