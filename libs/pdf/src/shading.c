@@ -57,6 +57,82 @@ PdfError* pdf_deserialize_shading_dict(
     ));
 
     switch (target_ptr->shading_type) {
+        case 2: {
+            PdfFieldDescriptor specific_fields[] = {
+                PDF_IGNORED_FIELD("ShadingType", NULL),
+                PDF_IGNORED_FIELD("ColorSpace", NULL),
+                PDF_IGNORED_FIELD("Background", NULL),
+                PDF_IGNORED_FIELD("BBox", NULL),
+                PDF_IGNORED_FIELD("AntiAlias", NULL),
+                PDF_FIELD(
+                    "Coords",
+                    &target_ptr->data.type2.coords,
+                    PDF_DESERDE_ARRAY(
+                        pdf_number_vec_push_uninit,
+                        PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+                    )
+                ),
+                PDF_FIELD(
+                    "Domain",
+                    &target_ptr->data.type2.domain,
+                    PDF_DESERDE_OPTIONAL(
+                        pdf_number_vec_op_init,
+                        PDF_DESERDE_ARRAY(
+                            pdf_number_vec_push_uninit,
+                            PDF_DESERDE_CUSTOM(
+                                pdf_deserialize_number_trampoline
+                            )
+                        )
+                    )
+                ),
+                PDF_FIELD(
+                    "Function",
+                    &target_ptr->data.type2.function,
+                    PDF_DESERDE_AS_ARRAY(
+                        pdf_function_vec_push_uninit,
+                        PDF_DESERDE_CUSTOM(pdf_deserialize_function_trampoline)
+                    )
+                ),
+                PDF_FIELD(
+                    "Extend",
+                    &target_ptr->data.type2.extend,
+                    PDF_DESERDE_OPTIONAL(
+                        pdf_boolean_vec_op_init,
+                        PDF_DESERDE_ARRAY(
+                            pdf_boolean_vec_push_uninit,
+                            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+                        )
+                    )
+                )
+            };
+
+            PDF_PROPAGATE(pdf_deserialize_dict(
+                object,
+                specific_fields,
+                sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
+                false,
+                resolver,
+                "Type2 shading dict"
+            ));
+
+            if (pdf_number_vec_len(target_ptr->data.type2.coords) != 4) {
+                return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+            }
+
+            if (target_ptr->data.type2.domain.has_value
+                && pdf_number_vec_len(target_ptr->data.type2.domain.value)
+                       != 2) {
+                return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+            }
+
+            if (target_ptr->data.type2.extend.has_value
+                && pdf_boolean_vec_len(target_ptr->data.type2.extend.value)
+                       != 2) {
+                return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+            }
+
+            break;
+        }
         case 3: {
             PdfFieldDescriptor specific_fields[] = {
                 PDF_IGNORED_FIELD("ShadingType", NULL),

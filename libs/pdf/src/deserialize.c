@@ -381,7 +381,8 @@ PdfError* pdf_deserialize_dict(
     if (resolved_object.type != PDF_OBJECT_TYPE_DICT) {
         return PDF_ERROR(
             PDF_ERR_OBJECT_NOT_DICT,
-            "Object type is not a dictionary"
+            "Object type is not a dictionary. Type is %d",
+            resolved_object.type
         );
     }
 
