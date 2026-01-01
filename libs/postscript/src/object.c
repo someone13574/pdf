@@ -8,66 +8,55 @@
 #include "postscript/interpreter.h"
 #include "postscript/tokenizer.h"
 
-#define DLINKED_NAME PostscriptObjectList
-#define DLINKED_LOWERCASE_NAME postscript_object_list
-#define DLINKED_TYPE PostscriptObject
+#define DLINKED_NAME PSObjectList
+#define DLINKED_LOWERCASE_NAME ps_object_list
+#define DLINKED_TYPE PSObject
 #include "arena/dlinked_impl.h"
 
 #define X(name) #name,
-const char* postscript_object_name_lookup[] = {POSTSCRIPT_OBJECT_TYPES};
+const char* ps_object_name_lookup[] = {PS_OBJECT_TYPES};
 #undef X
 
-PdfError* postscript_object_execute(
-    PostscriptInterpreter* interpreter,
-    const PostscriptObject* object
-) {
+PdfError*
+ps_object_execute(PSInterpreter* interpreter, const PSObject* object) {
     RELEASE_ASSERT(interpreter);
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(!object->literal);
 
     switch (object->type) {
-        case POSTSCRIPT_OBJECT_NAME: {
+        case PS_OBJECT_NAME: {
             LOG_DIAG(DEBUG, PS, "Executing `%s`", object->data.name);
 
-            PostscriptObject dict_object;
+            PSObject dict_object;
             PDF_PROPAGATE(
-                postscript_interpreter_dict_entry(
-                    interpreter,
-                    object,
-                    &dict_object
-                ),
+                ps_interpreter_dict_entry(interpreter, object, &dict_object),
                 "Couldn't find item to execute"
             );
 
             if (dict_object.literal) {
-                postscript_interpreter_operand_push(interpreter, dict_object);
+                ps_interpreter_operand_push(interpreter, dict_object);
                 break;
             }
 
-            PDF_PROPAGATE(postscript_object_execute(interpreter, &dict_object));
+            PDF_PROPAGATE(ps_object_execute(interpreter, &dict_object));
             break;
         }
-        case POSTSCRIPT_OBJECT_PROC: {
+        case PS_OBJECT_PROC: {
             LOG_DIAG(DEBUG, PS, "Executing procedure");
 
-            for (size_t idx = 0;
-                 idx < postscript_object_list_len(object->data.proc);
+            for (size_t idx = 0; idx < ps_object_list_len(object->data.proc);
                  idx++) {
-                PostscriptObject proc_element;
-                RELEASE_ASSERT(postscript_object_list_get(
-                    object->data.proc,
-                    idx,
-                    &proc_element
-                ));
-
-                PDF_PROPAGATE(
-                    postscript_interpret_object(interpreter, proc_element)
+                PSObject proc_element;
+                RELEASE_ASSERT(
+                    ps_object_list_get(object->data.proc, idx, &proc_element)
                 );
+
+                PDF_PROPAGATE(ps_interpret_object(interpreter, proc_element));
             }
 
             break;
         }
-        case POSTSCRIPT_OBJECT_OPERATOR: {
+        case PS_OBJECT_OPERATOR: {
             LOG_DIAG(TRACE, PS, "Executing operator");
 
             PDF_PROPAGATE(
@@ -84,10 +73,7 @@ PdfError* postscript_object_execute(
     return NULL;
 }
 
-bool postscript_object_eq(
-    const PostscriptObject* a,
-    const PostscriptObject* b
-) {
+bool ps_object_eq(const PSObject* a, const PSObject* b) {
     RELEASE_ASSERT(a);
     RELEASE_ASSERT(b);
 
@@ -96,7 +82,7 @@ bool postscript_object_eq(
     }
 
     switch (a->type) {
-        case POSTSCRIPT_OBJECT_NAME: {
+        case PS_OBJECT_NAME: {
             return strcmp(a->data.name, b->data.name) == 0;
         }
         default: {
@@ -107,37 +93,35 @@ bool postscript_object_eq(
     return false;
 }
 
-const char*
-postscript_object_fmt(Arena* arena, const PostscriptObject* object) {
+const char* ps_object_fmt(Arena* arena, const PSObject* object) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(object);
 
     switch (object->type) {
-        case POSTSCRIPT_OBJECT_INTEGER: {
+        case PS_OBJECT_INTEGER: {
             return arena_string_buffer(
                 arena_string_new_fmt(arena, "%d", (int)object->data.integer)
             );
         }
-        case POSTSCRIPT_OBJECT_NAME: {
+        case PS_OBJECT_NAME: {
             char* prefix = object->literal ? "/" : "";
             return arena_string_buffer(
                 arena_string_new_fmt(arena, "%s%s", prefix, object->data.name)
             );
         }
-        case POSTSCRIPT_OBJECT_REAL: {
+        case PS_OBJECT_REAL: {
             return arena_string_buffer(
                 arena_string_new_fmt(arena, "%f", object->data.real)
             );
         }
-        case POSTSCRIPT_OBJECT_ARRAY: {
+        case PS_OBJECT_ARRAY: {
             char* delims = object->literal ? "[]" : "{}";
 
             ArenaString* str = arena_string_new_fmt(arena, "%c ", delims[0]);
-            for (size_t idx = 0;
-                 idx < postscript_object_list_len(object->data.array);
+            for (size_t idx = 0; idx < ps_object_list_len(object->data.array);
                  idx++) {
-                PostscriptObject* array_object = NULL;
-                RELEASE_ASSERT(postscript_object_list_get_ptr(
+                PSObject* array_object = NULL;
+                RELEASE_ASSERT(ps_object_list_get_ptr(
                     object->data.array,
                     idx,
                     &array_object
@@ -147,7 +131,7 @@ postscript_object_fmt(Arena* arena, const PostscriptObject* object) {
                     arena,
                     "%s%s ",
                     arena_string_buffer(str),
-                    postscript_object_fmt(arena, array_object)
+                    ps_object_fmt(arena, array_object)
                 );
             }
 
@@ -158,23 +142,20 @@ postscript_object_fmt(Arena* arena, const PostscriptObject* object) {
                 delims[1]
             ));
         }
-        case POSTSCRIPT_OBJECT_PROC: {
+        case PS_OBJECT_PROC: {
             ArenaString* str = arena_string_new_fmt(arena, "{ ");
-            for (size_t idx = 0;
-                 idx < postscript_object_list_len(object->data.proc);
+            for (size_t idx = 0; idx < ps_object_list_len(object->data.proc);
                  idx++) {
-                PostscriptObject* proc_object = NULL;
-                RELEASE_ASSERT(postscript_object_list_get_ptr(
-                    object->data.proc,
-                    idx,
-                    &proc_object
-                ));
+                PSObject* proc_object = NULL;
+                RELEASE_ASSERT(
+                    ps_object_list_get_ptr(object->data.proc, idx, &proc_object)
+                );
 
                 str = arena_string_new_fmt(
                     arena,
                     "%s%s ",
                     arena_string_buffer(str),
-                    postscript_object_fmt(arena, proc_object)
+                    ps_object_fmt(arena, proc_object)
                 );
             }
 
@@ -182,26 +163,23 @@ postscript_object_fmt(Arena* arena, const PostscriptObject* object) {
                 arena_string_new_fmt(arena, "%s}", arena_string_buffer(str))
             );
         }
-        case POSTSCRIPT_OBJECT_OPERATOR: {
+        case PS_OBJECT_OPERATOR: {
             return "<|builtin|>";
         }
-        case POSTSCRIPT_OBJECT_DICT: {
+        case PS_OBJECT_DICT: {
             ArenaString* str = arena_string_new_fmt(arena, "<< ");
-            for (size_t idx = 0;
-                 idx < postscript_object_list_len(object->data.dict);
+            for (size_t idx = 0; idx < ps_object_list_len(object->data.dict);
                  idx++) {
-                PostscriptObject* dict_object = NULL;
-                RELEASE_ASSERT(postscript_object_list_get_ptr(
-                    object->data.dict,
-                    idx,
-                    &dict_object
-                ));
+                PSObject* dict_object = NULL;
+                RELEASE_ASSERT(
+                    ps_object_list_get_ptr(object->data.dict, idx, &dict_object)
+                );
 
                 str = arena_string_new_fmt(
                     arena,
                     "%s%s ",
                     arena_string_buffer(str),
-                    postscript_object_fmt(arena, dict_object)
+                    ps_object_fmt(arena, dict_object)
                 );
             }
 
@@ -209,17 +187,17 @@ postscript_object_fmt(Arena* arena, const PostscriptObject* object) {
                 arena_string_new_fmt(arena, "%s>>", arena_string_buffer(str))
             );
         }
-        case POSTSCRIPT_OBJECT_STRING: {
+        case PS_OBJECT_STRING: {
             return arena_string_buffer(arena_string_new_fmt(
                 arena,
                 "(%s)",
-                postscript_string_as_cstr(object->data.string, arena)
+                ps_string_as_cstr(object->data.string, arena)
             ));
         }
         default: {
             LOG_TODO(
                 "Print postscript object type %s",
-                postscript_object_name_lookup[object->type]
+                ps_object_name_lookup[object->type]
             );
         }
     }

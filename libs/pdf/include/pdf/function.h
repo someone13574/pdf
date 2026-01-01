@@ -33,7 +33,7 @@ typedef struct {
     PdfNumberVecOptional range;
 
     union {
-        PostscriptInterpreter* type4;
+        PSInterpreter* type4;
     } data;
 } PdfFunction;
 

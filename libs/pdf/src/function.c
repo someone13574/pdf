@@ -89,26 +89,24 @@ PdfError* pdf_deserialize_function(
                 );
             }
 
-            PostscriptInterpreter* interpreter =
-                postscript_interpreter_new(pdf_resolver_arena(resolver));
-            PostscriptTokenizer* tokenizer = postscript_tokenizer_new(
+            PSInterpreter* interpreter =
+                ps_interpreter_new(pdf_resolver_arena(resolver));
+            PSTokenizer* tokenizer = ps_tokenizer_new(
                 pdf_resolver_arena(resolver),
                 resolved.data.stream.stream_bytes,
                 resolved.data.stream.decoded_stream_len
             );
 
-            PDF_PROPAGATE(postscript_interpret_token(
+            PDF_PROPAGATE(ps_interpret_token(
                 interpreter,
-                (PostscriptToken) {.type = POSTSCRIPT_TOKEN_LIT_NAME,
-                                   .data.name = "func"}
+                (PSToken) {.type = PS_TOKEN_LIT_NAME, .data.name = "func"}
             ));
 
-            PDF_PROPAGATE(postscript_interpret_tokens(interpreter, tokenizer));
+            PDF_PROPAGATE(ps_interpret_tokens(interpreter, tokenizer));
 
-            PDF_PROPAGATE(postscript_interpret_token(
+            PDF_PROPAGATE(ps_interpret_token(
                 interpreter,
-                (PostscriptToken) {.type = POSTSCRIPT_TOKEN_EXE_NAME,
-                                   .data.name = "def"}
+                (PSToken) {.type = PS_TOKEN_EXE_NAME, .data.name = "def"}
             ));
 
             target_ptr->data.type4 = interpreter;
@@ -134,30 +132,27 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
                 PdfObject* pdf_operand = NULL;
                 RELEASE_ASSERT(pdf_object_vec_get(io, idx, &pdf_operand));
 
-                PostscriptObject operand;
+                PSObject operand;
                 PDF_PROPAGATE(
                     pdf_object_into_postscript(pdf_operand, &operand)
                 );
 
                 PDF_PROPAGATE(
-                    postscript_interpret_object(function->data.type4, operand)
+                    ps_interpret_object(function->data.type4, operand)
                 );
             }
 
-            PDF_PROPAGATE(postscript_interpret_token(
+            PDF_PROPAGATE(ps_interpret_token(
                 function->data.type4,
-                (PostscriptToken) {.type = POSTSCRIPT_TOKEN_EXE_NAME,
-                                   .data.name = "func"}
+                (PSToken) {.type = PS_TOKEN_EXE_NAME, .data.name = "func"}
             ));
 
             pdf_object_vec_clear(io);
 
-            PostscriptObjectList* stack =
-                postscript_interpreter_stack(function->data.type4);
-            for (size_t idx = 0; idx < postscript_object_list_len(stack);
-                 idx++) {
-                PostscriptObject output;
-                RELEASE_ASSERT(postscript_object_list_get(stack, idx, &output));
+            PSObjectList* stack = ps_interpreter_stack(function->data.type4);
+            for (size_t idx = 0; idx < ps_object_list_len(stack); idx++) {
+                PSObject output;
+                RELEASE_ASSERT(ps_object_list_get(stack, idx, &output));
 
                 PdfObject converted;
                 pdf_object_from_postscript(output, &converted);

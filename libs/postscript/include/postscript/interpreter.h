@@ -9,120 +9,96 @@
 #include "postscript/tokenizer.h"
 
 /// A postscript interpreter instance.
-typedef struct PostscriptInterpreter PostscriptInterpreter;
+typedef struct PSInterpreter PSInterpreter;
 
 /// Create a new postscript interpreter instance.
-PostscriptInterpreter* postscript_interpreter_new(Arena* arena);
+PSInterpreter* ps_interpreter_new(Arena* arena);
 
 /// Display the interpreter's current state.
-void postscript_interpreter_dump(PostscriptInterpreter* interpreter);
+void ps_interpreter_dump(PSInterpreter* interpreter);
 
 /// Get the interpreter's arena.
-Arena* postscript_interpreter_get_arena(PostscriptInterpreter* interpreter);
+Arena* ps_interpreter_get_arena(PSInterpreter* interpreter);
 
 /// Get the resource categories associated with the interpreter.
-PostscriptResourceCategoryVec* postscript_interpreter_get_resource_categories(
-    PostscriptInterpreter* interpreter
-);
+PSResourceCategoryVec*
+ps_interpreter_get_resource_categories(PSInterpreter* interpreter);
 
 /// Add a new operator to a resource.
-void postscript_interpreter_add_operator(
-    PostscriptInterpreter* interpreter,
+void ps_interpreter_add_operator(
+    PSInterpreter* interpreter,
     char* category_name,
     char* resource_name,
-    PostscriptOperator operator,
+    PSOperator operator,
     char * operator_name
 );
 
 /// Process a token.
-PdfError* postscript_interpret_token(
-    PostscriptInterpreter* interpreter,
-    PostscriptToken token
-);
+PdfError* ps_interpret_token(PSInterpreter* interpreter, PSToken token);
 
 /// Interpret all tokens in a stream
-PdfError* postscript_interpret_tokens(
-    PostscriptInterpreter* interpreter,
-    PostscriptTokenizer* tokenizer
-);
+PdfError*
+ps_interpret_tokens(PSInterpreter* interpreter, PSTokenizer* tokenizer);
 
 /// Process an object
-PdfError* postscript_interpret_object(
-    PostscriptInterpreter* interpreter,
-    PostscriptObject object
-);
+PdfError* ps_interpret_object(PSInterpreter* interpreter, PSObject object);
 
 /// Get the operand stack of the interpreter
-PostscriptObjectList*
-postscript_interpreter_stack(PostscriptInterpreter* interpreter);
+PSObjectList* ps_interpreter_stack(PSInterpreter* interpreter);
 
 /// Pop an operand from the top of the operand stack, returning it in
 /// `object_out`.
-PdfError* postscript_interpreter_pop_operand(
-    PostscriptInterpreter* interpreter,
-    PostscriptObject* object_out
-);
+PdfError*
+ps_interpreter_pop_operand(PSInterpreter* interpreter, PSObject* object_out);
 
 /// Pop an operand from the top of the operand stack, check its type, and return
 /// it in `object_out`.
-PdfError* postscript_interpreter_pop_operand_typed(
-    PostscriptInterpreter* interpreter,
-    PostscriptObjectType expected_type,
+PdfError* ps_interpreter_pop_operand_typed(
+    PSInterpreter* interpreter,
+    PSObjectType expected_type,
     bool literal,
-    PostscriptObject* object_out
+    PSObject* object_out
 );
 
 /// Push an operand to the operand stack.
-void postscript_interpreter_operand_push(
-    PostscriptInterpreter* interpreter,
-    PostscriptObject object
-);
+void ps_interpreter_operand_push(PSInterpreter* interpreter, PSObject object);
 
 /// Get the top of the dictionary stack.
-void postscript_interpreter_dict(
-    PostscriptInterpreter* interpreter,
-    PostscriptObject* object_out
-);
+void ps_interpreter_dict(PSInterpreter* interpreter, PSObject* object_out);
 
 /// Push a dictionary to the dictionary stack.
-void postscript_interpreter_dict_push(
-    PostscriptInterpreter* interpreter,
-    PostscriptObject dictionary
-);
+void ps_interpreter_dict_push(PSInterpreter* interpreter, PSObject dictionary);
 
 /// Pop a dictionary from the dictionary stack.
-PdfError* postscript_interpreter_dict_pop(PostscriptInterpreter* interpreter);
+PdfError* ps_interpreter_dict_pop(PSInterpreter* interpreter);
 
 /// Get a dictionary value from the dictionary stack.
-PdfError* postscript_interpreter_dict_entry(
-    const PostscriptInterpreter* interpreter,
-    const PostscriptObject* key,
-    PostscriptObject* value_out
+PdfError* ps_interpreter_dict_entry(
+    const PSInterpreter* interpreter,
+    const PSObject* key,
+    PSObject* value_out
 );
 
 /// Define a new key-value pair in the current dictionary.
-PdfError* postscript_interpreter_define(
-    PostscriptInterpreter* interpreter,
-    PostscriptObject key,
-    PostscriptObject value
-);
+PdfError*
+ps_interpreter_define(PSInterpreter* interpreter, PSObject key, PSObject value);
 
 /// Gets the current user-data.
-PdfError* postscript_interpreter_user_data(
-    PostscriptInterpreter* interpreter,
+PdfError* ps_interpreter_user_data(
+    PSInterpreter* interpreter,
     const char* expected_name,
     void** user_data_out
 );
 
 /// Pushes a new user-data to the stack.
-void postscript_interpreter_user_data_push(
-    PostscriptInterpreter* interpreter,
+void ps_interpreter_user_data_push(
+    PSInterpreter* interpreter,
     void* user_data,
     const char* name
 );
 
 /// Pops a user-data from the stack.
-PdfError* postscript_interpreter_user_data_pop(
-    PostscriptInterpreter* interpreter,
+PdfError* ps_interpreter_user_data_pop(
+    PSInterpreter* interpreter,
     const char* expected_name
 );

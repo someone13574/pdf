@@ -7,7 +7,7 @@
 #include "pdf_error/error.h"
 #include "postscript/tokenizer.h"
 
-#define POSTSCRIPT_OBJECT_TYPES                                                \
+#define PS_OBJECT_TYPES                                                        \
     X(BOOLEAN)                                                                 \
     X(FONT_ID)                                                                 \
     X(INTEGER)                                                                 \
@@ -26,80 +26,72 @@
     X(STRING)                                                                  \
     X(SINK)
 
-#define X(name) POSTSCRIPT_OBJECT_##name,
-typedef enum { POSTSCRIPT_OBJECT_TYPES } PostscriptObjectType;
+#define X(name) PS_OBJECT_##name,
+typedef enum { PS_OBJECT_TYPES } PSObjectType;
 #undef X
 
-extern const char* postscript_object_name_lookup[];
+extern const char* ps_object_name_lookup[];
 
 typedef enum {
     /// All operators defined for that object are allowed. However, packed
     /// array objects always have read-only (or even more restricted) access.
-    POSTSCRIPT_ACCESS_UNLIMITED,
+    PS_ACCESS_UNLIMITED,
 
     /// An object with read-only access may not have its value written, but may
     /// still be read or executed.
-    POSTSCRIPT_ACCESS_READ_ONLY,
+    PS_ACCESS_READ_ONLY,
 
     /// An object with execute-only access may not have its value either read or
     /// written, but may still be executed by the PostScript interpreter.
-    POSTSCRIPT_ACCESS_EXECUTE_ONLY,
+    PS_ACCESS_EXECUTE_ONLY,
 
     /// An object with no access may not be operated on in any way by a
     /// PostScript program. Such objects are not of any direct use to
     /// PostScript programs, but serve internal purposes that are not documented
     /// in this book.
-    POSTSCRIPT_ACCESS_NONE
-} PostscriptAccess;
+    PS_ACCESS_NONE
+} PSAccess;
 
-typedef struct PostscriptInterpreter PostscriptInterpreter;
-typedef struct PostscriptObjectList PostscriptObjectList;
-typedef PdfError* (*PostscriptOperator)(PostscriptInterpreter* interpreter);
+typedef struct PSInterpreter PSInterpreter;
+typedef struct PSObjectList PSObjectList;
+typedef PdfError* (*PSOperator)(PSInterpreter* interpreter);
 
 /// A buffer for collecting literal objects.
 typedef struct {
-    PostscriptObjectList* list;
+    PSObjectList* list;
 
     /// Restricts the final size of the buffer.
-    enum {
-        POSTSCRIPT_SINK_ARRAY,
-        POSTSCRIPT_SINK_PROC,
-        POSTSCRIPT_SINK_DICT,
-        POSTSCRIPT_SINK_CUSTOM
-    } type;
+    enum { PS_SINK_ARRAY, PS_SINK_PROC, PS_SINK_DICT, PS_SINK_CUSTOM } type;
 
     /// If this sink is a `POSTSCRIPT_SINK_CUSTOM`, then set the name here so it
     /// can be type-checked when consumed.
     char* sink_name;
-} PostscriptObjectSink;
+} PSObjectSink;
 
 typedef struct {
-    PostscriptObjectType type;
+    PSObjectType type;
     union {
         bool boolean;
         int32_t integer;
         char* name;
         double real;
-        PostscriptObjectList* array;
-        PostscriptObjectList* proc;
-        PostscriptObjectList* dict;
-        PostscriptOperator operator;
-        PostscriptString string;
-        PostscriptObjectSink sink;
+        PSObjectList* array;
+        PSObjectList* proc;
+        PSObjectList* dict;
+        PSOperator operator;
+        PSString string;
+        PSObjectSink sink;
     } data;
 
     bool literal;
-    PostscriptAccess access;
-} PostscriptObject;
+    PSAccess access;
+} PSObject;
 
-PdfError* postscript_object_execute(
-    PostscriptInterpreter* interpreter,
-    const PostscriptObject* object
-);
-bool postscript_object_eq(const PostscriptObject* a, const PostscriptObject* b);
-const char* postscript_object_fmt(Arena* arena, const PostscriptObject* object);
+PdfError* ps_object_execute(PSInterpreter* interpreter, const PSObject* object);
+bool ps_object_eq(const PSObject* a, const PSObject* b);
+const char* ps_object_fmt(Arena* arena, const PSObject* object);
 
-#define DLINKED_NAME PostscriptObjectList
-#define DLINKED_LOWERCASE_NAME postscript_object_list
-#define DLINKED_TYPE PostscriptObject
+#define DLINKED_NAME PSObjectList
+#define DLINKED_LOWERCASE_NAME ps_object_list
+#define DLINKED_TYPE PSObject
 #include "arena/dlinked_decl.h"

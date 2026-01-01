@@ -8,56 +8,51 @@
 /// brought into VM on demand.
 typedef struct {
     char* name;
-    PostscriptObject object;
-} PostscriptResource;
+    PSObject object;
+} PSResource;
 
 /// Creates a new resource from an existing object.
-PostscriptResource postscript_resource_new(char* name, PostscriptObject object);
+PSResource ps_resource_new(char* name, PSObject object);
 
 /// Create a new resource with dictionary storage.
-PostscriptResource postscript_resource_new_dict(Arena* arena, char* name);
+PSResource ps_resource_new_dict(Arena* arena, char* name);
 
 /// Add a new operator to the dictionary resource.
-void postscript_resource_add_op(
-    PostscriptResource* resource,
-    PostscriptOperator operator,
-    char * name
-);
+void ps_resource_add_op(PSResource* resource, PSOperator operator, char * name);
 
-#define DVEC_NAME PostscriptResourceVec
-#define DVEC_LOWERCASE_NAME postscript_resource_vec
-#define DVEC_TYPE PostscriptResource
+#define DVEC_NAME PSResourceVec
+#define DVEC_LOWERCASE_NAME ps_resource_vec
+#define DVEC_TYPE PSResource
 #include "arena/dvec_decl.h"
 
 /// A collection of named resources.
 typedef struct {
     char* name;
-    PostscriptResourceVec* resources;
-} PostscriptResourceCategory;
+    PSResourceVec* resources;
+} PSResourceCategory;
 
 /// Create a new resource category.
-PostscriptResourceCategory
-postscript_resource_category_new(Arena* arena, char* name);
+PSResourceCategory ps_resource_category_new(Arena* arena, char* name);
 
 /// Add a resource to a resource category
-PdfError* postscript_resource_category_add_resource(
-    PostscriptResourceCategory* category,
-    PostscriptResource resource
+PdfError* ps_resource_category_add_resource(
+    PSResourceCategory* category,
+    PSResource resource
 );
 
-#define DVEC_NAME PostscriptResourceCategoryVec
-#define DVEC_LOWERCASE_NAME postscript_resource_category_vec
-#define DVEC_TYPE PostscriptResourceCategory
+#define DVEC_NAME PSResourceCategoryVec
+#define DVEC_LOWERCASE_NAME ps_resource_category_vec
+#define DVEC_TYPE PSResourceCategory
 #include "arena/dvec_decl.h"
 
 /// Get a resource category from a list. Returns NULL if it doesn't exist.
-PostscriptResourceCategory* postscript_get_resource_category(
-    const PostscriptResourceCategoryVec* resource_categories,
+PSResourceCategory* ps_get_resource_category(
+    const PSResourceCategoryVec* resource_categories,
     char* name
 );
 
 /// Get a resource from a resource category. Returns NULL if it doesn't exist.
-PostscriptResource* postscript_resource_category_get_resource(
-    const PostscriptResourceCategory* resource_category,
+PSResource* ps_resource_category_get_resource(
+    const PSResourceCategory* resource_category,
     char* name
 );

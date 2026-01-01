@@ -6,103 +6,95 @@
 #include "pdf_error/error.h"
 #include "postscript/object.h"
 
-#define DVEC_NAME PostscriptResourceVec
-#define DVEC_LOWERCASE_NAME postscript_resource_vec
-#define DVEC_TYPE PostscriptResource
+#define DVEC_NAME PSResourceVec
+#define DVEC_LOWERCASE_NAME ps_resource_vec
+#define DVEC_TYPE PSResource
 #include "arena/dvec_impl.h"
 
-#define DVEC_NAME PostscriptResourceCategoryVec
-#define DVEC_LOWERCASE_NAME postscript_resource_category_vec
-#define DVEC_TYPE PostscriptResourceCategory
+#define DVEC_NAME PSResourceCategoryVec
+#define DVEC_LOWERCASE_NAME ps_resource_category_vec
+#define DVEC_TYPE PSResourceCategory
 #include "arena/dvec_impl.h"
 
-PostscriptResource
-postscript_resource_new(char* name, PostscriptObject object) {
+PSResource ps_resource_new(char* name, PSObject object) {
     RELEASE_ASSERT(name);
 
-    return (PostscriptResource) {.name = name, .object = object};
+    return (PSResource) {.name = name, .object = object};
 }
 
-PostscriptResource postscript_resource_new_dict(Arena* arena, char* name) {
+PSResource ps_resource_new_dict(Arena* arena, char* name) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(name);
 
-    return (PostscriptResource) {.name = name,
-                                 .object.type = POSTSCRIPT_OBJECT_DICT,
-                                 .object.data.dict =
-                                     postscript_object_list_new(arena),
-                                 .object.access = POSTSCRIPT_ACCESS_READ_ONLY,
-                                 .object.literal = true};
+    return (PSResource) {.name = name,
+                         .object.type = PS_OBJECT_DICT,
+                         .object.data.dict = ps_object_list_new(arena),
+                         .object.access = PS_ACCESS_READ_ONLY,
+                         .object.literal = true};
 }
 
-void postscript_resource_add_op(
-    PostscriptResource* resource,
-    PostscriptOperator operator,
-    char* name
-) {
+void ps_resource_add_op(PSResource* resource, PSOperator operator, char* name) {
     RELEASE_ASSERT(resource);
     RELEASE_ASSERT(name);
     RELEASE_ASSERT(operator);
-    RELEASE_ASSERT(resource->object.type == POSTSCRIPT_OBJECT_DICT);
+    RELEASE_ASSERT(resource->object.type == PS_OBJECT_DICT);
 
-    postscript_object_list_push_back(
+    ps_object_list_push_back(
         resource->object.data.dict,
-        (PostscriptObject) {.type = POSTSCRIPT_OBJECT_NAME,
-                            .data.name = name,
-                            .access = POSTSCRIPT_ACCESS_UNLIMITED,
-                            .literal = true}
+        (PSObject) {.type = PS_OBJECT_NAME,
+                    .data.name = name,
+                    .access = PS_ACCESS_UNLIMITED,
+                    .literal = true}
     );
 
-    postscript_object_list_push_back(
+    ps_object_list_push_back(
         resource->object.data.dict,
-        (PostscriptObject) {.type = POSTSCRIPT_OBJECT_OPERATOR,
-                            .data.operator = operator,
-                            .access = POSTSCRIPT_ACCESS_EXECUTE_ONLY,
-                            .literal = false}
+        (PSObject) {.type = PS_OBJECT_OPERATOR,
+                    .data.operator = operator,
+                    .access = PS_ACCESS_EXECUTE_ONLY,
+                    .literal = false}
     );
 }
 
-PostscriptResourceCategory
-postscript_resource_category_new(Arena* arena, char* name) {
+PSResourceCategory ps_resource_category_new(Arena* arena, char* name) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(name);
 
-    return (
-        PostscriptResourceCategory
-    ) {.name = name, .resources = postscript_resource_vec_new(arena)};
+    return (PSResourceCategory) {.name = name,
+                                 .resources = ps_resource_vec_new(arena)};
 }
 
-PdfError* postscript_resource_category_add_resource(
-    PostscriptResourceCategory* category,
-    PostscriptResource resource
+PdfError* ps_resource_category_add_resource(
+    PSResourceCategory* category,
+    PSResource resource
 ) {
     RELEASE_ASSERT(category);
     RELEASE_ASSERT(resource.name);
 
-    if (postscript_resource_category_get_resource(category, resource.name)) {
+    if (ps_resource_category_get_resource(category, resource.name)) {
         PDF_ERROR(
-            PDF_ERR_POSTSCRIPT_RESOURCE_DEFINED,
+            PDF_ERR_PS_RESOURCE_DEFINED,
             "Resource `%s` is already defined",
             resource.name
         );
     }
 
-    postscript_resource_vec_push(category->resources, resource);
+    ps_resource_vec_push(category->resources, resource);
 
     return NULL;
 }
 
-PostscriptResourceCategory* postscript_get_resource_category(
-    const PostscriptResourceCategoryVec* resource_categories,
+PSResourceCategory* ps_get_resource_category(
+    const PSResourceCategoryVec* resource_categories,
     char* name
 ) {
     RELEASE_ASSERT(resource_categories);
 
     for (size_t idx = 0;
-         idx < postscript_resource_category_vec_len(resource_categories);
+         idx < ps_resource_category_vec_len(resource_categories);
          idx++) {
-        PostscriptResourceCategory* category;
-        RELEASE_ASSERT(postscript_resource_category_vec_get_ptr(
+        PSResourceCategory* category;
+        RELEASE_ASSERT(ps_resource_category_vec_get_ptr(
             resource_categories,
             idx,
             &category
@@ -116,17 +108,17 @@ PostscriptResourceCategory* postscript_get_resource_category(
     return NULL;
 }
 
-PostscriptResource* postscript_resource_category_get_resource(
-    const PostscriptResourceCategory* resource_category,
+PSResource* ps_resource_category_get_resource(
+    const PSResourceCategory* resource_category,
     char* name
 ) {
     RELEASE_ASSERT(resource_category);
 
     for (size_t idx = 0;
-         idx < postscript_resource_vec_len(resource_category->resources);
+         idx < ps_resource_vec_len(resource_category->resources);
          idx++) {
-        PostscriptResource* resource;
-        RELEASE_ASSERT(postscript_resource_vec_get_ptr(
+        PSResource* resource;
+        RELEASE_ASSERT(ps_resource_vec_get_ptr(
             resource_category->resources,
             idx,
             &resource
