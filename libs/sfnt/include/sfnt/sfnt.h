@@ -51,7 +51,7 @@ typedef struct SfntFont SfntFont;
 
 PdfError* sfnt_font_new(
     Arena* arena,
-    uint8_t* buffer,
+    const uint8_t* buffer,
     size_t buffer_len,
     SfntFont** font
 );

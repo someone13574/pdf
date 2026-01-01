@@ -31,6 +31,13 @@ typedef struct {
     PdfGeomMat3Optional matrix;
 } PdfCalRGBParams;
 
+typedef struct {
+    PdfNameVec* names;
+    PdfName alternate_space;
+    PdfObject* tilt_transform;
+    PdfDictOptional attributes;
+} PdfDeviceNParams;
+
 typedef enum {
     PDF_COLOR_SPACE_DEVICE_GRAY,
     PDF_COLOR_SPACE_DEVICE_RGB,
@@ -59,6 +66,8 @@ PdfError* pdf_deserialize_color_space(
     PdfColorSpace* target_ptr,
     PdfResolver* resolver
 );
+
+DESERDE_DECL_TRAMPOLINE(pdf_deserialize_color_space_trampoline)
 
 GeomVec3 pdf_map_color(
     double* components,

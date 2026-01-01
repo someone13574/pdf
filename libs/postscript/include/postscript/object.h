@@ -16,6 +16,7 @@
     X(NULL)                                                                    \
     X(REAL)                                                                    \
     X(ARRAY)                                                                   \
+    X(PROC)                                                                    \
     X(OPERATOR)                                                                \
     X(DICT)                                                                    \
     X(FILE)                                                                    \
@@ -62,6 +63,7 @@ typedef struct {
     /// Restricts the final size of the buffer.
     enum {
         POSTSCRIPT_SINK_ARRAY,
+        POSTSCRIPT_SINK_PROC,
         POSTSCRIPT_SINK_DICT,
         POSTSCRIPT_SINK_CUSTOM
     } type;
@@ -79,6 +81,7 @@ typedef struct {
         char* name;
         double real;
         PostscriptObjectList* array;
+        PostscriptObjectList* proc;
         PostscriptObjectList* dict;
         PostscriptOperator operator;
         PostscriptString string;

@@ -75,6 +75,7 @@ typedef struct {
         PdfReal set_gray;
         PdfOpParamsSetRGB set_rgb;
         PdfOpParamsSetCMYK set_cmyk;
+        PdfName paint_shading;
         PdfName paint_xobject;
     } data;
 } PdfContentOp;

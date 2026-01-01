@@ -42,7 +42,7 @@ pdf_cmap_get_unicode(PdfCMap* cmap, uint32_t cid, uint32_t* unicode_out);
 
 PdfError* pdf_parse_cmap(
     Arena* arena,
-    const char* data,
+    const uint8_t* data,
     size_t data_len,
     PdfCMap** cmap_out
 );

@@ -40,6 +40,22 @@ PdfError* postscript_interpret_token(
     PostscriptToken token
 );
 
+/// Interpret all tokens in a stream
+PdfError* postscript_interpret_tokens(
+    PostscriptInterpreter* interpreter,
+    PostscriptTokenizer* tokenizer
+);
+
+/// Process an object
+PdfError* postscript_interpret_object(
+    PostscriptInterpreter* interpreter,
+    PostscriptObject object
+);
+
+/// Get the operand stack of the interpreter
+PostscriptObjectList*
+postscript_interpreter_stack(PostscriptInterpreter* interpreter);
+
 /// Pop an operand from the top of the operand stack, returning it in
 /// `object_out`.
 PdfError* postscript_interpreter_pop_operand(

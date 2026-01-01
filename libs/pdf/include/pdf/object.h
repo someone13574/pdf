@@ -58,7 +58,7 @@ typedef struct PdfStreamDict PdfStreamDict;
 typedef struct {
     PdfStreamDict* stream_dict;
 
-    uint8_t* stream_bytes;
+    const uint8_t* stream_bytes;
     size_t decoded_stream_len;
 } PdfStream;
 
@@ -213,14 +213,6 @@ DESERDE_DECL_OPTIONAL(
 struct PdfStreamDict {
     PdfInteger length;
     PdfNameVecOptional filter;
-
-    // Additional entries in an embedded font stream dictionary. TODO: Since
-    // unknown fields are now allowed, this should be a different structure.
-    PdfIntegerOptional length1;
-    PdfIntegerOptional length2;
-    PdfIntegerOptional length3;
-    PdfNameOptional subtype;
-    PdfStreamOptional metadata;
 
     const PdfObject* raw_dict;
 };

@@ -298,17 +298,6 @@ PdfError* postscript_interpret_token(
 ) {
     RELEASE_ASSERT(interpreter);
 
-    {
-        Arena* str_arena = arena_new(128);
-        LOG_DIAG(
-            TRACE,
-            PS,
-            "Interpreting token: `%s`",
-            postscript_string_as_cstr(token.text, str_arena)
-        );
-        arena_free(str_arena);
-    }
-
     switch (token.type) {
         case POSTSCRIPT_TOKEN_INTEGER: {
             postscript_interpreter_operand_push(
@@ -349,7 +338,9 @@ PdfError* postscript_interpret_token(
                 .literal = false
             };
 
-            PDF_PROPAGATE(postscript_object_execute(interpreter, &name_object));
+            PDF_PROPAGATE(
+                postscript_interpret_object(interpreter, name_object)
+            );
             break;
         }
         case POSTSCRIPT_TOKEN_LIT_NAME: {
@@ -422,6 +413,45 @@ PdfError* postscript_interpret_token(
             );
             break;
         }
+        case POSTSCRIPT_TOKEN_START_PROC: {
+            PostscriptObjectList* proc =
+                postscript_object_list_new(interpreter->arena);
+            postscript_interpreter_operand_push(
+                interpreter,
+                (PostscriptObject) {.type = POSTSCRIPT_OBJECT_SINK,
+                                    .data.sink.list = proc,
+                                    .data.sink.type = POSTSCRIPT_SINK_PROC,
+                                    .data.sink.sink_name = "proc",
+                                    .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                                    .literal = true}
+            );
+            break;
+        }
+        case POSTSCRIPT_TOKEN_END_PROC: {
+            PostscriptObject sink;
+            PDF_PROPAGATE(postscript_interpreter_pop_operand_typed(
+                interpreter,
+                POSTSCRIPT_OBJECT_SINK,
+                true,
+                &sink
+            ));
+
+            if (sink.data.sink.type != POSTSCRIPT_SINK_PROC) {
+                return PDF_ERROR(
+                    PDF_ERR_POSTSCRIPT_OPERAND_TYPE,
+                    "Wrong sink type"
+                );
+            }
+
+            postscript_interpreter_operand_push(
+                interpreter,
+                (PostscriptObject) {.type = POSTSCRIPT_OBJECT_PROC,
+                                    .data.proc = sink.data.sink.list,
+                                    .access = POSTSCRIPT_ACCESS_UNLIMITED,
+                                    .literal = true}
+            );
+            break;
+        }
         case POSTSCRIPT_TOKEN_START_DICT: {
             PostscriptObjectList* dict =
                 postscript_object_list_new(interpreter->arena);
@@ -474,6 +504,59 @@ PdfError* postscript_interpret_token(
     }
 
     return NULL;
+}
+
+PdfError* postscript_interpret_tokens(
+    PostscriptInterpreter* interpreter,
+    PostscriptTokenizer* tokenizer
+) {
+    RELEASE_ASSERT(interpreter);
+    RELEASE_ASSERT(tokenizer);
+
+    while (true) {
+        bool got_token;
+        PostscriptToken token;
+        PDF_PROPAGATE(postscript_next_token(tokenizer, &token, &got_token));
+
+        if (!got_token) {
+            break;
+        }
+
+        PDF_PROPAGATE(postscript_interpret_token(interpreter, token));
+    }
+
+    return NULL;
+}
+
+PdfError* postscript_interpret_object(
+    PostscriptInterpreter* interpreter,
+    PostscriptObject object
+) {
+    RELEASE_ASSERT(interpreter);
+
+    if (object.literal) {
+        postscript_interpreter_operand_push(interpreter, object);
+    } else {
+        PostscriptObject proc_object;
+        if (postscript_object_list_back(interpreter->operands, &proc_object)
+            && proc_object.type == POSTSCRIPT_OBJECT_SINK
+            && proc_object.data.sink.type == POSTSCRIPT_SINK_PROC) {
+            postscript_object_list_push_back(
+                proc_object.data.sink.list,
+                object
+            );
+        } else {
+            PDF_PROPAGATE(postscript_object_execute(interpreter, &object));
+        }
+    }
+
+    return NULL;
+}
+
+PostscriptObjectList*
+postscript_interpreter_stack(PostscriptInterpreter* interpreter) {
+    RELEASE_ASSERT(interpreter);
+    return interpreter->operands;
 }
 
 PdfError* postscript_interpreter_pop_operand(
@@ -677,6 +760,10 @@ PdfError* postscript_interpreter_define(
             PDF_ERR_POSTSCRIPT_ACCESS_VIOLATION,
             "The current top of the dictionary stack doesn't have write access"
         );
+    }
+
+    if (value.type == POSTSCRIPT_OBJECT_PROC) {
+        value.literal = false;
     }
 
     postscript_object_list_push_back(current_dict.data.dict, key);

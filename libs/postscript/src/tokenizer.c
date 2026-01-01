@@ -12,13 +12,13 @@
 struct PostscriptTokenizer {
     Arena* arena;
 
-    const char* data;
+    const uint8_t* data;
     size_t data_len;
     size_t offset;
 };
 
 PostscriptTokenizer*
-postscript_tokenizer_new(Arena* arena, const char* data, size_t data_len) {
+postscript_tokenizer_new(Arena* arena, const uint8_t* data, size_t data_len) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(data);
 
@@ -32,17 +32,17 @@ postscript_tokenizer_new(Arena* arena, const char* data, size_t data_len) {
     return tokenizer;
 }
 
-static bool is_postscript_whitespace(char c) {
+static bool is_postscript_whitespace(uint8_t c) {
     return c == ' ' || c == '\n' || c == '\r' || c == '\t' || c == '\0'
         || c == '\f';
 }
 
-static bool is_postscript_delimiter(char c) {
+static bool is_postscript_delimiter(uint8_t c) {
     return c == '(' || c == ')' || c == '<' || c == '>' || c == '[' || c == ']'
         || c == '{' || c == '}' || c == '/' || c == '%';
 }
 
-static bool is_postscript_regular(char c) {
+static bool is_postscript_regular(uint8_t c) {
     return !is_postscript_whitespace(c) && !is_postscript_delimiter(c);
 }
 
@@ -50,7 +50,7 @@ static void consume_whitespace(PostscriptTokenizer* tokenizer) {
     RELEASE_ASSERT(tokenizer);
 
     while (tokenizer->offset < tokenizer->data_len) {
-        char c = tokenizer->data[tokenizer->offset];
+        uint8_t c = tokenizer->data[tokenizer->offset];
         if (is_postscript_whitespace(c)) {
             tokenizer->offset++;
         } else {
@@ -70,7 +70,7 @@ static bool consume_comment(PostscriptTokenizer* tokenizer) {
     }
 
     while (tokenizer->offset < tokenizer->data_len) {
-        char c = tokenizer->data[tokenizer->offset++];
+        uint8_t c = tokenizer->data[tokenizer->offset++];
         if (c == '\n') {
             break;
         } else if (c == '\r') {
@@ -106,7 +106,7 @@ static void read_unsigned_integer(
     *is_integer_out = true;
 
     while (tokenizer->offset < tokenizer->data_len) {
-        char c = tokenizer->data[tokenizer->offset];
+        uint8_t c = tokenizer->data[tokenizer->offset];
 
         // Determine value of character
         uint64_t character_value;
@@ -159,7 +159,7 @@ static char* read_name(PostscriptTokenizer* tokenizer, size_t known_length) {
 
     // Measure length
     while (tokenizer->offset < tokenizer->data_len) {
-        char c = tokenizer->data[tokenizer->offset];
+        uint8_t c = tokenizer->data[tokenizer->offset];
 
         if (is_postscript_regular(c)) {
             tokenizer->offset++;
@@ -367,14 +367,14 @@ static PdfError* read_number_or_executable_name(
     }
 
     // Try to read exponent
-    char c = tokenizer->data[tokenizer->offset];
+    uint8_t c = tokenizer->data[tokenizer->offset];
     bool failed_exp = false;
     if (c == 'e' || c == 'E') {
         tokenizer->offset++;
 
         bool exp_neg = false;
         if (tokenizer->offset < tokenizer->data_len) {
-            char sign_char = tokenizer->data[tokenizer->offset];
+            uint8_t sign_char = tokenizer->data[tokenizer->offset];
             if (sign_char == '+') {
                 tokenizer->offset++;
             } else if (sign_char == '-') {
@@ -555,7 +555,7 @@ static PdfError* read_lit_string(
     }
 }
 
-static bool char_to_hex(char c, int* out) {
+static bool char_to_hex(uint8_t c, int* out) {
     if (c >= '0' && c <= '9') {
         *out = c - '0';
         return true;
@@ -589,7 +589,7 @@ static PdfError* read_hex_string(
     bool upper = true;
 
     while (tokenizer->offset < tokenizer->data_len) {
-        char c = tokenizer->data[tokenizer->offset++];
+        uint8_t c = tokenizer->data[tokenizer->offset++];
 
         if (is_postscript_whitespace(c)) {
             continue;
@@ -660,7 +660,7 @@ PdfError* postscript_next_token(
 
     size_t start_offset = tokenizer->offset;
 
-    char c = tokenizer->data[tokenizer->offset++];
+    uint8_t c = tokenizer->data[tokenizer->offset++];
     if (c == '+' || c == '-') {
         PDF_PROPAGATE(read_number_or_executable_name(
             tokenizer,
@@ -702,7 +702,7 @@ PdfError* postscript_next_token(
             );
         }
 
-        char c2 = tokenizer->data[tokenizer->offset];
+        uint8_t c2 = tokenizer->data[tokenizer->offset];
         if (c2 == '<') {
             tokenizer->offset++;
             token_out->type = POSTSCRIPT_TOKEN_START_DICT;
@@ -719,7 +719,7 @@ PdfError* postscript_next_token(
             token_out->type = POSTSCRIPT_TOKEN_LIT_NAME;
             token_out->data.name = "";
         } else {
-            char c2 = tokenizer->data[tokenizer->offset];
+            uint8_t c2 = tokenizer->data[tokenizer->offset];
             if (c2 == '/') {
                 tokenizer->offset++;
                 token_out->type = POSTSCRIPT_TOKEN_IMM_NAME;
@@ -745,7 +745,7 @@ PdfError* postscript_next_token(
             );
         }
 
-        char c2 = tokenizer->data[tokenizer->offset++];
+        uint8_t c2 = tokenizer->data[tokenizer->offset++];
         if (c2 != '>') {
             return PDF_ERROR(PDF_ERR_POSTSCRIPT_INVALID_CHAR, "Expected `>`");
         }
@@ -763,9 +763,6 @@ PdfError* postscript_next_token(
     }
 
     RELEASE_ASSERT(tokenizer->offset >= start_offset);
-    token_out->text.data = (uint8_t*)tokenizer->data + start_offset;
-    token_out->text.len = tokenizer->offset - start_offset;
-
     return NULL;
 }
 
@@ -820,12 +817,12 @@ postscript_string_as_uint(PostscriptString string, uint64_t* out_value) {
 #include "test/test.h"
 
 #define SETUP_TOKENIZER(text)                                                  \
-    char buffer[] = text;                                                      \
+    uint8_t buffer[] = text;                                                   \
     Arena* arena = arena_new(1024);                                            \
     PostscriptTokenizer* tokenizer = postscript_tokenizer_new(                 \
         arena,                                                                 \
         buffer,                                                                \
-        sizeof(buffer) / sizeof(char) - 1                                      \
+        sizeof(buffer) / sizeof(uint8_t) - 1                                   \
     );                                                                         \
     PostscriptToken token;                                                     \
     bool got_token = false;
@@ -836,38 +833,25 @@ postscript_string_as_uint(PostscriptString string, uint64_t* out_value) {
     TEST_ASSERT_EQ(tokenizer->data_len, tokenizer->offset);                    \
     arena_free(arena);
 
-#define CHECK_TOKEN_TEXT(expected_text)                                        \
-    TEST_ASSERT_EQ(                                                            \
-        expected_text,                                                         \
-        postscript_string_as_cstr(token.text, arena),                          \
-        "Incorrect token text"                                                 \
-    );
-
-#define GET_TOKEN_NO_DATA(expected_type, expected_text)                        \
+#define GET_TOKEN_NO_DATA(expected_type)                                       \
     TEST_PDF_REQUIRE(postscript_next_token(tokenizer, &token, &got_token));    \
     TEST_ASSERT(got_token, "Expected token");                                  \
     TEST_ASSERT_EQ(                                                            \
         (int)(expected_type),                                                  \
         (int)(token.type),                                                     \
         "Incorrect token type"                                                 \
-    );                                                                         \
-    CHECK_TOKEN_TEXT(expected_text);
+    );
 
-#define GET_TOKEN_WITH_DATA(                                                   \
-    expected_type,                                                             \
-    data_field,                                                                \
-    expected_value,                                                            \
-    expected_text                                                              \
-)                                                                              \
-    GET_TOKEN_NO_DATA(expected_type, expected_text)                            \
+#define GET_TOKEN_WITH_DATA(expected_type, data_field, expected_value)         \
+    GET_TOKEN_NO_DATA(expected_type)                                           \
     TEST_ASSERT_EQ(                                                            \
         expected_value,                                                        \
         token.data.data_field,                                                 \
         "Incorrect token value"                                                \
     );
 
-#define GET_STR_TOKEN_WITH_DATA(expected_type, expected_value, expected_text)  \
-    GET_TOKEN_NO_DATA(expected_type, expected_text)                            \
+#define GET_STR_TOKEN_WITH_DATA(expected_type, expected_value)                 \
+    GET_TOKEN_NO_DATA(expected_type)                                           \
     TEST_ASSERT_EQ(                                                            \
         expected_value,                                                        \
         postscript_string_as_cstr(token.data.string, arena),                   \
@@ -879,7 +863,7 @@ postscript_string_as_uint(PostscriptString string, uint64_t* out_value) {
 
 TEST_FUNC(test_postscript_tokenize_integer) {
     SETUP_TOKENIZER("123")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 123, "123")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 123)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -887,7 +871,7 @@ TEST_FUNC(test_postscript_tokenize_integer) {
 
 TEST_FUNC(test_postscript_tokenize_pos_integer) {
     SETUP_TOKENIZER("+123")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 123, "+123")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 123)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -895,7 +879,7 @@ TEST_FUNC(test_postscript_tokenize_pos_integer) {
 
 TEST_FUNC(test_postscript_tokenize_neg_integer) {
     SETUP_TOKENIZER("-123")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, -123, "-123")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, -123)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -903,12 +887,7 @@ TEST_FUNC(test_postscript_tokenize_neg_integer) {
 
 TEST_FUNC(test_postscript_tokenize_int_max) {
     SETUP_TOKENIZER("2147483647")
-    GET_TOKEN_WITH_DATA(
-        POSTSCRIPT_TOKEN_INTEGER,
-        integer,
-        2147483647,
-        "2147483647"
-    )
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 2147483647)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -916,12 +895,7 @@ TEST_FUNC(test_postscript_tokenize_int_max) {
 
 TEST_FUNC(test_postscript_tokenize_int_min) {
     SETUP_TOKENIZER("-2147483648")
-    GET_TOKEN_WITH_DATA(
-        POSTSCRIPT_TOKEN_INTEGER,
-        integer,
-        -2147483647 - 1,
-        "-2147483648"
-    )
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, -2147483647 - 1)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -929,7 +903,7 @@ TEST_FUNC(test_postscript_tokenize_int_min) {
 
 TEST_FUNC(test_postscript_tokenize_pos_real_conversion) {
     SETUP_TOKENIZER("2147483648")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 2147483648.0, "2147483648")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 2147483648.0)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -937,12 +911,7 @@ TEST_FUNC(test_postscript_tokenize_pos_real_conversion) {
 
 TEST_FUNC(test_postscript_tokenize_neg_real_conversion) {
     SETUP_TOKENIZER("-2147483649")
-    GET_TOKEN_WITH_DATA(
-        POSTSCRIPT_TOKEN_REAL,
-        real,
-        -2147483649.0,
-        "-2147483649"
-    )
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, -2147483649.0)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -950,7 +919,7 @@ TEST_FUNC(test_postscript_tokenize_neg_real_conversion) {
 
 TEST_FUNC(test_postscript_tokenize_real) {
     SETUP_TOKENIZER("34.5")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 34.5, "34.5")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 34.5)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -958,7 +927,7 @@ TEST_FUNC(test_postscript_tokenize_real) {
 
 TEST_FUNC(test_postscript_tokenize_real_trailing_zeros) {
     SETUP_TOKENIZER("34.5000")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 34.5, "34.5000")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 34.5)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -966,7 +935,7 @@ TEST_FUNC(test_postscript_tokenize_real_trailing_zeros) {
 
 TEST_FUNC(test_postscript_tokenize_pos_real) {
     SETUP_TOKENIZER("+34.5")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 34.5, "+34.5")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 34.5)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -974,7 +943,7 @@ TEST_FUNC(test_postscript_tokenize_pos_real) {
 
 TEST_FUNC(test_postscript_tokenize_neg_real) {
     SETUP_TOKENIZER("-34.5")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, -34.5, "-34.5")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, -34.5)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -982,7 +951,7 @@ TEST_FUNC(test_postscript_tokenize_neg_real) {
 
 TEST_FUNC(test_postscript_tokenize_no_leading_real) {
     SETUP_TOKENIZER(".5")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 0.5, ".5")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 0.5)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -990,7 +959,7 @@ TEST_FUNC(test_postscript_tokenize_no_leading_real) {
 
 TEST_FUNC(test_postscript_tokenize_no_trailing_real) {
     SETUP_TOKENIZER("5.")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 5., "5.")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 5.0)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -998,7 +967,7 @@ TEST_FUNC(test_postscript_tokenize_no_trailing_real) {
 
 TEST_FUNC(test_postscript_tokenize_neg_no_leading_real) {
     SETUP_TOKENIZER("-.002")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, -0.002, "-.002")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, -0.002)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1006,7 +975,7 @@ TEST_FUNC(test_postscript_tokenize_neg_no_leading_real) {
 
 TEST_FUNC(test_postscript_tokenize_exp_dot_real) {
     SETUP_TOKENIZER("123.6e3")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 123.6e3, "123.6e3")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 123.6e3)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1014,7 +983,7 @@ TEST_FUNC(test_postscript_tokenize_exp_dot_real) {
 
 TEST_FUNC(test_postscript_tokenize_exp_real) {
     SETUP_TOKENIZER("1E6")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 1e6, "1E6")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 1e6)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1022,7 +991,7 @@ TEST_FUNC(test_postscript_tokenize_exp_real) {
 
 TEST_FUNC(test_postscript_tokenize_neg_exp_real) {
     SETUP_TOKENIZER("1e-3")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 1e-3, "1e-3")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_REAL, real, 1e-3)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1030,7 +999,7 @@ TEST_FUNC(test_postscript_tokenize_neg_exp_real) {
 
 TEST_FUNC(test_postscript_tokenize_oct_radix) {
     SETUP_TOKENIZER("8#1777")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_RADIX_NUM, integer, 1023, "8#1777")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_RADIX_NUM, integer, 1023)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1038,7 +1007,7 @@ TEST_FUNC(test_postscript_tokenize_oct_radix) {
 
 TEST_FUNC(test_postscript_tokenize_radix_neg) {
     SETUP_TOKENIZER("16#fffffffe")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_RADIX_NUM, integer, -2, "16#fffffffe")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_RADIX_NUM, integer, -2)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1046,7 +1015,7 @@ TEST_FUNC(test_postscript_tokenize_radix_neg) {
 
 TEST_FUNC(test_postscript_tokenize_radix_uppercase) {
     SETUP_TOKENIZER("16#ffFfFFFE")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_RADIX_NUM, integer, -2, "16#ffFfFFFE")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_RADIX_NUM, integer, -2)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1054,7 +1023,7 @@ TEST_FUNC(test_postscript_tokenize_radix_uppercase) {
 
 TEST_FUNC(test_postscript_tokenize_bin_radix) {
     SETUP_TOKENIZER("2#100")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_RADIX_NUM, integer, 4, "2#100")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_RADIX_NUM, integer, 4)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1062,7 +1031,7 @@ TEST_FUNC(test_postscript_tokenize_bin_radix) {
 
 TEST_FUNC(test_postscript_tokenize_radix_single_digit) {
     SETUP_TOKENIZER("16#a")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_RADIX_NUM, integer, 10, "16#a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_RADIX_NUM, integer, 10)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1070,11 +1039,7 @@ TEST_FUNC(test_postscript_tokenize_radix_single_digit) {
 
 TEST_FUNC(test_postscript_tokenize_lit_string) {
     SETUP_TOKENIZER("(This is a string.)")
-    GET_STR_TOKEN_WITH_DATA(
-        POSTSCRIPT_TOKEN_LIT_STRING,
-        "This is a string.",
-        "(This is a string.)"
-    )
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "This is a string.")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1084,8 +1049,7 @@ TEST_FUNC(test_postscript_tokenize_lit_string_newline) {
     SETUP_TOKENIZER("(Strings may contain newlines\nand such.)")
     GET_STR_TOKEN_WITH_DATA(
         POSTSCRIPT_TOKEN_LIT_STRING,
-        "Strings may contain newlines\nand such.",
-        "(Strings may contain newlines\nand such.)"
+        "Strings may contain newlines\nand such."
     )
     CHECK_STREAM_CONSUMED()
 
@@ -1096,8 +1060,7 @@ TEST_FUNC(test_postscript_tokenize_lit_string_special_chars) {
     SETUP_TOKENIZER("(Strings may contain special characters *!&}^%.)")
     GET_STR_TOKEN_WITH_DATA(
         POSTSCRIPT_TOKEN_LIT_STRING,
-        "Strings may contain special characters *!&}^%.",
-        "(Strings may contain special characters *!&}^%.)"
+        "Strings may contain special characters *!&}^%."
     )
     CHECK_STREAM_CONSUMED()
 
@@ -1110,8 +1073,7 @@ TEST_FUNC(test_postscript_tokenize_lit_string_balanced_parens) {
     )
     GET_STR_TOKEN_WITH_DATA(
         POSTSCRIPT_TOKEN_LIT_STRING,
-        "Strings may contain balanced parenthesis () (and so on ())",
-        "(Strings may contain balanced parenthesis () (and so on ()))"
+        "Strings may contain balanced parenthesis () (and so on ())"
     )
     CHECK_STREAM_CONSUMED()
 
@@ -1120,7 +1082,7 @@ TEST_FUNC(test_postscript_tokenize_lit_string_balanced_parens) {
 
 TEST_FUNC(test_postscript_tokenize_lit_string_empty) {
     SETUP_TOKENIZER("()")
-    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "", "()")
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1128,11 +1090,7 @@ TEST_FUNC(test_postscript_tokenize_lit_string_empty) {
 
 TEST_FUNC(test_postscript_tokenize_lit_string_escapes) {
     SETUP_TOKENIZER("(\\n\\r\\t\\b\\f\\\\\\)\\()")
-    GET_STR_TOKEN_WITH_DATA(
-        POSTSCRIPT_TOKEN_LIT_STRING,
-        "\n\r\t\b\f\\)(",
-        "(\\n\\r\\t\\b\\f\\\\\\)\\()"
-    )
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "\n\r\t\b\f\\)(")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1140,11 +1098,7 @@ TEST_FUNC(test_postscript_tokenize_lit_string_escapes) {
 
 TEST_FUNC(test_postscript_tokenize_lit_string_octal) {
     SETUP_TOKENIZER("(\\0053\\53\\053)")
-    GET_STR_TOKEN_WITH_DATA(
-        POSTSCRIPT_TOKEN_LIT_STRING,
-        "\0053\053\053",
-        "(\\0053\\53\\053)"
-    )
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "\0053\053\053")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1152,11 +1106,7 @@ TEST_FUNC(test_postscript_tokenize_lit_string_octal) {
 
 TEST_FUNC(test_postscript_tokenize_lit_string_escape_ignore) {
     SETUP_TOKENIZER("(Hello\\ World)")
-    GET_STR_TOKEN_WITH_DATA(
-        POSTSCRIPT_TOKEN_LIT_STRING,
-        "Hello World",
-        "(Hello\\ World)"
-    )
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "Hello World")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1168,8 +1118,7 @@ TEST_FUNC(test_postscript_tokenize_lit_string_escape_newline) {
     )
     GET_STR_TOKEN_WITH_DATA(
         POSTSCRIPT_TOKEN_LIT_STRING,
-        "Hello World This is a test This is also a test",
-        "(Hello\\\n World\\\r\n This is a test\\\r This is also a test)"
+        "Hello World This is a test This is also a test"
     )
     CHECK_STREAM_CONSUMED()
 
@@ -1178,11 +1127,7 @@ TEST_FUNC(test_postscript_tokenize_lit_string_escape_newline) {
 
 TEST_FUNC(test_postscript_tokenize_hex_string) {
     SETUP_TOKENIZER("<68656C6C6F20776F726C64>")
-    GET_STR_TOKEN_WITH_DATA(
-        POSTSCRIPT_TOKEN_HEX_STRING,
-        "hello world",
-        "<68656C6C6F20776F726C64>"
-    )
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_HEX_STRING, "hello world")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1190,11 +1135,7 @@ TEST_FUNC(test_postscript_tokenize_hex_string) {
 
 TEST_FUNC(test_postscript_tokenize_hex_string_spaces) {
     SETUP_TOKENIZER("< 686  56  \r\fC6C6F\n207\t76F 726C6 4>")
-    GET_STR_TOKEN_WITH_DATA(
-        POSTSCRIPT_TOKEN_HEX_STRING,
-        "hello world",
-        "< 686  56  \r\fC6C6F\n207\t76F 726C6 4>"
-    )
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_HEX_STRING, "hello world")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1202,11 +1143,7 @@ TEST_FUNC(test_postscript_tokenize_hex_string_spaces) {
 
 TEST_FUNC(test_postscript_tokenize_hex_string_even_len) {
     SETUP_TOKENIZER("<901fa3>")
-    GET_STR_TOKEN_WITH_DATA(
-        POSTSCRIPT_TOKEN_HEX_STRING,
-        "\x90\x1f\xa3",
-        "<901fa3>"
-    )
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_HEX_STRING, "\x90\x1f\xa3")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1214,11 +1151,7 @@ TEST_FUNC(test_postscript_tokenize_hex_string_even_len) {
 
 TEST_FUNC(test_postscript_tokenize_hex_string_odd_len) {
     SETUP_TOKENIZER("<901fa>")
-    GET_STR_TOKEN_WITH_DATA(
-        POSTSCRIPT_TOKEN_HEX_STRING,
-        "\x90\x1f\xa0",
-        "<901fa>"
-    )
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_HEX_STRING, "\x90\x1f\xa0")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1237,7 +1170,7 @@ TEST_FUNC(test_postscript_tokenize_hex_string_unexpected) {
 
 TEST_FUNC(test_postscript_tokenize_name) {
     SETUP_TOKENIZER("abc")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "abc", "abc")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "abc")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1245,12 +1178,7 @@ TEST_FUNC(test_postscript_tokenize_name) {
 
 TEST_FUNC(test_postscript_tokenize_name_non_alpha) {
     SETUP_TOKENIZER("$@a_3name#")
-    GET_TOKEN_WITH_DATA(
-        POSTSCRIPT_TOKEN_EXE_NAME,
-        name,
-        "$@a_3name#",
-        "$@a_3name#"
-    )
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "$@a_3name#")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1258,7 +1186,7 @@ TEST_FUNC(test_postscript_tokenize_name_non_alpha) {
 
 TEST_FUNC(test_postscript_tokenize_leading_num_name) {
     SETUP_TOKENIZER("23a")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "23a", "23a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "23a")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1266,7 +1194,7 @@ TEST_FUNC(test_postscript_tokenize_leading_num_name) {
 
 TEST_FUNC(test_postscript_tokenize_leading_real_name) {
     SETUP_TOKENIZER("23.54a")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "23.54a", "23.54a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "23.54a")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1274,7 +1202,7 @@ TEST_FUNC(test_postscript_tokenize_leading_real_name) {
 
 TEST_FUNC(test_postscript_tokenize_leading_real_name2) {
     SETUP_TOKENIZER(".54a")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, ".54a", ".54a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, ".54a")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1282,7 +1210,7 @@ TEST_FUNC(test_postscript_tokenize_leading_real_name2) {
 
 TEST_FUNC(test_postscript_tokenize_leading_real_name3) {
     SETUP_TOKENIZER("-.54a")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "-.54a", "-.54a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "-.54a")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1290,7 +1218,7 @@ TEST_FUNC(test_postscript_tokenize_leading_real_name3) {
 
 TEST_FUNC(test_postscript_tokenize_leading_exp_name) {
     SETUP_TOKENIZER(".54e5a")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, ".54e5a", ".54e5a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, ".54e5a")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1298,7 +1226,7 @@ TEST_FUNC(test_postscript_tokenize_leading_exp_name) {
 
 TEST_FUNC(test_postscript_tokenize_leading_exp_name2) {
     SETUP_TOKENIZER("54e5a")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "54e5a", "54e5a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "54e5a")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1306,7 +1234,7 @@ TEST_FUNC(test_postscript_tokenize_leading_exp_name2) {
 
 TEST_FUNC(test_postscript_tokenize_leading_radix_name) {
     SETUP_TOKENIZER("2#101a")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "2#101a", "2#101a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "2#101a")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1314,7 +1242,7 @@ TEST_FUNC(test_postscript_tokenize_leading_radix_name) {
 
 TEST_FUNC(test_postscript_tokenize_leading_radix_name2) {
     SETUP_TOKENIZER("2#1012")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "2#1012", "2#1012")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "2#1012")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1323,7 +1251,7 @@ TEST_FUNC(test_postscript_tokenize_leading_radix_name2) {
 // Since 37 is an invalid radix, it should fall back to a name
 TEST_FUNC(test_postscript_tokenize_invalid_radix_name) {
     SETUP_TOKENIZER("37#101")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "37#101", "37#101")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "37#101")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1333,7 +1261,7 @@ TEST_FUNC(test_postscript_tokenize_invalid_radix_name) {
 // digits..." This has no decimal digits, therefore is not a real, it is a name.
 TEST_FUNC(test_postscript_tokenize_single_dot_name) {
     SETUP_TOKENIZER(".")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, ".", ".")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, ".")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1341,7 +1269,7 @@ TEST_FUNC(test_postscript_tokenize_single_dot_name) {
 
 TEST_FUNC(test_postscript_tokenize_single_plus_name) {
     SETUP_TOKENIZER("+")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "+", "+")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "+")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1349,7 +1277,7 @@ TEST_FUNC(test_postscript_tokenize_single_plus_name) {
 
 TEST_FUNC(test_postscript_tokenize_single_plus_name_non_eof) {
     SETUP_TOKENIZER("+ ")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "+", "+")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "+")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1357,7 +1285,7 @@ TEST_FUNC(test_postscript_tokenize_single_plus_name_non_eof) {
 
 TEST_FUNC(test_postscript_tokenize_plus_dot_name) {
     SETUP_TOKENIZER("+.")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "+.", "+.")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "+.")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1365,7 +1293,7 @@ TEST_FUNC(test_postscript_tokenize_plus_dot_name) {
 
 TEST_FUNC(test_postscript_tokenize_leading_signed_num_name) {
     SETUP_TOKENIZER("+51a")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "+51a", "+51a")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "+51a")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1373,7 +1301,7 @@ TEST_FUNC(test_postscript_tokenize_leading_signed_num_name) {
 
 TEST_FUNC(test_postscript_tokenize_lit_name) {
     SETUP_TOKENIZER("/name")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "name", "/name")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "name")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1381,7 +1309,7 @@ TEST_FUNC(test_postscript_tokenize_lit_name) {
 
 TEST_FUNC(test_postscript_tokenize_empty_lit_name) {
     SETUP_TOKENIZER("/")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "", "/")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1389,7 +1317,7 @@ TEST_FUNC(test_postscript_tokenize_empty_lit_name) {
 
 TEST_FUNC(test_postscript_tokenize_num_lit_name) {
     SETUP_TOKENIZER("/1")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "1", "/1")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "1")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1397,14 +1325,14 @@ TEST_FUNC(test_postscript_tokenize_num_lit_name) {
 
 TEST_FUNC(test_postscript_tokenize_lit_name_delim_term) {
     SETUP_TOKENIZER("/name()")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "name", "/name")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "name")
 
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_postscript_tokenize_imm_name) {
     SETUP_TOKENIZER("//name")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_IMM_NAME, name, "name", "//name")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_IMM_NAME, name, "name")
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1412,11 +1340,11 @@ TEST_FUNC(test_postscript_tokenize_imm_name) {
 
 TEST_FUNC(test_postscript_tokenize_array) {
     SETUP_TOKENIZER("[ 123 /abc (xyz) ]")
-    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_START_ARRAY, "[")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 123, "123")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "abc", "/abc")
-    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "xyz", "(xyz)")
-    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_END_ARRAY, "]")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_START_ARRAY)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 123)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "abc")
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "xyz")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_END_ARRAY)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1424,11 +1352,11 @@ TEST_FUNC(test_postscript_tokenize_array) {
 
 TEST_FUNC(test_postscript_tokenize_array_compact) {
     SETUP_TOKENIZER("[123/abc(xyz)]")
-    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_START_ARRAY, "[")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 123, "123")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "abc", "/abc")
-    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "xyz", "(xyz)")
-    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_END_ARRAY, "]")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_START_ARRAY)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 123)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "abc")
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "xyz")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_END_ARRAY)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1436,11 +1364,11 @@ TEST_FUNC(test_postscript_tokenize_array_compact) {
 
 TEST_FUNC(test_postscript_tokenize_proc) {
     SETUP_TOKENIZER("{add 2 div}")
-    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_START_PROC, "{")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "add", "add")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 2, "2")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "div", "div")
-    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_END_PROC, "}")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_START_PROC)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "add")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 2)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "div")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_END_PROC)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1448,12 +1376,12 @@ TEST_FUNC(test_postscript_tokenize_proc) {
 
 TEST_FUNC(test_postscript_tokenize_dict) {
     SETUP_TOKENIZER("<<key1 4 /key2 (value)>>")
-    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_START_DICT, "<<")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "key1", "key1")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 4, "4")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "key2", "/key2")
-    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "value", "(value)")
-    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_END_DICT, ">>")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_START_DICT)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "key1")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 4)
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_NAME, name, "key2")
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "value")
+    GET_TOKEN_NO_DATA(POSTSCRIPT_TOKEN_END_DICT)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;
@@ -1461,9 +1389,9 @@ TEST_FUNC(test_postscript_tokenize_dict) {
 
 TEST_FUNC(test_postscript_comments) {
     SETUP_TOKENIZER("  % This is a comment\ntest  (test2)\n3 % test")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "test", "test")
-    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "test2", "(test2)")
-    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 3, "3")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_EXE_NAME, name, "test")
+    GET_STR_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_LIT_STRING, "test2")
+    GET_TOKEN_WITH_DATA(POSTSCRIPT_TOKEN_INTEGER, integer, 3)
     CHECK_STREAM_CONSUMED()
 
     return TEST_RESULT_PASS;

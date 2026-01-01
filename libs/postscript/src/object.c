@@ -47,6 +47,26 @@ PdfError* postscript_object_execute(
             PDF_PROPAGATE(postscript_object_execute(interpreter, &dict_object));
             break;
         }
+        case POSTSCRIPT_OBJECT_PROC: {
+            LOG_DIAG(DEBUG, PS, "Executing procedure");
+
+            for (size_t idx = 0;
+                 idx < postscript_object_list_len(object->data.proc);
+                 idx++) {
+                PostscriptObject proc_element;
+                RELEASE_ASSERT(postscript_object_list_get(
+                    object->data.proc,
+                    idx,
+                    &proc_element
+                ));
+
+                PDF_PROPAGATE(
+                    postscript_interpret_object(interpreter, proc_element)
+                );
+            }
+
+            break;
+        }
         case POSTSCRIPT_OBJECT_OPERATOR: {
             LOG_DIAG(TRACE, PS, "Executing operator");
 
@@ -137,6 +157,30 @@ postscript_object_fmt(Arena* arena, const PostscriptObject* object) {
                 arena_string_buffer(str),
                 delims[1]
             ));
+        }
+        case POSTSCRIPT_OBJECT_PROC: {
+            ArenaString* str = arena_string_new_fmt(arena, "{ ");
+            for (size_t idx = 0;
+                 idx < postscript_object_list_len(object->data.proc);
+                 idx++) {
+                PostscriptObject* proc_object = NULL;
+                RELEASE_ASSERT(postscript_object_list_get_ptr(
+                    object->data.proc,
+                    idx,
+                    &proc_object
+                ));
+
+                str = arena_string_new_fmt(
+                    arena,
+                    "%s%s ",
+                    arena_string_buffer(str),
+                    postscript_object_fmt(arena, proc_object)
+                );
+            }
+
+            return arena_string_buffer(
+                arena_string_new_fmt(arena, "%s}", arena_string_buffer(str))
+            );
         }
         case POSTSCRIPT_OBJECT_OPERATOR: {
             return "<|builtin|>";

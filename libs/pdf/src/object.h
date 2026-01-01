@@ -5,6 +5,7 @@
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
+#include "postscript/object.h"
 
 PdfError* pdf_parse_object(
     PdfResolver* resolver,
@@ -14,5 +15,12 @@ PdfError* pdf_parse_object(
 
 PdfError*
 pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object);
+
+/// Converts a pdf object to a postscript object, if possible
+PdfError*
+pdf_object_into_postscript(const PdfObject* object, PostscriptObject* out);
+
+/// Converts a postscript object to a pdf object, if possible
+PdfError* pdf_object_from_postscript(PostscriptObject object, PdfObject* out);
 
 char* pdf_string_as_cstr(PdfString pdf_string, Arena* arena);

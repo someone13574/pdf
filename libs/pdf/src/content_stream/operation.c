@@ -890,7 +890,13 @@ PdfError* pdf_deserialize_content_op(
             return NULL;
         }
         case PDF_OPERATOR_sh: {
-            LOG_WARN(PDF, "TODO: Shading operator");
+            PdfContentOp* queue_op =
+                new_queue_op(operation_queue, PDF_OPERATOR_sh);
+            PDF_PROPAGATE(deserialize_name(
+                &queue_op->data.paint_shading,
+                operands,
+                resolver
+            ));
             return NULL;
         }
         case PDF_OPERATOR_Do: {

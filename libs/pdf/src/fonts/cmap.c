@@ -605,7 +605,7 @@ static PdfError* cidinit_endbfchar(PostscriptInterpreter* interpreter) {
 
 PdfError* pdf_parse_cmap(
     Arena* arena,
-    const char* data,
+    const uint8_t* data,
     size_t data_len,
     PdfCMap** cmap_out
 ) {
@@ -692,18 +692,7 @@ PdfError* pdf_parse_cmap(
     postscript_interpreter_user_data_push(interpreter, &user_data, "cmap");
 
     // Interpret cmap
-    while (true) {
-        bool got_token;
-        PostscriptToken token;
-
-        PDF_PROPAGATE(postscript_next_token(tokenizer, &token, &got_token));
-
-        if (!got_token) {
-            break;
-        }
-
-        PDF_PROPAGATE(postscript_interpret_token(interpreter, token));
-    }
+    PDF_PROPAGATE(postscript_interpret_tokens(interpreter, tokenizer));
 
     arena_free(interpreter_arena);
 
@@ -721,7 +710,7 @@ PdfError* pdf_load_cmap(Arena* arena, char* name, PdfCMap** cmap_out) {
     Arena* file_arena = arena_new(1);
 
     size_t file_len;
-    char* file = (char*)load_file_to_buffer(file_arena, cmap_path, &file_len);
+    uint8_t* file = load_file_to_buffer(file_arena, cmap_path, &file_len);
 
     PDF_PROPAGATE(pdf_parse_cmap(arena, file, file_len, cmap_out));
 

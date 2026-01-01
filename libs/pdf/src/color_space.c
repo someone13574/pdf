@@ -154,6 +154,9 @@ PdfError* pdf_deserialize_color_space(
             LOG_WARN(PDF, "TODO: ICC Color spaces");
             break;
         }
+        case PDF_COLOR_SPACE_DEVICE_N: {
+            break;
+        }
         default: {
             printf(
                 "%s\n",
@@ -166,6 +169,11 @@ PdfError* pdf_deserialize_color_space(
 
     return NULL;
 }
+
+DESERDE_IMPL_TRAMPOLINE(
+    pdf_deserialize_color_space_trampoline,
+    pdf_deserialize_color_space
+)
 
 static GeomVec3 linear_srgb_to_nonlinear(
     GeomVec3 linear,

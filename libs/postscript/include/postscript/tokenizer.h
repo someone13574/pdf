@@ -13,7 +13,7 @@ typedef struct PostscriptTokenizer PostscriptTokenizer;
 
 /// Create a new postscript tokenizer from a buffer
 PostscriptTokenizer*
-postscript_tokenizer_new(Arena* arena, const char* data, size_t data_len);
+postscript_tokenizer_new(Arena* arena, const uint8_t* data, size_t data_len);
 
 typedef enum {
     POSTSCRIPT_TOKEN_INTEGER,
@@ -46,8 +46,6 @@ typedef struct {
         PostscriptString string;
         char* name;
     } data;
-
-    PostscriptString text;
 } PostscriptToken;
 
 /// Get the next token in the postscript file, storing it in `token_out`. If
