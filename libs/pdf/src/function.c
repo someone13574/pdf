@@ -31,7 +31,7 @@ PdfError* pdf_deserialize_function(
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
             "FunctionType",
-            &target_ptr->type,
+            &target_ptr->function_type,
             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         ),
         PDF_FIELD(
@@ -80,7 +80,117 @@ PdfError* pdf_deserialize_function(
         );
     }
 
-    switch (target_ptr->type) {
+    switch (target_ptr->function_type) {
+        case 2: {
+            PdfFieldDescriptor specific_fields[] = {
+                PDF_IGNORED_FIELD("FunctionType", NULL),
+                PDF_IGNORED_FIELD("Domain", NULL),
+                PDF_IGNORED_FIELD("Range", NULL),
+                PDF_FIELD(
+                    "C0",
+                    &target_ptr->data.type2.c0,
+                    PDF_DESERDE_OPTIONAL(
+                        pdf_number_vec_op_init,
+                        PDF_DESERDE_ARRAY(
+                            pdf_number_vec_push_uninit,
+                            PDF_DESERDE_CUSTOM(
+                                pdf_deserialize_number_trampoline
+                            )
+                        )
+                    )
+                ),
+                PDF_FIELD(
+                    "C1",
+                    &target_ptr->data.type2.c1,
+                    PDF_DESERDE_OPTIONAL(
+                        pdf_number_vec_op_init,
+                        PDF_DESERDE_ARRAY(
+                            pdf_number_vec_push_uninit,
+                            PDF_DESERDE_CUSTOM(
+                                pdf_deserialize_number_trampoline
+                            )
+                        )
+                    )
+                ),
+                PDF_FIELD(
+                    "N",
+                    &target_ptr->data.type2.n,
+                    PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+                )
+            };
+
+            PDF_PROPAGATE(pdf_deserialize_dict(
+                object,
+                specific_fields,
+                sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
+                false,
+                resolver,
+                "Type3 PdfFunction"
+            ));
+            break;
+        }
+        case 3: {
+            PdfFieldDescriptor specific_fields[] = {
+                PDF_IGNORED_FIELD("FunctionType", NULL),
+                PDF_IGNORED_FIELD("Domain", NULL),
+                PDF_IGNORED_FIELD("Range", NULL),
+                PDF_FIELD(
+                    "Functions",
+                    &target_ptr->data.type3.functions,
+                    PDF_DESERDE_ARRAY(
+                        pdf_function_vec_push_uninit,
+                        PDF_DESERDE_CUSTOM(pdf_deserialize_function_trampoline)
+                    )
+                ),
+                PDF_FIELD(
+                    "Bounds",
+                    &target_ptr->data.type3.bounds,
+                    PDF_DESERDE_ARRAY(
+                        pdf_number_vec_push_uninit,
+                        PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+                    )
+                ),
+                PDF_FIELD(
+                    "Encode",
+                    &target_ptr->data.type3.encode,
+                    PDF_DESERDE_ARRAY(
+                        pdf_number_vec_push_uninit,
+                        PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+                    )
+                )
+            };
+
+            PDF_PROPAGATE(pdf_deserialize_dict(
+                object,
+                specific_fields,
+                sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
+                false,
+                resolver,
+                "Type3 PdfFunction"
+            ));
+
+            if (!target_ptr->data.type3.bounds) {
+                // TODO: Remove ugly workaround. Deserialization needs another
+                // rewrite.
+                target_ptr->data.type3.bounds =
+                    pdf_number_vec_new(pdf_resolver_arena(resolver));
+            }
+
+            size_t k = pdf_function_vec_len(target_ptr->data.type3.functions);
+            if (k == 0) {
+                return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+            }
+
+            if (pdf_number_vec_len(target_ptr->data.type3.bounds) != k - 1) {
+                return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+            }
+
+            if (pdf_number_vec_len(target_ptr->data.type3.encode) != 2 * k) {
+                return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+            }
+
+            break;
+        }
         case 4: {
             if (resolved.type != PDF_OBJECT_TYPE_STREAM) {
                 return PDF_ERROR(
@@ -113,7 +223,7 @@ PdfError* pdf_deserialize_function(
             break;
         }
         default: {
-            LOG_TODO("Function type %d", target_ptr->type);
+            LOG_TODO("Function type %d", target_ptr->function_type);
         }
     }
 
@@ -175,7 +285,7 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(io);
 
-    switch (function->type) {
+    switch (function->function_type) {
         case 4: {
             for (size_t idx = 0; idx < pdf_object_vec_len(io); idx++) {
                 PdfObject* pdf_operand = NULL;
@@ -268,12 +378,22 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
             break;
         }
         default: {
-            LOG_TODO("Function type %d", function->type);
+            LOG_TODO("Function type %d", function->function_type);
         }
     }
 
     return NULL;
 }
+
+DESERDE_IMPL_TRAMPOLINE(
+    pdf_deserialize_function_trampoline,
+    pdf_deserialize_function
+)
+
+#define DVEC_NAME PdfFunctionVec
+#define DVEC_LOWERCASE_NAME pdf_function_vec
+#define DVEC_TYPE PdfFunction
+#include "arena/dvec_impl.h"
 
 #ifdef TEST
 

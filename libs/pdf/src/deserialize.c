@@ -294,13 +294,16 @@ static PdfError* deserialize(
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(deserde_info.type != PDF_DESERDE_TYPE_UNIMPLEMENTED);
-    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(target_ptr || deserde_info.type == PDF_DESERDE_TYPE_IGNORED);
     RELEASE_ASSERT(resolver);
 
     switch (deserde_info.type) {
         case PDF_DESERDE_TYPE_UNIMPLEMENTED:
         case PDF_DESERDE_TYPE_IGNORED: {
-            LOG_PANIC("Unreachable");
+            if (target_ptr) {
+                *(PdfObject*)target_ptr = *object;
+            }
+            break;
         }
         case PDF_DESERDE_TYPE_OBJECT: {
             PDF_PROPAGATE(deserialize_primitive(
@@ -463,10 +466,6 @@ PdfError* pdf_deserialize_dict(
                     field->debug_info.file,
                     field->debug_info.line
                 );
-            }
-
-            if (field->deserde_info.type == PDF_DESERDE_TYPE_IGNORED) {
-                continue;
             }
 
             PDF_PROPAGATE(

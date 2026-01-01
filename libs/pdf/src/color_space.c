@@ -130,6 +130,9 @@ PdfError* pdf_deserialize_color_space(
     }
 
     switch (target_ptr->family) {
+        case PDF_COLOR_SPACE_DEVICE_CMYK: {
+            break;
+        }
         case PDF_COLOR_SPACE_CAL_RGB: {
             PdfObject* second = NULL;
             bool has_second =

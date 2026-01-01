@@ -94,6 +94,17 @@ typedef struct {
         PdfResolver* resolver                                                  \
     );
 
+#define DVEC_NAME PdfBooleanVec
+#define DVEC_LOWERCASE_NAME pdf_boolean_vec
+#define DVEC_TYPE PdfBoolean
+#include "arena/dvec_decl.h"
+
+DESERDE_DECL_OPTIONAL(
+    PdfBooleanVecOptional,
+    PdfBooleanVec*,
+    pdf_boolean_vec_op_init
+)
+
 /// Placeholder type for unimplemented deserialization fields. Choice is
 /// arbitrary. This is different from PdfIgnored because it is planned to be
 /// implemented in the future.

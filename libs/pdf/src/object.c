@@ -9,6 +9,7 @@
 #include "arena/arena.h"
 #include "arena/string.h"
 #include "ctx.h"
+#include "deserialize.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
@@ -25,6 +26,13 @@
 #define DVEC_LOWERCASE_NAME pdf_dict_entry_vec
 #define DVEC_TYPE PdfDictEntry
 #include "arena/dvec_impl.h"
+
+#define DVEC_NAME PdfBooleanVec
+#define DVEC_LOWERCASE_NAME pdf_boolean_vec
+#define DVEC_TYPE PdfBoolean
+#include "arena/dvec_impl.h"
+
+DESERDE_IMPL_OPTIONAL(PdfBooleanVecOptional, pdf_boolean_vec_op_init)
 
 PdfObject* pdf_dict_get(const PdfDict* dict, PdfName key) {
     RELEASE_ASSERT(dict);

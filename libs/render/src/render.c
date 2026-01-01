@@ -689,7 +689,7 @@ static PdfError* process_content_stream(
                     resolver
                 ));
 
-                LOG_PANIC("here");
+                // LOG_PANIC("here");
 
                 break;
             }
