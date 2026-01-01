@@ -10,7 +10,7 @@
 
 PdfResolver* pdf_fake_resolver_new(Arena* arena, PdfCtx* ctx);
 
-char* pdf_construct_deserde_test_doc(
+char* pdf_construct_deser_test_doc(
     const char** objects,
     size_t num_objects,
     const char* trailer_dict,

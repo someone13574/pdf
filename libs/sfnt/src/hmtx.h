@@ -3,10 +3,10 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
+#include "err/error.h"
 #include "hhea.h"
 #include "maxp.h"
 #include "parser.h"
-#include "pdf_error/error.h"
 #include "sfnt/types.h"
 
 typedef struct {
@@ -25,7 +25,7 @@ typedef struct {
     SfntFWordArray* left_side_bearing;
 } SfntHmtx;
 
-PdfError* sfnt_parse_hmtx(
+Error* sfnt_parse_hmtx(
     Arena* arena,
     SfntParser* parser,
     const SfntMaxp* maxp,

@@ -1,9 +1,9 @@
 #pragma once
 
+#include "err/error.h"
 #include "pdf/catalog.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 typedef struct {
     /// The total number of entries in the file’s cross-reference table, as
@@ -33,7 +33,7 @@ typedef struct {
     PdfArrayOptional id;
 } PdfTrailer;
 
-PdfError* pdf_deserialize_trailer(
+Error* pdf_deser_trailer(
     const PdfObject* object,
     PdfTrailer* target_ptr,
     PdfResolver* resolver

@@ -9,6 +9,7 @@
 #include "cache.h"
 #include "canvas/canvas.h"
 #include "cff/cff.h"
+#include "err/error.h"
 #include "geom/mat3.h"
 #include "logger/log.h"
 #include "pdf/fonts/agl.h"
@@ -20,11 +21,10 @@
 #include "pdf/fonts/stream_dict.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 #include "sfnt/glyph.h"
 #include "sfnt/sfnt.h"
 
-PdfError* next_cid(
+Error* next_cid(
     PdfFont* font,
     RenderCache* cache,
     PdfString* data,
@@ -48,7 +48,7 @@ PdfError* next_cid(
 
             // Get CMap. TODO: Check ROS against descendent font's ROS
             PdfCMap* cmap = NULL;
-            PDF_PROPAGATE(pdf_cmap_cache_get(
+            TRY(pdf_cmap_cache_get(
                 cache->cmap_cache,
                 font->data.type0.encoding,
                 &cmap
@@ -60,7 +60,7 @@ PdfError* next_cid(
                                | (uint32_t)data->data[*offset + 1];
 
             // Map codepoint to cid
-            PDF_PROPAGATE(pdf_cmap_get_cid(cmap, codepoint, cid_out));
+            TRY(pdf_cmap_get_cid(cmap, codepoint, cid_out));
 
             *offset += 2;
 
@@ -84,7 +84,7 @@ PdfError* next_cid(
     LOG_PANIC("Unreachable");
 }
 
-PdfError* cid_to_gid(
+Error* cid_to_gid(
     Arena* arena,
     PdfFont* font,
     RenderCache* cache,
@@ -117,7 +117,7 @@ PdfError* cid_to_gid(
             };
 
             // Call recursively
-            PDF_PROPAGATE(cid_to_gid(
+            TRY(cid_to_gid(
                 arena,
                 &descendent_font,
                 cache,
@@ -129,7 +129,7 @@ PdfError* cid_to_gid(
         }
         case PDF_FONT_CIDTYPE0: {
             PdfFontDescriptor font_descriptor;
-            PDF_PROPAGATE(pdf_resolve_font_descriptor(
+            TRY(pdf_resolve_font_descriptor(
                 font->data.cid.font_descriptor,
                 resolver,
                 &font_descriptor
@@ -141,14 +141,14 @@ PdfError* cid_to_gid(
                 LOG_TODO("Embedded Type2 font");
             } else if (font_descriptor.font_file3.has_value) {
                 PdfFontStreamDict stream_dict;
-                PDF_PROPAGATE(pdf_deserialize_font_stream_dict(
+                TRY(pdf_deser_font_stream_dict(
                     font_descriptor.font_file3.value.stream_dict->raw_dict,
                     &stream_dict,
                     resolver
                 ));
 
                 if (!stream_dict.subtype.has_value) {
-                    return PDF_ERROR(
+                    return ERROR(
                         PDF_ERR_MISSING_DICT_KEY,
                         "`Subtype` is required for FontFile3"
                     );
@@ -174,7 +174,7 @@ PdfError* cid_to_gid(
                 "TODO: Non-embedded cid2 fonts"
             );
 
-            PDF_PROPAGATE(pdf_map_cid_to_gid(
+            TRY(pdf_map_cid_to_gid(
                 &font->data.cid.cid_to_gid_map.value,
                 cid,
                 gid_out
@@ -187,7 +187,7 @@ PdfError* cid_to_gid(
 
             if (font->data.true_type.to_unicode.has_value) {
                 PdfCMap* to_unicode = NULL;
-                PDF_PROPAGATE(pdf_parse_cmap(
+                TRY(pdf_parse_cmap(
                     arena,
                     font->data.true_type.to_unicode.value.stream_bytes,
                     font->data.true_type.to_unicode.value.decoded_stream_len,
@@ -195,7 +195,7 @@ PdfError* cid_to_gid(
                 ));
 
                 uint32_t unicode;
-                PDF_PROPAGATE(pdf_cmap_get_unicode(to_unicode, cid, &unicode));
+                TRY(pdf_cmap_get_unicode(to_unicode, cid, &unicode));
                 *gid_out = unicode;
             } else {
                 const char* glyph = pdf_encoding_map_codepoint(
@@ -218,7 +218,7 @@ PdfError* cid_to_gid(
 
                 uint16_t codepoints[4] = {0, 0, 0, 0};
                 uint8_t num_codepoints = 0;
-                PDF_PROPAGATE(pdf_agl_glyphlist_lookup(
+                TRY(pdf_agl_glyphlist_lookup(
                     cache->glyph_list,
                     glyph,
                     codepoints,
@@ -243,7 +243,7 @@ PdfError* cid_to_gid(
     return NULL;
 }
 
-PdfError* render_glyph(
+Error* render_glyph(
     Arena* arena,
     PdfFont* font,
     PdfResolver* resolver,
@@ -275,7 +275,7 @@ PdfError* render_glyph(
             };
 
             // Call recursively
-            PDF_PROPAGATE(render_glyph(
+            TRY(render_glyph(
                 arena,
                 &descendent_font,
                 resolver,
@@ -288,7 +288,7 @@ PdfError* render_glyph(
         }
         case PDF_FONT_CIDTYPE0: {
             PdfFontDescriptor font_descriptor;
-            PDF_PROPAGATE(pdf_resolve_font_descriptor(
+            TRY(pdf_resolve_font_descriptor(
                 font->data.cid.font_descriptor,
                 resolver,
                 &font_descriptor
@@ -300,14 +300,14 @@ PdfError* render_glyph(
                 LOG_TODO("Embedded Type2 font");
             } else if (font_descriptor.font_file3.has_value) {
                 PdfFontStreamDict stream_dict;
-                PDF_PROPAGATE(pdf_deserialize_font_stream_dict(
+                TRY(pdf_deser_font_stream_dict(
                     font_descriptor.font_file3.value.stream_dict->raw_dict,
                     &stream_dict,
                     resolver
                 ));
 
                 if (!stream_dict.subtype.has_value) {
-                    return PDF_ERROR(
+                    return ERROR(
                         PDF_ERR_MISSING_DICT_KEY,
                         "`Subtype` is required for FontFile3"
                     );
@@ -319,14 +319,14 @@ PdfError* render_glyph(
                 } else if (strcmp(subtype, "CIDFontType0C") == 0) {
                     Arena* local_arena = arena_new(1024);
                     CffFontSet* cff_font_set;
-                    PDF_PROPAGATE(cff_parse_fontset(
+                    TRY(cff_parse_fontset(
                         arena,
                         font_descriptor.font_file3.value.stream_bytes,
                         font_descriptor.font_file3.value.decoded_stream_len,
                         &cff_font_set
                     ));
 
-                    PDF_PROPAGATE(cff_render_glyph(
+                    TRY(cff_render_glyph(
                         cff_font_set,
                         gid,
                         canvas,
@@ -346,7 +346,7 @@ PdfError* render_glyph(
         }
         case PDF_FONT_CIDTYPE2: {
             PdfFontDescriptor font_descriptor;
-            PDF_PROPAGATE(pdf_resolve_font_descriptor(
+            TRY(pdf_resolve_font_descriptor(
                 font->data.cid.font_descriptor,
                 resolver,
                 &font_descriptor
@@ -354,7 +354,7 @@ PdfError* render_glyph(
 
             SfntFont* sfnt_font = NULL;
             if (font_descriptor.font_file2.has_value) {
-                PDF_PROPAGATE(sfnt_font_new(
+                TRY(sfnt_font_new(
                     arena,
                     font_descriptor.font_file2.value.stream_bytes,
                     font_descriptor.font_file2.value.decoded_stream_len,
@@ -370,13 +370,13 @@ PdfError* render_glyph(
                 );
                 RELEASE_ASSERT(font_file);
 
-                PDF_PROPAGATE(
+                TRY(
                     sfnt_font_new(arena, font_file, font_file_size, &sfnt_font)
                 );
             }
 
             SfntGlyph glyph;
-            PDF_PROPAGATE(sfnt_get_glyph_for_gid(sfnt_font, gid, &glyph));
+            TRY(sfnt_get_glyph_for_gid(sfnt_font, gid, &glyph));
             sfnt_glyph_render(canvas, &glyph, transform, brush);
 
             return NULL;
@@ -385,7 +385,7 @@ PdfError* render_glyph(
             RELEASE_ASSERT(font->data.true_type.font_descriptor.has_value);
 
             PdfFontDescriptor font_descriptor;
-            PDF_PROPAGATE(pdf_resolve_font_descriptor(
+            TRY(pdf_resolve_font_descriptor(
                 font->data.true_type.font_descriptor.value,
                 resolver,
                 &font_descriptor
@@ -393,7 +393,7 @@ PdfError* render_glyph(
 
             SfntFont* sfnt_font = NULL;
             if (font_descriptor.font_file2.has_value) {
-                PDF_PROPAGATE(sfnt_font_new(
+                TRY(sfnt_font_new(
                     arena,
                     font_descriptor.font_file2.value.stream_bytes,
                     font_descriptor.font_file2.value.decoded_stream_len,
@@ -409,13 +409,13 @@ PdfError* render_glyph(
                 );
                 RELEASE_ASSERT(font_file);
 
-                PDF_PROPAGATE(
+                TRY(
                     sfnt_font_new(arena, font_file, font_file_size, &sfnt_font)
                 );
             }
 
             SfntGlyph glyph;
-            PDF_PROPAGATE(sfnt_get_glyph_for_cid(sfnt_font, gid, &glyph));
+            TRY(sfnt_get_glyph_for_cid(sfnt_font, gid, &glyph));
             sfnt_glyph_render(canvas, &glyph, transform, brush);
             break;
         }
@@ -427,7 +427,7 @@ PdfError* render_glyph(
     return NULL;
 }
 
-PdfError* cid_to_width(
+Error* cid_to_width(
     PdfFont* font,
     PdfResolver* resolver,
     uint32_t cid,
@@ -457,9 +457,7 @@ PdfError* cid_to_width(
             };
 
             // Call recursively
-            PDF_PROPAGATE(
-                cid_to_width(&descendent_font, resolver, cid, width_out)
-            );
+            TRY(cid_to_width(&descendent_font, resolver, cid, width_out));
             return NULL;
             break;
         }
@@ -504,7 +502,7 @@ PdfError* cid_to_width(
                 RELEASE_ASSERT(font->data.true_type.font_descriptor.has_value);
 
                 PdfFontDescriptor font_descriptor;
-                PDF_PROPAGATE(pdf_resolve_font_descriptor(
+                TRY(pdf_resolve_font_descriptor(
                     font->data.true_type.font_descriptor.value,
                     resolver,
                     &font_descriptor
@@ -524,7 +522,7 @@ PdfError* cid_to_width(
     return NULL;
 }
 
-PdfError* get_font_matrix(
+Error* get_font_matrix(
     Arena* arena,
     PdfResolver* resolver,
     PdfFont* font,
@@ -554,7 +552,7 @@ PdfError* get_font_matrix(
             };
 
             // Call recursively
-            PDF_PROPAGATE(get_font_matrix(
+            TRY(get_font_matrix(
                 arena,
                 resolver,
                 &descendent_font,
@@ -564,7 +562,7 @@ PdfError* get_font_matrix(
         }
         case PDF_FONT_CIDTYPE0: {
             PdfFontDescriptor font_descriptor;
-            PDF_PROPAGATE(pdf_resolve_font_descriptor(
+            TRY(pdf_resolve_font_descriptor(
                 font->data.cid.font_descriptor,
                 resolver,
                 &font_descriptor
@@ -576,14 +574,14 @@ PdfError* get_font_matrix(
                 LOG_TODO("Embedded Type2 font");
             } else if (font_descriptor.font_file3.has_value) {
                 PdfFontStreamDict stream_dict;
-                PDF_PROPAGATE(pdf_deserialize_font_stream_dict(
+                TRY(pdf_deser_font_stream_dict(
                     font_descriptor.font_file3.value.stream_dict->raw_dict,
                     &stream_dict,
                     resolver
                 ));
 
                 if (!stream_dict.subtype.has_value) {
-                    return PDF_ERROR(
+                    return ERROR(
                         PDF_ERR_MISSING_DICT_KEY,
                         "`Subtype` is required for FontFile3"
                     );
@@ -595,7 +593,7 @@ PdfError* get_font_matrix(
                 } else if (strcmp(subtype, "CIDFontType0C") == 0) {
                     Arena* local_arena = arena_new(1024);
                     CffFontSet* cff_font_set;
-                    PDF_PROPAGATE(cff_parse_fontset(
+                    TRY(cff_parse_fontset(
                         arena,
                         font_descriptor.font_file3.value.stream_bytes,
                         font_descriptor.font_file3.value.decoded_stream_len,
@@ -616,7 +614,7 @@ PdfError* get_font_matrix(
         case PDF_FONT_CIDTYPE2: {
             // TODO: proper font resolution, caching, using embedded
             PdfFontDescriptor font_descriptor;
-            PDF_PROPAGATE(pdf_resolve_font_descriptor(
+            TRY(pdf_resolve_font_descriptor(
                 font->data.cid.font_descriptor,
                 resolver,
                 &font_descriptor
@@ -624,7 +622,7 @@ PdfError* get_font_matrix(
 
             SfntFont* sfnt_font = NULL;
             if (font_descriptor.font_file2.has_value) {
-                PDF_PROPAGATE(sfnt_font_new(
+                TRY(sfnt_font_new(
                     arena,
                     font_descriptor.font_file2.value.stream_bytes,
                     font_descriptor.font_file2.value.decoded_stream_len,
@@ -640,7 +638,7 @@ PdfError* get_font_matrix(
                 );
                 RELEASE_ASSERT(font_file);
 
-                PDF_PROPAGATE(
+                TRY(
                     sfnt_font_new(arena, font_file, font_file_size, &sfnt_font)
                 );
             }
@@ -653,7 +651,7 @@ PdfError* get_font_matrix(
             RELEASE_ASSERT(font->data.true_type.font_descriptor.has_value);
 
             PdfFontDescriptor font_descriptor;
-            PDF_PROPAGATE(pdf_resolve_font_descriptor(
+            TRY(pdf_resolve_font_descriptor(
                 font->data.true_type.font_descriptor.value,
                 resolver,
                 &font_descriptor
@@ -661,7 +659,7 @@ PdfError* get_font_matrix(
 
             SfntFont* sfnt_font = NULL;
             if (font_descriptor.font_file2.has_value) {
-                PDF_PROPAGATE(sfnt_font_new(
+                TRY(sfnt_font_new(
                     arena,
                     font_descriptor.font_file2.value.stream_bytes,
                     font_descriptor.font_file2.value.decoded_stream_len,
@@ -677,7 +675,7 @@ PdfError* get_font_matrix(
                 );
                 RELEASE_ASSERT(font_file);
 
-                PDF_PROPAGATE(
+                TRY(
                     sfnt_font_new(arena, font_file, font_file_size, &sfnt_font)
                 );
             }

@@ -1,16 +1,16 @@
 #pragma once
 
 #include "arena/arena.h"
+#include "err/error.h"
 #include "maxp.h"
 #include "parser.h"
-#include "pdf_error/error.h"
 #include "sfnt/sfnt.h"
 
 typedef struct {
     Uint32Array* offsets;
 } SfntLoca;
 
-PdfError* sfnt_parse_loca(
+Error* sfnt_parse_loca(
     Arena* arena,
     SfntParser* parser,
     const SfntHead* head,
@@ -18,5 +18,5 @@ PdfError* sfnt_parse_loca(
     SfntLoca* loca
 );
 
-PdfError*
+Error*
 sfnt_loca_glyph_offset(const SfntLoca* loca, uint32_t gid, uint32_t* offset);

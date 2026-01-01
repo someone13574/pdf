@@ -23,15 +23,15 @@ add_library(pdf
     src/trailer.c
     src/types.c
     src/ctx.c
-    src/deserialize.c
+    src/deser.c
     src/test_helpers.c
     src/xobject.c
     src/shading.c
     src/function.c
     src/xref.c)
 target_include_directories(pdf PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(pdf PUBLIC arena geom pdf-error postscript)
-target_link_libraries(pdf PRIVATE codec pdf-logger pdf-test)
+target_link_libraries(pdf PUBLIC arena geom err postscript)
+target_link_libraries(pdf PRIVATE codec logger pdf-test)
 target_compile_features(pdf PUBLIC c_std_11)
 if (NOT MSVC)
     target_compile_options(pdf PRIVATE -fsanitize=address,undefined)

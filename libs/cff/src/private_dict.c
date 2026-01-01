@@ -3,9 +3,9 @@
 #include <stdbool.h>
 
 #include "arena/arena.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "parser.h"
-#include "pdf_error/error.h"
 #include "types.h"
 
 enum { CFF_MAX_OPERANDS = 48 };
@@ -39,7 +39,7 @@ static const char* cff_private_dict_key_names[] = {CFF_PRIVATE_DICT_KEYS};
 #undef X
 #undef CFF_PRIVATE_DICT_KEYS
 
-static PdfError* cff_private_dict_interpret_key(
+static Error* cff_private_dict_interpret_key(
     CffParser* parser,
     uint8_t operator0,
     CffPrivateDictKey* key_out
@@ -59,11 +59,11 @@ static PdfError* cff_private_dict_interpret_key(
         *key_out = (CffPrivateDictKey)(operator0 - 19 + CFF_PRIVATE_DICT_SUBRS);
         return NULL;
     } else if (operator0 != 12) {
-        return PDF_ERROR(PDF_ERR_CFF_INVALID_OPERATOR);
+        return ERROR(CFF_ERR_INVALID_OPERATOR);
     }
 
     CffCard8 operator1;
-    PDF_PROPAGATE(cff_parser_read_card8(parser, &operator1));
+    TRY(cff_parser_read_card8(parser, &operator1));
 
     if (operator1 >= 9 && operator1 <= 11) {
         *key_out =
@@ -75,10 +75,10 @@ static PdfError* cff_private_dict_interpret_key(
         return NULL;
     }
 
-    return PDF_ERROR(PDF_ERR_CFF_INVALID_OPERATOR);
+    return ERROR(CFF_ERR_INVALID_OPERATOR);
 }
 
-static PdfError* read_delta_array(
+static Error* read_delta_array(
     Arena* arena,
     CffToken* operand_stack,
     size_t* operand_count,
@@ -95,7 +95,7 @@ static PdfError* read_delta_array(
     for (size_t idx = 0; idx < *operand_count; idx++) {
         if (operand_stack[idx].type != CFF_TOKEN_INT_OPERAND) {
             // TODO: can these be reals as well for some keys?
-            return PDF_ERROR(PDF_ERR_CFF_INCORRECT_OPERAND);
+            return ERROR(CFF_ERR_INCORRECT_OPERAND);
         }
 
         int32_t value = prev + operand_stack[idx].value.integer;
@@ -108,22 +108,19 @@ static PdfError* read_delta_array(
     return NULL;
 }
 
-static PdfError*
+static Error*
 pop_int(CffToken* operand_stack, size_t* operand_count, int32_t* int_out) {
     RELEASE_ASSERT(operand_stack);
     RELEASE_ASSERT(operand_count);
     RELEASE_ASSERT(int_out);
 
     if (*operand_count == 0) {
-        return PDF_ERROR(PDF_ERR_CFF_MISSING_OPERAND);
+        return ERROR(CFF_ERR_MISSING_OPERAND);
     }
 
     CffToken token = operand_stack[--*operand_count];
     if (token.type != CFF_TOKEN_INT_OPERAND) {
-        return PDF_ERROR(
-            PDF_ERR_CFF_INCORRECT_OPERAND,
-            "Expected integer operand"
-        );
+        return ERROR(CFF_ERR_INCORRECT_OPERAND, "Expected integer operand");
     }
 
     *int_out = token.value.integer;
@@ -131,7 +128,7 @@ pop_int(CffToken* operand_stack, size_t* operand_count, int32_t* int_out) {
     return NULL;
 }
 
-static PdfError* pop_number(
+static Error* pop_number(
     CffToken* operand_stack,
     size_t* operand_count,
     CffNumber* number_out
@@ -141,7 +138,7 @@ static PdfError* pop_number(
     RELEASE_ASSERT(number_out);
 
     if (*operand_count == 0) {
-        return PDF_ERROR(PDF_ERR_CFF_MISSING_OPERAND);
+        return ERROR(CFF_ERR_MISSING_OPERAND);
     }
 
     CffToken token = operand_stack[--*operand_count];
@@ -158,25 +155,19 @@ static PdfError* pop_number(
             break;
         }
         default: {
-            return PDF_ERROR(
-                PDF_ERR_CFF_INCORRECT_OPERAND,
-                "Expected number operand"
-            );
+            return ERROR(CFF_ERR_INCORRECT_OPERAND, "Expected number operand");
         }
     }
 
     if (token.type != CFF_TOKEN_INT_OPERAND
         && token.type != CFF_TOKEN_REAL_OPERAND) {
-        return PDF_ERROR(
-            PDF_ERR_CFF_INCORRECT_OPERAND,
-            "Expected number operand"
-        );
+        return ERROR(CFF_ERR_INCORRECT_OPERAND, "Expected number operand");
     }
 
     return NULL;
 }
 
-PdfError* cff_parse_private_dict(
+Error* cff_parse_private_dict(
     Arena* arena,
     CffParser* parser,
     size_t length,
@@ -192,12 +183,12 @@ PdfError* cff_parse_private_dict(
 
     while (parser->offset < end_offset) {
         CffToken token;
-        PDF_PROPAGATE(cff_parser_read_token(parser, &token));
+        TRY(cff_parser_read_token(parser, &token));
 
         switch (token.type) {
             case CFF_TOKEN_OPERATOR: {
                 CffPrivateDictKey key;
-                PDF_PROPAGATE(cff_private_dict_interpret_key(
+                TRY(cff_private_dict_interpret_key(
                     parser,
                     token.value.operator,
                     &key
@@ -211,7 +202,7 @@ PdfError* cff_parse_private_dict(
                 );
                 switch (key) {
                     case CFF_PRIVATE_DICT_BLUE_VALUES: {
-                        PDF_PROPAGATE(read_delta_array(
+                        TRY(read_delta_array(
                             arena,
                             operand_stack,
                             &operand_count,
@@ -220,7 +211,7 @@ PdfError* cff_parse_private_dict(
                         break;
                     }
                     case CFF_PRIVATE_DICT_STEM_SNAP_H: {
-                        PDF_PROPAGATE(read_delta_array(
+                        TRY(read_delta_array(
                             arena,
                             operand_stack,
                             &operand_count,
@@ -229,7 +220,7 @@ PdfError* cff_parse_private_dict(
                         break;
                     }
                     case CFF_PRIVATE_DICT_STEM_SNAP_V: {
-                        PDF_PROPAGATE(read_delta_array(
+                        TRY(read_delta_array(
                             arena,
                             operand_stack,
                             &operand_count,
@@ -238,7 +229,7 @@ PdfError* cff_parse_private_dict(
                         break;
                     }
                     case CFF_PRIVATE_DICT_STD_HW: {
-                        PDF_PROPAGATE(pop_number(
+                        TRY(pop_number(
                             operand_stack,
                             &operand_count,
                             &private_dict_out->std_hw
@@ -246,7 +237,7 @@ PdfError* cff_parse_private_dict(
                         break;
                     }
                     case CFF_PRIVATE_DICT_STD_VW: {
-                        PDF_PROPAGATE(pop_number(
+                        TRY(pop_number(
                             operand_stack,
                             &operand_count,
                             &private_dict_out->std_vw
@@ -254,7 +245,7 @@ PdfError* cff_parse_private_dict(
                         break;
                     }
                     case CFF_PRIVATE_DICT_SUBRS: {
-                        PDF_PROPAGATE(pop_int(
+                        TRY(pop_int(
                             operand_stack,
                             &operand_count,
                             &private_dict_out->subrs
@@ -262,7 +253,7 @@ PdfError* cff_parse_private_dict(
                         break;
                     }
                     case CFF_PRIVATE_DICT_DEFAULT_WIDTH_X: {
-                        PDF_PROPAGATE(pop_number(
+                        TRY(pop_number(
                             operand_stack,
                             &operand_count,
                             &private_dict_out->default_width_x
@@ -270,7 +261,7 @@ PdfError* cff_parse_private_dict(
                         break;
                     }
                     case CFF_PRIVATE_DICT_NOMINAL_WIDTH_X: {
-                        PDF_PROPAGATE(pop_number(
+                        TRY(pop_number(
                             operand_stack,
                             &operand_count,
                             &private_dict_out->nominal_width_x
@@ -293,7 +284,7 @@ PdfError* cff_parse_private_dict(
                 );
 
                 if (operand_count == CFF_MAX_OPERANDS) {
-                    return PDF_ERROR(
+                    return ERROR(
                         PDF_ERR_EXCESS_OPERAND,
                         "An operator may be preceded by up to a maximum of 48 operands"
                     );

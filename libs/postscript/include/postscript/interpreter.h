@@ -3,7 +3,7 @@
 #include <stdbool.h>
 
 #include "arena/arena.h"
-#include "pdf_error/error.h"
+#include "err/error.h"
 #include "postscript/object.h"
 #include "postscript/resource.h"
 #include "postscript/tokenizer.h"
@@ -34,26 +34,25 @@ void ps_interpreter_add_operator(
 );
 
 /// Process a token.
-PdfError* ps_interpret_token(PSInterpreter* interpreter, PSToken token);
+Error* ps_interpret_token(PSInterpreter* interpreter, PSToken token);
 
 /// Interpret all tokens in a stream
-PdfError*
-ps_interpret_tokens(PSInterpreter* interpreter, PSTokenizer* tokenizer);
+Error* ps_interpret_tokens(PSInterpreter* interpreter, PSTokenizer* tokenizer);
 
 /// Process an object
-PdfError* ps_interpret_object(PSInterpreter* interpreter, PSObject object);
+Error* ps_interpret_object(PSInterpreter* interpreter, PSObject object);
 
 /// Get the operand stack of the interpreter
 PSObjectList* ps_interpreter_stack(PSInterpreter* interpreter);
 
 /// Pop an operand from the top of the operand stack, returning it in
 /// `object_out`.
-PdfError*
+Error*
 ps_interpreter_pop_operand(PSInterpreter* interpreter, PSObject* object_out);
 
 /// Pop an operand from the top of the operand stack, check its type, and return
 /// it in `object_out`.
-PdfError* ps_interpreter_pop_operand_typed(
+Error* ps_interpreter_pop_operand_typed(
     PSInterpreter* interpreter,
     PSObjectType expected_type,
     bool literal,
@@ -70,21 +69,21 @@ void ps_interpreter_dict(PSInterpreter* interpreter, PSObject* object_out);
 void ps_interpreter_dict_push(PSInterpreter* interpreter, PSObject dictionary);
 
 /// Pop a dictionary from the dictionary stack.
-PdfError* ps_interpreter_dict_pop(PSInterpreter* interpreter);
+Error* ps_interpreter_dict_pop(PSInterpreter* interpreter);
 
 /// Get a dictionary value from the dictionary stack.
-PdfError* ps_interpreter_dict_entry(
+Error* ps_interpreter_dict_entry(
     const PSInterpreter* interpreter,
     const PSObject* key,
     PSObject* value_out
 );
 
 /// Define a new key-value pair in the current dictionary.
-PdfError*
+Error*
 ps_interpreter_define(PSInterpreter* interpreter, PSObject key, PSObject value);
 
 /// Gets the current user-data.
-PdfError* ps_interpreter_user_data(
+Error* ps_interpreter_user_data(
     PSInterpreter* interpreter,
     const char* expected_name,
     void** user_data_out
@@ -98,7 +97,7 @@ void ps_interpreter_user_data_push(
 );
 
 /// Pops a user-data from the stack.
-PdfError* ps_interpreter_user_data_pop(
+Error* ps_interpreter_user_data_pop(
     PSInterpreter* interpreter,
     const char* expected_name
 );

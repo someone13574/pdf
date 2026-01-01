@@ -1,4 +1,4 @@
-#include "pdf_error/error.h"
+#include "err/error.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -6,17 +6,17 @@
 
 #include "logger/log.h"
 
-typedef struct PdfErrorCtx {
-    struct PdfErrorCtx* next;
+typedef struct ErrorCtx {
+    struct ErrorCtx* next;
 
     char* message;
     const char* func;
     const char* file;
     unsigned long line;
-} PdfErrorCtx;
+} ErrorCtx;
 
-static PdfErrorCtx* pdf_error_ctx_extend(
-    PdfErrorCtx* chain,
+static ErrorCtx* error_ctx_extend(
+    ErrorCtx* chain,
     char* message,
     const char* func,
     const char* file,
@@ -25,7 +25,7 @@ static PdfErrorCtx* pdf_error_ctx_extend(
     RELEASE_ASSERT(func);
     RELEASE_ASSERT(file);
 
-    PdfErrorCtx* ctx = malloc(sizeof(PdfErrorCtx));
+    ErrorCtx* ctx = malloc(sizeof(ErrorCtx));
     RELEASE_ASSERT(ctx);
 
     ctx->next = chain;
@@ -37,11 +37,11 @@ static PdfErrorCtx* pdf_error_ctx_extend(
     return ctx;
 }
 
-static void pdf_error_ctx_display(PdfErrorCtx* chain) {
+static void error_ctx_display(ErrorCtx* chain) {
     RELEASE_ASSERT(chain);
 
     if (chain->next) {
-        pdf_error_ctx_display(chain->next);
+        error_ctx_display(chain->next);
     }
 
     if (chain->message) {
@@ -70,7 +70,7 @@ static void pdf_error_ctx_display(PdfErrorCtx* chain) {
     }
 }
 
-static void pdf_error_ctx_free(PdfErrorCtx* chain) {
+static void error_ctx_free(ErrorCtx* chain) {
     RELEASE_ASSERT(chain);
 
     if (chain->message) {
@@ -79,7 +79,7 @@ static void pdf_error_ctx_free(PdfErrorCtx* chain) {
     }
 
     if (chain->next) {
-        pdf_error_ctx_free(chain->next);
+        error_ctx_free(chain->next);
         chain->next = NULL;
     }
 
@@ -101,15 +101,15 @@ static char* fmt_error_message(const char* fmt, va_list args) {
     return buffer;
 }
 
-struct PdfError {
-    PdfErrorCode code;
-    PdfErrorCtx* ctx_chain;
-    PdfError* next_error;
+struct Error {
+    ErrorCode code;
+    ErrorCtx* ctx_chain;
+    Error* next_error;
 };
 
-PdfError* pdf_error_new(PdfErrorCode code) {
+Error* error_new(ErrorCode code) {
     // TODO: find a way to do this without dynamically allocated memory
-    PdfError* error = malloc(sizeof(PdfError));
+    Error* error = malloc(sizeof(Error));
     RELEASE_ASSERT(error);
 
     error->code = code;
@@ -119,17 +119,16 @@ PdfError* pdf_error_new(PdfErrorCode code) {
     return error;
 }
 
-void pdf_error_free(PdfError* error) {
+void error_free(Error* error) {
     RELEASE_ASSERT(error);
 
-    pdf_error_ctx_free(error->ctx_chain);
+    error_ctx_free(error->ctx_chain);
     free(error);
 }
 
-PdfError*
-pdf_error_conditional_context(PdfError* error, PdfError* context_error) {
+Error* error_conditional_context(Error* error, Error* context_error) {
     if (!error) {
-        pdf_error_free(context_error);
+        error_free(context_error);
         return NULL;
     }
 
@@ -140,13 +139,13 @@ pdf_error_conditional_context(PdfError* error, PdfError* context_error) {
     RELEASE_ASSERT(error);
     RELEASE_ASSERT(context_error);
 
-    PDF_ERROR_ADD_CONTEXT_FMT(error, "Attached context error to this error");
-    PDF_ERROR_ADD_CONTEXT_FMT(
+    ERROR_ADD_CONTEXT_FMT(error, "Attached context error to this error");
+    ERROR_ADD_CONTEXT_FMT(
         context_error,
         "Attached this error as context to another error"
     );
 
-    PdfError* curr_error = context_error;
+    Error* curr_error = context_error;
     while (curr_error->next_error) {
         curr_error = curr_error->next_error;
     }
@@ -155,8 +154,8 @@ pdf_error_conditional_context(PdfError* error, PdfError* context_error) {
     return context_error;
 }
 
-PdfError* pdf_error_add_context(
-    PdfError* error,
+Error* error_add_context(
+    Error* error,
     const char* func,
     const char* file,
     unsigned long line,
@@ -167,7 +166,7 @@ PdfError* pdf_error_add_context(
     RELEASE_ASSERT(func);
     RELEASE_ASSERT(file);
 
-    PdfError* curr_error = error;
+    Error* curr_error = error;
 
     do {
         if (fmt) {
@@ -175,16 +174,11 @@ PdfError* pdf_error_add_context(
             va_start(args, fmt);
             char* message = fmt_error_message(fmt, args);
             va_end(args);
-            error->ctx_chain = pdf_error_ctx_extend(
-                error->ctx_chain,
-                message,
-                func,
-                file,
-                line
-            );
+            error->ctx_chain =
+                error_ctx_extend(error->ctx_chain, message, func, file, line);
         } else {
             error->ctx_chain =
-                pdf_error_ctx_extend(error->ctx_chain, NULL, func, file, line);
+                error_ctx_extend(error->ctx_chain, NULL, func, file, line);
         }
 
         curr_error = curr_error->next_error;
@@ -193,30 +187,30 @@ PdfError* pdf_error_add_context(
     return error;
 }
 
-PdfErrorCode pdf_error_code(const PdfError* error) {
+ErrorCode error_code(const Error* error) {
     RELEASE_ASSERT(error);
 
     return error->code;
 }
 
-void pdf_error_print(const PdfError* error) {
+void error_print(const Error* error) {
     RELEASE_ASSERT(error);
 
     if (error->ctx_chain) {
-        pdf_error_ctx_display(error->ctx_chain);
+        error_ctx_display(error->ctx_chain);
     }
 }
 
-void pdf_error_unwrap(PdfError* error, const char* file, unsigned long line) {
+void error_unwrap(Error* error, const char* file, unsigned long line) {
     RELEASE_ASSERT(error);
     RELEASE_ASSERT(file);
 
-    pdf_error_print(error);
+    error_print(error);
 
-    PdfErrorCode code = error->code;
-    PdfError* next_error = error->next_error;
+    ErrorCode code = error->code;
+    Error* next_error = error->next_error;
 
-    pdf_error_free(error);
+    error_free(error);
 
     logger_log(
         "ERROR",
@@ -231,15 +225,15 @@ void pdf_error_unwrap(PdfError* error, const char* file, unsigned long line) {
 
     if (next_error) {
         printf("\n");
-        pdf_error_unwrap(next_error, file, line);
+        error_unwrap(next_error, file, line);
     } else {
         exit(EXIT_FAILURE);
     }
 }
 
-bool pdf_error_free_is_ok(PdfError* error) {
+bool error_free_is_ok(Error* error) {
     if (error) {
-        pdf_error_free(error);
+        error_free(error);
         return false;
     } else {
         return true;

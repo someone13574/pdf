@@ -2,8 +2,8 @@
 
 #include <string.h>
 
+#include "err/error.h"
 #include "logger/log.h"
-#include "pdf_error/error.h"
 #include "postscript/object.h"
 
 #define DVEC_NAME PSResourceVec
@@ -64,7 +64,7 @@ PSResourceCategory ps_resource_category_new(Arena* arena, char* name) {
                                  .resources = ps_resource_vec_new(arena)};
 }
 
-PdfError* ps_resource_category_add_resource(
+Error* ps_resource_category_add_resource(
     PSResourceCategory* category,
     PSResource resource
 ) {
@@ -72,8 +72,8 @@ PdfError* ps_resource_category_add_resource(
     RELEASE_ASSERT(resource.name);
 
     if (ps_resource_category_get_resource(category, resource.name)) {
-        PDF_ERROR(
-            PDF_ERR_PS_RESOURCE_DEFINED,
+        ERROR(
+            PS_ERR_RESOURCE_DEFINED,
             "Resource `%s` is already defined",
             resource.name
         );

@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
-#include "pdf_error/error.h"
+#include "err/error.h"
 #include "postscript/tokenizer.h"
 
 #define PS_OBJECT_TYPES                                                        \
@@ -54,7 +54,7 @@ typedef enum {
 
 typedef struct PSInterpreter PSInterpreter;
 typedef struct PSObjectList PSObjectList;
-typedef PdfError* (*PSOperator)(PSInterpreter* interpreter);
+typedef Error* (*PSOperator)(PSInterpreter* interpreter);
 
 /// A buffer for collecting literal objects.
 typedef struct {
@@ -87,7 +87,7 @@ typedef struct {
     PSAccess access;
 } PSObject;
 
-PdfError* ps_object_execute(PSInterpreter* interpreter, const PSObject* object);
+Error* ps_object_execute(PSInterpreter* interpreter, const PSObject* object);
 bool ps_object_eq(const PSObject* a, const PSObject* b);
 const char* ps_object_fmt(Arena* arena, const PSObject* object);
 

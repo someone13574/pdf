@@ -132,20 +132,20 @@ typedef struct {
     PdfIgnored cid_set;
 } PdfFontDescriptor;
 
-PdfError* pdf_deserialize_font_descriptor(
+Error* pdf_deser_font_descriptor(
     const PdfObject* object,
     PdfFontDescriptor* target_ptr,
     PdfResolver* resolver
 );
 
-DESERDE_DECL_RESOLVABLE(
+DESER_DECL_RESOLVABLE(
     PdfFontDescriptorRef,
     PdfFontDescriptor,
     pdf_font_descriptor_ref_init,
     pdf_resolve_font_descriptor
 )
 
-DESERDE_DECL_OPTIONAL(
+DESER_DECL_OPTIONAL(
     PdfFontDescriptorRefOptional,
     PdfFontDescriptorRef,
     pdf_font_descriptor_ref_op_init

@@ -6,16 +6,16 @@
 #include "pdf/resources.h"
 
 typedef struct PdfPages PdfPages;
-DESERDE_DECL_RESOLVABLE(
+DESER_DECL_RESOLVABLE(
     PdfPagesRef,
     PdfPages,
     pdf_pages_ref_init,
     pdf_resolve_pages
 )
-DESERDE_DECL_OPTIONAL(PdfPagesRefOptional, PdfPagesRef, pdf_pages_ref_op_init)
+DESER_DECL_OPTIONAL(PdfPagesRefOptional, PdfPagesRef, pdf_pages_ref_op_init)
 
 typedef struct PdfPageTree PdfPageTree;
-DESERDE_DECL_RESOLVABLE(
+DESER_DECL_RESOLVABLE(
     PdfPageTreeRef,
     PdfPageTree,
     pdf_page_tree_ref_init,
@@ -192,18 +192,13 @@ typedef struct {
     PdfUnimplemented vp;
 } PdfPage;
 
-PdfError* pdf_deserialize_page(
+Error* pdf_deser_page(
     const PdfObject* object,
     PdfPage* target_ptr,
     PdfResolver* resolver
 );
 
-DESERDE_DECL_RESOLVABLE(
-    PdfPageRef,
-    PdfPage,
-    pdf_page_ref_init,
-    pdf_resolve_page
-)
+DESER_DECL_RESOLVABLE(PdfPageRef, PdfPage, pdf_page_ref_init, pdf_resolve_page)
 
 struct PdfPages {
     /// (Required) The type of PDF object that this dictionary describes; shall
@@ -251,7 +246,7 @@ struct PdfPages {
     PdfIntegerOptional rotate;
 };
 
-PdfError* pdf_deserialize_pages(
+Error* pdf_deser_pages(
     const PdfObject* object,
     PdfPages* target_ptr,
     PdfResolver* resolver
@@ -265,7 +260,7 @@ struct PdfPageTree {
     } value;
 };
 
-PdfError* pdf_deserialize_page_tree(
+Error* pdf_deser_page_tree(
     const PdfObject* object,
     PdfPageTree* target_ptr,
     PdfResolver* resolver
@@ -276,10 +271,10 @@ void pdf_page_tree_inherit(PdfPageTree* dst, PdfPages* src);
 
 typedef struct PdfPageIter PdfPageIter;
 
-PdfError* pdf_page_iter_new(
+Error* pdf_page_iter_new(
     PdfResolver* resolver,
     PdfPagesRef root_ref,
     PdfPageIter** iter_out
 );
 
-PdfError* pdf_page_iter_next(PdfPageIter* iter, PdfPage* out_page, bool* done);
+Error* pdf_page_iter_next(PdfPageIter* iter, PdfPage* out_page, bool* done);

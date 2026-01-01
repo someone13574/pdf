@@ -2,18 +2,18 @@
 
 #include <stdbool.h>
 
-#include "../deserialize.h"
+#include "../deser.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 #define DVEC_NAME PdfFontWidthVec
 #define DVEC_LOWERCASE_NAME pdf_font_width_vec
 #define DVEC_TYPE PdfFontWidthEntry
 #include "arena/dvec_impl.h"
 
-PdfError* pdf_deserialize_font_widths(
+Error* pdf_deser_font_widths(
     const PdfObject* object,
     PdfFontWidths* deserialized,
     PdfResolver* resolver
@@ -31,7 +31,7 @@ PdfError* pdf_deserialize_font_widths(
     pdf_resolve_object(resolver, object, &resolved_object, true);
 
     if (resolved_object.type != PDF_OBJECT_TYPE_ARRAY) {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "Font width array must be an array"
         );
@@ -101,7 +101,7 @@ PdfError* pdf_deserialize_font_widths(
             }
         } else if (element->type == PDF_OBJECT_TYPE_ARRAY) {
             if (integers_read != 1) {
-                return PDF_ERROR(
+                return ERROR(
                     PDF_ERR_INCORRECT_TYPE,
                     "Array of widths must have exactly one preceding integer"
                 );
@@ -143,7 +143,7 @@ PdfError* pdf_deserialize_font_widths(
                 ));
 
                 if (subarray_element->type != PDF_OBJECT_TYPE_INTEGER) {
-                    return PDF_ERROR(
+                    return ERROR(
                         PDF_ERR_INCORRECT_TYPE,
                         "Object type in array of widths must be an integer"
                     );
@@ -155,7 +155,7 @@ PdfError* pdf_deserialize_font_widths(
 
             integers_read = 0;
         } else {
-            return PDF_ERROR(
+            return ERROR(
                 PDF_ERR_INCORRECT_TYPE,
                 "Only integers and arrays of integers can be in a widths array"
             );
@@ -165,8 +165,5 @@ PdfError* pdf_deserialize_font_widths(
     return NULL;
 }
 
-DESERDE_IMPL_TRAMPOLINE(
-    pdf_deserialize_font_widths_trampoline,
-    pdf_deserialize_font_widths
-)
-DESERDE_IMPL_OPTIONAL(PdfFontWidthsOptional, pdf_font_widths_op_init)
+DESER_IMPL_TRAMPOLINE(pdf_deser_font_widths_trampoline, pdf_deser_font_widths)
+DESER_IMPL_OPTIONAL(PdfFontWidthsOptional, pdf_font_widths_op_init)

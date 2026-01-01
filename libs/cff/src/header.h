@@ -1,7 +1,7 @@
 #pragma once
 
+#include "err/error.h"
 #include "parser.h"
-#include "pdf_error/error.h"
 #include "types.h"
 
 typedef struct {
@@ -18,4 +18,4 @@ typedef struct {
     CffOffsetSize offset_size;
 } CffHeader;
 
-PdfError* cff_read_header(CffParser* parser, CffHeader* cff_header_out);
+Error* cff_read_header(CffParser* parser, CffHeader* cff_header_out);

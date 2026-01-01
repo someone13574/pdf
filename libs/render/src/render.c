@@ -7,6 +7,7 @@
 #include "cache.h"
 #include "canvas/canvas.h"
 #include "canvas/path_builder.h"
+#include "err/error.h"
 #include "geom/mat3.h"
 #include "geom/rect.h"
 #include "geom/vec2.h"
@@ -22,7 +23,6 @@
 #include "pdf/resources.h"
 #include "pdf/shading.h"
 #include "pdf/xobject.h"
-#include "pdf_error/error.h"
 #include "text_state.h"
 
 static CanvasLineCap pdf_line_cap_to_canvas(PdfLineCapStyle line_cap) {
@@ -84,12 +84,12 @@ static void save_graphics_state(RenderState* state) {
     );
 }
 
-static PdfError* restore_graphics_state(RenderState* state) {
+static Error* restore_graphics_state(RenderState* state) {
     RELEASE_ASSERT(state);
 
     if (!graphics_state_stack_pop_front(state->graphics_state_stack, NULL)) {
-        return PDF_ERROR(
-            PDF_ERR_RENDER_GSTATE_CANNOT_RESTORE,
+        return ERROR(
+            RENDER_ERR_GSTATE_CANNOT_RESTORE,
             "GState stack underflow"
         );
     }
@@ -102,7 +102,7 @@ static uint32_t pack_rgba(GeomVec3 rgb, double a) {
          | ((uint32_t)(rgb.z * 255.0) << 8) | (uint32_t)(a * 255.0);
 }
 
-static PdfError* process_content_stream(
+static Error* process_content_stream(
     Arena* arena,
     RenderState* state,
     PdfContentStream* content_stream,
@@ -156,11 +156,7 @@ static PdfError* process_content_stream(
                 RELEASE_ASSERT(gstate_object);
 
                 PdfGStateParams params;
-                PDF_PROPAGATE(pdf_deserialize_gstate_params(
-                    gstate_object,
-                    &params,
-                    resolver
-                ));
+                TRY(pdf_deser_gstate_params(gstate_object, &params, resolver));
 
                 graphics_state_apply_params(
                     current_graphics_state(state),
@@ -173,7 +169,7 @@ static PdfError* process_content_stream(
                 break;
             }
             case PDF_OPERATOR_Q: {
-                PDF_PROPAGATE(restore_graphics_state(state));
+                TRY(restore_graphics_state(state));
                 break;
             }
             case PDF_OPERATOR_cm: {
@@ -341,7 +337,7 @@ static PdfError* process_content_stream(
                     op.data.set_font.font
                 );
 
-                PDF_PROPAGATE(pdf_deserialize_font(
+                TRY(pdf_deser_font(
                     font_object,
                     &current_graphics_state(state)->text_state.text_font,
                     resolver
@@ -427,7 +423,7 @@ static PdfError* process_content_stream(
                             )
                         };
 
-                        PDF_PROPAGATE(text_state_render(
+                        TRY(text_state_render(
                             arena,
                             canvas,
                             resolver,
@@ -453,7 +449,7 @@ static PdfError* process_content_stream(
                 );
                 RELEASE_ASSERT(color_space_object);
 
-                PDF_PROPAGATE(pdf_deserialize_color_space(
+                TRY(pdf_deser_color_space(
                     color_space_object,
                     &graphics_state->nonstroking_color_space,
                     resolver
@@ -514,7 +510,7 @@ static PdfError* process_content_stream(
                 switch (graphics_state->nonstroking_color_space.family) {
                     case PDF_COLOR_SPACE_CAL_RGB: {
                         if (pdf_object_vec_len(op.data.set_color) != 3) {
-                            return PDF_ERROR(
+                            return ERROR(
                                 PDF_ERR_MISSING_OPERAND,
                                 "Expected 3 operands, found %zu",
                                 pdf_object_vec_len(op.data.set_color)
@@ -531,7 +527,7 @@ static PdfError* process_content_stream(
                                 &component
                             ));
 
-                            PDF_PROPAGATE(pdf_deserialize_num_as_real(
+                            TRY(pdf_deser_num_as_real(
                                 component,
                                 &components[component_idx],
                                 resolver
@@ -675,7 +671,7 @@ static PdfError* process_content_stream(
                 RELEASE_ASSERT(shading_object);
 
                 PdfObject resolved;
-                PDF_PROPAGATE(pdf_resolve_object(
+                TRY(pdf_resolve_object(
                     resolver,
                     shading_object,
                     &resolved,
@@ -683,11 +679,7 @@ static PdfError* process_content_stream(
                 ));
 
                 PdfShadingDict shading_dict;
-                PDF_PROPAGATE(pdf_deserialize_shading_dict(
-                    &resolved,
-                    &shading_dict,
-                    resolver
-                ));
+                TRY(pdf_deser_shading_dict(&resolved, &shading_dict, resolver));
 
                 // LOG_PANIC("here");
 
@@ -704,9 +696,7 @@ static PdfError* process_content_stream(
                 RELEASE_ASSERT(xobject_object);
 
                 PdfXObject xobject;
-                PDF_PROPAGATE(
-                    pdf_deserialize_xobject(xobject_object, &xobject, resolver)
-                );
+                TRY(pdf_deser_xobject(xobject_object, &xobject, resolver));
 
                 switch (xobject.type) {
                     case PDF_XOBJECT_IMAGE: {
@@ -722,7 +712,7 @@ static PdfError* process_content_stream(
                         );
                         // TODO: clip with bbox
 
-                        PDF_PROPAGATE(process_content_stream(
+                        TRY(process_content_stream(
                             arena,
                             state,
                             &form->content_stream,
@@ -731,7 +721,7 @@ static PdfError* process_content_stream(
                             canvas
                         ));
 
-                        PDF_PROPAGATE(restore_graphics_state(state));
+                        TRY(restore_graphics_state(state));
                     }
                 }
 
@@ -746,7 +736,7 @@ static PdfError* process_content_stream(
     return NULL;
 }
 
-PdfError* render_page(
+Error* render_page(
     Arena* arena,
     PdfResolver* resolver,
     const PdfPage* page,
@@ -821,11 +811,9 @@ PdfError* render_page(
             ));
 
             PdfContentStream stream;
-            PDF_PROPAGATE(
-                pdf_resolve_content_stream(stream_ref, resolver, &stream)
-            );
+            TRY(pdf_resolve_content_stream(stream_ref, resolver, &stream));
 
-            PDF_PROPAGATE(process_content_stream(
+            TRY(process_content_stream(
                 arena,
                 &state,
                 &stream,

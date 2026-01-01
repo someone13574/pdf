@@ -5,10 +5,10 @@
 #include "arena/arena.h"
 #include "canvas/canvas.h"
 #include "canvas/path_builder.h"
+#include "err/error.h"
 #include "geom/vec2.h"
 #include "logger/log.h"
 #include "parser.h"
-#include "pdf_error/error.h"
 #include "sfnt/glyph.h"
 
 #define DVEC_NAME SfntSimpleGlyphFlagsVec
@@ -21,7 +21,7 @@
 #define DARRAY_TYPE SfntGlyphPoint
 #include "arena/darray_impl.h"
 
-PdfError*
+Error*
 sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(parser);
@@ -32,13 +32,11 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
 
     data->end_pts_of_contours =
         uint16_array_new(arena, (size_t)glyph->num_contours);
-    PDF_PROPAGATE(
-        sfnt_parser_read_uint16_array(parser, data->end_pts_of_contours)
-    );
+    TRY(sfnt_parser_read_uint16_array(parser, data->end_pts_of_contours));
 
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->instruction_len));
+    TRY(sfnt_parser_read_uint16(parser, &data->instruction_len));
     data->instructions = uint8_array_new(arena, data->instruction_len);
-    PDF_PROPAGATE(sfnt_parser_read_uint8_array(parser, data->instructions));
+    TRY(sfnt_parser_read_uint8_array(parser, data->instructions));
 
     uint16_t last_point_idx;
     RELEASE_ASSERT(uint16_array_get(
@@ -53,10 +51,10 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
 
     while (point_idx <= last_point_idx) {
         SfntSimpleGlyphFlags flags = {.flags = 0, .repetitions = 0};
-        PDF_PROPAGATE(sfnt_parser_read_uint8(parser, &flags.flags));
+        TRY(sfnt_parser_read_uint8(parser, &flags.flags));
 
         if ((flags.flags & SFNT_SIMPLE_GLYPH_REPEAT) != 0) {
-            PDF_PROPAGATE(sfnt_parser_read_uint8(parser, &flags.repetitions));
+            TRY(sfnt_parser_read_uint8(parser, &flags.repetitions));
         }
 
         point_idx += (uint16_t)(flags.repetitions + 1);
@@ -100,7 +98,7 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
                 bool positive =
                     (flags.flags & SFNT_SIMPLE_GLYPH_X_MODIFIER) != 0;
                 uint8_t delta_mag;
-                PDF_PROPAGATE(sfnt_parser_read_uint8(parser, &delta_mag));
+                TRY(sfnt_parser_read_uint8(parser, &delta_mag));
 
                 int16_t delta_x =
                     (int16_t)(positive ? delta_mag : -(int16_t)delta_mag);
@@ -112,7 +110,7 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
                 );
             } else {
                 int16_t delta_x;
-                PDF_PROPAGATE(sfnt_parser_read_int16(parser, &delta_x));
+                TRY(sfnt_parser_read_int16(parser, &delta_x));
 
                 LOG_DIAG(TRACE, SFNT, "Delta-x: %d", delta_x);
                 sfnt_glyph_point_array_set(
@@ -161,7 +159,7 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
                 bool positive =
                     (flags.flags & SFNT_SIMPLE_GLYPH_Y_MODIFIER) != 0;
                 uint8_t delta_mag;
-                PDF_PROPAGATE(sfnt_parser_read_uint8(parser, &delta_mag));
+                TRY(sfnt_parser_read_uint8(parser, &delta_mag));
 
                 int16_t delta_y =
                     (int16_t)(positive ? delta_mag : -(int16_t)delta_mag);
@@ -175,7 +173,7 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
                 point->delta_y = delta_y;
             } else {
                 int16_t delta_y;
-                PDF_PROPAGATE(sfnt_parser_read_int16(parser, &delta_y));
+                TRY(sfnt_parser_read_int16(parser, &delta_y));
 
                 LOG_DIAG(TRACE, SFNT, "Delta-y: %d", delta_y);
                 SfntGlyphPoint* point;
@@ -192,16 +190,16 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
     return NULL;
 }
 
-PdfError* sfnt_parse_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
+Error* sfnt_parse_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(glyph);
 
-    PDF_PROPAGATE(sfnt_parser_read_int16(parser, &glyph->num_contours));
-    PDF_PROPAGATE(sfnt_parser_read_fword(parser, &glyph->x_min));
-    PDF_PROPAGATE(sfnt_parser_read_fword(parser, &glyph->y_min));
-    PDF_PROPAGATE(sfnt_parser_read_fword(parser, &glyph->x_max));
-    PDF_PROPAGATE(sfnt_parser_read_fword(parser, &glyph->y_max));
+    TRY(sfnt_parser_read_int16(parser, &glyph->num_contours));
+    TRY(sfnt_parser_read_fword(parser, &glyph->x_min));
+    TRY(sfnt_parser_read_fword(parser, &glyph->y_min));
+    TRY(sfnt_parser_read_fword(parser, &glyph->x_max));
+    TRY(sfnt_parser_read_fword(parser, &glyph->y_max));
 
     if (glyph->num_contours == 0) {
         glyph->glyph_type = SFNT_GLYPH_TYPE_NONE;

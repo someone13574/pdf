@@ -3,9 +3,9 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
+#include "err/error.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 typedef struct {
     /// A string identifying the issuer of the character collection.
@@ -24,30 +24,28 @@ typedef struct {
     PdfInteger supplement;
 } PdfCIDSystemInfo;
 
-PdfError* pdf_deserialize_cid_system_info(
+Error* pdf_deser_cid_system_info(
     const PdfObject* object,
     PdfCIDSystemInfo* target_ptr,
     PdfResolver* resolver
 );
 
-DESERDE_DECL_TRAMPOLINE(pdf_deserialize_cid_system_info_trampoline)
+DESER_DECL_TRAMPOLINE(pdf_deser_cid_system_info_trampoline)
 
 typedef struct PdfCMap PdfCMap;
 
-PdfError*
-pdf_cmap_get_cid(PdfCMap* cmap, uint32_t codepoint, uint32_t* cid_out);
+Error* pdf_cmap_get_cid(PdfCMap* cmap, uint32_t codepoint, uint32_t* cid_out);
 
-PdfError*
-pdf_cmap_get_unicode(PdfCMap* cmap, uint32_t cid, uint32_t* unicode_out);
+Error* pdf_cmap_get_unicode(PdfCMap* cmap, uint32_t cid, uint32_t* unicode_out);
 
-PdfError* pdf_parse_cmap(
+Error* pdf_parse_cmap(
     Arena* arena,
     const uint8_t* data,
     size_t data_len,
     PdfCMap** cmap_out
 );
 
-PdfError* pdf_load_cmap(Arena* arena, char* name, PdfCMap** cmap_out);
+Error* pdf_load_cmap(Arena* arena, char* name, PdfCMap** cmap_out);
 
 typedef struct PdfCMapCache PdfCMapCache;
 
@@ -55,5 +53,4 @@ typedef struct PdfCMapCache PdfCMapCache;
 PdfCMapCache* pdf_cmap_cache_new(Arena* arena);
 
 /// Gets a cmap associated with a name, loading it if required.
-PdfError*
-pdf_cmap_cache_get(PdfCMapCache* cache, char* name, PdfCMap** cmap_out);
+Error* pdf_cmap_cache_get(PdfCMapCache* cache, char* name, PdfCMap** cmap_out);

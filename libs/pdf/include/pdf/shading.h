@@ -1,10 +1,10 @@
 #pragma once
 
+#include "err/error.h"
 #include "pdf/color_space.h"
 #include "pdf/function.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 /// Axial shadings
 typedef struct {
@@ -113,7 +113,7 @@ typedef struct {
     PdfShadingDictData data;
 } PdfShadingDict;
 
-PdfError* pdf_deserialize_shading_dict(
+Error* pdf_deser_shading_dict(
     const PdfObject* object,
     PdfShadingDict* target_ptr,
     PdfResolver* resolver

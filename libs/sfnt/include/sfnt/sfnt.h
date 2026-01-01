@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
-#include "pdf_error/error.h"
+#include "err/error.h"
 #include "sfnt/glyph.h"
 #include "sfnt/types.h"
 
@@ -49,7 +49,7 @@ typedef struct {
 
 typedef struct SfntFont SfntFont;
 
-PdfError* sfnt_font_new(
+Error* sfnt_font_new(
     Arena* arena,
     const uint8_t* buffer,
     size_t buffer_len,
@@ -58,7 +58,7 @@ PdfError* sfnt_font_new(
 
 SfntHead sfnt_font_head(SfntFont* font);
 
-PdfError*
+Error*
 sfnt_get_glyph_for_cid(SfntFont* font, uint32_t cid, SfntGlyph* glyph_out);
-PdfError*
+Error*
 sfnt_get_glyph_for_gid(SfntFont* font, uint32_t gid, SfntGlyph* glyph_out);

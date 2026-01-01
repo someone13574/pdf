@@ -3,9 +3,9 @@
 
 #include "../ctx.h"
 #include "arena/arena.h"
+#include "err/error.h"
 #include "filters.h"
 #include "logger/log.h"
-#include "pdf_error/error.h"
 
 static bool char_to_hex(uint8_t c, int* out) {
     if (c >= '0' && c <= '9') {
@@ -24,7 +24,7 @@ static bool char_to_hex(uint8_t c, int* out) {
 
 // TODO: Merge the three different implementations of this (this one, the
 // postscript one, and I think there is one in the charstring2 implementation)
-PdfError* pdf_filter_ascii_hex_decode(
+Error* pdf_filter_ascii_hex_decode(
     Arena* arena,
     const uint8_t* stream,
     size_t stream_len,
@@ -55,7 +55,7 @@ PdfError* pdf_filter_ascii_hex_decode(
 
         int hex;
         if (!char_to_hex(c, &hex)) {
-            return PDF_ERROR(
+            return ERROR(
                 PDF_ERR_ASCII_HEX_INVALID,
                 "Unexpected character `%c` in ASCIIHexDecode filter stream",
                 c
@@ -85,7 +85,7 @@ TEST_FUNC(test_ascii_hex_decode_basic) {
 
     uint8_t* decoded = NULL;
     size_t decoded_len;
-    TEST_PDF_REQUIRE(pdf_filter_ascii_hex_decode(
+    TEST_REQUIRE(pdf_filter_ascii_hex_decode(
         arena,
         (uint8_t*)encoded,
         strlen(encoded),
@@ -109,7 +109,7 @@ TEST_FUNC(test_ascii_hex_decode_spaces) {
 
     uint8_t* decoded = NULL;
     size_t decoded_len;
-    TEST_PDF_REQUIRE(pdf_filter_ascii_hex_decode(
+    TEST_REQUIRE(pdf_filter_ascii_hex_decode(
         arena,
         (uint8_t*)encoded,
         strlen(encoded),
@@ -133,7 +133,7 @@ TEST_FUNC(test_ascii_hex_decode_even_eod) {
 
     uint8_t* decoded = NULL;
     size_t decoded_len;
-    TEST_PDF_REQUIRE(pdf_filter_ascii_hex_decode(
+    TEST_REQUIRE(pdf_filter_ascii_hex_decode(
         arena,
         (uint8_t*)encoded,
         strlen(encoded),
@@ -157,7 +157,7 @@ TEST_FUNC(test_ascii_hex_decode_odd_eod) {
 
     uint8_t* decoded = NULL;
     size_t decoded_len;
-    TEST_PDF_REQUIRE(pdf_filter_ascii_hex_decode(
+    TEST_REQUIRE(pdf_filter_ascii_hex_decode(
         arena,
         (uint8_t*)encoded,
         strlen(encoded),
@@ -181,7 +181,7 @@ TEST_FUNC(test_ascii_hex_decode_err) {
 
     uint8_t* decoded = NULL;
     size_t decoded_len;
-    TEST_PDF_REQUIRE_ERR(
+    TEST_REQUIRE_ERR(
         pdf_filter_ascii_hex_decode(
             arena,
             (uint8_t*)encoded,

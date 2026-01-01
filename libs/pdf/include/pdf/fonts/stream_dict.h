@@ -1,8 +1,8 @@
 #pragma once
 
+#include "err/error.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 typedef struct {
     PdfIntegerOptional length1;
@@ -12,7 +12,7 @@ typedef struct {
     PdfStreamOptional metadata;
 } PdfFontStreamDict;
 
-PdfError* pdf_deserialize_font_stream_dict(
+Error* pdf_deser_font_stream_dict(
     const PdfObject* object,
     PdfFontStreamDict* target_ptr,
     PdfResolver* resolver

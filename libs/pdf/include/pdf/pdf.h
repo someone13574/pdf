@@ -1,9 +1,9 @@
 #pragma once
 
+#include "err/error.h"
 #include "pdf/catalog.h"
 #include "pdf/resolver.h"
 #include "pdf/trailer.h"
-#include "pdf_error/error.h"
 
 void pdf_get_trailer(PdfResolver* resolver, PdfTrailer* trailer);
-PdfError* pdf_get_catalog(PdfResolver* resolver, PdfCatalog* catalog);
+Error* pdf_get_catalog(PdfResolver* resolver, PdfCatalog* catalog);

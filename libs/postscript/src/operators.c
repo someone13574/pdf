@@ -4,8 +4,8 @@
 #include <stdbool.h>
 
 #include "arena/arena.h"
+#include "err/error.h"
 #include "logger/log.h"
-#include "pdf_error/error.h"
 #include "postscript/interpreter.h"
 #include "postscript/object.h"
 #include "postscript/resource.h"
@@ -90,22 +90,22 @@ PSObject ps_systemdict_ops(Arena* arena) {
     return dict;
 }
 
-PdfError* ps_builtin_op_pop(PSInterpreter* interpreter) {
+Error* ps_builtin_op_pop(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PSObject popped;
-    PDF_PROPAGATE(ps_interpreter_pop_operand(interpreter, &popped));
+    TRY(ps_interpreter_pop_operand(interpreter, &popped));
 
     return NULL;
 }
 
-PdfError* ps_builtin_op_exch(PSInterpreter* interpreter) {
+Error* ps_builtin_op_exch(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PSObject a;
-    PDF_PROPAGATE(ps_interpreter_pop_operand(interpreter, &a));
+    TRY(ps_interpreter_pop_operand(interpreter, &a));
     PSObject b;
-    PDF_PROPAGATE(ps_interpreter_pop_operand(interpreter, &b));
+    TRY(ps_interpreter_pop_operand(interpreter, &b));
 
     ps_interpreter_operand_push(interpreter, a);
     ps_interpreter_operand_push(interpreter, b);
@@ -113,11 +113,11 @@ PdfError* ps_builtin_op_exch(PSInterpreter* interpreter) {
     return NULL;
 }
 
-PdfError* ps_builtin_op_dup(PSInterpreter* interpreter) {
+Error* ps_builtin_op_dup(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PSObject object;
-    PDF_PROPAGATE(ps_interpreter_pop_operand(interpreter, &object));
+    TRY(ps_interpreter_pop_operand(interpreter, &object));
 
     ps_interpreter_operand_push(interpreter, object);
     ps_interpreter_operand_push(interpreter, object);
@@ -125,11 +125,11 @@ PdfError* ps_builtin_op_dup(PSInterpreter* interpreter) {
     return NULL;
 }
 
-PdfError* ps_builtin_op_copy(PSInterpreter* interpreter) {
+Error* ps_builtin_op_copy(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PSObject count_object;
-    PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+    TRY(ps_interpreter_pop_operand_typed(
         interpreter,
         PS_OBJECT_INTEGER,
         true,
@@ -141,7 +141,7 @@ PdfError* ps_builtin_op_copy(PSInterpreter* interpreter) {
 
     for (int32_t idx = 0; idx < count_object.data.integer; idx++) {
         PSObject object;
-        PDF_PROPAGATE(ps_interpreter_pop_operand(interpreter, &object));
+        TRY(ps_interpreter_pop_operand(interpreter, &object));
 
         ps_object_list_push_back(list, object);
     }
@@ -163,9 +163,9 @@ PdfError* ps_builtin_op_copy(PSInterpreter* interpreter) {
     return NULL;
 }
 
-PdfError* ps_builtin_op_index(PSInterpreter* interpreter) {
+Error* ps_builtin_op_index(PSInterpreter* interpreter) {
     PSObject idx_object;
-    PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+    TRY(ps_interpreter_pop_operand_typed(
         interpreter,
         PS_OBJECT_INTEGER,
         true,
@@ -176,7 +176,7 @@ PdfError* ps_builtin_op_index(PSInterpreter* interpreter) {
     size_t len = ps_object_list_len(stack);
     if (idx_object.data.integer >= (int32_t)len
         || idx_object.data.integer < 0) {
-        return PDF_ERROR(PDF_ERR_PS_OPERANDS_EMPTY);
+        return ERROR(PS_ERR_OPERANDS_EMPTY);
     }
 
     PSObject object;
@@ -185,17 +185,17 @@ PdfError* ps_builtin_op_index(PSInterpreter* interpreter) {
             len - (size_t)idx_object.data.integer - 1,
             &object
         )) {
-        return PDF_ERROR(PDF_ERR_PS_OPERANDS_EMPTY);
+        return ERROR(PS_ERR_OPERANDS_EMPTY);
     }
 
     return NULL;
 }
 
-PdfError* ps_builtin_op_roll(PSInterpreter* interpreter) {
+Error* ps_builtin_op_roll(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PSObject j_object;
-    PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+    TRY(ps_interpreter_pop_operand_typed(
         interpreter,
         PS_OBJECT_INTEGER,
         true,
@@ -203,7 +203,7 @@ PdfError* ps_builtin_op_roll(PSInterpreter* interpreter) {
     ));
 
     PSObject n_object;
-    PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+    TRY(ps_interpreter_pop_operand_typed(
         interpreter,
         PS_OBJECT_INTEGER,
         true,
@@ -214,7 +214,7 @@ PdfError* ps_builtin_op_roll(PSInterpreter* interpreter) {
     int32_t j = j_object.data.integer;
 
     if (n < 0) {
-        return PDF_ERROR(PDF_ERR_PS_OPERANDS_EMPTY);
+        return ERROR(PS_ERR_OPERANDS_EMPTY);
     }
     if (n == 0) {
         return NULL;
@@ -225,7 +225,7 @@ PdfError* ps_builtin_op_roll(PSInterpreter* interpreter) {
 
     for (int32_t idx = 0; idx < n; idx++) {
         PSObject object;
-        PDF_PROPAGATE(ps_interpreter_pop_operand(interpreter, &object));
+        TRY(ps_interpreter_pop_operand(interpreter, &object));
         ps_object_list_push_back(list, object);
     }
 
@@ -246,7 +246,7 @@ PdfError* ps_builtin_op_roll(PSInterpreter* interpreter) {
     return NULL;
 }
 
-static PdfError* object_to_double(PSObject obj, double* out) {
+static Error* object_to_double(PSObject obj, double* out) {
     if (obj.type == PS_OBJECT_INTEGER) {
         *out = (double)obj.data.integer;
         return NULL;
@@ -254,8 +254,8 @@ static PdfError* object_to_double(PSObject obj, double* out) {
         *out = obj.data.real;
         return NULL;
     } else {
-        return PDF_ERROR(
-            PDF_ERR_PS_OPERAND_TYPE,
+        return ERROR(
+            PS_ERR_OPERAND_TYPE,
             "Postscript numbers must be an integer or real"
         );
     }
@@ -281,7 +281,7 @@ static inline void push_real(PSInterpreter* interpreter, double x) {
     );
 }
 
-static PdfError* binary_numeric_op(
+static Error* binary_numeric_op(
     PSInterpreter* interpreter,
     int32_t (*integer_op)(int32_t, int32_t),
     double (*real_op)(double, double)
@@ -290,8 +290,8 @@ static PdfError* binary_numeric_op(
     RELEASE_ASSERT(real_op);
 
     PSObject x, y;
-    PDF_PROPAGATE(ps_interpreter_pop_operand(interpreter, &y));
-    PDF_PROPAGATE(ps_interpreter_pop_operand(interpreter, &x));
+    TRY(ps_interpreter_pop_operand(interpreter, &y));
+    TRY(ps_interpreter_pop_operand(interpreter, &x));
 
     if (integer_op && x.type == PS_OBJECT_INTEGER
         && y.type == PS_OBJECT_INTEGER) {
@@ -300,8 +300,8 @@ static PdfError* binary_numeric_op(
     }
 
     double x_real, y_real;
-    PDF_PROPAGATE(object_to_double(x, &x_real));
-    PDF_PROPAGATE(object_to_double(y, &y_real));
+    TRY(object_to_double(x, &x_real));
+    TRY(object_to_double(y, &y_real));
 
     push_real(interpreter, real_op(x_real, y_real));
     return NULL;
@@ -336,33 +336,33 @@ static double real_atan(double x, double y) {
     return atan(y / x) * 180.0 / M_PI;
 }
 
-PdfError* ps_builtin_op_add(PSInterpreter* interpreter) {
+Error* ps_builtin_op_add(PSInterpreter* interpreter) {
     return binary_numeric_op(interpreter, int_add, real_add);
 }
 
-PdfError* ps_builtin_op_sub(PSInterpreter* interpreter) {
+Error* ps_builtin_op_sub(PSInterpreter* interpreter) {
     return binary_numeric_op(interpreter, int_sub, real_sub);
 }
 
-PdfError* ps_builtin_op_mul(PSInterpreter* interpreter) {
+Error* ps_builtin_op_mul(PSInterpreter* interpreter) {
     return binary_numeric_op(interpreter, int_mul, real_mul);
 }
 
-PdfError* ps_builtin_op_div(PSInterpreter* interpreter) {
+Error* ps_builtin_op_div(PSInterpreter* interpreter) {
     return binary_numeric_op(interpreter, NULL, real_div);
 }
 
-PdfError* ps_builtin_op_idiv(PSInterpreter* interpreter) {
+Error* ps_builtin_op_idiv(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PSObject x, y;
-    PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+    TRY(ps_interpreter_pop_operand_typed(
         interpreter,
         PS_OBJECT_INTEGER,
         true,
         &y
     ));
-    PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+    TRY(ps_interpreter_pop_operand_typed(
         interpreter,
         PS_OBJECT_INTEGER,
         true,
@@ -373,17 +373,17 @@ PdfError* ps_builtin_op_idiv(PSInterpreter* interpreter) {
     return NULL;
 }
 
-PdfError* ps_builtin_op_mod(PSInterpreter* interpreter) {
+Error* ps_builtin_op_mod(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PSObject x, y;
-    PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+    TRY(ps_interpreter_pop_operand_typed(
         interpreter,
         PS_OBJECT_INTEGER,
         true,
         &y
     ));
-    PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+    TRY(ps_interpreter_pop_operand_typed(
         interpreter,
         PS_OBJECT_INTEGER,
         true,
@@ -394,7 +394,7 @@ PdfError* ps_builtin_op_mod(PSInterpreter* interpreter) {
     return NULL;
 }
 
-static PdfError* unary_numeric_op(
+static Error* unary_numeric_op(
     PSInterpreter* interpreter,
     int32_t (*integer_op)(int32_t),
     double (*real_op)(double)
@@ -403,7 +403,7 @@ static PdfError* unary_numeric_op(
     RELEASE_ASSERT(real_op);
 
     PSObject x;
-    PDF_PROPAGATE(ps_interpreter_pop_operand(interpreter, &x));
+    TRY(ps_interpreter_pop_operand(interpreter, &x));
 
     if (integer_op && x.type == PS_OBJECT_INTEGER) {
         push_integer(interpreter, integer_op(x.data.integer));
@@ -416,7 +416,7 @@ static PdfError* unary_numeric_op(
         return NULL;
     }
 
-    return PDF_ERROR(PDF_ERR_PS_OPERAND_TYPE);
+    return ERROR(PS_ERR_OPERAND_TYPE);
 }
 
 static int32_t integer_neg(int32_t a) {
@@ -426,7 +426,7 @@ static double real_neg(double a) {
     return -a;
 }
 
-PdfError* ps_builtin_op_neg(PSInterpreter* interpreter) {
+Error* ps_builtin_op_neg(PSInterpreter* interpreter) {
     return unary_numeric_op(interpreter, integer_neg, real_neg);
 }
 
@@ -437,7 +437,7 @@ static double real_abs(double a) {
     return a >= 0.0 ? a : -a;
 }
 
-PdfError* ps_builtin_op_abs(PSInterpreter* interpreter) {
+Error* ps_builtin_op_abs(PSInterpreter* interpreter) {
     return unary_numeric_op(interpreter, integer_abs, real_abs);
 }
 
@@ -445,23 +445,23 @@ static int32_t integer_noop(int32_t x) {
     return x;
 }
 
-PdfError* ps_builtin_op_ceiling(PSInterpreter* interpreter) {
+Error* ps_builtin_op_ceiling(PSInterpreter* interpreter) {
     return unary_numeric_op(interpreter, integer_noop, ceil);
 }
 
-PdfError* ps_builtin_op_floor(PSInterpreter* interpreter) {
+Error* ps_builtin_op_floor(PSInterpreter* interpreter) {
     return unary_numeric_op(interpreter, integer_noop, floor);
 }
 
-PdfError* ps_builtin_op_round(PSInterpreter* interpreter) {
+Error* ps_builtin_op_round(PSInterpreter* interpreter) {
     return unary_numeric_op(interpreter, integer_noop, round);
 }
 
-PdfError* ps_builtin_op_truncate(PSInterpreter* interpreter) {
+Error* ps_builtin_op_truncate(PSInterpreter* interpreter) {
     return unary_numeric_op(interpreter, integer_noop, trunc);
 }
 
-PdfError* ps_builtin_op_sqrt(PSInterpreter* interpreter) {
+Error* ps_builtin_op_sqrt(PSInterpreter* interpreter) {
     return unary_numeric_op(interpreter, NULL, sqrt);
 }
 
@@ -469,7 +469,7 @@ static double degrees_sin(double x) {
     return sin(x * M_PI / 180.0);
 }
 
-PdfError* ps_builtin_op_sin(PSInterpreter* interpreter) {
+Error* ps_builtin_op_sin(PSInterpreter* interpreter) {
     return unary_numeric_op(interpreter, NULL, degrees_sin);
 }
 
@@ -477,33 +477,33 @@ static double degrees_cos(double x) {
     return cos(x * M_PI / 180.0);
 }
 
-PdfError* ps_builtin_op_cos(PSInterpreter* interpreter) {
+Error* ps_builtin_op_cos(PSInterpreter* interpreter) {
     return unary_numeric_op(interpreter, NULL, degrees_cos);
 }
 
-PdfError* ps_builtin_op_atan(PSInterpreter* interpreter) {
+Error* ps_builtin_op_atan(PSInterpreter* interpreter) {
     return binary_numeric_op(interpreter, NULL, real_atan);
 }
 
-PdfError* ps_builtin_op_exp(PSInterpreter* interpreter) {
+Error* ps_builtin_op_exp(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     return binary_numeric_op(interpreter, NULL, real_pow);
 }
 
-PdfError* ps_builtin_op_ln(PSInterpreter* interpreter) {
+Error* ps_builtin_op_ln(PSInterpreter* interpreter) {
     return unary_numeric_op(interpreter, NULL, log);
 }
 
-PdfError* ps_builtin_op_log(PSInterpreter* interpreter) {
+Error* ps_builtin_op_log(PSInterpreter* interpreter) {
     return unary_numeric_op(interpreter, NULL, log10);
 }
 
-PdfError* ps_builtin_op_cvi(PSInterpreter* interpreter) {
+Error* ps_builtin_op_cvi(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PSObject x;
-    PDF_PROPAGATE(ps_interpreter_pop_operand(interpreter, &x));
+    TRY(ps_interpreter_pop_operand(interpreter, &x));
 
     if (x.type == PS_OBJECT_INTEGER) {
         push_integer(interpreter, x.data.integer);
@@ -512,15 +512,15 @@ PdfError* ps_builtin_op_cvi(PSInterpreter* interpreter) {
         push_integer(interpreter, (int32_t)trunc(x.data.real));
         return NULL;
     } else {
-        return PDF_ERROR(PDF_ERR_PS_OPERAND_TYPE);
+        return ERROR(PS_ERR_OPERAND_TYPE);
     }
 }
 
-PdfError* ps_builtin_op_cvr(PSInterpreter* interpreter) {
+Error* ps_builtin_op_cvr(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PSObject x;
-    PDF_PROPAGATE(ps_interpreter_pop_operand(interpreter, &x));
+    TRY(ps_interpreter_pop_operand(interpreter, &x));
 
     if (x.type == PS_OBJECT_REAL) {
         push_real(interpreter, x.data.real);
@@ -529,15 +529,15 @@ PdfError* ps_builtin_op_cvr(PSInterpreter* interpreter) {
         push_real(interpreter, (double)x.data.integer);
         return NULL;
     } else {
-        return PDF_ERROR(PDF_ERR_PS_OPERAND_TYPE);
+        return ERROR(PS_ERR_OPERAND_TYPE);
     }
 }
 
-PdfError* ps_builtin_op_dict(PSInterpreter* interpreter) {
+Error* ps_builtin_op_dict(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PSObject length_object;
-    PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+    TRY(ps_interpreter_pop_operand_typed(
         interpreter,
         PS_OBJECT_INTEGER,
         true,
@@ -557,24 +557,24 @@ PdfError* ps_builtin_op_dict(PSInterpreter* interpreter) {
     return NULL;
 }
 
-PdfError* ps_builtin_op_def(PSInterpreter* interpreter) {
+Error* ps_builtin_op_def(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PSObject value;
     PSObject key;
-    PDF_PROPAGATE(ps_interpreter_pop_operand(interpreter, &value));
-    PDF_PROPAGATE(ps_interpreter_pop_operand(interpreter, &key));
+    TRY(ps_interpreter_pop_operand(interpreter, &value));
+    TRY(ps_interpreter_pop_operand(interpreter, &key));
 
-    PDF_PROPAGATE(ps_interpreter_define(interpreter, key, value));
+    TRY(ps_interpreter_define(interpreter, key, value));
 
     return NULL;
 }
 
-PdfError* ps_builtin_op_begin(PSInterpreter* interpreter) {
+Error* ps_builtin_op_begin(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PSObject dict_object;
-    PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+    TRY(ps_interpreter_pop_operand_typed(
         interpreter,
         PS_OBJECT_DICT,
         true,
@@ -585,15 +585,15 @@ PdfError* ps_builtin_op_begin(PSInterpreter* interpreter) {
     return NULL;
 }
 
-PdfError* ps_builtin_op_end(PSInterpreter* interpreter) {
+Error* ps_builtin_op_end(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
-    PDF_PROPAGATE(ps_interpreter_dict_pop(interpreter));
+    TRY(ps_interpreter_dict_pop(interpreter));
 
     return NULL;
 }
 
-PdfError* ps_builtin_op_currentdict(PSInterpreter* interpreter) {
+Error* ps_builtin_op_currentdict(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PSObject current_dict;
@@ -603,25 +603,25 @@ PdfError* ps_builtin_op_currentdict(PSInterpreter* interpreter) {
     return NULL;
 }
 
-PdfError* ps_builtin_op_defineresource(PSInterpreter* interpreter) {
+Error* ps_builtin_op_defineresource(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     PSObject category_name;
     PSObject instance;
     PSObject key_name;
-    PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+    TRY(ps_interpreter_pop_operand_typed(
         interpreter,
         PS_OBJECT_NAME,
         true,
         &category_name
     ));
-    PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+    TRY(ps_interpreter_pop_operand_typed(
         interpreter,
         PS_OBJECT_DICT,
         true,
         &instance
     ));
-    PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+    TRY(ps_interpreter_pop_operand_typed(
         interpreter,
         PS_OBJECT_NAME,
         true,
@@ -633,8 +633,8 @@ PdfError* ps_builtin_op_defineresource(PSInterpreter* interpreter) {
         category_name.data.name
     );
     if (!category) {
-        return PDF_ERROR(
-            PDF_ERR_PS_UNKNOWN_RESOURCE,
+        return ERROR(
+            PS_ERR_UNKNOWN_RESOURCE,
             "Unknown resource category %s",
             category_name.data.name
         );
@@ -648,12 +648,12 @@ PdfError* ps_builtin_op_defineresource(PSInterpreter* interpreter) {
     return NULL;
 }
 
-PdfError* ps_builtin_op_findresource(PSInterpreter* interpreter) {
+Error* ps_builtin_op_findresource(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     // Read operands
     PSObject category_name_object;
-    PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+    TRY(ps_interpreter_pop_operand_typed(
         interpreter,
         PS_OBJECT_NAME,
         true,
@@ -661,7 +661,7 @@ PdfError* ps_builtin_op_findresource(PSInterpreter* interpreter) {
     ));
 
     PSObject resource_name_object;
-    PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+    TRY(ps_interpreter_pop_operand_typed(
         interpreter,
         PS_OBJECT_NAME,
         true,
@@ -674,8 +674,8 @@ PdfError* ps_builtin_op_findresource(PSInterpreter* interpreter) {
         category_name_object.data.name
     );
     if (!category) {
-        return PDF_ERROR(
-            PDF_ERR_PS_UNKNOWN_RESOURCE,
+        return ERROR(
+            PS_ERR_UNKNOWN_RESOURCE,
             "Unknown resource category for resource %s/%s",
             category_name_object.data.name,
             resource_name_object.data.name
@@ -687,8 +687,8 @@ PdfError* ps_builtin_op_findresource(PSInterpreter* interpreter) {
         resource_name_object.data.name
     );
     if (!resource) {
-        return PDF_ERROR(
-            PDF_ERR_PS_UNKNOWN_RESOURCE,
+        return ERROR(
+            PS_ERR_UNKNOWN_RESOURCE,
             "Unknown resource %s in category %s",
             resource_name_object.data.name,
             category_name_object.data.name

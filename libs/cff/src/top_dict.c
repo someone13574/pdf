@@ -4,12 +4,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "err/error.h"
 #include "geom/mat3.h"
 #include "geom/rect.h"
 #include "geom/vec2.h"
 #include "logger/log.h"
 #include "parser.h"
-#include "pdf_error/error.h"
 #include "types.h"
 
 enum { CFF_MAX_OPERANDS = 48 };
@@ -50,7 +50,7 @@ static const char* cff_top_dict_key_names[] = {CFF_TOP_DICT_KEYS};
 #undef X
 #undef CFF_TOP_DICT_KEYS
 
-static PdfError* cff_top_dict_interpret_key(
+static Error* cff_top_dict_interpret_key(
     CffParser* parser,
     uint8_t operator0,
     CffTopDictKey* key_out
@@ -116,7 +116,7 @@ static PdfError* cff_top_dict_interpret_key(
     CffCard8 operator1; // Use a Card8 instead of a token since BaseFontName and
                         // BaseFontBlend allow bytes 22 and 23, when the limit
                         // for operators is 21.
-    PDF_PROPAGATE(cff_parser_read_card8(parser, &operator1));
+    TRY(cff_parser_read_card8(parser, &operator1));
 
     RELEASE_ASSERT(operator0 == 12);
     CffTopDictKey two_byte_keys[] = {
@@ -142,32 +142,29 @@ static PdfError* cff_top_dict_interpret_key(
             two_byte_keys[operator1 - 20 + 9]; // SyntheticBase is 12 20.
                                                // We pack in a single array.
     } else {
-        return PDF_ERROR(PDF_ERR_CFF_EXPECTED_OPERATOR);
+        return ERROR(CFF_ERR_EXPECTED_OPERATOR);
     }
 
     return NULL;
 }
 
-static PdfError*
+static Error*
 pop_sid(CffToken* operand_stack, size_t* operand_count, CffSID* sid_out) {
     RELEASE_ASSERT(operand_stack);
     RELEASE_ASSERT(operand_count);
     RELEASE_ASSERT(sid_out);
 
     if (*operand_count == 0) {
-        return PDF_ERROR(PDF_ERR_CFF_MISSING_OPERAND);
+        return ERROR(CFF_ERR_MISSING_OPERAND);
     }
 
     CffToken token = operand_stack[--*operand_count];
     if (token.type != CFF_TOKEN_INT_OPERAND) {
-        return PDF_ERROR(PDF_ERR_CFF_INCORRECT_OPERAND, "Expected SID operand");
+        return ERROR(CFF_ERR_INCORRECT_OPERAND, "Expected SID operand");
     }
 
     if (token.value.integer < 0 || token.value.integer >= 65000) {
-        return PDF_ERROR(
-            PDF_ERR_CFF_INVALID_SID,
-            "SIDs must be in the range 0-64999"
-        );
+        return ERROR(CFF_ERR_INVALID_SID, "SIDs must be in the range 0-64999");
     }
 
     *sid_out = (CffSID)token.value.integer;
@@ -176,22 +173,19 @@ pop_sid(CffToken* operand_stack, size_t* operand_count, CffSID* sid_out) {
 }
 
 // TODO: Share these functions with private dict
-static PdfError*
+static Error*
 pop_int(CffToken* operand_stack, size_t* operand_count, int32_t* int_out) {
     RELEASE_ASSERT(operand_stack);
     RELEASE_ASSERT(operand_count);
     RELEASE_ASSERT(int_out);
 
     if (*operand_count == 0) {
-        return PDF_ERROR(PDF_ERR_CFF_MISSING_OPERAND);
+        return ERROR(CFF_ERR_MISSING_OPERAND);
     }
 
     CffToken token = operand_stack[--*operand_count];
     if (token.type != CFF_TOKEN_INT_OPERAND) {
-        return PDF_ERROR(
-            PDF_ERR_CFF_INCORRECT_OPERAND,
-            "Expected integer operand"
-        );
+        return ERROR(CFF_ERR_INCORRECT_OPERAND, "Expected integer operand");
     }
 
     *int_out = token.value.integer;
@@ -199,7 +193,7 @@ pop_int(CffToken* operand_stack, size_t* operand_count, int32_t* int_out) {
     return NULL;
 }
 
-static PdfError* pop_number(
+static Error* pop_number(
     CffToken* operand_stack,
     size_t* operand_count,
     CffNumber* number_out
@@ -209,7 +203,7 @@ static PdfError* pop_number(
     RELEASE_ASSERT(number_out);
 
     if (*operand_count == 0) {
-        return PDF_ERROR(PDF_ERR_CFF_MISSING_OPERAND);
+        return ERROR(CFF_ERR_MISSING_OPERAND);
     }
 
     CffToken token = operand_stack[--*operand_count];
@@ -226,25 +220,19 @@ static PdfError* pop_number(
             break;
         }
         default: {
-            return PDF_ERROR(
-                PDF_ERR_CFF_INCORRECT_OPERAND,
-                "Expected number operand"
-            );
+            return ERROR(CFF_ERR_INCORRECT_OPERAND, "Expected number operand");
         }
     }
 
     if (token.type != CFF_TOKEN_INT_OPERAND
         && token.type != CFF_TOKEN_REAL_OPERAND) {
-        return PDF_ERROR(
-            PDF_ERR_CFF_INCORRECT_OPERAND,
-            "Expected number operand"
-        );
+        return ERROR(CFF_ERR_INCORRECT_OPERAND, "Expected number operand");
     }
 
     return NULL;
 }
 
-PdfError*
+Error*
 cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(top_dict_out);
@@ -255,12 +243,12 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
     size_t end_offset = parser->offset + length;
     while (parser->offset < end_offset) {
         CffToken token;
-        PDF_PROPAGATE(cff_parser_read_token(parser, &token));
+        TRY(cff_parser_read_token(parser, &token));
 
         switch (token.type) {
             case CFF_TOKEN_OPERATOR: {
                 CffTopDictKey key;
-                PDF_PROPAGATE(cff_top_dict_interpret_key(
+                TRY(cff_top_dict_interpret_key(
                     parser,
                     token.value.operator,
                     &key
@@ -269,7 +257,7 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
                 LOG_DIAG(DEBUG, CFF, "Key: %s", cff_top_dict_key_names[key]);
                 switch (key) {
                     case CFF_TOP_DICT_VERSION: {
-                        PDF_PROPAGATE(pop_sid(
+                        TRY(pop_sid(
                             operand_stack,
                             &operand_count,
                             &top_dict_out->version
@@ -277,7 +265,7 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
                         break;
                     }
                     case CFF_TOP_DICT_NOTICE: {
-                        PDF_PROPAGATE(pop_sid(
+                        TRY(pop_sid(
                             operand_stack,
                             &operand_count,
                             &top_dict_out->notice
@@ -285,7 +273,7 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
                         break;
                     }
                     case CFF_TOP_DICT_COPYRIGHT: {
-                        PDF_PROPAGATE(pop_sid(
+                        TRY(pop_sid(
                             operand_stack,
                             &operand_count,
                             &top_dict_out->copyright
@@ -293,7 +281,7 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
                         break;
                     }
                     case CFF_TOP_DICT_FULL_NAME: {
-                        PDF_PROPAGATE(pop_sid(
+                        TRY(pop_sid(
                             operand_stack,
                             &operand_count,
                             &top_dict_out->full_name
@@ -301,7 +289,7 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
                         break;
                     }
                     case CFF_TOP_DICT_FAMILY_NAME: {
-                        PDF_PROPAGATE(pop_sid(
+                        TRY(pop_sid(
                             operand_stack,
                             &operand_count,
                             &top_dict_out->family_name
@@ -309,7 +297,7 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
                         break;
                     }
                     case CFF_TOP_DICT_WEIGHT: {
-                        PDF_PROPAGATE(pop_sid(
+                        TRY(pop_sid(
                             operand_stack,
                             &operand_count,
                             &top_dict_out->weight
@@ -317,7 +305,7 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
                         break;
                     }
                     case CFF_TOP_DICT_UNDERLINE_POSITION: {
-                        PDF_PROPAGATE(pop_number(
+                        TRY(pop_number(
                             operand_stack,
                             &operand_count,
                             &top_dict_out->underline_position
@@ -327,7 +315,7 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
                     case CFF_TOP_DICT_FONT_BBOX: {
                         CffNumber vals[4];
                         for (size_t idx = 0; idx < 4; idx++) {
-                            PDF_PROPAGATE(pop_number(
+                            TRY(pop_number(
                                 operand_stack,
                                 &operand_count,
                                 &vals[idx]
@@ -348,7 +336,7 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
                         break;
                     }
                     case CFF_TOP_DICT_CHARSET: {
-                        PDF_PROPAGATE(pop_int(
+                        TRY(pop_int(
                             operand_stack,
                             &operand_count,
                             &top_dict_out->charset
@@ -356,7 +344,7 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
                         break;
                     }
                     case CFF_TOP_DICT_CHAR_STRINGS: {
-                        PDF_PROPAGATE(pop_int(
+                        TRY(pop_int(
                             operand_stack,
                             &operand_count,
                             &top_dict_out->char_strings
@@ -364,12 +352,12 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
                         break;
                     }
                     case CFF_TOP_DICT_PRIVATE: {
-                        PDF_PROPAGATE(pop_int(
+                        TRY(pop_int(
                             operand_stack,
                             &operand_count,
                             &top_dict_out->private_offset
                         ));
-                        PDF_PROPAGATE(pop_int(
+                        TRY(pop_int(
                             operand_stack,
                             &operand_count,
                             &top_dict_out->private_dict_size
@@ -392,7 +380,7 @@ cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
                 );
 
                 if (operand_count == CFF_MAX_OPERANDS) {
-                    return PDF_ERROR(
+                    return ERROR(
                         PDF_ERR_EXCESS_OPERAND,
                         "An operator may be preceded by up to a maximum of 48 operands"
                     );

@@ -5,8 +5,8 @@
 
 #include "arena/arena.h"
 #include "arena/common.h"
+#include "err/error.h"
 #include "logger/log.h"
-#include "pdf_error/error.h"
 
 int main(void) {
     Arena* arena = arena_new(1024);
@@ -19,11 +19,11 @@ int main(void) {
     );
 
     PdfCMap* cmap = NULL;
-    PDF_REQUIRE(pdf_parse_cmap(arena, buffer, buffer_len, &cmap));
+    REQUIRE(pdf_parse_cmap(arena, buffer, buffer_len, &cmap));
 
     for (uint32_t codepoint = 0; codepoint <= 0xffff; codepoint++) {
         uint32_t cid;
-        PDF_REQUIRE(
+        REQUIRE(
             pdf_cmap_get_cid(cmap, codepoint, &cid),
             "Failed to get cid for codepoint 0x%04x",
             (unsigned int)codepoint

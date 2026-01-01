@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 #include "arena/arena.h"
-#include "pdf_error/error.h"
+#include "err/error.h"
 
 /// A struct for storing the state required to tokenize a postscript file into
 /// tokens.
@@ -50,11 +50,11 @@ typedef struct {
 
 /// Get the next token in the postscript file, storing it in `token_out`. If
 /// `got_token` is set to false, there were no remaining tokens to get.
-PdfError*
+Error*
 ps_next_token(PSTokenizer* tokenizer, PSToken* token_out, bool* got_token);
 
 /// Converts a PostscriptString into a null-terminated c-string.
 char* ps_string_as_cstr(PSString string, Arena* arena);
 
 /// Converts a hex PostscriptString into an unsigned integer.
-PdfError* ps_string_as_uint(PSString string, uint64_t* out_value);
+Error* ps_string_as_uint(PSString string, uint64_t* out_value);

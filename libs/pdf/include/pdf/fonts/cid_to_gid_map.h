@@ -11,19 +11,18 @@ typedef struct {
     } value;
 } PdfCIDToGIDMap;
 
-PdfError* pdf_deserialize_cid_to_gid_map(
+Error* pdf_deser_cid_to_gid_map(
     const PdfObject* object,
     PdfCIDToGIDMap* target_ptr,
     PdfResolver* resolver
 );
 
-PdfError*
-pdf_map_cid_to_gid(PdfCIDToGIDMap* map, uint32_t cid, uint32_t* gid_out);
+Error* pdf_map_cid_to_gid(PdfCIDToGIDMap* map, uint32_t cid, uint32_t* gid_out);
 
-DESERDE_DECL_OPTIONAL(
+DESER_DECL_OPTIONAL(
     PdfCIDToGIDMapOptional,
     PdfCIDToGIDMap,
     pdf_cid_to_gid_map_op_init
 )
 
-DESERDE_DECL_TRAMPOLINE(pdf_deserialize_cid_to_gid_map_trampoline)
+DESER_DECL_TRAMPOLINE(pdf_deser_cid_to_gid_map_trampoline)

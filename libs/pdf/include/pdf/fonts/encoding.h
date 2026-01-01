@@ -15,7 +15,7 @@ typedef struct {
     PdfArrayOptional differences;
 } PdfEncodingDict;
 
-PdfError* pdf_deserialize_encoding_dict(
+Error* pdf_deser_encoding_dict(
     const PdfObject* object,
     PdfEncodingDict* target_ptr,
     PdfResolver* resolver
@@ -26,8 +26,8 @@ const char* pdf_encoding_map_codepoint(
     uint8_t codepoint
 );
 
-DESERDE_DECL_TRAMPOLINE(pdf_deserialize_encoding_dict_trampoline)
-DESERDE_DECL_OPTIONAL(
+DESER_DECL_TRAMPOLINE(pdf_deser_encoding_dict_trampoline)
+DESER_DECL_OPTIONAL(
     PdfEncodingDictOptional,
     PdfEncodingDict,
     pdf_encoding_dict_op_init

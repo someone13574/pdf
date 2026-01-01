@@ -1,13 +1,13 @@
 #include "pdf/catalog.h"
 
-#include "deserialize.h"
+#include "deser.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/page.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
-PdfError* pdf_deserialize_catalog(
+Error* pdf_deser_catalog(
     const PdfObject* object,
     PdfCatalog* target_ptr,
     PdfResolver* resolver
@@ -20,14 +20,14 @@ PdfError* pdf_deserialize_catalog(
         PDF_FIELD(
             "Type",
             &target_ptr->type,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
         ),
         PDF_UNIMPLEMENTED_FIELD("Version"),
         PDF_UNIMPLEMENTED_FIELD("Extensions"),
         PDF_FIELD(
             "Pages",
             &target_ptr->pages,
-            PDF_DESERDE_RESOLVABLE(pdf_pages_ref_init)
+            PDF_DESER_RESOLVABLE(pdf_pages_ref_init)
         ),
         PDF_UNIMPLEMENTED_FIELD("PageLabels"),
         PDF_UNIMPLEMENTED_FIELD("Names"),
@@ -59,7 +59,7 @@ PdfError* pdf_deserialize_catalog(
         PDF_IGNORED_FIELD("NeedsRendering", &target_ptr->needs_rendering),
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deser_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -71,10 +71,10 @@ PdfError* pdf_deserialize_catalog(
     return NULL;
 }
 
-DESERDE_IMPL_RESOLVABLE(
+DESER_IMPL_RESOLVABLE(
     PdfCatalogRef,
     PdfCatalog,
     pdf_catalog_ref_init,
     pdf_resolve_catalog,
-    pdf_deserialize_catalog
+    pdf_deser_catalog
 )

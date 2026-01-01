@@ -3,10 +3,10 @@
 #include <stdlib.h>
 
 #include "arena/arena.h"
+#include "err/error.h"
 #include "pdf/object.h"
-#include "pdf_error/error.h"
 
-PdfError* pdf_decode_filtered_stream(
+Error* pdf_decode_filtered_stream(
     Arena* arena,
     const uint8_t* encoded,
     size_t length,
@@ -15,7 +15,7 @@ PdfError* pdf_decode_filtered_stream(
     size_t* decoded_len
 );
 
-PdfError* pdf_filter_ascii_hex_decode(
+Error* pdf_filter_ascii_hex_decode(
     Arena* arena,
     const uint8_t* stream,
     size_t stream_len,

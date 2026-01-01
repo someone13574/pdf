@@ -6,8 +6,8 @@
 #include <string.h>
 
 #include "arena/arena.h"
+#include "err/error.h"
 #include "logger/log.h"
-#include "pdf_error/error.h"
 
 struct PSTokenizer {
     Arena* arena;
@@ -188,7 +188,7 @@ static char* read_name(PSTokenizer* tokenizer, size_t known_length) {
 /// the number, otherwise, it must exclude that character. `name_read_offset`
 /// corresponds to the offset which would be used to read a name if it needs to
 /// fall back to that.
-static PdfError* read_number_or_executable_name(
+static Error* read_number_or_executable_name(
     PSTokenizer* tokenizer,
     size_t name_read_offset,
     bool negative,
@@ -294,10 +294,7 @@ static PdfError* read_number_or_executable_name(
 
         if (read_length > 0 && !unterminated) {
             if (!is_int_val || integer_val > UINT32_MAX) {
-                return PDF_ERROR(
-                    PDF_ERR_PS_LIMITCHECK,
-                    "Radix number too large"
-                );
+                return ERROR(PS_ERR_LIMITCHECK, "Radix number too large");
             }
 
             union UintToSint {
@@ -419,7 +416,7 @@ static PdfError* read_number_or_executable_name(
     return NULL;
 }
 
-static PdfError*
+static Error*
 read_lit_string(PSTokenizer* tokenizer, PSString* string_out, bool first_pass) {
     RELEASE_ASSERT(tokenizer);
     RELEASE_ASSERT(string_out);
@@ -538,7 +535,7 @@ read_lit_string(PSTokenizer* tokenizer, PSString* string_out, bool first_pass) {
     }
 
     if (open_parenthesis != 0) {
-        return PDF_ERROR(PDF_ERR_PS_EOF);
+        return ERROR(PS_ERR_EOF);
     }
 
     if (first_pass) {
@@ -566,7 +563,7 @@ static bool char_to_hex(uint8_t c, int* out) {
     }
 }
 
-static PdfError*
+static Error*
 read_hex_string(PSTokenizer* tokenizer, PSString* string_out, bool first_pass) {
     RELEASE_ASSERT(tokenizer);
     RELEASE_ASSERT(string_out);
@@ -611,8 +608,8 @@ read_hex_string(PSTokenizer* tokenizer, PSString* string_out, bool first_pass) {
                 write_offset++;
             }
         } else {
-            return PDF_ERROR(
-                PDF_ERR_PS_INVALID_CHAR,
+            return ERROR(
+                PS_ERR_INVALID_CHAR,
                 "Non-hex character `%c` found in postscript hex string",
                 c
             );
@@ -629,7 +626,7 @@ read_hex_string(PSTokenizer* tokenizer, PSString* string_out, bool first_pass) {
     }
 }
 
-PdfError*
+Error*
 ps_next_token(PSTokenizer* tokenizer, PSToken* token_out, bool* got_token) {
     RELEASE_ASSERT(tokenizer);
     RELEASE_ASSERT(token_out);
@@ -652,7 +649,7 @@ ps_next_token(PSTokenizer* tokenizer, PSToken* token_out, bool* got_token) {
 
     uint8_t c = tokenizer->data[tokenizer->offset++];
     if (c == '+' || c == '-') {
-        PDF_PROPAGATE(read_number_or_executable_name(
+        TRY(read_number_or_executable_name(
             tokenizer,
             tokenizer->offset - 1,
             c == '-',
@@ -661,7 +658,7 @@ ps_next_token(PSTokenizer* tokenizer, PSToken* token_out, bool* got_token) {
             token_out
         ));
     } else if (c == '.') {
-        PDF_PROPAGATE(read_number_or_executable_name(
+        TRY(read_number_or_executable_name(
             tokenizer,
             tokenizer->offset - 1,
             false,
@@ -671,7 +668,7 @@ ps_next_token(PSTokenizer* tokenizer, PSToken* token_out, bool* got_token) {
         ));
     } else if (c >= '0' && c <= '9') {
         tokenizer->offset--;
-        PDF_PROPAGATE(read_number_or_executable_name(
+        TRY(read_number_or_executable_name(
             tokenizer,
             tokenizer->offset,
             false,
@@ -681,12 +678,10 @@ ps_next_token(PSTokenizer* tokenizer, PSToken* token_out, bool* got_token) {
         ));
     } else if (c == '(') {
         token_out->type = PS_TOKEN_LIT_STRING;
-        PDF_PROPAGATE(
-            read_lit_string(tokenizer, &token_out->data.string, true)
-        );
+        TRY(read_lit_string(tokenizer, &token_out->data.string, true));
     } else if (c == '<') {
         if (tokenizer->offset >= tokenizer->data_len) {
-            return PDF_ERROR(PDF_ERR_PS_EOF, "EOF after start of hex string.");
+            return ERROR(PS_ERR_EOF, "EOF after start of hex string.");
         }
 
         uint8_t c2 = tokenizer->data[tokenizer->offset];
@@ -697,9 +692,7 @@ ps_next_token(PSTokenizer* tokenizer, PSToken* token_out, bool* got_token) {
             LOG_TODO("Base-85 postscript strings");
         } else {
             token_out->type = PS_TOKEN_HEX_STRING;
-            PDF_PROPAGATE(
-                read_hex_string(tokenizer, &token_out->data.string, true)
-            );
+            TRY(read_hex_string(tokenizer, &token_out->data.string, true));
         }
     } else if (c == '/') {
         if (tokenizer->offset >= tokenizer->data_len) {
@@ -726,12 +719,12 @@ ps_next_token(PSTokenizer* tokenizer, PSToken* token_out, bool* got_token) {
         token_out->type = PS_TOKEN_END_PROC;
     } else if (c == '>') {
         if (tokenizer->offset >= tokenizer->data_len) {
-            return PDF_ERROR(PDF_ERR_PS_EOF, "Hit EOF when expecting `>`");
+            return ERROR(PS_ERR_EOF, "Hit EOF when expecting `>`");
         }
 
         uint8_t c2 = tokenizer->data[tokenizer->offset++];
         if (c2 != '>') {
-            return PDF_ERROR(PDF_ERR_PS_INVALID_CHAR, "Expected `>`");
+            return ERROR(PS_ERR_INVALID_CHAR, "Expected `>`");
         }
 
         token_out->type = PS_TOKEN_END_DICT;
@@ -739,8 +732,8 @@ ps_next_token(PSTokenizer* tokenizer, PSToken* token_out, bool* got_token) {
         token_out->type = PS_TOKEN_EXE_NAME;
         token_out->data.name = read_name(tokenizer, 1);
     } else {
-        return PDF_ERROR(
-            PDF_ERR_PS_INVALID_CHAR,
+        return ERROR(
+            PS_ERR_INVALID_CHAR,
             "Unexpected character `%c` in postscript",
             c
         );
@@ -764,7 +757,7 @@ char* ps_string_as_cstr(PSString string, Arena* arena) {
     return cstr;
 }
 
-PdfError* ps_string_as_uint(PSString string, uint64_t* out_value) {
+Error* ps_string_as_uint(PSString string, uint64_t* out_value) {
     RELEASE_ASSERT(out_value);
 
     if (string.len == 0) {
@@ -776,8 +769,8 @@ PdfError* ps_string_as_uint(PSString string, uint64_t* out_value) {
         // Check high bytes for non-zero values, which would be an overflow
         for (size_t idx = 0; idx < string.len - 8; idx++) {
             if (string.data[idx] != 0) {
-                return PDF_ERROR(
-                    PDF_ERR_PS_LIMITCHECK,
+                return ERROR(
+                    PS_ERR_LIMITCHECK,
                     "Failed to convert hex string to 64-bit unsigned integer"
                 );
             }
@@ -808,13 +801,13 @@ PdfError* ps_string_as_uint(PSString string, uint64_t* out_value) {
     bool got_token = false;
 
 #define CHECK_STREAM_CONSUMED()                                                \
-    TEST_PDF_REQUIRE(ps_next_token(tokenizer, &token, &got_token));            \
+    TEST_REQUIRE(ps_next_token(tokenizer, &token, &got_token));                \
     TEST_ASSERT(!got_token);                                                   \
     TEST_ASSERT_EQ(tokenizer->data_len, tokenizer->offset);                    \
     arena_free(arena);
 
 #define GET_TOKEN_NO_DATA(expected_type)                                       \
-    TEST_PDF_REQUIRE(ps_next_token(tokenizer, &token, &got_token));            \
+    TEST_REQUIRE(ps_next_token(tokenizer, &token, &got_token));                \
     TEST_ASSERT(got_token, "Expected token");                                  \
     TEST_ASSERT_EQ(                                                            \
         (int)(expected_type),                                                  \
@@ -1140,9 +1133,9 @@ TEST_FUNC(test_ps_tokenize_hex_string_odd_len) {
 TEST_FUNC(test_ps_tokenize_hex_string_unexpected) {
     SETUP_TOKENIZER("<90x3>")
 
-    TEST_PDF_REQUIRE_ERR(
+    TEST_REQUIRE_ERR(
         ps_next_token(tokenizer, &token, &got_token),
-        PDF_ERR_PS_INVALID_CHAR
+        PS_ERR_INVALID_CHAR
     );
 
     return TEST_RESULT_PASS;

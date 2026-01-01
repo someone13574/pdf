@@ -4,19 +4,19 @@
 #include <string.h>
 
 #include "arena/arena.h"
-#include "deserialize.h"
+#include "deser.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/resources.h"
-#include "pdf_error/error.h"
 
 #define DVEC_NAME PdfPageTreeRefVec
 #define DVEC_LOWERCASE_NAME pdf_page_tree_ref_vec
 #define DVEC_TYPE PdfPageTreeRef
 #include "arena/dvec_impl.h"
 
-PdfError* pdf_deserialize_page(
+Error* pdf_deser_page(
     const PdfObject* object,
     PdfPage* target_ptr,
     PdfResolver* resolver
@@ -29,80 +29,80 @@ PdfError* pdf_deserialize_page(
         PDF_FIELD(
             "Type",
             &target_ptr->type,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
         ),
         PDF_FIELD(
             "Parent",
             &target_ptr->parent,
-            PDF_DESERDE_RESOLVABLE(pdf_pages_ref_init)
+            PDF_DESER_RESOLVABLE(pdf_pages_ref_init)
         ),
         PDF_IGNORED_FIELD("LastModified", &target_ptr->last_modified),
         PDF_FIELD(
             "Resources",
             &target_ptr->resources,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_resources_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_resources_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_resources_trampoline)
             )
         ),
         PDF_FIELD(
             "MediaBox",
             &target_ptr->media_box,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_rectangle_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
             )
         ),
         PDF_FIELD(
             "CropBox",
             &target_ptr->crop_box,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_rectangle_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
             )
         ),
         PDF_FIELD(
             "BleedBox",
             &target_ptr->bleed_box,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_rectangle_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
             )
         ),
         PDF_FIELD(
             "TrimBox",
             &target_ptr->trim_box,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_rectangle_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
             )
         ),
         PDF_FIELD(
             "ArtBox",
             &target_ptr->art_box,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_rectangle_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
             )
         ),
         PDF_UNIMPLEMENTED_FIELD("BoxColorInfo"),
         PDF_FIELD(
             "Contents",
             &target_ptr->contents,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_content_stream_ref_vec_op_init,
-                PDF_DESERDE_AS_ARRAY(
+                PDF_DESER_AS_ARRAY(
                     pdf_content_stream_ref_vec_push_uninit,
-                    PDF_DESERDE_RESOLVABLE(pdf_content_stream_ref_init)
+                    PDF_DESER_RESOLVABLE(pdf_content_stream_ref_init)
                 )
             )
         ),
         PDF_FIELD(
             "Rotate",
             &target_ptr->rotate,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_integer_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
             )
         ),
         PDF_IGNORED_FIELD("Group", &target_ptr->group), // TODO: group
@@ -128,7 +128,7 @@ PdfError* pdf_deserialize_page(
         PDF_UNIMPLEMENTED_FIELD("VP")
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deser_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -138,21 +138,21 @@ PdfError* pdf_deserialize_page(
     ));
 
     if (strcmp(target_ptr->type, "Page") != 0) {
-        return PDF_ERROR(PDF_ERR_INVALID_SUBTYPE, "`Type` must be `Page`");
+        return ERROR(PDF_ERR_INVALID_SUBTYPE, "`Type` must be `Page`");
     }
 
     return NULL;
 }
 
-DESERDE_IMPL_RESOLVABLE(
+DESER_IMPL_RESOLVABLE(
     PdfPageRef,
     PdfPage,
     pdf_page_ref_init,
     pdf_resolve_page,
-    pdf_deserialize_page
+    pdf_deser_page
 )
 
-PdfError* pdf_deserialize_pages(
+Error* pdf_deser_pages(
     const PdfObject* object,
     PdfPages* target_ptr,
     PdfResolver* resolver
@@ -165,64 +165,64 @@ PdfError* pdf_deserialize_pages(
         PDF_FIELD(
             "Type",
             &target_ptr->type,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
         ),
         PDF_FIELD(
             "Parent",
             &target_ptr->parent,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_pages_ref_op_init,
-                PDF_DESERDE_RESOLVABLE(pdf_pages_ref_init)
+                PDF_DESER_RESOLVABLE(pdf_pages_ref_init)
             )
         ),
         PDF_FIELD(
             "Kids",
             &target_ptr->kids,
-            PDF_DESERDE_ARRAY(
+            PDF_DESER_ARRAY(
                 pdf_page_tree_ref_vec_push_uninit,
-                PDF_DESERDE_RESOLVABLE(pdf_page_tree_ref_init)
+                PDF_DESER_RESOLVABLE(pdf_page_tree_ref_init)
             )
         ),
         PDF_FIELD(
             "Count",
             &target_ptr->count,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         ),
         PDF_FIELD(
             "Resources",
             &target_ptr->resources,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_resources_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_resources_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_resources_trampoline)
             )
         ),
         PDF_FIELD(
             "MediaBox",
             &target_ptr->media_box,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_rectangle_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
             )
         ),
         PDF_FIELD(
             "CropBox",
             &target_ptr->crop_box,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_rectangle_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
             )
         ),
         PDF_FIELD(
             "Rotate",
             &target_ptr->rotate,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_integer_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
             )
         ),
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deser_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -232,13 +232,13 @@ PdfError* pdf_deserialize_pages(
     ));
 
     if (strcmp(target_ptr->type, "Pages") != 0) {
-        return PDF_ERROR(PDF_ERR_INVALID_SUBTYPE, "`Type` must be `Pages`");
+        return ERROR(PDF_ERR_INVALID_SUBTYPE, "`Type` must be `Pages`");
     }
 
     return NULL;
 }
 
-PdfError* pdf_deserialize_page_tree(
+Error* pdf_deser_page_tree(
     const PdfObject* object,
     PdfPageTree* target_ptr,
     PdfResolver* resolver
@@ -249,10 +249,10 @@ PdfError* pdf_deserialize_page_tree(
 
     PdfName type = NULL;
     PdfFieldDescriptor stub_fields[] = {
-        PDF_FIELD("Type", &type, PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME))
+        PDF_FIELD("Type", &type, PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME))
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deser_dict(
         object,
         stub_fields,
         1,
@@ -263,16 +263,12 @@ PdfError* pdf_deserialize_page_tree(
 
     if (strcmp(type, "Page") == 0) {
         target_ptr->kind = PDF_PAGE_TREE_PAGE;
-        PDF_PROPAGATE(
-            pdf_deserialize_page(object, &target_ptr->value.page, resolver)
-        );
+        TRY(pdf_deser_page(object, &target_ptr->value.page, resolver));
     } else if (strcmp(type, "Page") == 0) {
         target_ptr->kind = PDF_PAGE_TREE_PAGES;
-        PDF_PROPAGATE(
-            pdf_deserialize_pages(object, &target_ptr->value.pages, resolver)
-        );
+        TRY(pdf_deser_pages(object, &target_ptr->value.pages, resolver));
     } else {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INVALID_SUBTYPE,
             "`Type` must be `Page` or `Pages`"
         );
@@ -320,22 +316,22 @@ void pdf_page_tree_inherit(PdfPageTree* dst, PdfPages* src) {
     }
 }
 
-DESERDE_IMPL_RESOLVABLE(
+DESER_IMPL_RESOLVABLE(
     PdfPagesRef,
     PdfPages,
     pdf_pages_ref_init,
     pdf_resolve_pages,
-    pdf_deserialize_pages
+    pdf_deser_pages
 )
 
-DESERDE_IMPL_OPTIONAL(PdfPagesRefOptional, pdf_pages_ref_op_init)
+DESER_IMPL_OPTIONAL(PdfPagesRefOptional, pdf_pages_ref_op_init)
 
-DESERDE_IMPL_RESOLVABLE(
+DESER_IMPL_RESOLVABLE(
     PdfPageTreeRef,
     PdfPageTree,
     pdf_page_tree_ref_init,
     pdf_resolve_page_tree,
-    pdf_deserialize_page_tree
+    pdf_deser_page_tree
 )
 
 typedef struct {
@@ -354,7 +350,7 @@ struct PdfPageIter {
     size_t page_idx;
 };
 
-PdfError* pdf_page_iter_new(
+Error* pdf_page_iter_new(
     PdfResolver* resolver,
     PdfPagesRef root_ref,
     PdfPageIter** iter_out
@@ -370,7 +366,7 @@ PdfError* pdf_page_iter_new(
     iter->page_idx = 0;
 
     PdfPages root;
-    PDF_PROPAGATE(pdf_resolve_pages(root_ref, resolver, &root));
+    TRY(pdf_resolve_pages(root_ref, resolver, &root));
     pdf_page_iter_frame_vec_push(
         iter->stack,
         (PdfPageIterFrame) {.node = root, .next_child_idx = 0}
@@ -380,7 +376,7 @@ PdfError* pdf_page_iter_new(
     return NULL;
 }
 
-PdfError* pdf_page_iter_next(PdfPageIter* iter, PdfPage* out_page, bool* done) {
+Error* pdf_page_iter_next(PdfPageIter* iter, PdfPage* out_page, bool* done) {
     RELEASE_ASSERT(iter);
     RELEASE_ASSERT(done);
 
@@ -407,7 +403,7 @@ PdfError* pdf_page_iter_next(PdfPageIter* iter, PdfPage* out_page, bool* done) {
         curr_frame->next_child_idx += 1;
 
         PdfPageTree kid;
-        PDF_PROPAGATE(pdf_resolve_page_tree(kid_ref, iter->resolver, &kid));
+        TRY(pdf_resolve_page_tree(kid_ref, iter->resolver, &kid));
         pdf_page_tree_inherit(&kid, &curr_frame->node);
 
         if (kid.kind == PDF_PAGE_TREE_PAGE) {

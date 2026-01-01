@@ -1,9 +1,9 @@
 #pragma once
 
+#include "err/error.h"
 #include "pdf/object.h"
 #include "pdf/page.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 // Catalog
 typedef struct {
@@ -38,13 +38,13 @@ typedef struct {
     PdfIgnored needs_rendering;
 } PdfCatalog;
 
-PdfError* pdf_deserialize_catalog(
+Error* pdf_deser_catalog(
     const PdfObject* object,
     PdfCatalog* target_ptr,
     PdfResolver* resolver
 );
 
-DESERDE_DECL_RESOLVABLE(
+DESER_DECL_RESOLVABLE(
     PdfCatalogRef,
     PdfCatalog,
     pdf_catalog_ref_init,

@@ -4,15 +4,15 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "deserialize.h"
+#include "deser.h"
+#include "err/error.h"
 #include "geom/mat3.h"
 #include "geom/vec3.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
-static PdfError* deserialize_cal_rgb_params(
+static Error* deser_cal_rgb_params(
     const PdfObject* object,
     PdfCalRGBParams* target_ptr,
     PdfResolver* resolver
@@ -25,35 +25,35 @@ static PdfError* deserialize_cal_rgb_params(
         PDF_FIELD(
             "WhitePoint",
             &target_ptr->whitepoint,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_geom_vec3_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_geom_vec3_trampoline)
         ),
         PDF_FIELD(
             "BlackPoint",
             &target_ptr->blackpoint,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_geom_vec3_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_geom_vec3_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_geom_vec3_trampoline)
             )
         ),
         PDF_FIELD(
             "Gamma",
             &target_ptr->gamma,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_geom_vec3_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_geom_vec3_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_geom_vec3_trampoline)
             )
         ),
         PDF_FIELD(
             "Matrix",
             &target_ptr->matrix,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_geom_mat3_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_geom_mat3_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_geom_mat3_trampoline)
             )
         )
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deser_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -64,7 +64,7 @@ static PdfError* deserialize_cal_rgb_params(
     return NULL;
 }
 
-PdfError* pdf_deserialize_color_space(
+Error* pdf_deser_color_space(
     const PdfObject* object,
     PdfColorSpace* target_ptr,
     PdfResolver* resolver
@@ -74,7 +74,7 @@ PdfError* pdf_deserialize_color_space(
     RELEASE_ASSERT(resolver);
 
     PdfObject resolved;
-    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved, true));
+    TRY(pdf_resolve_object(resolver, object, &resolved, true));
 
     PdfName family = NULL;
     if (resolved.type == PDF_OBJECT_TYPE_NAME) {
@@ -85,7 +85,7 @@ PdfError* pdf_deserialize_color_space(
             pdf_object_vec_get(resolved.data.array.elements, 0, &first);
 
         if (!has_first || first->type != PDF_OBJECT_TYPE_NAME) {
-            return PDF_ERROR(
+            return ERROR(
                 PDF_ERR_INCORRECT_TYPE,
                 "First element of color space array must be a name"
             );
@@ -93,7 +93,7 @@ PdfError* pdf_deserialize_color_space(
 
         family = first->data.name;
     } else {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "Color space must be a name or array"
         );
@@ -122,7 +122,7 @@ PdfError* pdf_deserialize_color_space(
     } else if (strcmp(family, "DeviceN") == 0) {
         target_ptr->family = PDF_COLOR_SPACE_DEVICE_N;
     } else {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INVALID_SUBTYPE,
             "Unknown color space `%s`",
             family
@@ -139,13 +139,13 @@ PdfError* pdf_deserialize_color_space(
                 pdf_object_vec_get(resolved.data.array.elements, 1, &second);
 
             if (!has_second) {
-                return PDF_ERROR(
+                return ERROR(
                     PDF_ERR_INCORRECT_TYPE,
                     "First element of color space array must be a name"
                 );
             }
 
-            PDF_PROPAGATE(deserialize_cal_rgb_params(
+            TRY(deser_cal_rgb_params(
                 second,
                 &target_ptr->params.cal_rgb,
                 resolver
@@ -173,10 +173,7 @@ PdfError* pdf_deserialize_color_space(
     return NULL;
 }
 
-DESERDE_IMPL_TRAMPOLINE(
-    pdf_deserialize_color_space_trampoline,
-    pdf_deserialize_color_space
-)
+DESER_IMPL_TRAMPOLINE(pdf_deser_color_space_trampoline, pdf_deser_color_space)
 
 static GeomVec3 linear_srgb_to_nonlinear(
     GeomVec3 linear,

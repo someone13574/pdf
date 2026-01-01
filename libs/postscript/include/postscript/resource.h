@@ -1,7 +1,7 @@
 #pragma once
 
 #include "arena/arena.h"
-#include "pdf_error/error.h"
+#include "err/error.h"
 #include "postscript/object.h"
 
 /// A collection of named objects that reside in VM or can be located and
@@ -35,7 +35,7 @@ typedef struct {
 PSResourceCategory ps_resource_category_new(Arena* arena, char* name);
 
 /// Add a resource to a resource category
-PdfError* ps_resource_category_add_resource(
+Error* ps_resource_category_add_resource(
     PSResourceCategory* category,
     PSResource resource
 );
