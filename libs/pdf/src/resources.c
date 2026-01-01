@@ -3,12 +3,12 @@
 #include <string.h>
 
 #include "deserialize.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
-PdfError* pdf_deserialize_resources(
+Error* pdf_deserialize_resources(
     const PdfObject* object,
     PdfResources* target_ptr,
     PdfResolver* resolver
@@ -87,7 +87,7 @@ PdfError* pdf_deserialize_resources(
         ),
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -105,7 +105,7 @@ DESERDE_IMPL_TRAMPOLINE(
 )
 DESERDE_IMPL_OPTIONAL(PdfResourcesOptional, pdf_resources_op_init)
 
-PdfError* pdf_deserialize_gstate_params(
+Error* pdf_deserialize_gstate_params(
     const PdfObject* object,
     PdfGStateParams* target_ptr,
     PdfResolver* resolver
@@ -207,7 +207,7 @@ PdfError* pdf_deserialize_gstate_params(
         PDF_UNIMPLEMENTED_FIELD("TK")
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -218,10 +218,7 @@ PdfError* pdf_deserialize_gstate_params(
 
     if (target_ptr->type.has_value) {
         if (strcmp(target_ptr->type.value, "ExtGState") != 0) {
-            return PDF_ERROR(
-                PDF_ERR_INVALID_SUBTYPE,
-                "`Type` must be `ExtGState`"
-            );
+            return ERROR(PDF_ERR_INVALID_SUBTYPE, "`Type` must be `ExtGState`");
         }
     }
 

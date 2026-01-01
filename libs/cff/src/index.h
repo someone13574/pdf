@@ -1,7 +1,7 @@
 #pragma once
 
+#include "err/error.h"
 #include "parser.h"
-#include "pdf_error/error.h"
 #include "types.h"
 
 /// An INDEX is an array of variable-sized objects. It comprises a header, an
@@ -23,13 +23,13 @@ typedef struct {
 } CffIndex;
 
 /// Read a `CffIndex` from the current parser offset.
-PdfError* cff_parse_index(CffParser* parser, CffIndex* index_out);
+Error* cff_parse_index(CffParser* parser, CffIndex* index_out);
 
 /// Seeks to the end of a CFF index.
-PdfError* cff_index_skip(CffIndex* index, CffParser* parser);
+Error* cff_index_skip(CffIndex* index, CffParser* parser);
 
 /// Seeks to object `object_idx` and returns its size.
-PdfError* cff_index_seek_object(
+Error* cff_index_seek_object(
     CffIndex* index,
     CffParser* parser,
     CffCard16 object_idx,

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "arena/arena.h"
+#include "err/error.h"
 #include "parser.h"
-#include "pdf_error/error.h"
 #include "types.h"
 
 #define DARRAY_NAME CffSIDArray
@@ -14,7 +14,7 @@ typedef struct {
     CffSIDArray* glyph_names;
 } CffCharset;
 
-PdfError* cff_parse_charset(
+Error* cff_parse_charset(
     CffParser* parser,
     Arena* arena,
     CffCard16 num_glyphs,

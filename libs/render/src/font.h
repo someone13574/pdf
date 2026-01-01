@@ -4,16 +4,16 @@
 
 #include "cache.h"
 #include "canvas/canvas.h"
+#include "err/error.h"
 #include "geom/mat3.h"
 #include "pdf/fonts/font.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 // TODO: Ideally this would be entirely within the PDF library
 
 /// Returns the next CID in the data stream, advancing `offset` and setting
 /// `finished` if this is the last CID in the stream.
-PdfError* next_cid(
+Error* next_cid(
     PdfFont* font,
     RenderCache* cache,
     PdfString* data,
@@ -23,7 +23,7 @@ PdfError* next_cid(
 );
 
 /// Maps a CID to a GID for the given glyph.
-PdfError* cid_to_gid(
+Error* cid_to_gid(
     Arena* arena,
     PdfFont* font,
     RenderCache* cache,
@@ -33,7 +33,7 @@ PdfError* cid_to_gid(
 );
 
 /// Renders a given glyph.
-PdfError* render_glyph(
+Error* render_glyph(
     Arena* arena,
     PdfFont* font,
     PdfResolver* resolver,
@@ -44,7 +44,7 @@ PdfError* render_glyph(
 );
 
 /// Gets the width for a CID.
-PdfError* cid_to_width(
+Error* cid_to_width(
     PdfFont* font,
     PdfResolver* resolver,
     uint32_t cid,
@@ -52,7 +52,7 @@ PdfError* cid_to_width(
 );
 
 /// Get the font matrix for a font
-PdfError* get_font_matrix(
+Error* get_font_matrix(
     Arena* arena,
     PdfResolver* resolver,
     PdfFont* font,

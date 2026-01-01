@@ -7,11 +7,11 @@
 #include "arena/arena.h"
 #include "arena/common.h"
 #include "canvas/canvas.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "pdf/catalog.h"
 #include "pdf/page.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 #include "render/render.h"
 
 int main(int argc, char** argv) {
@@ -26,24 +26,24 @@ int main(int argc, char** argv) {
     RELEASE_ASSERT(buffer);
 
     PdfResolver* resolver;
-    PDF_REQUIRE(pdf_resolver_new(arena, buffer, buffer_size, &resolver));
+    REQUIRE(pdf_resolver_new(arena, buffer, buffer_size, &resolver));
 
     PdfCatalog catalog;
-    PDF_REQUIRE(pdf_get_catalog(resolver, &catalog));
+    REQUIRE(pdf_get_catalog(resolver, &catalog));
 
     PdfPageIter* page_iter = NULL;
-    PDF_REQUIRE(pdf_page_iter_new(resolver, catalog.pages, &page_iter));
+    REQUIRE(pdf_page_iter_new(resolver, catalog.pages, &page_iter));
 
     bool iter_done = false;
     PdfPage page;
     while (true) {
-        PDF_REQUIRE(pdf_page_iter_next(page_iter, &page, &iter_done));
+        REQUIRE(pdf_page_iter_next(page_iter, &page, &iter_done));
         if (iter_done) {
             break;
         }
 
         Canvas* canvas = NULL;
-        PDF_REQUIRE(render_page(arena, resolver, &page, &canvas));
+        REQUIRE(render_page(arena, resolver, &page, &canvas));
         canvas_write_file(canvas, "test.svg");
     };
 

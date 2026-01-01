@@ -3,9 +3,9 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
+#include "err/error.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 #include "postscript/object.h"
 
 typedef struct PdfFunction PdfFunction;
@@ -78,14 +78,14 @@ struct PdfFunction {
     } data;
 };
 
-PdfError* pdf_deserialize_function(
+Error* pdf_deserialize_function(
     const PdfObject* object,
     PdfFunction* target_ptr,
     PdfResolver* resolver
 );
 
 /// Run a function using the operands in io and returning the outputs in io
-PdfError*
+Error*
 pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io);
 
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_function_trampoline)

@@ -2,8 +2,8 @@
 
 #include <stdint.h>
 
+#include "err/error.h"
 #include "parser.h"
-#include "pdf_error/error.h"
 #include "sfnt/types.h"
 
 typedef struct {
@@ -24,4 +24,4 @@ typedef struct {
     uint16_t max_component_depth;
 } SfntMaxp;
 
-PdfError* sfnt_parse_maxp(SfntParser* parser, SfntMaxp* maxp);
+Error* sfnt_parse_maxp(SfntParser* parser, SfntMaxp* maxp);

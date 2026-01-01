@@ -1,5 +1,6 @@
 #pragma once
 
+#include "err/error.h"
 #include "pdf/fonts/cid_to_gid_map.h"
 #include "pdf/fonts/cmap.h"
 #include "pdf/fonts/encoding.h"
@@ -7,7 +8,6 @@
 #include "pdf/fonts/font_widths.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 /// TODO: DW2, W2, CIDToGIDMap
 typedef struct {
@@ -63,7 +63,7 @@ typedef struct {
     PdfCIDToGIDMapOptional cid_to_gid_map;
 } PdfCIDFont;
 
-PdfError* pdf_deserialize_cid_font(
+Error* pdf_deserialize_cid_font(
     const PdfObject* object,
     PdfCIDFont* target_ptr,
     PdfResolver* resolver
@@ -108,7 +108,7 @@ typedef struct {
     PdfStreamOptional to_unicode;
 } PdfType0font;
 
-PdfError* pdf_deserialize_type0_font(
+Error* pdf_deserialize_type0_font(
     const PdfObject* object,
     PdfType0font* target_ptr,
     PdfResolver* resolver
@@ -183,7 +183,7 @@ typedef struct {
     PdfStreamOptional to_unicode;
 } PdfTrueTypeFont;
 
-PdfError* pdf_deserialize_truetype_font_dict(
+Error* pdf_deserialize_truetype_font_dict(
     const PdfObject* object,
     PdfTrueTypeFont* target_ptr,
     PdfResolver* resolver
@@ -228,7 +228,7 @@ typedef struct {
     } data;
 } PdfFont;
 
-PdfError* pdf_deserialize_font(
+Error* pdf_deserialize_font(
     const PdfObject* object,
     PdfFont* deserialized,
     PdfResolver* resolver

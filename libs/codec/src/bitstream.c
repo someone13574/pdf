@@ -3,14 +3,14 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "err/error.h"
 #include "logger/log.h"
-#include "pdf_error/error.h"
 
 BitStream bitstream_new(const uint8_t* data, size_t n_bytes) {
     return (BitStream) {.data = data, .length_bytes = n_bytes, .offset = 0};
 }
 
-PdfError* bitstream_next(BitStream* bitstream, uint32_t* out) {
+Error* bitstream_next(BitStream* bitstream, uint32_t* out) {
     RELEASE_ASSERT(bitstream);
     RELEASE_ASSERT(out);
 
@@ -18,10 +18,7 @@ PdfError* bitstream_next(BitStream* bitstream, uint32_t* out) {
     size_t bit_offset = bitstream->offset & 0x7;
 
     if (byte_offset >= bitstream->length_bytes) {
-        return PDF_ERROR(
-            CODEC_ERR_BITSTREAM_EOD,
-            "Bitstream reached end-of-data"
-        );
+        return ERROR(CODEC_ERR_BITSTREAM_EOD, "Bitstream reached end-of-data");
     }
 
     *out = (bitstream->data[byte_offset] >> bit_offset) & 0x1;
@@ -38,7 +35,7 @@ PdfError* bitstream_next(BitStream* bitstream, uint32_t* out) {
     return NULL;
 }
 
-PdfError* bitstream_read_n(BitStream* bitstream, size_t n_bits, uint32_t* out) {
+Error* bitstream_read_n(BitStream* bitstream, size_t n_bits, uint32_t* out) {
     RELEASE_ASSERT(bitstream);
     RELEASE_ASSERT(n_bits <= 32);
     RELEASE_ASSERT(out);
@@ -52,7 +49,7 @@ PdfError* bitstream_read_n(BitStream* bitstream, size_t n_bits, uint32_t* out) {
         RELEASE_ASSERT(write_offset < 32);
 
         if (byte_offset >= bitstream->length_bytes) {
-            return PDF_ERROR(
+            return ERROR(
                 CODEC_ERR_BITSTREAM_EOD,
                 "Bitstream reached end-of-data during %zu bit read (start offset %zu in %zu bit stream)",
                 n_bits + write_offset,
@@ -130,7 +127,7 @@ TEST_FUNC(test_bitstream_next) {
     uint32_t expected[] = {1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1};
     for (size_t idx = 0; idx < 16; idx++) {
         uint32_t value;
-        TEST_PDF_REQUIRE(bitstream_next(&bitstream, &value));
+        TEST_REQUIRE(bitstream_next(&bitstream, &value));
         TEST_ASSERT_EQ(expected[idx], value, "Bit idx `%zu` didn't match", idx);
     }
 
@@ -144,15 +141,12 @@ TEST_FUNC(test_bitstream_next_eod) {
     uint32_t expected[] = {1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1};
     for (size_t idx = 0; idx < 16; idx++) {
         uint32_t value;
-        TEST_PDF_REQUIRE(bitstream_next(&bitstream, &value));
+        TEST_REQUIRE(bitstream_next(&bitstream, &value));
         TEST_ASSERT_EQ(expected[idx], value, "Bit idx `%zu` didn't match", idx);
     }
 
     uint32_t out;
-    TEST_PDF_REQUIRE_ERR(
-        bitstream_next(&bitstream, &out),
-        CODEC_ERR_BITSTREAM_EOD
-    );
+    TEST_REQUIRE_ERR(bitstream_next(&bitstream, &out), CODEC_ERR_BITSTREAM_EOD);
 
     return TEST_RESULT_PASS;
 }
@@ -162,10 +156,10 @@ TEST_FUNC(test_bitstream_read_n_aligned) {
     BitStream bitstream = bitstream_new(data, 2);
 
     uint32_t out;
-    TEST_PDF_REQUIRE(bitstream_read_n(&bitstream, 8, &out));
+    TEST_REQUIRE(bitstream_read_n(&bitstream, 8, &out));
     TEST_ASSERT_EQ((uint32_t)0xd7, out);
 
-    TEST_PDF_REQUIRE(bitstream_read_n(&bitstream, 8, &out));
+    TEST_REQUIRE(bitstream_read_n(&bitstream, 8, &out));
     TEST_ASSERT_EQ((uint32_t)0xa9, out);
 
     return TEST_RESULT_PASS;
@@ -176,10 +170,10 @@ TEST_FUNC(test_bitstream_read_n_unaligned) {
     BitStream bitstream = bitstream_new(data, 2);
 
     uint32_t out;
-    TEST_PDF_REQUIRE(bitstream_next(&bitstream, &out));
+    TEST_REQUIRE(bitstream_next(&bitstream, &out));
     TEST_ASSERT_EQ((uint32_t)1, out);
 
-    TEST_PDF_REQUIRE(bitstream_read_n(&bitstream, 5, &out));
+    TEST_REQUIRE(bitstream_read_n(&bitstream, 5, &out));
     TEST_ASSERT_EQ((uint32_t)0xb, out);
 
     return TEST_RESULT_PASS;
@@ -190,16 +184,16 @@ TEST_FUNC(test_bitstream_read_n_overlapping) {
     BitStream bitstream = bitstream_new(data, 2);
 
     uint32_t out;
-    TEST_PDF_REQUIRE(bitstream_next(&bitstream, &out));
+    TEST_REQUIRE(bitstream_next(&bitstream, &out));
     TEST_ASSERT_EQ((uint32_t)1, out);
 
-    TEST_PDF_REQUIRE(bitstream_read_n(&bitstream, 12, &out));
+    TEST_REQUIRE(bitstream_read_n(&bitstream, 12, &out));
     TEST_ASSERT_EQ((uint32_t)0x4eb, out);
 
     uint32_t expected[] = {1, 0, 1};
     for (size_t idx = 0; idx < 3; idx++) {
         uint32_t value;
-        TEST_PDF_REQUIRE(bitstream_next(&bitstream, &value));
+        TEST_REQUIRE(bitstream_next(&bitstream, &value));
         TEST_ASSERT_EQ(expected[idx], value);
     }
 
@@ -211,10 +205,10 @@ TEST_FUNC(test_bitstream_read_n_multi_bound) {
     BitStream bitstream = bitstream_new(data, 5);
 
     uint32_t out;
-    TEST_PDF_REQUIRE(bitstream_next(&bitstream, &out));
+    TEST_REQUIRE(bitstream_next(&bitstream, &out));
     TEST_ASSERT_EQ((uint32_t)1, out);
 
-    TEST_PDF_REQUIRE(bitstream_read_n(&bitstream, 32, &out));
+    TEST_REQUIRE(bitstream_read_n(&bitstream, 32, &out));
     TEST_ASSERT_EQ((uint32_t)0x6a154eb, out);
 
     return TEST_RESULT_PASS;
@@ -225,10 +219,10 @@ TEST_FUNC(test_bitstream_read_n_eod) {
     BitStream bitstream = bitstream_new(data, 4);
 
     uint32_t out;
-    TEST_PDF_REQUIRE(bitstream_next(&bitstream, &out));
+    TEST_REQUIRE(bitstream_next(&bitstream, &out));
     TEST_ASSERT_EQ((uint32_t)1, out);
 
-    TEST_PDF_REQUIRE_ERR(
+    TEST_REQUIRE_ERR(
         bitstream_read_n(&bitstream, 32, &out),
         CODEC_ERR_BITSTREAM_EOD
     );
@@ -241,7 +235,7 @@ TEST_FUNC(test_bitstream_align_byte) {
     BitStream bitstream = bitstream_new(data, 5);
 
     uint32_t out;
-    TEST_PDF_REQUIRE(bitstream_read_n(&bitstream, 13, &out));
+    TEST_REQUIRE(bitstream_read_n(&bitstream, 13, &out));
 
     bitstream_align_byte(&bitstream);
     TEST_ASSERT_EQ((size_t)16, bitstream.offset);
@@ -249,7 +243,7 @@ TEST_FUNC(test_bitstream_align_byte) {
     bitstream_align_byte(&bitstream);
     TEST_ASSERT_EQ((size_t)16, bitstream.offset);
 
-    TEST_PDF_REQUIRE(bitstream_next(&bitstream, &out));
+    TEST_REQUIRE(bitstream_next(&bitstream, &out));
     bitstream_align_byte(&bitstream);
     TEST_ASSERT_EQ((size_t)24, bitstream.offset);
 
@@ -263,7 +257,7 @@ TEST_FUNC(test_bitstream_remaining_bits) {
     TEST_ASSERT_EQ((size_t)40, bitstream_remaining_bits(&bitstream));
 
     uint32_t out;
-    TEST_PDF_REQUIRE(bitstream_read_n(&bitstream, 13, &out));
+    TEST_REQUIRE(bitstream_read_n(&bitstream, 13, &out));
     TEST_ASSERT_EQ((size_t)27, bitstream_remaining_bits(&bitstream));
 
     return TEST_RESULT_PASS;

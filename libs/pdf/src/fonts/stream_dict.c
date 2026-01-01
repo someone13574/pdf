@@ -3,10 +3,10 @@
 #include <stdbool.h>
 
 #include "../deserialize.h"
+#include "err/error.h"
 #include "logger/log.h"
-#include "pdf_error/error.h"
 
-PdfError* pdf_deserialize_font_stream_dict(
+Error* pdf_deserialize_font_stream_dict(
     const PdfObject* object,
     PdfFontStreamDict* target_ptr,
     PdfResolver* resolver
@@ -58,7 +58,7 @@ PdfError* pdf_deserialize_font_stream_dict(
         )
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),

@@ -5,12 +5,12 @@
 #include <string.h>
 
 #include "cache.h"
+#include "err/error.h"
 #include "font.h"
 #include "geom/mat3.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 TextState text_state_default(void) {
     return (TextState) {.font_set = false,
@@ -24,7 +24,7 @@ TextObjectState text_object_state_default(void) {
                               .text_line_matrix = geom_mat3_identity()};
 }
 
-PdfError* text_state_render(
+Error* text_state_render(
     Arena* arena,
     Canvas* canvas,
     PdfResolver* resolver,
@@ -44,7 +44,7 @@ PdfError* text_state_render(
     RELEASE_ASSERT(text.data);
 
     if (!state->font_set) {
-        return PDF_ERROR(RENDER_ERR_FONT_NOT_SET);
+        return ERROR(RENDER_ERR_FONT_NOT_SET);
     }
 
     size_t offset = 0;
@@ -53,7 +53,7 @@ PdfError* text_state_render(
         // Get CID
         bool finished = false;
         uint32_t cid;
-        PDF_PROPAGATE(
+        TRY(
             next_cid(&state->text_font, cache, &text, &offset, &finished, &cid)
         );
 
@@ -63,15 +63,11 @@ PdfError* text_state_render(
 
         // Get GID
         uint32_t gid;
-        PDF_PROPAGATE(
-            cid_to_gid(arena, &state->text_font, cache, resolver, cid, &gid)
-        );
+        TRY(cid_to_gid(arena, &state->text_font, cache, resolver, cid, &gid));
 
         // Get font matrix
         GeomMat3 font_matrix;
-        PDF_PROPAGATE(
-            get_font_matrix(arena, resolver, &state->text_font, &font_matrix)
-        );
+        TRY(get_font_matrix(arena, resolver, &state->text_font, &font_matrix));
 
         // Render
         GeomMat3 render_matrix = geom_mat3_mul(
@@ -95,7 +91,7 @@ PdfError* text_state_render(
             ctm
         );
 
-        PDF_PROPAGATE(render_glyph(
+        TRY(render_glyph(
             arena,
             &state->text_font,
             resolver,
@@ -106,9 +102,7 @@ PdfError* text_state_render(
         ));
 
         PdfNumber glyph_width;
-        PDF_PROPAGATE(
-            cid_to_width(&state->text_font, resolver, cid, &glyph_width)
-        );
+        TRY(cid_to_width(&state->text_font, resolver, cid, &glyph_width));
 
         double tx =
             (pdf_number_as_real(glyph_width) * 0.001 * state->text_font_size

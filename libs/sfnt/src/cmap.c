@@ -4,9 +4,9 @@
 
 #include "arena/arena.h"
 #include "arena/common.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "parser.h"
-#include "pdf_error/error.h"
 
 #define DVEC_NAME SfntCmapHeaderVec
 #define DVEC_LOWERCASE_NAME sfnt_cmap_header_vec
@@ -14,9 +14,9 @@
 #include "arena/dvec_impl.h"
 
 static size_t sfnt_cmap_select_encoding(SfntCmap* cmap);
-static PdfError*
+static Error*
 parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data);
-static PdfError* sfnt_cmap_get_encoding(
+static Error* sfnt_cmap_get_encoding(
     Arena* arena,
     SfntCmap* cmap,
     SfntParser* parser,
@@ -24,7 +24,7 @@ static PdfError* sfnt_cmap_get_encoding(
     SfntCmapSubtable* subtable
 );
 
-PdfError* sfnt_parse_cmap_header(
+Error* sfnt_parse_cmap_header(
     Arena* arena,
     SfntParser* parser,
     SfntCmapHeader* subtable
@@ -33,33 +33,31 @@ PdfError* sfnt_parse_cmap_header(
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(subtable);
 
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &subtable->platform_id));
-    PDF_PROPAGATE(
-        sfnt_parser_read_uint16(parser, &subtable->platform_specific_id)
-    );
-    PDF_PROPAGATE(sfnt_parser_read_uint32(parser, &subtable->offset));
+    TRY(sfnt_parser_read_uint16(parser, &subtable->platform_id));
+    TRY(sfnt_parser_read_uint16(parser, &subtable->platform_specific_id));
+    TRY(sfnt_parser_read_uint32(parser, &subtable->offset));
 
     return NULL;
 }
 
-PdfError* sfnt_parse_cmap(Arena* arena, SfntParser* parser, SfntCmap* cmap) {
+Error* sfnt_parse_cmap(Arena* arena, SfntParser* parser, SfntCmap* cmap) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(cmap);
     RELEASE_ASSERT(parser->offset == 0);
 
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &cmap->version));
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &cmap->num_subtables));
+    TRY(sfnt_parser_read_uint16(parser, &cmap->version));
+    TRY(sfnt_parser_read_uint16(parser, &cmap->num_subtables));
 
     cmap->headers = sfnt_cmap_header_vec_new(arena);
     for (size_t idx = 0; idx < cmap->num_subtables; idx++) {
         SfntCmapHeader header;
-        PDF_PROPAGATE(sfnt_parse_cmap_header(arena, parser, &header));
+        TRY(sfnt_parse_cmap_header(arena, parser, &header));
         sfnt_cmap_header_vec_push(cmap->headers, header);
     }
 
     size_t encoding_idx = sfnt_cmap_select_encoding(cmap);
-    PDF_PROPAGATE(sfnt_cmap_get_encoding(
+    TRY(sfnt_cmap_get_encoding(
         arena,
         cmap,
         parser,
@@ -163,39 +161,37 @@ size_t sfnt_cmap_select_encoding(SfntCmap* cmap) {
     return selected_idx;
 }
 
-static PdfError*
+static Error*
 parse_cmap_format0(Arena* arena, SfntParser* parser, SfntCmapFormat0* data) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(data);
 
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->length));
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->language));
+    TRY(sfnt_parser_read_uint16(parser, &data->length));
+    TRY(sfnt_parser_read_uint16(parser, &data->language));
     if (data->length != 262) {
-        return PDF_ERROR(
+        return ERROR(
             SFNT_ERR_INVALID_LENGTH,
             "Cmap format0 length must be 262"
         );
     }
 
     data->glyph_index_array = uint8_array_new(arena, 256);
-    PDF_PROPAGATE(
-        sfnt_parser_read_uint8_array(parser, data->glyph_index_array)
-    );
+    TRY(sfnt_parser_read_uint8_array(parser, data->glyph_index_array));
 
     return NULL;
 }
 
-static PdfError*
+static Error*
 parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(data);
 
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->length));
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->language));
+    TRY(sfnt_parser_read_uint16(parser, &data->length));
+    TRY(sfnt_parser_read_uint16(parser, &data->language));
 
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->seg_count_x2));
+    TRY(sfnt_parser_read_uint16(parser, &data->seg_count_x2));
     data->end_code = uint16_array_new(arena, data->seg_count_x2 / 2);
     data->start_code = uint16_array_new(arena, data->seg_count_x2 / 2);
     data->id_delta = uint16_array_new(arena, data->seg_count_x2 / 2);
@@ -205,7 +201,7 @@ parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data) {
     size_t num_bytes = (size_t)num_words * 2;
     size_t glyph_index_array_bytes = data->length - num_bytes;
     if ((glyph_index_array_bytes & 0x1) != 0) {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_CMAP_INVALID_GIA_LEN,
             "The glyph index array's length isn't word-aligned"
         );
@@ -214,20 +210,18 @@ parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data) {
         uint16_array_new(arena, glyph_index_array_bytes / 2);
 
     uint16_t reserved_pad;
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->search_range));
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->entry_selector));
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->range_shift));
-    PDF_PROPAGATE(sfnt_parser_read_uint16_array(parser, data->end_code));
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &reserved_pad));
-    PDF_PROPAGATE(sfnt_parser_read_uint16_array(parser, data->start_code));
-    PDF_PROPAGATE(sfnt_parser_read_uint16_array(parser, data->id_delta));
-    PDF_PROPAGATE(sfnt_parser_read_uint16_array(parser, data->id_range_offset));
-    PDF_PROPAGATE(
-        sfnt_parser_read_uint16_array(parser, data->glyph_index_array)
-    );
+    TRY(sfnt_parser_read_uint16(parser, &data->search_range));
+    TRY(sfnt_parser_read_uint16(parser, &data->entry_selector));
+    TRY(sfnt_parser_read_uint16(parser, &data->range_shift));
+    TRY(sfnt_parser_read_uint16_array(parser, data->end_code));
+    TRY(sfnt_parser_read_uint16(parser, &reserved_pad));
+    TRY(sfnt_parser_read_uint16_array(parser, data->start_code));
+    TRY(sfnt_parser_read_uint16_array(parser, data->id_delta));
+    TRY(sfnt_parser_read_uint16_array(parser, data->id_range_offset));
+    TRY(sfnt_parser_read_uint16_array(parser, data->glyph_index_array));
 
     if (reserved_pad != 0) {
-        return PDF_ERROR(
+        return ERROR(
             SFNT_ERR_RESERVED,
             "The cmap format4 reserved pad word wasn't zero"
         );
@@ -236,29 +230,27 @@ parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data) {
     return NULL;
 }
 
-static PdfError*
+static Error*
 parse_cmap_format6(Arena* arena, SfntParser* parser, SfntCmapFormat6* data) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(parser);
     RELEASE_ASSERT(data);
 
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->length));
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->language));
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->first_code));
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->entry_count));
+    TRY(sfnt_parser_read_uint16(parser, &data->length));
+    TRY(sfnt_parser_read_uint16(parser, &data->language));
+    TRY(sfnt_parser_read_uint16(parser, &data->first_code));
+    TRY(sfnt_parser_read_uint16(parser, &data->entry_count));
     if (data->length != 10 + data->entry_count * 2) {
-        return PDF_ERROR(SFNT_ERR_INVALID_LENGTH);
+        return ERROR(SFNT_ERR_INVALID_LENGTH);
     }
 
     data->glyph_index_array = uint16_array_new(arena, data->entry_count);
-    PDF_PROPAGATE(
-        sfnt_parser_read_uint16_array(parser, data->glyph_index_array)
-    );
+    TRY(sfnt_parser_read_uint16_array(parser, data->glyph_index_array));
 
     return NULL;
 }
 
-PdfError* sfnt_cmap_get_encoding(
+Error* sfnt_cmap_get_encoding(
     Arena* arena,
     SfntCmap* cmap,
     SfntParser* parser,
@@ -273,7 +265,7 @@ PdfError* sfnt_cmap_get_encoding(
     RELEASE_ASSERT(sfnt_cmap_header_vec_get(cmap->headers, idx, &header));
     parser->offset = header.offset;
 
-    PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &subtable->format));
+    TRY(sfnt_parser_read_uint16(parser, &subtable->format));
 
     switch (subtable->format) {
         case 0: {

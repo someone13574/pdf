@@ -4,8 +4,8 @@
 #include <string.h>
 
 #include "arena/arena.h"
+#include "err/error.h"
 #include "logger/log.h"
-#include "pdf_error/error.h"
 
 typedef struct {
     const char* name; // This is unterminated!
@@ -93,7 +93,7 @@ PdfAglGlyphList* pdf_parse_agl_glyphlist(Arena* arena, const char* code) {
     return glyph_list;
 }
 
-PdfError* pdf_agl_glyphlist_lookup(
+Error* pdf_agl_glyphlist_lookup(
     PdfAglGlyphList* glyphlist,
     const char* glyph_name,
     uint16_t* codepoints_out,
@@ -127,7 +127,7 @@ PdfError* pdf_agl_glyphlist_lookup(
         }
     }
 
-    return PDF_ERROR(
+    return ERROR(
         PDF_ERR_INVALID_GLYPH_NAME,
         "Invalid glyph name `%s`",
         glyph_name

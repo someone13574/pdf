@@ -5,10 +5,10 @@
 
 #include "arena/arena.h"
 #include "codec/zlib.h"
+#include "err/error.h"
 #include "logger/log.h"
-#include "pdf_error/error.h"
 
-PdfError* pdf_decode_filtered_stream(
+Error* pdf_decode_filtered_stream(
     Arena* arena,
     const uint8_t* encoded,
     size_t length,
@@ -35,7 +35,7 @@ PdfError* pdf_decode_filtered_stream(
                 uint8_t* out;
                 size_t out_len;
 
-                PDF_PROPAGATE(pdf_filter_ascii_hex_decode(
+                TRY(pdf_filter_ascii_hex_decode(
                     local_arena,
                     temp,
                     temp_len,
@@ -47,9 +47,7 @@ PdfError* pdf_decode_filtered_stream(
                 temp_len = out_len;
             } else if (strcmp(name, "FlateDecode") == 0) {
                 Uint8Array* out = NULL;
-                PDF_PROPAGATE(
-                    decode_zlib_data(local_arena, temp, temp_len, &out)
-                );
+                TRY(decode_zlib_data(local_arena, temp, temp_len, &out));
 
                 temp = uint8_array_get_raw(out, &temp_len);
             } else {

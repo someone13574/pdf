@@ -3,8 +3,8 @@
 #include <string.h>
 
 #include "arena/string.h"
+#include "err/error.h"
 #include "logger/log.h"
-#include "pdf_error/error.h"
 #include "postscript/interpreter.h"
 #include "postscript/tokenizer.h"
 
@@ -17,8 +17,7 @@
 const char* ps_object_name_lookup[] = {PS_OBJECT_TYPES};
 #undef X
 
-PdfError*
-ps_object_execute(PSInterpreter* interpreter, const PSObject* object) {
+Error* ps_object_execute(PSInterpreter* interpreter, const PSObject* object) {
     RELEASE_ASSERT(interpreter);
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(!object->literal);
@@ -28,17 +27,15 @@ ps_object_execute(PSInterpreter* interpreter, const PSObject* object) {
             LOG_DIAG(DEBUG, PS, "Executing `%s`", object->data.name);
 
             PSObject dict_object;
-            PDF_PROPAGATE(
-                ps_interpreter_dict_entry(interpreter, object, &dict_object),
-                "Couldn't find item to execute"
-            );
+            TRY(ps_interpreter_dict_entry(interpreter, object, &dict_object),
+                "Couldn't find item to execute");
 
             if (dict_object.literal) {
                 ps_interpreter_operand_push(interpreter, dict_object);
                 break;
             }
 
-            PDF_PROPAGATE(ps_object_execute(interpreter, &dict_object));
+            TRY(ps_object_execute(interpreter, &dict_object));
             break;
         }
         case PS_OBJECT_PROC: {
@@ -51,7 +48,7 @@ ps_object_execute(PSInterpreter* interpreter, const PSObject* object) {
                     ps_object_list_get(object->data.proc, idx, &proc_element)
                 );
 
-                PDF_PROPAGATE(ps_interpret_object(interpreter, proc_element));
+                TRY(ps_interpret_object(interpreter, proc_element));
             }
 
             break;
@@ -59,10 +56,8 @@ ps_object_execute(PSInterpreter* interpreter, const PSObject* object) {
         case PS_OBJECT_OPERATOR: {
             LOG_DIAG(TRACE, PS, "Executing operator");
 
-            PDF_PROPAGATE(
-                object->data.operator(interpreter),
-                "Error occurred while executing operator"
-            );
+            TRY(object->data.operator(interpreter),
+                "Error occurred while executing operator");
             break;
         }
         default: {

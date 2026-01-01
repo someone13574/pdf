@@ -2,11 +2,11 @@
 
 #include "cache.h"
 #include "canvas/canvas.h"
+#include "err/error.h"
 #include "geom/mat3.h"
 #include "pdf/fonts/font.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 typedef enum {
     TEXT_RENDERING_MODE_FILL,
@@ -42,7 +42,7 @@ typedef struct {
 
 TextObjectState text_object_state_default(void);
 
-PdfError* text_state_render(
+Error* text_state_render(
     Arena* arena,
     Canvas* canvas,
     PdfResolver* resolver,

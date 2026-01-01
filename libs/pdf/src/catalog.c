@@ -1,13 +1,13 @@
 #include "pdf/catalog.h"
 
 #include "deserialize.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/page.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
-PdfError* pdf_deserialize_catalog(
+Error* pdf_deserialize_catalog(
     const PdfObject* object,
     PdfCatalog* target_ptr,
     PdfResolver* resolver
@@ -59,7 +59,7 @@ PdfError* pdf_deserialize_catalog(
         PDF_IGNORED_FIELD("NeedsRendering", &target_ptr->needs_rendering),
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),

@@ -3,12 +3,12 @@
 #include <stdio.h>
 
 #include "deserialize.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
-PdfError* pdf_deserialize_shading_dict(
+Error* pdf_deserialize_shading_dict(
     const PdfObject* object,
     PdfShadingDict* target_ptr,
     PdfResolver* resolver
@@ -47,7 +47,7 @@ PdfError* pdf_deserialize_shading_dict(
         )
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -106,7 +106,7 @@ PdfError* pdf_deserialize_shading_dict(
                 )
             };
 
-            PDF_PROPAGATE(pdf_deserialize_dict(
+            TRY(pdf_deserialize_dict(
                 object,
                 specific_fields,
                 sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
@@ -116,19 +116,19 @@ PdfError* pdf_deserialize_shading_dict(
             ));
 
             if (pdf_number_vec_len(target_ptr->data.type2.coords) != 4) {
-                return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
             }
 
             if (target_ptr->data.type2.domain.has_value
                 && pdf_number_vec_len(target_ptr->data.type2.domain.value)
                        != 2) {
-                return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
             }
 
             if (target_ptr->data.type2.extend.has_value
                 && pdf_boolean_vec_len(target_ptr->data.type2.extend.value)
                        != 2) {
-                return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
             }
 
             break;
@@ -182,7 +182,7 @@ PdfError* pdf_deserialize_shading_dict(
                 )
             };
 
-            PDF_PROPAGATE(pdf_deserialize_dict(
+            TRY(pdf_deserialize_dict(
                 object,
                 specific_fields,
                 sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
@@ -192,19 +192,19 @@ PdfError* pdf_deserialize_shading_dict(
             ));
 
             if (pdf_number_vec_len(target_ptr->data.type3.coords) != 6) {
-                return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
             }
 
             if (target_ptr->data.type3.domain.has_value
                 && pdf_number_vec_len(target_ptr->data.type3.domain.value)
                        != 2) {
-                return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
             }
 
             if (target_ptr->data.type3.extend.has_value
                 && pdf_boolean_vec_len(target_ptr->data.type3.extend.value)
                        != 2) {
-                return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
             }
 
             break;

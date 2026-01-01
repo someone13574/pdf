@@ -2,13 +2,13 @@
 
 #include "arena/arena.h"
 #include "deserialize.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "pdf/catalog.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
-PdfError* pdf_deserialize_trailer(
+Error* pdf_deserialize_trailer(
     const PdfObject* object,
     PdfTrailer* target_ptr,
     PdfResolver* resolver
@@ -54,7 +54,7 @@ PdfError* pdf_deserialize_trailer(
         )
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),

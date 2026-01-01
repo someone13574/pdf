@@ -4,9 +4,9 @@
 #include <string.h>
 
 #include "arena/arena.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "operators.h"
-#include "pdf_error/error.h"
 #include "postscript/object.h"
 #include "postscript/resource.h"
 #include "postscript/tokenizer.h"
@@ -276,7 +276,7 @@ static PSObjectList* get_current_object_list(
     return object.data.sink.list;
 }
 
-PdfError* ps_interpret_token(PSInterpreter* interpreter, PSToken token) {
+Error* ps_interpret_token(PSInterpreter* interpreter, PSToken token) {
     RELEASE_ASSERT(interpreter);
 
     switch (token.type) {
@@ -319,7 +319,7 @@ PdfError* ps_interpret_token(PSInterpreter* interpreter, PSToken token) {
                 .literal = false
             };
 
-            PDF_PROPAGATE(ps_interpret_object(interpreter, name_object));
+            TRY(ps_interpret_object(interpreter, name_object));
             break;
         }
         case PS_TOKEN_LIT_NAME: {
@@ -368,7 +368,7 @@ PdfError* ps_interpret_token(PSInterpreter* interpreter, PSToken token) {
         }
         case PS_TOKEN_END_ARRAY: {
             PSObject sink;
-            PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+            TRY(ps_interpreter_pop_operand_typed(
                 interpreter,
                 PS_OBJECT_SINK,
                 true,
@@ -376,7 +376,7 @@ PdfError* ps_interpret_token(PSInterpreter* interpreter, PSToken token) {
             ));
 
             if (sink.data.sink.type != PS_SINK_ARRAY) {
-                return PDF_ERROR(PS_ERR_OPERAND_TYPE, "Wrong sink type");
+                return ERROR(PS_ERR_OPERAND_TYPE, "Wrong sink type");
             }
 
             ps_interpreter_operand_push(
@@ -403,7 +403,7 @@ PdfError* ps_interpret_token(PSInterpreter* interpreter, PSToken token) {
         }
         case PS_TOKEN_END_PROC: {
             PSObject sink;
-            PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+            TRY(ps_interpreter_pop_operand_typed(
                 interpreter,
                 PS_OBJECT_SINK,
                 true,
@@ -411,7 +411,7 @@ PdfError* ps_interpret_token(PSInterpreter* interpreter, PSToken token) {
             ));
 
             if (sink.data.sink.type != PS_SINK_PROC) {
-                return PDF_ERROR(PS_ERR_OPERAND_TYPE, "Wrong sink type");
+                return ERROR(PS_ERR_OPERAND_TYPE, "Wrong sink type");
             }
 
             ps_interpreter_operand_push(
@@ -438,7 +438,7 @@ PdfError* ps_interpret_token(PSInterpreter* interpreter, PSToken token) {
         }
         case PS_TOKEN_END_DICT: {
             PSObject sink;
-            PDF_PROPAGATE(ps_interpreter_pop_operand_typed(
+            TRY(ps_interpreter_pop_operand_typed(
                 interpreter,
                 PS_OBJECT_SINK,
                 true,
@@ -446,11 +446,11 @@ PdfError* ps_interpret_token(PSInterpreter* interpreter, PSToken token) {
             ));
 
             if (sink.data.sink.type != PS_SINK_DICT) {
-                return PDF_ERROR(PS_ERR_OPERAND_TYPE, "Wrong sink type");
+                return ERROR(PS_ERR_OPERAND_TYPE, "Wrong sink type");
             }
 
             if (ps_object_list_len(sink.data.sink.list) % 2 != 0) {
-                return PDF_ERROR(
+                return ERROR(
                     PS_ERR_OPERAND_TYPE,
                     "Invalid number of object in dict"
                 );
@@ -473,27 +473,26 @@ PdfError* ps_interpret_token(PSInterpreter* interpreter, PSToken token) {
     return NULL;
 }
 
-PdfError*
-ps_interpret_tokens(PSInterpreter* interpreter, PSTokenizer* tokenizer) {
+Error* ps_interpret_tokens(PSInterpreter* interpreter, PSTokenizer* tokenizer) {
     RELEASE_ASSERT(interpreter);
     RELEASE_ASSERT(tokenizer);
 
     while (true) {
         bool got_token;
         PSToken token;
-        PDF_PROPAGATE(ps_next_token(tokenizer, &token, &got_token));
+        TRY(ps_next_token(tokenizer, &token, &got_token));
 
         if (!got_token) {
             break;
         }
 
-        PDF_PROPAGATE(ps_interpret_token(interpreter, token));
+        TRY(ps_interpret_token(interpreter, token));
     }
 
     return NULL;
 }
 
-PdfError* ps_interpret_object(PSInterpreter* interpreter, PSObject object) {
+Error* ps_interpret_object(PSInterpreter* interpreter, PSObject object) {
     RELEASE_ASSERT(interpreter);
 
     if (object.literal) {
@@ -505,7 +504,7 @@ PdfError* ps_interpret_object(PSInterpreter* interpreter, PSObject object) {
             && proc_object.data.sink.type == PS_SINK_PROC) {
             ps_object_list_push_back(proc_object.data.sink.list, object);
         } else {
-            PDF_PROPAGATE(ps_object_execute(interpreter, &object));
+            TRY(ps_object_execute(interpreter, &object));
         }
     }
 
@@ -517,13 +516,13 @@ PSObjectList* ps_interpreter_stack(PSInterpreter* interpreter) {
     return interpreter->operands;
 }
 
-PdfError*
+Error*
 ps_interpreter_pop_operand(PSInterpreter* interpreter, PSObject* object_out) {
     RELEASE_ASSERT(interpreter);
     RELEASE_ASSERT(object_out);
 
     if (!ps_object_list_pop_back(interpreter->operands, object_out)) {
-        return PDF_ERROR(PS_ERR_OPERANDS_EMPTY, "No operands to pop");
+        return ERROR(PS_ERR_OPERANDS_EMPTY, "No operands to pop");
     }
 
     LOG_DIAG(
@@ -537,7 +536,7 @@ ps_interpreter_pop_operand(PSInterpreter* interpreter, PSObject* object_out) {
     return NULL;
 }
 
-PdfError* ps_interpreter_pop_operand_typed(
+Error* ps_interpreter_pop_operand_typed(
     PSInterpreter* interpreter,
     PSObjectType expected_type,
     bool literal,
@@ -546,16 +545,16 @@ PdfError* ps_interpreter_pop_operand_typed(
     RELEASE_ASSERT(interpreter);
     RELEASE_ASSERT(object_out);
 
-    PDF_PROPAGATE(ps_interpreter_pop_operand(interpreter, object_out));
+    TRY(ps_interpreter_pop_operand(interpreter, object_out));
     if (object_out->type != expected_type) {
-        return PDF_ERROR(
+        return ERROR(
             PS_ERR_OPERAND_TYPE,
             "Incorrect operand type: expected %d, found %d",
             (int)expected_type,
             (int)object_out->type
         );
     } else if (object_out->literal != literal) {
-        return PDF_ERROR(
+        return ERROR(
             PS_ERR_OPERAND_TYPE,
             "Incorrect operand type: expected literal=%d, found literal=%d",
             (int)literal,
@@ -615,11 +614,11 @@ void ps_interpreter_dict_push(PSInterpreter* interpreter, PSObject dictionary) {
     ps_object_list_push_back(interpreter->dict_stack, dictionary);
 }
 
-PdfError* ps_interpreter_dict_pop(PSInterpreter* interpreter) {
+Error* ps_interpreter_dict_pop(PSInterpreter* interpreter) {
     RELEASE_ASSERT(interpreter);
 
     if (ps_object_list_len(interpreter->dict_stack) <= 2) {
-        return PDF_ERROR(
+        return ERROR(
             PS_ERR_POP_STANDARD_DICT,
             "Cannot pop userdict from dictionary stack"
         );
@@ -631,7 +630,7 @@ PdfError* ps_interpreter_dict_pop(PSInterpreter* interpreter) {
     return NULL;
 }
 
-PdfError* ps_interpreter_dict_entry(
+Error* ps_interpreter_dict_entry(
     const PSInterpreter* interpreter,
     const PSObject* key,
     PSObject* value_out
@@ -671,14 +670,14 @@ PdfError* ps_interpreter_dict_entry(
         }
     }
 
-    return PDF_ERROR(
+    return ERROR(
         PS_ERR_KEY_MISSING,
         "Entry with key `%s` not found in dictionary stack",
         ps_object_fmt(interpreter->arena, key)
     );
 }
 
-PdfError* ps_interpreter_define(
+Error* ps_interpreter_define(
     PSInterpreter* interpreter,
     PSObject key,
     PSObject value
@@ -690,7 +689,7 @@ PdfError* ps_interpreter_define(
     RELEASE_ASSERT(current_dict.type == PS_OBJECT_DICT);
 
     if (current_dict.access != PS_ACCESS_UNLIMITED) {
-        return PDF_ERROR(
+        return ERROR(
             PS_ERR_ACCESS_VIOLATION,
             "The current top of the dictionary stack doesn't have write access"
         );
@@ -706,7 +705,7 @@ PdfError* ps_interpreter_define(
     return NULL;
 }
 
-PdfError* ps_interpreter_user_data(
+Error* ps_interpreter_user_data(
     PSInterpreter* interpreter,
     const char* expected_name,
     void** user_data_out
@@ -720,14 +719,11 @@ PdfError* ps_interpreter_user_data(
             interpreter->user_data_stack,
             &user_data_top
         )) {
-        return PDF_ERROR(
-            PS_ERR_USER_DATA_INVALID,
-            "The user-data stack is empty"
-        );
+        return ERROR(PS_ERR_USER_DATA_INVALID, "The user-data stack is empty");
     }
 
     if (strcmp(expected_name, user_data_top.name) != 0) {
-        return PDF_ERROR(
+        return ERROR(
             PS_ERR_USER_DATA_INVALID,
             "The user-data at the top of the stack had an unexpected name"
         );
@@ -755,7 +751,7 @@ void ps_interpreter_user_data_push(
 }
 
 /// Pops a user-data from the stack.
-PdfError* ps_interpreter_user_data_pop(
+Error* ps_interpreter_user_data_pop(
     PSInterpreter* interpreter,
     const char* expected_name
 ) {
@@ -767,14 +763,11 @@ PdfError* ps_interpreter_user_data_pop(
             interpreter->user_data_stack,
             &user_data_top
         )) {
-        return PDF_ERROR(
-            PS_ERR_USER_DATA_INVALID,
-            "The user-data stack is empty"
-        );
+        return ERROR(PS_ERR_USER_DATA_INVALID, "The user-data stack is empty");
     }
 
     if (strcmp(expected_name, user_data_top.name) != 0) {
-        return PDF_ERROR(
+        return ERROR(
             PS_ERR_USER_DATA_INVALID,
             "The user-data at the top of the stack had an unexpected name"
         );

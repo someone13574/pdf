@@ -1,17 +1,17 @@
 #pragma once
 
 #include "arena/arena.h"
+#include "err/error.h"
 #include "parser.h"
-#include "pdf_error/error.h"
 #include "sfnt/sfnt.h"
 
-PdfError* sfnt_parse_directory(
+Error* sfnt_parse_directory(
     Arena* arena,
     SfntParser* parser,
     SfntFontDirectory* font_directory
 );
 
-PdfError* sfnt_directory_get_entry(
+Error* sfnt_directory_get_entry(
     const SfntFontDirectory* directory,
     uint32_t tag,
     SfntDirectoryEntry** entry

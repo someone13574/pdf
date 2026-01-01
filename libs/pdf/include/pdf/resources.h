@@ -1,8 +1,8 @@
 #pragma once
 
+#include "err/error.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 // TODO: Use typed lazy refs
 typedef struct {
@@ -41,7 +41,7 @@ typedef struct {
     PdfDictOptional properties;
 } PdfResources;
 
-PdfError* pdf_deserialize_resources(
+Error* pdf_deserialize_resources(
     const PdfObject* object,
     PdfResources* target_ptr,
     PdfResolver* resolver
@@ -204,7 +204,7 @@ typedef struct {
     PdfUnimplemented tk;
 } PdfGStateParams;
 
-PdfError* pdf_deserialize_gstate_params(
+Error* pdf_deserialize_gstate_params(
     const PdfObject* object,
     PdfGStateParams* target_ptr,
     PdfResolver* resolver

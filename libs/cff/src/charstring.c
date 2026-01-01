@@ -6,11 +6,11 @@
 #include "arena/arena.h"
 #include "canvas/canvas.h"
 #include "canvas/path_builder.h"
+#include "err/error.h"
 #include "geom/vec2.h"
 #include "index.h"
 #include "logger/log.h"
 #include "parser.h"
-#include "pdf_error/error.h"
 #include "types.h"
 
 enum { CHARSTR_MAX_OPERANDS = 48 };
@@ -115,7 +115,7 @@ typedef struct {
     GeomVec2 current_point;
 } CharstrState;
 
-static PdfError* cff_charstr2_subr(
+static Error* cff_charstr2_subr(
     CffParser* parser,
     CffIndex global_subr_index,
     CffIndex local_subr_index,
@@ -134,11 +134,11 @@ static double operand_as_real(CharstrOperand operand) {
     LOG_PANIC("Unreachable");
 }
 
-static PdfError* push_integer_operand(int32_t value, CharstrState* state) {
+static Error* push_integer_operand(int32_t value, CharstrState* state) {
     RELEASE_ASSERT(state);
 
     if (state->operand_count == CHARSTR_MAX_OPERANDS) {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_EXCESS_OPERAND,
             "An operator may be preceded by up to a maximum of 48 operands"
         );
@@ -162,25 +162,25 @@ static size_t num_operands_available(CharstrState* state) {
     return state->operand_count - state->stack_bottom;
 }
 
-static PdfError*
+static Error*
 check_operands_available(size_t required_count, CharstrState* state) {
     RELEASE_ASSERT(state);
 
     if (num_operands_available(state) < required_count) {
-        return PDF_ERROR(CFF_ERR_MISSING_OPERAND);
+        return ERROR(CFF_ERR_MISSING_OPERAND);
     }
 
     return NULL;
 }
 
-static PdfError* handle_width(size_t required_operands, CharstrState* state) {
+static Error* handle_width(size_t required_operands, CharstrState* state) {
     RELEASE_ASSERT(state);
 
     if (!state->width_set
         && num_operands_available(state) > required_operands) {
         LOG_DIAG(TRACE, CFF, "Reading width in charstring");
 
-        PDF_PROPAGATE(check_operands_available(1, state));
+        TRY(check_operands_available(1, state));
 
         state->width =
             operand_as_real(state->operand_stack[state->stack_bottom++]);
@@ -190,11 +190,10 @@ static PdfError* handle_width(size_t required_operands, CharstrState* state) {
     return NULL;
 }
 
-static PdfError*
-get_relative_position(CharstrState* state, GeomVec2* point_out) {
+static Error* get_relative_position(CharstrState* state, GeomVec2* point_out) {
     RELEASE_ASSERT(state);
 
-    PDF_PROPAGATE(check_operands_available(2, state));
+    TRY(check_operands_available(2, state));
 
     state->current_point = geom_vec2_add(
         state->current_point,
@@ -219,11 +218,11 @@ get_relative_position(CharstrState* state, GeomVec2* point_out) {
     return NULL;
 }
 
-static PdfError*
+static Error*
 get_relative_position_yx(CharstrState* state, GeomVec2* point_out) {
     RELEASE_ASSERT(state);
 
-    PDF_PROPAGATE(check_operands_available(2, state));
+    TRY(check_operands_available(2, state));
 
     state->current_point = geom_vec2_add(
         state->current_point,
@@ -248,10 +247,10 @@ get_relative_position_yx(CharstrState* state, GeomVec2* point_out) {
     return NULL;
 }
 
-static PdfError* get_relative_x(CharstrState* state, GeomVec2* point_out) {
+static Error* get_relative_x(CharstrState* state, GeomVec2* point_out) {
     RELEASE_ASSERT(state);
 
-    PDF_PROPAGATE(check_operands_available(1, state));
+    TRY(check_operands_available(1, state));
 
     state->current_point = geom_vec2_add(
         state->current_point,
@@ -275,10 +274,10 @@ static PdfError* get_relative_x(CharstrState* state, GeomVec2* point_out) {
     return NULL;
 }
 
-static PdfError* get_relative_y(CharstrState* state, GeomVec2* point_out) {
+static Error* get_relative_y(CharstrState* state, GeomVec2* point_out) {
     RELEASE_ASSERT(state);
 
-    PDF_PROPAGATE(check_operands_available(1, state));
+    TRY(check_operands_available(1, state));
 
     state->current_point = geom_vec2_add(
         state->current_point,
@@ -302,21 +301,21 @@ static PdfError* get_relative_y(CharstrState* state, GeomVec2* point_out) {
     return NULL;
 }
 
-static PdfError* pop_operand(CharstrState* state, CharstrOperand* operand_out) {
+static Error* pop_operand(CharstrState* state, CharstrOperand* operand_out) {
     RELEASE_ASSERT(state);
     RELEASE_ASSERT(operand_out);
 
-    PDF_PROPAGATE(check_operands_available(1, state));
+    TRY(check_operands_available(1, state));
     *operand_out = state->operand_stack[--state->operand_count];
 
     return NULL;
 }
 
-static PdfError* check_stack_consumed(CharstrState* state) {
+static Error* check_stack_consumed(CharstrState* state) {
     RELEASE_ASSERT(state);
 
     if (num_operands_available(state) != 0) {
-        return PDF_ERROR(PDF_ERR_EXCESS_OPERAND, "Operand must consume stack");
+        return ERROR(PDF_ERR_EXCESS_OPERAND, "Operand must consume stack");
     }
 
     state->operand_count = 0;
@@ -337,7 +336,7 @@ static CffCard16 subr_bias(CffCard16 num_subrs) {
     }
 }
 
-static PdfError* charstring_interpret_operator(
+static Error* charstring_interpret_operator(
     CharstrOperator operator,
     CharstrState* state,
     CffParser* parser,
@@ -365,58 +364,58 @@ static PdfError* charstring_interpret_operator(
 
     switch (operator) {
         case CHARSTR_OPERATOR_VMOVETO: {
-            PDF_PROPAGATE(handle_width(1, state));
-            PDF_PROPAGATE(get_relative_y(state, NULL));
+            TRY(handle_width(1, state));
+            TRY(get_relative_y(state, NULL));
             path_builder_new_contour(state->path_builder, state->current_point);
-            PDF_PROPAGATE(check_stack_consumed(state));
+            TRY(check_stack_consumed(state));
             break;
         }
         case CHARSTR_OPERATOR_RLINETO: {
             do {
-                PDF_PROPAGATE(get_relative_position(state, NULL));
+                TRY(get_relative_position(state, NULL));
                 path_builder_line_to(state->path_builder, state->current_point);
             } while (num_operands_available(state) >= 2);
 
-            PDF_PROPAGATE(check_stack_consumed(state));
+            TRY(check_stack_consumed(state));
             break;
         }
         case CHARSTR_OPERATOR_HLINETO: {
             bool horizontal = true;
             do {
                 if (horizontal) {
-                    PDF_PROPAGATE(get_relative_x(state, NULL));
+                    TRY(get_relative_x(state, NULL));
                 } else {
-                    PDF_PROPAGATE(get_relative_y(state, NULL));
+                    TRY(get_relative_y(state, NULL));
                 }
                 path_builder_line_to(state->path_builder, state->current_point);
                 horizontal = !horizontal;
             } while (num_operands_available(state) >= 1);
 
-            PDF_PROPAGATE(check_stack_consumed(state));
+            TRY(check_stack_consumed(state));
             break;
         }
         case CHARSTR_OPERATOR_VLINETO: {
             bool horizontal = false;
             do {
                 if (horizontal) {
-                    PDF_PROPAGATE(get_relative_x(state, NULL));
+                    TRY(get_relative_x(state, NULL));
                 } else {
-                    PDF_PROPAGATE(get_relative_y(state, NULL));
+                    TRY(get_relative_y(state, NULL));
                 }
                 path_builder_line_to(state->path_builder, state->current_point);
                 horizontal = !horizontal;
             } while (num_operands_available(state) >= 1);
 
-            PDF_PROPAGATE(check_stack_consumed(state));
+            TRY(check_stack_consumed(state));
             break;
         }
         case CHARSTR_OPERATOR_RRCURVETO: {
             do {
                 GeomVec2 control_a;
                 GeomVec2 control_b;
-                PDF_PROPAGATE(get_relative_position(state, &control_a));
-                PDF_PROPAGATE(get_relative_position(state, &control_b));
-                PDF_PROPAGATE(get_relative_position(state, NULL));
+                TRY(get_relative_position(state, &control_a));
+                TRY(get_relative_position(state, &control_b));
+                TRY(get_relative_position(state, NULL));
 
                 path_builder_cubic_bezier_to(
                     state->path_builder,
@@ -426,14 +425,14 @@ static PdfError* charstring_interpret_operator(
                 );
             } while (num_operands_available(state) >= 6);
 
-            PDF_PROPAGATE(check_stack_consumed(state));
+            TRY(check_stack_consumed(state));
             break;
         }
         case CHARSTR_OPERATOR_CALLSUBR: {
             CharstrOperand unbiased_subr_num;
-            PDF_PROPAGATE(pop_operand(state, &unbiased_subr_num));
+            TRY(pop_operand(state, &unbiased_subr_num));
             if (unbiased_subr_num.type != CHARSTR_OPERAND_INT) {
-                return PDF_ERROR(
+                return ERROR(
                     CFF_ERR_INCORRECT_OPERAND,
                     "Expected an integer operand"
                 );
@@ -442,7 +441,7 @@ static PdfError* charstring_interpret_operator(
             CffCard16 bias = subr_bias(local_subr_index.count);
             int64_t subr_idx = unbiased_subr_num.value.integer + bias;
             if (subr_idx < 0 || subr_idx >= local_subr_index.count) {
-                return PDF_ERROR(
+                return ERROR(
                     CFF_ERR_INVALID_SUBR,
                     "Invalid local subroutine #%lld",
                     (long long int)subr_idx
@@ -451,13 +450,13 @@ static PdfError* charstring_interpret_operator(
 
             size_t return_offset = parser->offset;
             size_t subr_size;
-            PDF_PROPAGATE(cff_index_seek_object(
+            TRY(cff_index_seek_object(
                 &local_subr_index,
                 parser,
                 (CffCard16)subr_idx,
                 &subr_size
             ));
-            PDF_PROPAGATE(cff_charstr2_subr(
+            TRY(cff_charstr2_subr(
                 parser,
                 global_subr_index,
                 local_subr_index,
@@ -465,7 +464,7 @@ static PdfError* charstring_interpret_operator(
                 state,
                 endchar_out
             ));
-            PDF_PROPAGATE(cff_parser_seek(parser, return_offset));
+            TRY(cff_parser_seek(parser, return_offset));
             break;
         }
         case CHARSTR_OPERATOR_RETURN: {
@@ -474,31 +473,31 @@ static PdfError* charstring_interpret_operator(
         }
         case CHARSTR_OPERATOR_ENDCHAR: {
             *endchar_out = true;
-            PDF_PROPAGATE(handle_width(0, state));
-            PDF_PROPAGATE(check_stack_consumed(state));
+            TRY(handle_width(0, state));
+            TRY(check_stack_consumed(state));
             break;
         }
         case CHARSTR_OPERATOR_RMOVETO: {
-            PDF_PROPAGATE(handle_width(2, state));
-            PDF_PROPAGATE(get_relative_position(state, NULL));
+            TRY(handle_width(2, state));
+            TRY(get_relative_position(state, NULL));
             path_builder_new_contour(state->path_builder, state->current_point);
-            PDF_PROPAGATE(check_stack_consumed(state));
+            TRY(check_stack_consumed(state));
             break;
         }
         case CHARSTR_OPERATOR_HMOVETO: {
-            PDF_PROPAGATE(handle_width(1, state));
-            PDF_PROPAGATE(get_relative_x(state, NULL));
+            TRY(handle_width(1, state));
+            TRY(get_relative_x(state, NULL));
             path_builder_new_contour(state->path_builder, state->current_point);
-            PDF_PROPAGATE(check_stack_consumed(state));
+            TRY(check_stack_consumed(state));
             break;
         }
         case CHARSTR_OPERATOR_RCURVELINE: {
             do {
                 GeomVec2 control_a;
                 GeomVec2 control_b;
-                PDF_PROPAGATE(get_relative_position(state, &control_a));
-                PDF_PROPAGATE(get_relative_position(state, &control_b));
-                PDF_PROPAGATE(get_relative_position(state, NULL));
+                TRY(get_relative_position(state, &control_a));
+                TRY(get_relative_position(state, &control_b));
+                TRY(get_relative_position(state, NULL));
 
                 path_builder_cubic_bezier_to(
                     state->path_builder,
@@ -508,23 +507,23 @@ static PdfError* charstring_interpret_operator(
                 );
             } while (num_operands_available(state) >= 6);
 
-            PDF_PROPAGATE(get_relative_position(state, NULL));
+            TRY(get_relative_position(state, NULL));
             path_builder_line_to(state->path_builder, state->current_point);
 
-            PDF_PROPAGATE(check_stack_consumed(state));
+            TRY(check_stack_consumed(state));
             break;
         }
         case CHARSTR_OPERATOR_RLINECURVE: {
             do {
-                PDF_PROPAGATE(get_relative_position(state, NULL));
+                TRY(get_relative_position(state, NULL));
                 path_builder_line_to(state->path_builder, state->current_point);
             } while (num_operands_available(state) >= 8);
 
             GeomVec2 control_a;
             GeomVec2 control_b;
-            PDF_PROPAGATE(get_relative_position(state, &control_a));
-            PDF_PROPAGATE(get_relative_position(state, &control_b));
-            PDF_PROPAGATE(get_relative_position(state, NULL));
+            TRY(get_relative_position(state, &control_a));
+            TRY(get_relative_position(state, &control_b));
+            TRY(get_relative_position(state, NULL));
 
             path_builder_cubic_bezier_to(
                 state->path_builder,
@@ -533,7 +532,7 @@ static PdfError* charstring_interpret_operator(
                 control_b
             );
 
-            PDF_PROPAGATE(check_stack_consumed(state));
+            TRY(check_stack_consumed(state));
             break;
         }
         case CHARSTR_OPERATOR_VVCURVETO: {
@@ -543,15 +542,15 @@ static PdfError* charstring_interpret_operator(
                 if (read_x_delta) {
                     // If there is an extra operand at the front, the first
                     // point is a full point and not just a y-delta.
-                    PDF_PROPAGATE(get_relative_position(state, &control_a));
+                    TRY(get_relative_position(state, &control_a));
                     read_x_delta = false;
                 } else {
-                    PDF_PROPAGATE(get_relative_y(state, &control_a));
+                    TRY(get_relative_y(state, &control_a));
                 }
 
                 GeomVec2 control_b;
-                PDF_PROPAGATE(get_relative_position(state, &control_b));
-                PDF_PROPAGATE(get_relative_y(state, NULL));
+                TRY(get_relative_position(state, &control_b));
+                TRY(get_relative_y(state, NULL));
 
                 path_builder_cubic_bezier_to(
                     state->path_builder,
@@ -561,7 +560,7 @@ static PdfError* charstring_interpret_operator(
                 );
             } while (num_operands_available(state) >= 4);
 
-            PDF_PROPAGATE(check_stack_consumed(state));
+            TRY(check_stack_consumed(state));
             break;
         }
         case CHARSTR_OPERATOR_HHCURVETO: {
@@ -573,15 +572,15 @@ static PdfError* charstring_interpret_operator(
                     // point is a full point and not just a x-delta. We also
                     // read the operands backwards since that is how they are
                     // stored in this case.
-                    PDF_PROPAGATE(get_relative_position_yx(state, &control_a));
+                    TRY(get_relative_position_yx(state, &control_a));
                     read_y_delta = false;
                 } else {
-                    PDF_PROPAGATE(get_relative_x(state, &control_a));
+                    TRY(get_relative_x(state, &control_a));
                 }
 
                 GeomVec2 control_b;
-                PDF_PROPAGATE(get_relative_position(state, &control_b));
-                PDF_PROPAGATE(get_relative_x(state, NULL));
+                TRY(get_relative_position(state, &control_b));
+                TRY(get_relative_x(state, NULL));
 
                 path_builder_cubic_bezier_to(
                     state->path_builder,
@@ -591,14 +590,14 @@ static PdfError* charstring_interpret_operator(
                 );
             } while (num_operands_available(state) >= 4);
 
-            PDF_PROPAGATE(check_stack_consumed(state));
+            TRY(check_stack_consumed(state));
             break;
         }
         case CHARSTR_OPERATOR_CALLGSUBR: {
             CharstrOperand unbiased_subr_num;
-            PDF_PROPAGATE(pop_operand(state, &unbiased_subr_num));
+            TRY(pop_operand(state, &unbiased_subr_num));
             if (unbiased_subr_num.type != CHARSTR_OPERAND_INT) {
-                return PDF_ERROR(
+                return ERROR(
                     CFF_ERR_INCORRECT_OPERAND,
                     "Expected an integer operand"
                 );
@@ -607,7 +606,7 @@ static PdfError* charstring_interpret_operator(
             CffCard16 bias = subr_bias(global_subr_index.count);
             int64_t subr_idx = unbiased_subr_num.value.integer + bias;
             if (subr_idx < 0 || subr_idx >= global_subr_index.count) {
-                return PDF_ERROR(
+                return ERROR(
                     CFF_ERR_INVALID_SUBR,
                     "Invalid global subroutine #%lld",
                     (long long int)subr_idx
@@ -616,13 +615,13 @@ static PdfError* charstring_interpret_operator(
 
             size_t return_offset = parser->offset;
             size_t subr_size;
-            PDF_PROPAGATE(cff_index_seek_object(
+            TRY(cff_index_seek_object(
                 &global_subr_index,
                 parser,
                 (CffCard16)subr_idx,
                 &subr_size
             ));
-            PDF_PROPAGATE(cff_charstr2_subr(
+            TRY(cff_charstr2_subr(
                 parser,
                 global_subr_index,
                 local_subr_index,
@@ -630,7 +629,7 @@ static PdfError* charstring_interpret_operator(
                 state,
                 endchar_out
             ));
-            PDF_PROPAGATE(cff_parser_seek(parser, return_offset));
+            TRY(cff_parser_seek(parser, return_offset));
 
             break;
         }
@@ -639,26 +638,26 @@ static PdfError* charstring_interpret_operator(
             do {
                 GeomVec2 control_a;
                 if (horizontal) {
-                    PDF_PROPAGATE(get_relative_x(state, &control_a));
+                    TRY(get_relative_x(state, &control_a));
                 } else {
-                    PDF_PROPAGATE(get_relative_y(state, &control_a));
+                    TRY(get_relative_y(state, &control_a));
                 }
 
                 GeomVec2 control_b;
-                PDF_PROPAGATE(get_relative_position(state, &control_b));
+                TRY(get_relative_position(state, &control_b));
 
                 if (num_operands_available(state) == 2) {
                     // Handle full point at end
                     if (horizontal) {
-                        PDF_PROPAGATE(get_relative_position_yx(state, NULL));
+                        TRY(get_relative_position_yx(state, NULL));
                     } else {
-                        PDF_PROPAGATE(get_relative_position(state, NULL));
+                        TRY(get_relative_position(state, NULL));
                     }
                 } else if (horizontal) {
                     // Horizontal delta is now zero
-                    PDF_PROPAGATE(get_relative_y(state, NULL));
+                    TRY(get_relative_y(state, NULL));
                 } else {
-                    PDF_PROPAGATE(get_relative_x(state, NULL));
+                    TRY(get_relative_x(state, NULL));
                 }
 
                 path_builder_cubic_bezier_to(
@@ -670,7 +669,7 @@ static PdfError* charstring_interpret_operator(
                 horizontal = !horizontal;
             } while (num_operands_available(state) >= 4);
 
-            PDF_PROPAGATE(check_stack_consumed(state));
+            TRY(check_stack_consumed(state));
             break;
         }
         case CHARSTR_OPERATOR_HVCURVETO: {
@@ -678,26 +677,26 @@ static PdfError* charstring_interpret_operator(
             do {
                 GeomVec2 control_a;
                 if (horizontal) {
-                    PDF_PROPAGATE(get_relative_x(state, &control_a));
+                    TRY(get_relative_x(state, &control_a));
                 } else {
-                    PDF_PROPAGATE(get_relative_y(state, &control_a));
+                    TRY(get_relative_y(state, &control_a));
                 }
 
                 GeomVec2 control_b;
-                PDF_PROPAGATE(get_relative_position(state, &control_b));
+                TRY(get_relative_position(state, &control_b));
 
                 if (num_operands_available(state) == 2) {
                     // Handle full point at end
                     if (horizontal) {
-                        PDF_PROPAGATE(get_relative_position_yx(state, NULL));
+                        TRY(get_relative_position_yx(state, NULL));
                     } else {
-                        PDF_PROPAGATE(get_relative_position(state, NULL));
+                        TRY(get_relative_position(state, NULL));
                     }
                 } else if (horizontal) {
                     // Horizontal delta is now zero
-                    PDF_PROPAGATE(get_relative_y(state, NULL));
+                    TRY(get_relative_y(state, NULL));
                 } else {
-                    PDF_PROPAGATE(get_relative_x(state, NULL));
+                    TRY(get_relative_x(state, NULL));
                 }
 
                 path_builder_cubic_bezier_to(
@@ -709,7 +708,7 @@ static PdfError* charstring_interpret_operator(
                 horizontal = !horizontal;
             } while (num_operands_available(state) >= 4);
 
-            PDF_PROPAGATE(check_stack_consumed(state));
+            TRY(check_stack_consumed(state));
             break;
         }
         default: {
@@ -724,7 +723,7 @@ static PdfError* charstring_interpret_operator(
     return NULL;
 }
 
-static PdfError* cff_charstr2_subr(
+static Error* cff_charstr2_subr(
     CffParser* parser,
     CffIndex global_subr_index,
     CffIndex local_subr_index,
@@ -739,13 +738,13 @@ static PdfError* cff_charstr2_subr(
     size_t end_offset = parser->offset + length;
     while (parser->offset < end_offset) {
         CffCard8 byte;
-        PDF_PROPAGATE(cff_parser_read_card8(parser, &byte));
+        TRY(cff_parser_read_card8(parser, &byte));
 
         bool endchar = false;
         bool return_subr = false;
 
         if (byte <= 11) {
-            PDF_PROPAGATE(charstring_interpret_operator(
+            TRY(charstring_interpret_operator(
                 byte,
                 state,
                 parser,
@@ -756,7 +755,7 @@ static PdfError* cff_charstr2_subr(
             ));
         } else if (byte == 12) {
             CffCard8 next_byte;
-            PDF_PROPAGATE(cff_parser_read_card8(parser, &next_byte));
+            TRY(cff_parser_read_card8(parser, &next_byte));
 
             LOG_DIAG(
                 INFO,
@@ -766,7 +765,7 @@ static PdfError* cff_charstr2_subr(
             );
             LOG_TODO();
         } else if (byte <= 18) {
-            PDF_PROPAGATE(charstring_interpret_operator(
+            TRY(charstring_interpret_operator(
                 byte,
                 state,
                 parser,
@@ -778,7 +777,7 @@ static PdfError* cff_charstr2_subr(
         } else if (byte <= 20) {
             LOG_TODO();
         } else if (byte <= 27) {
-            PDF_PROPAGATE(charstring_interpret_operator(
+            TRY(charstring_interpret_operator(
                 byte,
                 state,
                 parser,
@@ -790,7 +789,7 @@ static PdfError* cff_charstr2_subr(
         } else if (byte == 28) {
             LOG_TODO();
         } else if (byte <= 31) {
-            PDF_PROPAGATE(charstring_interpret_operator(
+            TRY(charstring_interpret_operator(
                 byte,
                 state,
                 parser,
@@ -800,18 +799,18 @@ static PdfError* cff_charstr2_subr(
                 &return_subr
             ));
         } else if (byte <= 246) {
-            PDF_PROPAGATE(push_integer_operand((int32_t)byte - 139, state));
+            TRY(push_integer_operand((int32_t)byte - 139, state));
         } else if (byte <= 250) {
             CffCard8 next_byte;
-            PDF_PROPAGATE(cff_parser_read_card8(parser, &next_byte));
-            PDF_PROPAGATE(push_integer_operand(
+            TRY(cff_parser_read_card8(parser, &next_byte));
+            TRY(push_integer_operand(
                 ((int32_t)byte - 247) * 256 + (int32_t)next_byte + 108,
                 state
             ));
         } else if (byte <= 254) {
             CffCard8 next_byte;
-            PDF_PROPAGATE(cff_parser_read_card8(parser, &next_byte));
-            PDF_PROPAGATE(push_integer_operand(
+            TRY(cff_parser_read_card8(parser, &next_byte));
+            TRY(push_integer_operand(
                 -(((int32_t)byte - 251) * 256) - (int32_t)next_byte - 108,
                 state
             ));
@@ -830,7 +829,7 @@ static PdfError* cff_charstr2_subr(
     return NULL;
 }
 
-PdfError* cff_charstr2_render(
+Error* cff_charstr2_render(
     CffParser* parser,
     CffIndex global_subr_index,
     CffIndex local_subr_index,
@@ -853,7 +852,7 @@ PdfError* cff_charstr2_render(
 
     bool endchar; // We don't actually need this since we aren't actually
                   // calling a subroutine.
-    PDF_PROPAGATE(cff_charstr2_subr(
+    TRY(cff_charstr2_subr(
         parser,
         global_subr_index,
         local_subr_index,

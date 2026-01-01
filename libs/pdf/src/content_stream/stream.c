@@ -7,15 +7,15 @@
 #include "../deserialize.h"
 #include "../object.h"
 #include "arena/arena.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "operation.h"
 #include "operator.h"
 #include "pdf/content_stream/operator.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
-PdfError* pdf_deserialize_content_stream(
+Error* pdf_deserialize_content_stream(
     const PdfObject* object,
     PdfContentStream* deserialized,
     PdfResolver* resolver
@@ -25,9 +25,9 @@ PdfError* pdf_deserialize_content_stream(
     RELEASE_ASSERT(resolver);
 
     PdfObject resolved;
-    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved, true));
+    TRY(pdf_resolve_object(resolver, object, &resolved, true));
     if (resolved.type != PDF_OBJECT_TYPE_STREAM) {
-        return PDF_ERROR(PDF_ERR_INCORRECT_TYPE, "Expected a stream");
+        return ERROR(PDF_ERR_INCORRECT_TYPE, "Expected a stream");
     }
 
     PdfStream* stream = &resolved.data.stream;
@@ -37,7 +37,7 @@ PdfError* pdf_deserialize_content_stream(
         stream->stream_bytes,
         stream->decoded_stream_len
     );
-    PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
+    TRY(pdf_ctx_consume_whitespace(ctx));
 
     int compatibility = 0;
     PdfObjectVec* operands = pdf_object_vec_new(pdf_resolver_arena(resolver));
@@ -50,7 +50,7 @@ PdfError* pdf_deserialize_content_stream(
 
         PdfObject operand;
         size_t restore_offset = pdf_ctx_offset(ctx);
-        PdfError* stop_reason = NULL;
+        Error* stop_reason = NULL;
 
         while (true) {
             stop_reason = pdf_parse_operand_object(
@@ -59,7 +59,7 @@ PdfError* pdf_deserialize_content_stream(
                 &operand
             );
             if (stop_reason) {
-                stop_reason = PDF_ERROR_ADD_CONTEXT_FMT(
+                stop_reason = ERROR_ADD_CONTEXT_FMT(
                     stop_reason,
                     "Ending operand parsing"
                 );
@@ -71,28 +71,26 @@ PdfError* pdf_deserialize_content_stream(
             *operand_alloc = operand;
             pdf_object_vec_push(operands, operand_alloc);
 
-            PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
+            TRY(pdf_ctx_consume_whitespace(ctx));
             restore_offset = pdf_ctx_offset(ctx);
         }
 
-        PDF_PROPAGATE(pdf_ctx_seek(ctx, restore_offset));
+        TRY(pdf_ctx_seek(ctx, restore_offset));
 
         // Parse operator
         PdfOperator operator = PDF_OPERATOR_UNSET;
-        PdfError* operator_error = pdf_parse_operator(ctx, &operator);
+        Error* operator_error = pdf_parse_operator(ctx, &operator);
         if (compatibility > 0 && operator_error) {
-            pdf_error_free(operator_error);
+            error_free(operator_error);
             pdf_ctx_consume_regular(ctx);
             operator = PDF_OPERATOR_UNSET;
         } else {
             RELEASE_ASSERT(operator != PDF_OPERATOR_UNSET);
         }
-        PDF_PROPAGATE(
-            pdf_error_conditional_context(operator_error, stop_reason)
-        );
+        TRY(error_conditional_context(operator_error, stop_reason));
 
-        PDF_PROPAGATE(pdf_ctx_require_byte_type(ctx, true, is_pdf_non_regular));
-        PDF_PROPAGATE(pdf_ctx_consume_whitespace(ctx));
+        TRY(pdf_ctx_require_byte_type(ctx, true, is_pdf_non_regular));
+        TRY(pdf_ctx_consume_whitespace(ctx));
 
         if (operator == PDF_OPERATOR_BX) {
             compatibility++;
@@ -104,7 +102,7 @@ PdfError* pdf_deserialize_content_stream(
 
         // Deserialize operation
         if (operator != PDF_OPERATOR_UNSET) {
-            PDF_PROPAGATE(pdf_deserialize_content_op(
+            TRY(pdf_deserialize_content_op(
                 operator,
                 operands,
                 resolver,

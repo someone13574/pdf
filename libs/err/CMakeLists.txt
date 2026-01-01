@@ -1,0 +1,8 @@
+add_library(err src/error.c)
+target_include_directories(err PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_link_libraries(err PRIVATE pdf-logger)
+target_compile_features(err PUBLIC c_std_11)
+if (NOT MSVC)
+    target_compile_options(err PRIVATE -fsanitize=address,undefined)
+    target_link_options(err PRIVATE -fsanitize=address,undefined)
+endif()

@@ -4,10 +4,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "err/error.h"
 #include "geom/mat3.h"
 #include "geom/vec3.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 typedef struct PdfObject PdfObject;
 
@@ -81,14 +81,14 @@ typedef struct {
         base_type* resolved;                                                   \
     } new_type;                                                                \
     void init_fn(void* ptr_to_resolvable, PdfIndirectRef ref);                 \
-    PdfError* resolve_fn(                                                      \
+    Error* resolve_fn(                                                         \
         new_type resolvable,                                                   \
         PdfResolver* resolver,                                                 \
         base_type* resolved_out                                                \
     );
 
 #define DESERDE_DECL_TRAMPOLINE(trampoline_name)                               \
-    PdfError* trampoline_name(                                                 \
+    Error* trampoline_name(                                                    \
         const PdfObject* object,                                               \
         void* target_ptr,                                                      \
         PdfResolver* resolver                                                  \
@@ -125,14 +125,14 @@ typedef struct {
 
 DESERDE_DECL_OPTIONAL(PdfNumberOptional, PdfNumber, pdf_number_op_init)
 
-PdfError* pdf_deserialize_number(
+Error* pdf_deserialize_number(
     const PdfObject* object,
     PdfNumber* target_ptr,
     PdfResolver* resolver
 );
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_number_trampoline)
 
-PdfError* pdf_deserialize_num_as_real(
+Error* pdf_deserialize_num_as_real(
     const PdfObject* object,
     PdfReal* target_ptr,
     PdfResolver* resolver
@@ -157,7 +157,7 @@ DESERDE_DECL_OPTIONAL(
     pdf_number_vec_op_init
 )
 
-PdfError* pdf_deserialize_geom_vec3(
+Error* pdf_deserialize_geom_vec3(
     const PdfObject* object,
     GeomVec3* target_ptr,
     PdfResolver* resolver
@@ -175,7 +175,7 @@ typedef struct {
 
 DESERDE_DECL_OPTIONAL(PdfRectangleOptional, PdfRectangle, pdf_rectangle_op_init)
 
-PdfError* pdf_deserialize_rectangle(
+Error* pdf_deserialize_rectangle(
     const PdfObject* object,
     PdfRectangle* target_ptr,
     PdfResolver* resolver
@@ -183,7 +183,7 @@ PdfError* pdf_deserialize_rectangle(
 
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_rectangle_trampoline)
 
-PdfError* pdf_deserialize_pdf_mat(
+Error* pdf_deserialize_pdf_mat(
     const PdfObject* object,
     GeomMat3* target_ptr,
     PdfResolver* resolver
@@ -192,7 +192,7 @@ PdfError* pdf_deserialize_pdf_mat(
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_pdf_mat_trampoline)
 DESERDE_DECL_OPTIONAL(PdfGeomMat3Optional, GeomMat3, pdf_geom_mat3_op_init)
 
-PdfError* pdf_deserialize_geom_mat3(
+Error* pdf_deserialize_geom_mat3(
     const PdfObject* object,
     GeomMat3* target_ptr,
     PdfResolver* resolver
@@ -233,7 +233,7 @@ struct PdfStreamDict {
     const PdfObject* raw_dict;
 };
 
-PdfError* pdf_deserialize_stream_dict(
+Error* pdf_deserialize_stream_dict(
     const PdfObject* object,
     PdfStreamDict* deserialized,
     PdfResolver* resolver
@@ -272,7 +272,7 @@ struct PdfObject {
 };
 
 // Gets the value associated with a given key in a dictionary object
-PdfError*
+Error*
 pdf_object_dict_get(const PdfObject* dict, const char* key, PdfObject* object);
 
 // Generates a pretty-printed PdfObject string. If no arena is passed, you must

@@ -5,9 +5,9 @@
 #include "arena/arena.h"
 #include "arena/common.h"
 #include "canvas/canvas.h"
+#include "err/error.h"
 #include "geom/mat3.h"
 #include "logger/log.h"
-#include "pdf_error/error.h"
 #include "sfnt/glyph.h"
 #include "sfnt/sfnt.h"
 
@@ -25,10 +25,10 @@ int main(int argc, char** argv) {
     );
 
     SfntFont* font;
-    PDF_REQUIRE(sfnt_font_new(arena, buffer, buffer_len, &font));
+    REQUIRE(sfnt_font_new(arena, buffer, buffer_len, &font));
 
     SfntGlyph glyph;
-    PDF_REQUIRE(sfnt_get_glyph_for_cid(font, '%', &glyph));
+    REQUIRE(sfnt_get_glyph_for_cid(font, '%', &glyph));
 
     Canvas* canvas = canvas_new_scalable(arena, 2000, 2000, 0xffffffff);
     GeomMat3 transform =

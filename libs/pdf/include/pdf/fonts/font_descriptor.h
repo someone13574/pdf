@@ -132,7 +132,7 @@ typedef struct {
     PdfIgnored cid_set;
 } PdfFontDescriptor;
 
-PdfError* pdf_deserialize_font_descriptor(
+Error* pdf_deserialize_font_descriptor(
     const PdfObject* object,
     PdfFontDescriptor* target_ptr,
     PdfResolver* resolver

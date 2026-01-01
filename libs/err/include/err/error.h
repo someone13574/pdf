@@ -93,33 +93,32 @@ typedef enum {
     SFNT_ERR_MISSING_TABLE,
     SFNT_ERR_RESERVED,
     SFNT_ERR_TABLE_CHECKSUM
-} PdfErrorCode;
+} ErrorCode;
 
-typedef struct PdfError PdfError;
+typedef struct Error Error;
 
-PdfError* pdf_error_new(PdfErrorCode code) RET_NONNULL_ATTR;
-void pdf_error_free(PdfError* error);
+Error* error_new(ErrorCode code) RET_NONNULL_ATTR;
+void error_free(Error* error);
 
-PdfError*
-pdf_error_conditional_context(PdfError* error, PdfError* context_error);
+Error* error_conditional_context(Error* error, Error* context_error);
 
-PdfError* pdf_error_add_context(
-    PdfError* error,
+Error* error_add_context(
+    Error* error,
     const char* func,
     const char* file,
     unsigned long line,
     const char* fmt,
     ...
 ) RET_NONNULL_ATTR FORMAT_ATTR(5, 6);
-PdfErrorCode pdf_error_code(const PdfError* error);
+ErrorCode error_code(const Error* error);
 
-void pdf_error_print(const PdfError* error);
-void pdf_error_unwrap(
-    PdfError* error,
+void error_print(const Error* error);
+void error_unwrap(
+    Error* error,
     const char* file,
     unsigned long line
 ) NORETURN_ATTR;
-bool pdf_error_free_is_ok(PdfError* error);
+bool error_free_is_ok(Error* error);
 
 #if defined(SOURCE_PATH_SIZE)
 #define RELATIVE_FILE_PATH (&__FILE__[SOURCE_PATH_SIZE])
@@ -127,11 +126,11 @@ bool pdf_error_free_is_ok(PdfError* error);
 #define RELATIVE_FILE_PATH __FILE__
 #endif
 
-#define PDF_ERROR_ADD_CONTEXT(err)                                             \
-    pdf_error_add_context((err), __func__, RELATIVE_FILE_PATH, __LINE__, NULL)
+#define ERROR_ADD_CONTEXT(err)                                                 \
+    error_add_context((err), __func__, RELATIVE_FILE_PATH, __LINE__, NULL)
 
-#define PDF_ERROR_ADD_CONTEXT_FMT(err, ...)                                    \
-    pdf_error_add_context(                                                     \
+#define ERROR_ADD_CONTEXT_FMT(err, ...)                                        \
+    error_add_context(                                                         \
         (err),                                                                 \
         __func__,                                                              \
         RELATIVE_FILE_PATH,                                                    \
@@ -139,26 +138,26 @@ bool pdf_error_free_is_ok(PdfError* error);
         __VA_ARGS__                                                            \
     )
 
-#define _PDF_ERR_CAT_INNER(a, b) a##b
-#define _PDF_ERR_CAT(a, b) _PDF_ERR_CAT_INNER(a, b)
+#define _ERR_CAT_INNER(a, b) a##b
+#define _ERR_CAT(a, b) _ERR_CAT_INNER(a, b)
 
-#define PDF_PROPAGATE(expr, ...)                                               \
+#define TRY(expr, ...)                                                         \
     do {                                                                       \
-        PdfError* pdf_error = (expr);                                          \
-        if (pdf_error) {                                                       \
-            return _PDF_ERR_CAT(PDF_ERROR_ADD_CONTEXT, __VA_OPT__(_FMT))(      \
-                pdf_error __VA_OPT__(, __VA_ARGS__)                            \
+        Error* try_error_internal = (expr);                                    \
+        if (try_error_internal) {                                              \
+            return _ERR_CAT(ERROR_ADD_CONTEXT, __VA_OPT__(_FMT))(              \
+                try_error_internal __VA_OPT__(, __VA_ARGS__)                   \
             );                                                                 \
         }                                                                      \
     } while (0)
 
-#define PDF_REQUIRE(expr, ...)                                                 \
+#define REQUIRE(expr, ...)                                                     \
     do {                                                                       \
-        PdfError* pdf_error = (expr);                                          \
-        if (pdf_error) {                                                       \
-            pdf_error_unwrap(                                                  \
-                _PDF_ERR_CAT(PDF_ERROR_ADD_CONTEXT, __VA_OPT__(_FMT))(         \
-                    pdf_error __VA_OPT__(, __VA_ARGS__)                        \
+        Error* require_error_internal = (expr);                                \
+        if (require_error_internal) {                                          \
+            error_unwrap(                                                      \
+                _ERR_CAT(ERROR_ADD_CONTEXT, __VA_OPT__(_FMT))(                 \
+                    require_error_internal __VA_OPT__(, __VA_ARGS__)           \
                 ),                                                             \
                 RELATIVE_FILE_PATH,                                            \
                 __LINE__                                                       \
@@ -166,46 +165,46 @@ bool pdf_error_free_is_ok(PdfError* error);
         }                                                                      \
     } while (0)
 
-#define PDF_ERROR(code, ...)                                                   \
-    _PDF_ERR_CAT(PDF_ERROR_ADD_CONTEXT, __VA_OPT__(_FMT))                      \
-    (pdf_error_new(code) __VA_OPT__(, __VA_ARGS__))
+#define ERROR(code, ...)                                                       \
+    _ERR_CAT(ERROR_ADD_CONTEXT, __VA_OPT__(_FMT))                              \
+    (error_new(code) __VA_OPT__(, __VA_ARGS__))
 
 #ifdef TEST
 
-#define TEST_PDF_REQUIRE(expr)                                                 \
+#define TEST_REQUIRE(expr)                                                     \
     do {                                                                       \
-        PdfError* error = (expr);                                              \
-        if (error) {                                                           \
-            pdf_error_print(error);                                            \
+        Error* require_error_internal = (expr);                                \
+        if (require_error_internal) {                                          \
+            error_print(require_error_internal);                               \
             LOG_ERROR(                                                         \
                 TEST,                                                          \
                 "An error occurred during the test: %d",                       \
-                pdf_error_code(error)                                          \
+                error_code(require_error_internal)                             \
             );                                                                 \
-            pdf_error_free(error);                                             \
+            error_free(require_error_internal);                                \
             return TEST_RESULT_FAIL;                                           \
         }                                                                      \
     } while (0)
 
-#define TEST_PDF_REQUIRE_ERR(expr, code)                                            \
+#define TEST_REQUIRE_ERR(expr, code)                                                \
     do {                                                                            \
-        PdfError* error = (expr);                                                   \
-        if (!error) {                                                               \
+        Error* require_error_internal = (expr);                                     \
+        if (!require_error_internal) {                                              \
             LOG_ERROR(TEST, "Expected an error of type " #code " to occur");        \
             return TEST_RESULT_FAIL;                                                \
         }                                                                           \
-        if (pdf_error_code(error) != (code)) {                                      \
+        if (error_code(require_error_internal) != (code)) {                         \
             LOG_ERROR(                                                              \
                 TEST,                                                               \
                 "Expression returned the incorrect error code. Expected %d (" #code \
                 "), found %d",                                                      \
-                pdf_error_code(error),                                              \
+                error_code(require_error_internal),                                 \
                 (code)                                                              \
             );                                                                      \
-            pdf_error_free(error);                                                  \
+            error_free(require_error_internal);                                     \
             return TEST_RESULT_FAIL;                                                \
         }                                                                           \
-        pdf_error_free(error);                                                      \
+        error_free(require_error_internal);                                         \
     } while (0)
 
 #endif // TEST

@@ -5,18 +5,18 @@
 
 #include "arena/arena.h"
 #include "deserialize.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/resources.h"
-#include "pdf_error/error.h"
 
 #define DVEC_NAME PdfPageTreeRefVec
 #define DVEC_LOWERCASE_NAME pdf_page_tree_ref_vec
 #define DVEC_TYPE PdfPageTreeRef
 #include "arena/dvec_impl.h"
 
-PdfError* pdf_deserialize_page(
+Error* pdf_deserialize_page(
     const PdfObject* object,
     PdfPage* target_ptr,
     PdfResolver* resolver
@@ -128,7 +128,7 @@ PdfError* pdf_deserialize_page(
         PDF_UNIMPLEMENTED_FIELD("VP")
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -138,7 +138,7 @@ PdfError* pdf_deserialize_page(
     ));
 
     if (strcmp(target_ptr->type, "Page") != 0) {
-        return PDF_ERROR(PDF_ERR_INVALID_SUBTYPE, "`Type` must be `Page`");
+        return ERROR(PDF_ERR_INVALID_SUBTYPE, "`Type` must be `Page`");
     }
 
     return NULL;
@@ -152,7 +152,7 @@ DESERDE_IMPL_RESOLVABLE(
     pdf_deserialize_page
 )
 
-PdfError* pdf_deserialize_pages(
+Error* pdf_deserialize_pages(
     const PdfObject* object,
     PdfPages* target_ptr,
     PdfResolver* resolver
@@ -222,7 +222,7 @@ PdfError* pdf_deserialize_pages(
         ),
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -232,13 +232,13 @@ PdfError* pdf_deserialize_pages(
     ));
 
     if (strcmp(target_ptr->type, "Pages") != 0) {
-        return PDF_ERROR(PDF_ERR_INVALID_SUBTYPE, "`Type` must be `Pages`");
+        return ERROR(PDF_ERR_INVALID_SUBTYPE, "`Type` must be `Pages`");
     }
 
     return NULL;
 }
 
-PdfError* pdf_deserialize_page_tree(
+Error* pdf_deserialize_page_tree(
     const PdfObject* object,
     PdfPageTree* target_ptr,
     PdfResolver* resolver
@@ -252,7 +252,7 @@ PdfError* pdf_deserialize_page_tree(
         PDF_FIELD("Type", &type, PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME))
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         object,
         stub_fields,
         1,
@@ -263,16 +263,12 @@ PdfError* pdf_deserialize_page_tree(
 
     if (strcmp(type, "Page") == 0) {
         target_ptr->kind = PDF_PAGE_TREE_PAGE;
-        PDF_PROPAGATE(
-            pdf_deserialize_page(object, &target_ptr->value.page, resolver)
-        );
+        TRY(pdf_deserialize_page(object, &target_ptr->value.page, resolver));
     } else if (strcmp(type, "Page") == 0) {
         target_ptr->kind = PDF_PAGE_TREE_PAGES;
-        PDF_PROPAGATE(
-            pdf_deserialize_pages(object, &target_ptr->value.pages, resolver)
-        );
+        TRY(pdf_deserialize_pages(object, &target_ptr->value.pages, resolver));
     } else {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INVALID_SUBTYPE,
             "`Type` must be `Page` or `Pages`"
         );
@@ -354,7 +350,7 @@ struct PdfPageIter {
     size_t page_idx;
 };
 
-PdfError* pdf_page_iter_new(
+Error* pdf_page_iter_new(
     PdfResolver* resolver,
     PdfPagesRef root_ref,
     PdfPageIter** iter_out
@@ -370,7 +366,7 @@ PdfError* pdf_page_iter_new(
     iter->page_idx = 0;
 
     PdfPages root;
-    PDF_PROPAGATE(pdf_resolve_pages(root_ref, resolver, &root));
+    TRY(pdf_resolve_pages(root_ref, resolver, &root));
     pdf_page_iter_frame_vec_push(
         iter->stack,
         (PdfPageIterFrame) {.node = root, .next_child_idx = 0}
@@ -380,7 +376,7 @@ PdfError* pdf_page_iter_new(
     return NULL;
 }
 
-PdfError* pdf_page_iter_next(PdfPageIter* iter, PdfPage* out_page, bool* done) {
+Error* pdf_page_iter_next(PdfPageIter* iter, PdfPage* out_page, bool* done) {
     RELEASE_ASSERT(iter);
     RELEASE_ASSERT(done);
 
@@ -407,7 +403,7 @@ PdfError* pdf_page_iter_next(PdfPageIter* iter, PdfPage* out_page, bool* done) {
         curr_frame->next_child_idx += 1;
 
         PdfPageTree kid;
-        PDF_PROPAGATE(pdf_resolve_page_tree(kid_ref, iter->resolver, &kid));
+        TRY(pdf_resolve_page_tree(kid_ref, iter->resolver, &kid));
         pdf_page_tree_inherit(&kid, &curr_frame->node);
 
         if (kid.kind == PDF_PAGE_TREE_PAGE) {

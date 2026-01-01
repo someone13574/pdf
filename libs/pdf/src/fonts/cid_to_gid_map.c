@@ -3,12 +3,12 @@
 #include <string.h>
 
 #include "../deserialize.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
-PdfError* pdf_deserialize_cid_to_gid_map(
+Error* pdf_deserialize_cid_to_gid_map(
     const PdfObject* object,
     PdfCIDToGIDMap* target_ptr,
     PdfResolver* resolver
@@ -18,11 +18,11 @@ PdfError* pdf_deserialize_cid_to_gid_map(
     RELEASE_ASSERT(resolver);
 
     PdfObject resolved;
-    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved, true));
+    TRY(pdf_resolve_object(resolver, object, &resolved, true));
 
     if (resolved.type == PDF_OBJECT_TYPE_NAME) {
         if (strcmp(resolved.data.name, "Identity") != 0) {
-            return PDF_ERROR(
+            return ERROR(
                 PDF_ERR_INCORRECT_TYPE,
                 "CIDToGIDMap name must be identity"
             );
@@ -38,7 +38,7 @@ PdfError* pdf_deserialize_cid_to_gid_map(
     return NULL;
 }
 
-PdfError*
+Error*
 pdf_map_cid_to_gid(PdfCIDToGIDMap* map, uint32_t cid, uint32_t* gid_out) {
     RELEASE_ASSERT(map);
     RELEASE_ASSERT(gid_out);
@@ -47,7 +47,7 @@ pdf_map_cid_to_gid(PdfCIDToGIDMap* map, uint32_t cid, uint32_t* gid_out) {
         *gid_out = cid;
     } else {
         if (cid * 2 + 1 >= map->value.stream.decoded_stream_len) {
-            return PDF_ERROR(
+            return ERROR(
                 PDF_ERR_INVALID_CID,
                 "Cid `%zu` out-of-bounds in cid-to-gid map",
                 (size_t)cid

@@ -15,7 +15,7 @@ if (NOT MSVC)
 endif()
 
 add_executable(font-example font.c)
-target_link_libraries(font-example PRIVATE pdf-error pdf-logger sfnt)
+target_link_libraries(font-example PRIVATE err pdf-logger sfnt)
 target_compile_definitions(font-example PRIVATE DEBUG TEST)
 if (NOT MSVC)
     target_compile_options(font-example PRIVATE -fsanitize=address,undefined)

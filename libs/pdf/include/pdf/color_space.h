@@ -1,9 +1,9 @@
 #pragma once
 
+#include "err/error.h"
 #include "geom/vec3.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 typedef struct {
     /// (Required) An array of three numbers [ XW YW ZW ] specifying the
@@ -61,7 +61,7 @@ typedef struct {
     PdfColorSpaceParams params;
 } PdfColorSpace;
 
-PdfError* pdf_deserialize_color_space(
+Error* pdf_deserialize_color_space(
     const PdfObject* object,
     PdfColorSpace* target_ptr,
     PdfResolver* resolver

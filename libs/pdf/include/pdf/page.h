@@ -192,7 +192,7 @@ typedef struct {
     PdfUnimplemented vp;
 } PdfPage;
 
-PdfError* pdf_deserialize_page(
+Error* pdf_deserialize_page(
     const PdfObject* object,
     PdfPage* target_ptr,
     PdfResolver* resolver
@@ -251,7 +251,7 @@ struct PdfPages {
     PdfIntegerOptional rotate;
 };
 
-PdfError* pdf_deserialize_pages(
+Error* pdf_deserialize_pages(
     const PdfObject* object,
     PdfPages* target_ptr,
     PdfResolver* resolver
@@ -265,7 +265,7 @@ struct PdfPageTree {
     } value;
 };
 
-PdfError* pdf_deserialize_page_tree(
+Error* pdf_deserialize_page_tree(
     const PdfObject* object,
     PdfPageTree* target_ptr,
     PdfResolver* resolver
@@ -276,10 +276,10 @@ void pdf_page_tree_inherit(PdfPageTree* dst, PdfPages* src);
 
 typedef struct PdfPageIter PdfPageIter;
 
-PdfError* pdf_page_iter_new(
+Error* pdf_page_iter_new(
     PdfResolver* resolver,
     PdfPagesRef root_ref,
     PdfPageIter** iter_out
 );
 
-PdfError* pdf_page_iter_next(PdfPageIter* iter, PdfPage* out_page, bool* done);
+Error* pdf_page_iter_next(PdfPageIter* iter, PdfPage* out_page, bool* done);

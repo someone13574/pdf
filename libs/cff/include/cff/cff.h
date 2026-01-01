@@ -5,14 +5,14 @@
 
 #include "arena/arena.h"
 #include "canvas/canvas.h"
+#include "err/error.h"
 #include "geom/mat3.h"
-#include "pdf_error/error.h"
 
 /// A CFF FontSet.
 typedef struct CffFontSet CffFontSet;
 
 /// Parse a CFF FontSet, storing the result in `cff_fontset_out`.
-PdfError* cff_parse_fontset(
+Error* cff_parse_fontset(
     Arena* arena,
     const uint8_t* data,
     size_t data_len,
@@ -20,7 +20,7 @@ PdfError* cff_parse_fontset(
 );
 
 /// Render a glyph with a given transformation.
-PdfError* cff_render_glyph(
+Error* cff_render_glyph(
     CffFontSet* fontset,
     uint32_t gid,
     Canvas* canvas,

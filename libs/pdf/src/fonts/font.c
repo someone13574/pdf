@@ -3,12 +3,12 @@
 #include <string.h>
 
 #include "../deserialize.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "pdf/fonts/encoding.h"
 #include "pdf/fonts/font_descriptor.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 DESERDE_IMPL_TRAMPOLINE(
     pdf_deserialize_cid_font_trampoline,
@@ -20,7 +20,7 @@ DESERDE_IMPL_TRAMPOLINE(
 #define DVEC_TYPE PdfCIDFont
 #include "arena/dvec_impl.h"
 
-PdfError* pdf_deserialize_cid_font(
+Error* pdf_deserialize_cid_font(
     const PdfObject* object,
     PdfCIDFont* target_ptr,
     PdfResolver* resolver
@@ -83,7 +83,7 @@ PdfError* pdf_deserialize_cid_font(
         )
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -93,14 +93,14 @@ PdfError* pdf_deserialize_cid_font(
     ));
 
     if (strcmp(target_ptr->type, "Font") != 0) {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "`Type` key must be `Font`, found `%s`",
             target_ptr->type
         );
     } else if (strcmp(target_ptr->subtype, "CIDFontType0") != 0
                && strcmp(target_ptr->subtype, "CIDFontType2") != 0) {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "`Subtype` key must be `CIDFontType0` or `CIDFontType2`"
         );
@@ -109,7 +109,7 @@ PdfError* pdf_deserialize_cid_font(
     return NULL;
 }
 
-PdfError* pdf_deserialize_type0_font(
+Error* pdf_deserialize_type0_font(
     const PdfObject* object,
     PdfType0font* target_ptr,
     PdfResolver* resolver
@@ -157,7 +157,7 @@ PdfError* pdf_deserialize_type0_font(
         )
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -167,7 +167,7 @@ PdfError* pdf_deserialize_type0_font(
     ));
 
     if (strcmp(target_ptr->type, "Font") != 0) {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "Incorrect `Type` for font: %s",
             target_ptr->type
@@ -175,7 +175,7 @@ PdfError* pdf_deserialize_type0_font(
     }
 
     if (strcmp(target_ptr->subtype, "Type0") != 0) {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "Incorrect `Subtype` for Type0 font: %s",
             target_ptr->subtype
@@ -183,7 +183,7 @@ PdfError* pdf_deserialize_type0_font(
     }
 
     if (pdf_cid_font_vec_len(target_ptr->descendant_fonts) != 1) {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "The `DescendantFonts` array of a Type0 font must have exactly one element"
         );
@@ -192,7 +192,7 @@ PdfError* pdf_deserialize_type0_font(
     return NULL;
 }
 
-PdfError* pdf_deserialize_truetype_font_dict(
+Error* pdf_deserialize_truetype_font_dict(
     const PdfObject* object,
     PdfTrueTypeFont* target_ptr,
     PdfResolver* resolver
@@ -270,7 +270,7 @@ PdfError* pdf_deserialize_truetype_font_dict(
         )
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -280,13 +280,13 @@ PdfError* pdf_deserialize_truetype_font_dict(
     ));
 
     if (strcmp(target_ptr->type, "Font") != 0) {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "`Type` key must be `Font`, found `%s`",
             target_ptr->type
         );
     } else if (strcmp(target_ptr->subtype, "TrueType") != 0) {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "`Subtype` key must be `TrueType`"
         );
@@ -300,7 +300,7 @@ typedef struct {
     PdfName subtype;
 } PdfFontInfo;
 
-PdfError* pdf_deserialize_font(
+Error* pdf_deserialize_font(
     const PdfObject* object,
     PdfFont* target_ptr,
     PdfResolver* resolver
@@ -323,7 +323,7 @@ PdfError* pdf_deserialize_font(
         )
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -333,7 +333,7 @@ PdfError* pdf_deserialize_font(
     ));
 
     if (strcmp(font_info.type, "Font") != 0) {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "Expected font dictionary, found `Type=%s`",
             font_info.type
@@ -342,7 +342,7 @@ PdfError* pdf_deserialize_font(
 
     if (strcmp(font_info.subtype, "Type0") == 0) {
         target_ptr->type = PDF_FONT_TYPE0;
-        PDF_PROPAGATE(pdf_deserialize_type0_font(
+        TRY(pdf_deserialize_type0_font(
             object,
             &target_ptr->data.type0,
             resolver
@@ -358,23 +358,19 @@ PdfError* pdf_deserialize_font(
         LOG_TODO("Type3 font dictionaries");
     } else if (strcmp(font_info.subtype, "TrueType") == 0) {
         target_ptr->type = PDF_FONT_TRUETYPE;
-        PDF_PROPAGATE(pdf_deserialize_truetype_font_dict(
+        TRY(pdf_deserialize_truetype_font_dict(
             object,
             &target_ptr->data.true_type,
             resolver
         ));
     } else if (strcmp(font_info.subtype, "CIDFontType0") == 0) {
         target_ptr->type = PDF_FONT_CIDTYPE0;
-        PDF_PROPAGATE(
-            pdf_deserialize_cid_font(object, &target_ptr->data.cid, resolver)
-        );
+        TRY(pdf_deserialize_cid_font(object, &target_ptr->data.cid, resolver));
     } else if (strcmp(font_info.subtype, "CIDFontType2") == 0) {
         target_ptr->type = PDF_FONT_CIDTYPE2;
-        PDF_PROPAGATE(
-            pdf_deserialize_cid_font(object, &target_ptr->data.cid, resolver)
-        );
+        TRY(pdf_deserialize_cid_font(object, &target_ptr->data.cid, resolver));
     } else {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "Invalid font subtype `%s`",
             font_info.subtype

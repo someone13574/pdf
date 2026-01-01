@@ -1,8 +1,8 @@
 #pragma once
 
+#include "err/error.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 typedef struct {
     /// Whether this entry has been actually set. If this is false, the default
@@ -31,7 +31,7 @@ DESERDE_DECL_OPTIONAL(
     pdf_font_widths_op_init
 )
 
-PdfError* pdf_deserialize_font_widths(
+Error* pdf_deserialize_font_widths(
     const PdfObject* object,
     PdfFontWidths* deserialized,
     PdfResolver* resolver

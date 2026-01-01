@@ -6,17 +6,17 @@
 #include "arena/arena.h"
 #include "ctx.h"
 #include "deserialize.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "object.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 #include "postscript/interpreter.h"
 #include "postscript/object.h"
 #include "postscript/tokenizer.h"
 #include "test_helpers.h"
 
-PdfError* pdf_deserialize_function(
+Error* pdf_deserialize_function(
     const PdfObject* object,
     PdfFunction* target_ptr,
     PdfResolver* resolver
@@ -26,7 +26,7 @@ PdfError* pdf_deserialize_function(
     RELEASE_ASSERT(resolver);
 
     PdfObject resolved;
-    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved, true));
+    TRY(pdf_resolve_object(resolver, object, &resolved, true));
 
     PdfFieldDescriptor fields[] = {
         PDF_FIELD(
@@ -56,7 +56,7 @@ PdfError* pdf_deserialize_function(
     };
 
     if (resolved.type == PDF_OBJECT_TYPE_DICT) {
-        PDF_PROPAGATE(pdf_deserialize_dict(
+        TRY(pdf_deserialize_dict(
             &resolved,
             fields,
             sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -65,7 +65,7 @@ PdfError* pdf_deserialize_function(
             "Function"
         ));
     } else if (resolved.type == PDF_OBJECT_TYPE_STREAM) {
-        PDF_PROPAGATE(pdf_deserialize_dict(
+        TRY(pdf_deserialize_dict(
             resolved.data.stream.stream_dict->raw_dict,
             fields,
             sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -74,7 +74,7 @@ PdfError* pdf_deserialize_function(
             "Function"
         ));
     } else {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "Functions must be a stream or dict"
         );
@@ -119,7 +119,7 @@ PdfError* pdf_deserialize_function(
                 )
             };
 
-            PDF_PROPAGATE(pdf_deserialize_dict(
+            TRY(pdf_deserialize_dict(
                 object,
                 specific_fields,
                 sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
@@ -160,7 +160,7 @@ PdfError* pdf_deserialize_function(
                 )
             };
 
-            PDF_PROPAGATE(pdf_deserialize_dict(
+            TRY(pdf_deserialize_dict(
                 object,
                 specific_fields,
                 sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
@@ -178,22 +178,22 @@ PdfError* pdf_deserialize_function(
 
             size_t k = pdf_function_vec_len(target_ptr->data.type3.functions);
             if (k == 0) {
-                return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
             }
 
             if (pdf_number_vec_len(target_ptr->data.type3.bounds) != k - 1) {
-                return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
             }
 
             if (pdf_number_vec_len(target_ptr->data.type3.encode) != 2 * k) {
-                return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
             }
 
             break;
         }
         case 4: {
             if (resolved.type != PDF_OBJECT_TYPE_STREAM) {
-                return PDF_ERROR(
+                return ERROR(
                     PDF_ERR_INCORRECT_TYPE,
                     "Type4 function must be a stream"
                 );
@@ -207,14 +207,14 @@ PdfError* pdf_deserialize_function(
                 resolved.data.stream.decoded_stream_len
             );
 
-            PDF_PROPAGATE(ps_interpret_token(
+            TRY(ps_interpret_token(
                 interpreter,
                 (PSToken) {.type = PS_TOKEN_LIT_NAME, .data.name = "func"}
             ));
 
-            PDF_PROPAGATE(ps_interpret_tokens(interpreter, tokenizer));
+            TRY(ps_interpret_tokens(interpreter, tokenizer));
 
-            PDF_PROPAGATE(ps_interpret_token(
+            TRY(ps_interpret_token(
                 interpreter,
                 (PSToken) {.type = PS_TOKEN_EXE_NAME, .data.name = "def"}
             ));
@@ -230,7 +230,7 @@ PdfError* pdf_deserialize_function(
     return NULL;
 }
 
-static PdfError*
+static Error*
 clip_num(PdfObject object, PdfNumber min, PdfNumber max, PdfObject* out) {
     PdfNumber val;
     switch (object.type) {
@@ -249,7 +249,7 @@ clip_num(PdfObject object, PdfNumber min, PdfNumber max, PdfObject* out) {
             return NULL;
         }
         default: {
-            return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+            return ERROR(PDF_ERR_INCORRECT_TYPE);
         }
     }
 
@@ -279,7 +279,7 @@ clip_num(PdfObject object, PdfNumber min, PdfNumber max, PdfObject* out) {
     return NULL;
 }
 
-PdfError*
+Error*
 pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
     RELEASE_ASSERT(function);
     RELEASE_ASSERT(arena);
@@ -300,9 +300,9 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
                         2 * idx + 1,
                         &max
                     )) {
-                    return PDF_ERROR(PDF_ERR_EXCESS_OPERAND);
+                    return ERROR(PDF_ERR_EXCESS_OPERAND);
                 }
-                PDF_PROPAGATE(clip_num(*pdf_operand, min, max, &clipped));
+                TRY(clip_num(*pdf_operand, min, max, &clipped));
 
                 PSObject operand = {
                     .literal = true,
@@ -318,15 +318,13 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
                     operand.type = PS_OBJECT_BOOLEAN;
                     operand.data.boolean = clipped.data.boolean;
                 } else {
-                    return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+                    return ERROR(PDF_ERR_INCORRECT_TYPE);
                 }
 
-                PDF_PROPAGATE(
-                    ps_interpret_object(function->data.type4, operand)
-                );
+                TRY(ps_interpret_object(function->data.type4, operand));
             }
 
-            PDF_PROPAGATE(ps_interpret_token(
+            TRY(ps_interpret_token(
                 function->data.type4,
                 (PSToken) {.type = PS_TOKEN_EXE_NAME, .data.name = "func"}
             ));
@@ -349,7 +347,7 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
                     converted.type = PDF_OBJECT_TYPE_BOOLEAN;
                     converted.data.boolean = output.data.boolean;
                 } else {
-                    return PDF_ERROR(PS_ERR_OPERAND_TYPE);
+                    return ERROR(PS_ERR_OPERAND_TYPE);
                 }
 
                 PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
@@ -366,9 +364,9 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
                             2 * idx + 1,
                             &max
                         )) {
-                        return PDF_ERROR(PDF_ERR_EXCESS_OPERAND);
+                        return ERROR(PDF_ERR_EXCESS_OPERAND);
                     }
-                    PDF_PROPAGATE(clip_num(converted, min, max, object));
+                    TRY(clip_num(converted, min, max, object));
                 } else {
                     *object = converted;
                 }
@@ -419,10 +417,10 @@ TEST_FUNC(test_pdf_function) {
     PdfResolver* resolver = pdf_fake_resolver_new(arena, ctx);
 
     PdfObject object;
-    TEST_PDF_REQUIRE(pdf_parse_object(resolver, &object, false));
+    TEST_REQUIRE(pdf_parse_object(resolver, &object, false));
 
     PdfFunction func;
-    TEST_PDF_REQUIRE(pdf_deserialize_function(&object, &func, resolver));
+    TEST_REQUIRE(pdf_deserialize_function(&object, &func, resolver));
 
     PdfObject* a = arena_alloc(arena, sizeof(PdfObject));
     PdfObject* b = arena_alloc(arena, sizeof(PdfObject));
@@ -434,7 +432,7 @@ TEST_FUNC(test_pdf_function) {
     PdfObjectVec* io = pdf_object_vec_new(arena);
     pdf_object_vec_push(io, a);
     pdf_object_vec_push(io, b);
-    TEST_PDF_REQUIRE(pdf_run_function(&func, arena, io));
+    TEST_REQUIRE(pdf_run_function(&func, arena, io));
 
     PdfObject* out = NULL;
     TEST_ASSERT(pdf_object_vec_pop(io, &out));

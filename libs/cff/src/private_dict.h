@@ -4,8 +4,8 @@
 
 #include "arena/arena.h"
 #include "arena/common.h"
+#include "err/error.h"
 #include "parser.h"
-#include "pdf_error/error.h"
 #include "types.h"
 
 typedef struct {
@@ -29,7 +29,7 @@ typedef struct {
     CffNumber nominal_width_x;
 } CffPrivateDict;
 
-PdfError* cff_parse_private_dict(
+Error* cff_parse_private_dict(
     Arena* arena,
     CffParser* parser,
     size_t length,

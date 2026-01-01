@@ -3,13 +3,13 @@
 #include <string.h>
 
 #include "deserialize.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/resources.h"
-#include "pdf_error/error.h"
 
-PdfError* pdf_deserialize_form_xobject(
+Error* pdf_deserialize_form_xobject(
     const PdfObject* object,
     PdfFormXObject* target_ptr,
     PdfResolver* resolver
@@ -81,15 +81,12 @@ PdfError* pdf_deserialize_form_xobject(
     };
 
     PdfObject resolved;
-    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved, true));
+    TRY(pdf_resolve_object(resolver, object, &resolved, true));
     if (resolved.type != PDF_OBJECT_TYPE_STREAM) {
-        return PDF_ERROR(
-            PDF_ERR_INCORRECT_TYPE,
-            "Expected xobject to be a stream"
-        );
+        return ERROR(PDF_ERR_INCORRECT_TYPE, "Expected xobject to be a stream");
     }
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         resolved.data.stream.stream_dict->raw_dict,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -98,18 +95,16 @@ PdfError* pdf_deserialize_form_xobject(
         "PdfFormXObject"
     ));
 
-    PDF_PROPAGATE(
-        pdf_deserialize_content_stream(
+    TRY(pdf_deserialize_content_stream(
             &resolved,
             &target_ptr->content_stream,
             resolver
         ),
-        "Failed to deserialize form context stream"
-    );
+        "Failed to deserialize form context stream");
 
     if (target_ptr->type.has_value
         && strcmp(target_ptr->type.value, "XObject") != 0) {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "Incorrect type `%s`",
             target_ptr->subtype
@@ -117,7 +112,7 @@ PdfError* pdf_deserialize_form_xobject(
     }
 
     if (strcmp(target_ptr->subtype, "Form") != 0) {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "Incorrect subtype `%s`",
             target_ptr->subtype
@@ -131,7 +126,7 @@ typedef struct {
     PdfName subtype;
 } XObjectUntyped;
 
-PdfError* pdf_deserialize_xobject(
+Error* pdf_deserialize_xobject(
     const PdfObject* object,
     PdfXObject* target_ptr,
     PdfResolver* resolver
@@ -148,15 +143,12 @@ PdfError* pdf_deserialize_xobject(
     )};
 
     PdfObject resolved;
-    PDF_PROPAGATE(pdf_resolve_object(resolver, object, &resolved, true));
+    TRY(pdf_resolve_object(resolver, object, &resolved, true));
     if (resolved.type != PDF_OBJECT_TYPE_STREAM) {
-        return PDF_ERROR(
-            PDF_ERR_INCORRECT_TYPE,
-            "Expected xobject to be a stream"
-        );
+        return ERROR(PDF_ERR_INCORRECT_TYPE, "Expected xobject to be a stream");
     }
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         resolved.data.stream.stream_dict->raw_dict,
         fields,
         true,
@@ -167,7 +159,7 @@ PdfError* pdf_deserialize_xobject(
 
     if (strcmp(untyped.subtype, "Form") == 0) {
         target_ptr->type = PDF_XOBJECT_FORM;
-        PDF_PROPAGATE(pdf_deserialize_form_xobject(
+        TRY(pdf_deserialize_form_xobject(
             object,
             &target_ptr->data.form,
             resolver
@@ -175,7 +167,7 @@ PdfError* pdf_deserialize_xobject(
     } else if (strcmp(untyped.subtype, "Image") == 0) {
         LOG_TODO();
     } else {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INVALID_SUBTYPE,
             "Invalid xobject subtype `%s`",
             untyped.subtype

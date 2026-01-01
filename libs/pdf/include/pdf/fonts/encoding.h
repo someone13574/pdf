@@ -15,7 +15,7 @@ typedef struct {
     PdfArrayOptional differences;
 } PdfEncodingDict;
 
-PdfError* pdf_deserialize_encoding_dict(
+Error* pdf_deserialize_encoding_dict(
     const PdfObject* object,
     PdfEncodingDict* target_ptr,
     PdfResolver* resolver

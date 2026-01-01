@@ -6,7 +6,7 @@
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
-PdfError* pdf_deserialize_stream_dict(
+Error* pdf_deserialize_stream_dict(
     const PdfObject* object,
     PdfStreamDict* target_ptr,
     PdfResolver* resolver
@@ -56,7 +56,7 @@ PdfError* pdf_deserialize_stream_dict(
     );
     arena_free(temp_arena);
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         copied_object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),

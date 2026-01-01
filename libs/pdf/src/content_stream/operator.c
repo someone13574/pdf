@@ -2,10 +2,10 @@
 
 #include <stdint.h>
 
+#include "err/error.h"
 #include "logger/log.h"
-#include "pdf_error/error.h"
 
-static PdfError* two_byte_operator(
+static Error* two_byte_operator(
     PdfCtx* ctx,
     PdfOperator operator,
     uint8_t second_byte,
@@ -15,10 +15,10 @@ static PdfError* two_byte_operator(
     RELEASE_ASSERT(selected);
 
     uint8_t peeked;
-    PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &peeked));
+    TRY(pdf_ctx_peek_and_advance(ctx, &peeked));
 
     if (peeked != second_byte) {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_UNKNOWN_OPERATOR,
             "Expected char `%c`, found `%c`",
             second_byte,
@@ -30,7 +30,7 @@ static PdfError* two_byte_operator(
     return NULL;
 }
 
-static PdfError* select_one_or_two_byte_operator(
+static Error* select_one_or_two_byte_operator(
     PdfCtx* ctx,
     PdfOperator single_byte_operator,
     PdfOperator two_byte_operator,
@@ -41,38 +41,38 @@ static PdfError* select_one_or_two_byte_operator(
     RELEASE_ASSERT(selected);
 
     uint8_t peeked;
-    PdfError* error = pdf_ctx_peek(ctx, &peeked);
+    Error* error = pdf_ctx_peek(ctx, &peeked);
 
-    if ((error && pdf_error_code(error) == PDF_ERR_CTX_EOF)
+    if ((error && error_code(error) == PDF_ERR_CTX_EOF)
         || (!error && is_pdf_non_regular(peeked))) {
         *selected = single_byte_operator;
         if (error) {
-            pdf_error_free(error);
+            error_free(error);
         }
         return NULL;
     }
 
-    if (pdf_error_free_is_ok(error) && peeked == second_byte) {
+    if (error_free_is_ok(error) && peeked == second_byte) {
         *selected = two_byte_operator;
-        PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, NULL));
+        TRY(pdf_ctx_peek_and_advance(ctx, NULL));
         return NULL;
     }
 
-    return PDF_ERROR(PDF_ERR_UNKNOWN_OPERATOR);
+    return ERROR(PDF_ERR_UNKNOWN_OPERATOR);
 }
 
-static PdfError*
+static Error*
 is_single_byte_operator(PdfCtx* ctx, bool* is_single_char, uint8_t* next_byte) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(is_single_char);
     RELEASE_ASSERT(next_byte);
 
-    PdfError* error = pdf_ctx_peek(ctx, next_byte);
-    if ((error && pdf_error_code(error) == PDF_ERR_CTX_EOF)
+    Error* error = pdf_ctx_peek(ctx, next_byte);
+    if ((error && error_code(error) == PDF_ERR_CTX_EOF)
         || (!error && is_pdf_non_regular(*next_byte))) {
         *is_single_char = true;
         if (error) {
-            pdf_error_free(error);
+            error_free(error);
         }
         return NULL;
     }
@@ -82,16 +82,16 @@ is_single_byte_operator(PdfCtx* ctx, bool* is_single_char, uint8_t* next_byte) {
     }
 
     *is_single_char = false;
-    PDF_PROPAGATE(pdf_ctx_shift(ctx, 1));
+    TRY(pdf_ctx_shift(ctx, 1));
     return NULL;
 }
 
-PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
+Error* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(operator);
 
     uint8_t peeked;
-    PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &peeked));
+    TRY(pdf_ctx_peek_and_advance(ctx, &peeked));
 
     switch (peeked) {
         case 'w': {
@@ -118,9 +118,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
         case 'd': {
             bool is_single_byte;
             uint8_t next_byte;
-            PDF_PROPAGATE(
-                is_single_byte_operator(ctx, &is_single_byte, &next_byte)
-            );
+            TRY(is_single_byte_operator(ctx, &is_single_byte, &next_byte));
 
             if (is_single_byte) {
                 *operator = PDF_OPERATOR_d;
@@ -137,13 +135,13 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
                     return NULL;
                 }
                 default: {
-                    return PDF_ERROR(PDF_ERR_UNKNOWN_OPERATOR);
+                    return ERROR(PDF_ERR_UNKNOWN_OPERATOR);
                 }
             }
         }
         case 'r': {
             uint8_t next_byte;
-            PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &next_byte));
+            TRY(pdf_ctx_peek_and_advance(ctx, &next_byte));
 
             switch (next_byte) {
                 case 'i': {
@@ -159,7 +157,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
                     return NULL;
                 }
                 default: {
-                    return PDF_ERROR(PDF_ERR_UNKNOWN_OPERATOR);
+                    return ERROR(PDF_ERR_UNKNOWN_OPERATOR);
                 }
             }
         }
@@ -187,9 +185,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
         case 'c': {
             bool is_single_byte;
             uint8_t next_byte;
-            PDF_PROPAGATE(
-                is_single_byte_operator(ctx, &is_single_byte, &next_byte)
-            );
+            TRY(is_single_byte_operator(ctx, &is_single_byte, &next_byte));
 
             if (is_single_byte) {
                 *operator = PDF_OPERATOR_c;
@@ -206,7 +202,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
                     return NULL;
                 }
                 default: {
-                    return PDF_ERROR(PDF_ERR_UNKNOWN_OPERATOR);
+                    return ERROR(PDF_ERR_UNKNOWN_OPERATOR);
                 }
             }
         }
@@ -233,9 +229,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
         case 'S': {
             bool is_single_byte;
             uint8_t next_byte;
-            PDF_PROPAGATE(
-                is_single_byte_operator(ctx, &is_single_byte, &next_byte)
-            );
+            TRY(is_single_byte_operator(ctx, &is_single_byte, &next_byte));
 
             if (is_single_byte) {
                 *operator = PDF_OPERATOR_S;
@@ -243,7 +237,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
             }
 
             if (next_byte != 'C') {
-                return PDF_ERROR(PDF_ERR_UNKNOWN_OPERATOR);
+                return ERROR(PDF_ERR_UNKNOWN_OPERATOR);
             }
 
             return select_one_or_two_byte_operator(
@@ -257,9 +251,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
         case 's': {
             bool is_single_byte;
             uint8_t next_byte;
-            PDF_PROPAGATE(
-                is_single_byte_operator(ctx, &is_single_byte, &next_byte)
-            );
+            TRY(is_single_byte_operator(ctx, &is_single_byte, &next_byte));
 
             if (is_single_byte) {
                 *operator = PDF_OPERATOR_S;
@@ -281,7 +273,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
                     return NULL;
                 }
                 default: {
-                    return PDF_ERROR(PDF_ERR_UNKNOWN_OPERATOR);
+                    return ERROR(PDF_ERR_UNKNOWN_OPERATOR);
                 }
             }
         }
@@ -301,9 +293,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
         case 'B': {
             bool is_single_byte;
             uint8_t next_byte;
-            PDF_PROPAGATE(
-                is_single_byte_operator(ctx, &is_single_byte, &next_byte)
-            );
+            TRY(is_single_byte_operator(ctx, &is_single_byte, &next_byte));
 
             if (is_single_byte) {
                 *operator = PDF_OPERATOR_B;
@@ -344,7 +334,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
                     return NULL;
                 }
                 default: {
-                    return PDF_ERROR(PDF_ERR_UNKNOWN_OPERATOR);
+                    return ERROR(PDF_ERR_UNKNOWN_OPERATOR);
                 }
             }
         }
@@ -372,7 +362,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
         }
         case 'E': {
             uint8_t next_byte;
-            PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &next_byte));
+            TRY(pdf_ctx_peek_and_advance(ctx, &next_byte));
 
             switch (next_byte) {
                 case 'T': {
@@ -396,13 +386,13 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
                     return NULL;
                 }
                 default: {
-                    return PDF_ERROR(PDF_ERR_UNKNOWN_OPERATOR);
+                    return ERROR(PDF_ERR_UNKNOWN_OPERATOR);
                 }
             }
         }
         case 'T': {
             uint8_t next_byte;
-            PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &next_byte));
+            TRY(pdf_ctx_peek_and_advance(ctx, &next_byte));
 
             switch (next_byte) {
                 case 'c': {
@@ -458,7 +448,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
                     return NULL;
                 }
                 default: {
-                    return PDF_ERROR(PDF_ERR_UNKNOWN_OPERATOR);
+                    return ERROR(PDF_ERR_UNKNOWN_OPERATOR);
                 }
             }
         }
@@ -493,7 +483,7 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
         }
         case 'D': {
             uint8_t next_byte;
-            PDF_PROPAGATE(pdf_ctx_peek_and_advance(ctx, &next_byte));
+            TRY(pdf_ctx_peek_and_advance(ctx, &next_byte));
 
             switch (next_byte) {
                 case 'o': {
@@ -505,16 +495,12 @@ PdfError* pdf_parse_operator(PdfCtx* ctx, PdfOperator* operator) {
                     return NULL;
                 }
                 default: {
-                    return PDF_ERROR(PDF_ERR_UNKNOWN_OPERATOR);
+                    return ERROR(PDF_ERR_UNKNOWN_OPERATOR);
                 }
             }
         }
         default: {
-            return PDF_ERROR(
-                PDF_ERR_UNKNOWN_OPERATOR,
-                "First byte: %c",
-                peeked
-            );
+            return ERROR(PDF_ERR_UNKNOWN_OPERATOR, "First byte: %c", peeked);
         }
     }
 }

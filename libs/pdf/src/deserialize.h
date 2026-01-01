@@ -4,9 +4,9 @@
 #include <stddef.h>
 
 #include "arena/arena.h"
+#include "err/error.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
 typedef struct PdfDeserdeInfo PdfDeserdeInfo;
 
@@ -43,7 +43,7 @@ typedef struct {
 } PdfDeserdeArrayInfo;
 
 /// Function which deserializes a type from an object.
-typedef PdfError* (*PdfDeserdeFn)(
+typedef Error* (*PdfDeserdeFn)(
     const PdfObject* object,
     void* target_ptr,
     PdfResolver* resolver
@@ -118,7 +118,7 @@ typedef struct {
 
 /// Deserializes a PDF dictionary, possibly behind an indirect reference or in
 /// an indirect object, into a struct.
-PdfError* pdf_deserialize_dict(
+Error* pdf_deserialize_dict(
     const PdfObject* object,
     const PdfFieldDescriptor* fields,
     size_t num_fields,
@@ -145,7 +145,7 @@ typedef struct {
 
 /// Deserializes an array of objects. Note that this will not attempt to resolve
 /// references.
-PdfError* pdf_deserialize_operands(
+Error* pdf_deserialize_operands(
     const PdfObjectVec* operands,
     const PdfOperandDescriptor* descriptors,
     size_t num_descriptors,
@@ -250,7 +250,7 @@ PdfError* pdf_deserialize_operands(
         resolvable->ref = ref;                                                 \
         resolvable->resolved = NULL;                                           \
     }                                                                          \
-    PdfError* resolve_fn(                                                      \
+    Error* resolve_fn(                                                         \
         new_type resolvable,                                                   \
         PdfResolver* resolver,                                                 \
         base_type* resolved_out                                                \
@@ -262,16 +262,16 @@ PdfError* pdf_deserialize_operands(
             return NULL;                                                       \
         }                                                                      \
         PdfObject resolved;                                                    \
-        PDF_PROPAGATE(pdf_resolve_ref(resolver, resolvable.ref, &resolved));   \
+        TRY(pdf_resolve_ref(resolver, resolvable.ref, &resolved));             \
         resolvable.resolved =                                                  \
             arena_alloc(pdf_resolver_arena(resolver), sizeof(base_type));      \
-        PDF_PROPAGATE(deserde_fn(&resolved, resolvable.resolved, resolver));   \
+        TRY(deserde_fn(&resolved, resolvable.resolved, resolver));             \
         *resolved_out = *resolvable.resolved;                                  \
         return NULL;                                                           \
     }
 
 #define DESERDE_IMPL_TRAMPOLINE(trampoline_fn, deserde_fn)                     \
-    PdfError* trampoline_fn(                                                   \
+    Error* trampoline_fn(                                                      \
         const PdfObject* object,                                               \
         void* target_ptr,                                                      \
         PdfResolver* resolver                                                  \

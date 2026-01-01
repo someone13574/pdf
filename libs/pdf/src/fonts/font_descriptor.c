@@ -3,12 +3,12 @@
 #include <string.h>
 
 #include "../deserialize.h"
+#include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf_error/error.h"
 
-PdfError* pdf_deserialize_font_descriptor(
+Error* pdf_deserialize_font_descriptor(
     const PdfObject* object,
     PdfFontDescriptor* target_ptr,
     PdfResolver* resolver
@@ -187,7 +187,7 @@ PdfError* pdf_deserialize_font_descriptor(
         PDF_IGNORED_FIELD("CIDSet", &target_ptr->cid_set)
     };
 
-    PDF_PROPAGATE(pdf_deserialize_dict(
+    TRY(pdf_deserialize_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -197,10 +197,7 @@ PdfError* pdf_deserialize_font_descriptor(
     ));
 
     if (strcmp(target_ptr->type, "FontDescriptor") != 0) {
-        return PDF_ERROR(
-            PDF_ERR_INCORRECT_TYPE,
-            "`Type` must be `FontDescriptor`"
-        );
+        return ERROR(PDF_ERR_INCORRECT_TYPE, "`Type` must be `FontDescriptor`");
     }
 
     size_t num_font_files = 0;
@@ -215,7 +212,7 @@ PdfError* pdf_deserialize_font_descriptor(
     }
 
     if (num_font_files > 1) {
-        return PDF_ERROR(
+        return ERROR(
             PDF_ERR_INCORRECT_TYPE,
             "At most, only one of the FontFile, FontFile2, and FontFile3 entries shall be present."
         );
