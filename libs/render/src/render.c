@@ -89,7 +89,7 @@ static PdfError* restore_graphics_state(RenderState* state) {
 
     if (!graphics_state_stack_pop_front(state->graphics_state_stack, NULL)) {
         return PDF_ERROR(
-            PDF_ERR_RENDER_GSTATE_CANNOT_RESTORE,
+            RENDER_ERR_GSTATE_CANNOT_RESTORE,
             "GState stack underflow"
         );
     }

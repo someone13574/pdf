@@ -54,7 +54,7 @@ sfnt_loca_glyph_offset(const SfntLoca* loca, uint32_t gid, uint32_t* offset) {
 
     if (!uint32_array_get(loca->offsets, gid, offset)) {
         return PDF_ERROR(
-            PDF_ERR_SFNT_INVALID_GID,
+            SFNT_ERR_INVALID_GID,
             "Couldn't find loca entry for glyph id %u",
             gid
         );

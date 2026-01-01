@@ -349,7 +349,7 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
                     converted.type = PDF_OBJECT_TYPE_BOOLEAN;
                     converted.data.boolean = output.data.boolean;
                 } else {
-                    return PDF_ERROR(PDF_ERR_PS_OPERAND_TYPE);
+                    return PDF_ERROR(PS_ERR_OPERAND_TYPE);
                 }
 
                 PdfObject* object = arena_alloc(arena, sizeof(PdfObject));

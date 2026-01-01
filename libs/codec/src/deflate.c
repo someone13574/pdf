@@ -59,7 +59,7 @@ deflate_parse_block_header(BitStream* bitstream, DeflateBlockHeader* header) {
             break;
         }
         default: {
-            return PDF_ERROR(PDF_ERR_DEFLATE_INVALID_BLOCK_TYPE);
+            return PDF_ERROR(CODEC_ERR_DEFLATE_INVALID_BLOCK_TYPE);
         }
     }
 
@@ -228,7 +228,7 @@ static PdfError* deflate_huffman_decode(
         uint8_t symbol_len = lut->length_lut[encoded_symbol];
         bitstream->offset -= lut->max_bit_len - symbol_len;
         if (symbol_len == 0) {
-            return PDF_ERROR(PDF_ERR_DEFLATE_INVALID_SYMBOL);
+            return PDF_ERROR(CODEC_ERR_DEFLATE_INVALID_SYMBOL);
         }
 
         *symbol_out = lut->symbol_lut[encoded_symbol];
@@ -279,7 +279,7 @@ static PdfError* deflate_huffman_decode(
         bits++;
     } while (bits <= lut->max_bit_len);
 
-    return PDF_ERROR(PDF_ERR_DEFLATE_INVALID_SYMBOL);
+    return PDF_ERROR(CODEC_ERR_DEFLATE_INVALID_SYMBOL);
 }
 
 static PdfError* decode_dyn_huffman_table_luts(
@@ -377,7 +377,7 @@ static PdfError* decode_dyn_huffman_table_luts(
 
             if (symbol == 16) {
                 if (bit_len_offset == 0) {
-                    return PDF_ERROR(PDF_ERR_DEFLATE_REPEAT_UNDERFLOW);
+                    return PDF_ERROR(CODEC_ERR_DEFLATE_REPEAT_UNDERFLOW);
                 }
 
                 repeat_val = bit_lens[bit_len_offset - 1];
@@ -408,7 +408,7 @@ static PdfError* decode_dyn_huffman_table_luts(
 
             if (bit_len_offset + repeat_count
                 > num_lit_code_lens + num_dist_code_lens) {
-                return PDF_ERROR(PDF_ERR_DEFLATE_REPEAT_OVERFLOW);
+                return PDF_ERROR(CODEC_ERR_DEFLATE_REPEAT_OVERFLOW);
             }
 
             for (size_t idx = 0; idx < repeat_count; idx++) {
@@ -537,7 +537,7 @@ static PdfError* deflate_decode_distance_code(
 
     if (dist_symbol >= 30) {
         return PDF_ERROR(
-            PDF_ERR_DEFLATE_INVALID_SYMBOL,
+            CODEC_ERR_DEFLATE_INVALID_SYMBOL,
             "Invalid distance symbol %u",
             (unsigned int)dist_symbol
         );
@@ -588,7 +588,7 @@ PdfError* decode_deflate_data(
 
             if ((uint16_t)len != (uint16_t)~n_len) {
                 return PDF_ERROR(
-                    PDF_ERR_DEFLATE_LEN_COMPLIMENT,
+                    CODEC_ERR_DEFLATE_LEN_COMPLIMENT,
                     "Uncompressed block length's one's compliment didn't match"
                 );
             }
@@ -652,7 +652,7 @@ PdfError* decode_deflate_data(
                         (uint32_t)uint8_vec_len(output_stream);
                     if (output_stream_len < distance) {
                         return PDF_ERROR(
-                            PDF_ERR_DEFLATE_BACKREF_UNDERFLOW,
+                            CODEC_ERR_DEFLATE_BACKREF_UNDERFLOW,
                             "Attempted to backreference to %d",
                             (int)output_stream_len - (int)distance
                         );

@@ -33,7 +33,7 @@ PdfError* sfnt_subparser_new(
 
     if (offset + len > parent->buffer_len) {
         return PDF_ERROR(
-            PDF_ERR_SFNT_EOF,
+            SFNT_ERR_EOF,
             "Sfnt subparser length overflowed parent bounds"
         );
     }
@@ -73,7 +73,7 @@ PdfError* sfnt_subparser_new(
 
     if (sum != checksum) {
         return PDF_ERROR(
-            PDF_ERR_SFNT_TABLE_CHECKSUM,
+            SFNT_ERR_TABLE_CHECKSUM,
             "SFNT checksum mismatch %llu != %llu",
             (unsigned long long)checksum,
             (unsigned long long)sum
@@ -87,7 +87,7 @@ PdfError* sfnt_parser_seek(SfntParser* parser, size_t offset) {
     RELEASE_ASSERT(parser);
 
     if (offset >= parser->buffer_len) {
-        return PDF_ERROR(PDF_ERR_SFNT_EOF);
+        return PDF_ERROR(SFNT_ERR_EOF);
     }
 
     parser->offset = offset;
@@ -99,7 +99,7 @@ PdfError* sfnt_parser_read_int8(SfntParser* parser, int8_t* out) {
     RELEASE_ASSERT(out);
 
     if (parser->offset + 1 > parser->buffer_len) {
-        return PDF_ERROR(PDF_ERR_SFNT_EOF);
+        return PDF_ERROR(SFNT_ERR_EOF);
     }
 
     *out = (int8_t)parser->buffer[parser->offset++];
@@ -111,7 +111,7 @@ PdfError* sfnt_parser_read_uint8(SfntParser* parser, uint8_t* out) {
     RELEASE_ASSERT(out);
 
     if (parser->offset + 1 > parser->buffer_len) {
-        return PDF_ERROR(PDF_ERR_SFNT_EOF);
+        return PDF_ERROR(SFNT_ERR_EOF);
     }
 
     *out = parser->buffer[parser->offset++];
@@ -133,7 +133,7 @@ PdfError* sfnt_parser_read_uint16(SfntParser* parser, uint16_t* out) {
     RELEASE_ASSERT(out);
 
     if (parser->offset + 2 > parser->buffer_len) {
-        return PDF_ERROR(PDF_ERR_SFNT_EOF);
+        return PDF_ERROR(SFNT_ERR_EOF);
     }
 
     uint32_t parsed = ((uint32_t)parser->buffer[parser->offset] << 8)
@@ -159,7 +159,7 @@ PdfError* sfnt_parser_read_uint32(SfntParser* parser, uint32_t* out) {
     RELEASE_ASSERT(out);
 
     if (parser->offset + 4 > parser->buffer_len) {
-        return PDF_ERROR(PDF_ERR_SFNT_EOF);
+        return PDF_ERROR(SFNT_ERR_EOF);
     }
 
     *out = ((uint32_t)parser->buffer[parser->offset] << 24)
@@ -186,7 +186,7 @@ PdfError* sfnt_parser_read_uint64(SfntParser* parser, uint64_t* out) {
     RELEASE_ASSERT(out);
 
     if (parser->offset + 8 > parser->buffer_len) {
-        return PDF_ERROR(PDF_ERR_SFNT_EOF);
+        return PDF_ERROR(SFNT_ERR_EOF);
     }
 
     *out = ((uint64_t)parser->buffer[parser->offset] << 56)

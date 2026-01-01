@@ -240,7 +240,7 @@ static PdfError* cidinit_begincodespacerange(PSInterpreter* interpreter) {
     ));
 
     if (length.data.integer < 0) {
-        return PDF_ERROR(PDF_ERR_PS_INVALID_LENGTH);
+        return PDF_ERROR(PS_ERR_INVALID_LENGTH);
     }
 
     ps_interpreter_operand_push(
@@ -281,7 +281,7 @@ static PdfError* cidinit_endcodespacerange(PSInterpreter* interpreter) {
     if (sink.data.sink.type != PS_SINK_CUSTOM
         || strcmp("codespacerange", sink.data.sink.sink_name) != 0) {
         return PDF_ERROR(
-            PDF_ERR_PS_OPERAND_TYPE,
+            PS_ERR_OPERAND_TYPE,
             "codespacerange sink had wrong name"
         );
     }
@@ -289,7 +289,7 @@ static PdfError* cidinit_endcodespacerange(PSInterpreter* interpreter) {
     if (ps_object_list_len(sink.data.sink.list)
         != user_data->curr_sink_len * 2) {
         return PDF_ERROR(
-            PDF_ERR_PS_OPERAND_TYPE,
+            PS_ERR_OPERAND_TYPE,
             "codespacerange sink had incorrect number of elements"
         );
     }
@@ -307,14 +307,14 @@ static PdfError* cidinit_endcodespacerange(PSInterpreter* interpreter) {
 
         if (start_str.type != PS_OBJECT_STRING) {
             return PDF_ERROR(
-                PDF_ERR_PS_OPERAND_TYPE,
+                PS_ERR_OPERAND_TYPE,
                 "codespacerange start must be a string"
             );
         }
 
         if (end_str.type != PS_OBJECT_STRING) {
             return PDF_ERROR(
-                PDF_ERR_PS_OPERAND_TYPE,
+                PS_ERR_OPERAND_TYPE,
                 "codespacerange end must be a string"
             );
         }
@@ -357,7 +357,7 @@ static PdfError* cidinit_begincidrange(PSInterpreter* interpreter) {
     ));
 
     if (length.data.integer < 0) {
-        return PDF_ERROR(PDF_ERR_PS_INVALID_LENGTH);
+        return PDF_ERROR(PS_ERR_INVALID_LENGTH);
     }
 
     ps_interpreter_operand_push(
@@ -397,16 +397,13 @@ static PdfError* cidinit_endcidrange(PSInterpreter* interpreter) {
 
     if (sink.data.sink.type != PS_SINK_CUSTOM
         || strcmp("cidrange", sink.data.sink.sink_name) != 0) {
-        return PDF_ERROR(
-            PDF_ERR_PS_OPERAND_TYPE,
-            "cidrange sink had wrong name"
-        );
+        return PDF_ERROR(PS_ERR_OPERAND_TYPE, "cidrange sink had wrong name");
     }
 
     if (ps_object_list_len(sink.data.sink.list)
         != user_data->curr_sink_len * 3) {
         return PDF_ERROR(
-            PDF_ERR_PS_OPERAND_TYPE,
+            PS_ERR_OPERAND_TYPE,
             "cidrange sink had incorrect number of elements"
         );
     }
@@ -428,21 +425,21 @@ static PdfError* cidinit_endcidrange(PSInterpreter* interpreter) {
 
         if (code_start_str.type != PS_OBJECT_STRING) {
             return PDF_ERROR(
-                PDF_ERR_PS_OPERAND_TYPE,
+                PS_ERR_OPERAND_TYPE,
                 "cidrange start must be a string"
             );
         }
 
         if (code_end_str.type != PS_OBJECT_STRING) {
             return PDF_ERROR(
-                PDF_ERR_PS_OPERAND_TYPE,
+                PS_ERR_OPERAND_TYPE,
                 "cidrange end must be a string"
             );
         }
 
         if (cid_start.type != PS_OBJECT_INTEGER || cid_start.data.integer < 0) {
             return PDF_ERROR(
-                PDF_ERR_PS_OPERAND_TYPE,
+                PS_ERR_OPERAND_TYPE,
                 "cidrange cid start must be a positive integer"
             );
         }
@@ -485,7 +482,7 @@ static PdfError* cidinit_beginbfchar(PSInterpreter* interpreter) {
     ));
 
     if (length.data.integer < 0) {
-        return PDF_ERROR(PDF_ERR_PS_INVALID_LENGTH);
+        return PDF_ERROR(PS_ERR_INVALID_LENGTH);
     }
 
     ps_interpreter_operand_push(
@@ -525,16 +522,13 @@ static PdfError* cidinit_endbfchar(PSInterpreter* interpreter) {
 
     if (sink.data.sink.type != PS_SINK_CUSTOM
         || strcmp("bfchar", sink.data.sink.sink_name) != 0) {
-        return PDF_ERROR(
-            PDF_ERR_PS_OPERAND_TYPE,
-            "cidrange sink had wrong name"
-        );
+        return PDF_ERROR(PS_ERR_OPERAND_TYPE, "cidrange sink had wrong name");
     }
 
     if (ps_object_list_len(sink.data.sink.list)
         != user_data->curr_sink_len * 2) {
         return PDF_ERROR(
-            PDF_ERR_PS_OPERAND_TYPE,
+            PS_ERR_OPERAND_TYPE,
             "bfchar sink had incorrect number of elements"
         );
     }
@@ -550,7 +544,7 @@ static PdfError* cidinit_endbfchar(PSInterpreter* interpreter) {
 
         if (key_str.type != PS_OBJECT_STRING) {
             return PDF_ERROR(
-                PDF_ERR_PS_OPERAND_TYPE,
+                PS_ERR_OPERAND_TYPE,
                 "bfchar key must be a string"
             );
         }
@@ -558,7 +552,7 @@ static PdfError* cidinit_endbfchar(PSInterpreter* interpreter) {
         if (value_str.type != PS_OBJECT_STRING) {
             // TODO: allow names as well
             return PDF_ERROR(
-                PDF_ERR_PS_OPERAND_TYPE,
+                PS_ERR_OPERAND_TYPE,
                 "bfchar value must be a string"
             );
         }

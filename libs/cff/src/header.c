@@ -17,7 +17,7 @@ PdfError* cff_read_header(CffParser* parser, CffHeader* cff_header_out) {
     );
 
     if (cff_header_out->major > 1) {
-        return PDF_ERROR(PDF_ERR_CFF_UNSUPPORTED_VERSION);
+        return PDF_ERROR(CFF_ERR_UNSUPPORTED_VERSION);
     }
 
     return NULL;

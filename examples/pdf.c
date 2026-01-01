@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
 
     size_t buffer_size;
     uint8_t* buffer =
-        load_file_to_buffer(arena, "test-files/cmyk.pdf", &buffer_size);
+        load_file_to_buffer(arena, "test-files/wiki.pdf", &buffer_size);
     RELEASE_ASSERT(buffer);
 
     PdfResolver* resolver;

@@ -294,10 +294,7 @@ static PdfError* read_number_or_executable_name(
 
         if (read_length > 0 && !unterminated) {
             if (!is_int_val || integer_val > UINT32_MAX) {
-                return PDF_ERROR(
-                    PDF_ERR_PS_LIMITCHECK,
-                    "Radix number too large"
-                );
+                return PDF_ERROR(PS_ERR_LIMITCHECK, "Radix number too large");
             }
 
             union UintToSint {
@@ -538,7 +535,7 @@ read_lit_string(PSTokenizer* tokenizer, PSString* string_out, bool first_pass) {
     }
 
     if (open_parenthesis != 0) {
-        return PDF_ERROR(PDF_ERR_PS_EOF);
+        return PDF_ERROR(PS_ERR_EOF);
     }
 
     if (first_pass) {
@@ -612,7 +609,7 @@ read_hex_string(PSTokenizer* tokenizer, PSString* string_out, bool first_pass) {
             }
         } else {
             return PDF_ERROR(
-                PDF_ERR_PS_INVALID_CHAR,
+                PS_ERR_INVALID_CHAR,
                 "Non-hex character `%c` found in postscript hex string",
                 c
             );
@@ -686,7 +683,7 @@ ps_next_token(PSTokenizer* tokenizer, PSToken* token_out, bool* got_token) {
         );
     } else if (c == '<') {
         if (tokenizer->offset >= tokenizer->data_len) {
-            return PDF_ERROR(PDF_ERR_PS_EOF, "EOF after start of hex string.");
+            return PDF_ERROR(PS_ERR_EOF, "EOF after start of hex string.");
         }
 
         uint8_t c2 = tokenizer->data[tokenizer->offset];
@@ -726,12 +723,12 @@ ps_next_token(PSTokenizer* tokenizer, PSToken* token_out, bool* got_token) {
         token_out->type = PS_TOKEN_END_PROC;
     } else if (c == '>') {
         if (tokenizer->offset >= tokenizer->data_len) {
-            return PDF_ERROR(PDF_ERR_PS_EOF, "Hit EOF when expecting `>`");
+            return PDF_ERROR(PS_ERR_EOF, "Hit EOF when expecting `>`");
         }
 
         uint8_t c2 = tokenizer->data[tokenizer->offset++];
         if (c2 != '>') {
-            return PDF_ERROR(PDF_ERR_PS_INVALID_CHAR, "Expected `>`");
+            return PDF_ERROR(PS_ERR_INVALID_CHAR, "Expected `>`");
         }
 
         token_out->type = PS_TOKEN_END_DICT;
@@ -740,7 +737,7 @@ ps_next_token(PSTokenizer* tokenizer, PSToken* token_out, bool* got_token) {
         token_out->data.name = read_name(tokenizer, 1);
     } else {
         return PDF_ERROR(
-            PDF_ERR_PS_INVALID_CHAR,
+            PS_ERR_INVALID_CHAR,
             "Unexpected character `%c` in postscript",
             c
         );
@@ -777,7 +774,7 @@ PdfError* ps_string_as_uint(PSString string, uint64_t* out_value) {
         for (size_t idx = 0; idx < string.len - 8; idx++) {
             if (string.data[idx] != 0) {
                 return PDF_ERROR(
-                    PDF_ERR_PS_LIMITCHECK,
+                    PS_ERR_LIMITCHECK,
                     "Failed to convert hex string to 64-bit unsigned integer"
                 );
             }
@@ -1142,7 +1139,7 @@ TEST_FUNC(test_ps_tokenize_hex_string_unexpected) {
 
     TEST_PDF_REQUIRE_ERR(
         ps_next_token(tokenizer, &token, &got_token),
-        PDF_ERR_PS_INVALID_CHAR
+        PS_ERR_INVALID_CHAR
     );
 
     return TEST_RESULT_PASS;

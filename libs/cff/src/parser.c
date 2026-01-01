@@ -21,7 +21,7 @@ PdfError* cff_parser_seek(CffParser* parser, size_t offset) {
     RELEASE_ASSERT(parser);
 
     if (offset > parser->buffer_len) {
-        return PDF_ERROR(PDF_ERR_CFF_EOF);
+        return PDF_ERROR(CFF_ERR_EOF);
     }
 
     parser->offset = offset;
@@ -33,7 +33,7 @@ PdfError* cff_parser_read_card8(CffParser* parser, CffCard8* card8_out) {
     RELEASE_ASSERT(card8_out);
 
     if (parser->offset >= parser->buffer_len) {
-        return PDF_ERROR(PDF_ERR_CFF_EOF);
+        return PDF_ERROR(CFF_ERR_EOF);
     }
 
     *card8_out = parser->buffer[parser->offset++];
@@ -46,7 +46,7 @@ PdfError* cff_parser_read_card16(CffParser* parser, CffCard16* card16_out) {
     RELEASE_ASSERT(card16_out);
 
     if (parser->offset + 1 >= parser->buffer_len) {
-        return PDF_ERROR(PDF_ERR_CFF_EOF);
+        return PDF_ERROR(CFF_ERR_EOF);
     }
 
     *card16_out = (CffCard16)((CffCard16)parser->buffer[parser->offset++] << 8);
@@ -65,7 +65,7 @@ PdfError* cff_parser_read_offset(
     RELEASE_ASSERT(offset_out);
 
     if (parser->offset + offset_size - 1 >= parser->buffer_len) {
-        return PDF_ERROR(PDF_ERR_CFF_EOF);
+        return PDF_ERROR(CFF_ERR_EOF);
     }
 
     *offset_out = 0;
@@ -83,13 +83,13 @@ cff_parser_read_offset_size(CffParser* parser, CffOffsetSize* offset_size_out) {
     RELEASE_ASSERT(offset_size_out);
 
     if (parser->offset >= parser->buffer_len) {
-        return PDF_ERROR(PDF_ERR_CFF_EOF);
+        return PDF_ERROR(CFF_ERR_EOF);
     }
 
     *offset_size_out = parser->buffer[parser->offset++];
     if (*offset_size_out < 1 || *offset_size_out > 4) {
         return PDF_ERROR(
-            PDF_ERR_CFF_INVALID_OFFSET_SIZE,
+            CFF_ERR_INVALID_OFFSET_SIZE,
             "Offset size must be in range 1-4"
         );
     }
@@ -107,7 +107,7 @@ PdfError* cff_parser_read_sid(CffParser* parser, CffSID* sid_out) {
     *sid_out = card16;
     if (card16 > 64999) {
         return PDF_ERROR(
-            PDF_ERR_CFF_INVALID_SID,
+            CFF_ERR_INVALID_SID,
             "CFF SID's must be in the range 0-64999"
         );
     }
@@ -218,7 +218,7 @@ static PdfError* read_real_operand(CffParser* parser, CffToken* token_out) {
         } else if (nibble == 0xa) {
             if (!integer_part) {
                 return PDF_ERROR(
-                    PDF_ERR_CFF_INVALID_REAL_OPERAND,
+                    CFF_ERR_INVALID_REAL_OPERAND,
                     "Real cannot have more than one decimal and the exponent cannot be fractional"
                 );
             }
@@ -227,7 +227,7 @@ static PdfError* read_real_operand(CffParser* parser, CffToken* token_out) {
         } else if (nibble == 0xb) {
             if (exp_part) {
                 return PDF_ERROR(
-                    PDF_ERR_CFF_INVALID_REAL_OPERAND,
+                    CFF_ERR_INVALID_REAL_OPERAND,
                     "Real cannot have more than one exp part"
                 );
             }
@@ -237,7 +237,7 @@ static PdfError* read_real_operand(CffParser* parser, CffToken* token_out) {
         } else if (nibble == 0xc) {
             if (exp_part) {
                 return PDF_ERROR(
-                    PDF_ERR_CFF_INVALID_REAL_OPERAND,
+                    CFF_ERR_INVALID_REAL_OPERAND,
                     "Real cannot have more than one exp part"
                 );
             }
@@ -248,7 +248,7 @@ static PdfError* read_real_operand(CffParser* parser, CffToken* token_out) {
         } else if (nibble == 0xe) {
             if (processed_nibbles != 0) {
                 return PDF_ERROR(
-                    PDF_ERR_CFF_INVALID_REAL_OPERAND,
+                    CFF_ERR_INVALID_REAL_OPERAND,
                     "Minus sign not at start of real"
                 );
             }
@@ -257,7 +257,7 @@ static PdfError* read_real_operand(CffParser* parser, CffToken* token_out) {
             break;
         } else {
             return PDF_ERROR(
-                PDF_ERR_CFF_RESERVED,
+                CFF_ERR_RESERVED,
                 "Nibble 0xd is reserved in real operands"
             );
         }
@@ -297,7 +297,7 @@ PdfError* cff_parser_read_token(CffParser* parser, CffToken* token_out) {
         PDF_PROPAGATE(read_real_operand(parser, token_out));
     } else if (byte0 <= 27 || byte0 == 31 || byte0 == 255) {
         return PDF_ERROR(
-            PDF_ERR_CFF_RESERVED,
+            CFF_ERR_RESERVED,
             "Byte value %d is reserved in tokens",
             (int)byte0
         );
@@ -319,7 +319,7 @@ PdfError* cff_parser_get_str(
     RELEASE_ASSERT(str_out);
 
     if (parser->offset + length >= parser->buffer_len) {
-        return PDF_ERROR(PDF_ERR_CFF_EOF);
+        return PDF_ERROR(CFF_ERR_EOF);
     }
 
     *str_out = arena_alloc(arena, sizeof(char) * (length + 1));
@@ -373,7 +373,7 @@ TEST_FUNC(test_cff_parser_seek_invalid) {
 
     CffParser parser =
         cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
-    TEST_PDF_REQUIRE_ERR(cff_parser_seek(&parser, 4), PDF_ERR_CFF_EOF);
+    TEST_PDF_REQUIRE_ERR(cff_parser_seek(&parser, 4), CFF_ERR_EOF);
 
     return TEST_RESULT_PASS;
 }
@@ -391,10 +391,7 @@ TEST_FUNC(test_cff_parser_read_card8) {
     TEST_ASSERT_EQ((CffCard8)'b', card8);
     TEST_PDF_REQUIRE(cff_parser_read_card8(&parser, &card8));
     TEST_ASSERT_EQ((CffCard8)'c', card8);
-    TEST_PDF_REQUIRE_ERR(
-        cff_parser_read_card8(&parser, &card8),
-        PDF_ERR_CFF_EOF
-    );
+    TEST_PDF_REQUIRE_ERR(cff_parser_read_card8(&parser, &card8), CFF_ERR_EOF);
 
     return TEST_RESULT_PASS;
 }
@@ -451,10 +448,7 @@ TEST_FUNC(test_cff_parser_read_card16_eof) {
     TEST_PDF_REQUIRE(cff_parser_seek(&parser, 5));
 
     CffCard16 card16;
-    TEST_PDF_REQUIRE_ERR(
-        cff_parser_read_card16(&parser, &card16),
-        PDF_ERR_CFF_EOF
-    );
+    TEST_PDF_REQUIRE_ERR(cff_parser_read_card16(&parser, &card16), CFF_ERR_EOF);
 
     return TEST_RESULT_PASS;
 }
@@ -490,7 +484,7 @@ TEST_FUNC(test_cff_parser_read_offset_eof) {
     TEST_PDF_REQUIRE(cff_parser_seek(&parser, 2));
     TEST_PDF_REQUIRE_ERR(
         cff_parser_read_offset(&parser, 4, &offset),
-        PDF_ERR_CFF_EOF
+        CFF_ERR_EOF
     );
 
     return TEST_RESULT_PASS;
@@ -520,7 +514,7 @@ TEST_FUNC(test_cff_parser_read_offset_size0) {
     CffOffsetSize offset_size;
     TEST_PDF_REQUIRE_ERR(
         cff_parser_read_offset_size(&parser, &offset_size),
-        PDF_ERR_CFF_INVALID_OFFSET_SIZE
+        CFF_ERR_INVALID_OFFSET_SIZE
     );
 
     return TEST_RESULT_PASS;
@@ -533,7 +527,7 @@ TEST_FUNC(test_cff_parser_read_offset_size5) {
     CffOffsetSize offset_size;
     TEST_PDF_REQUIRE_ERR(
         cff_parser_read_offset_size(&parser, &offset_size),
-        PDF_ERR_CFF_INVALID_OFFSET_SIZE
+        CFF_ERR_INVALID_OFFSET_SIZE
     );
 
     return TEST_RESULT_PASS;
@@ -570,7 +564,7 @@ TEST_FUNC(test_cff_parser_read_sid_invalid_65000) {
     CffSID sid;
     TEST_PDF_REQUIRE_ERR(
         cff_parser_read_sid(&parser, &sid),
-        PDF_ERR_CFF_INVALID_SID
+        CFF_ERR_INVALID_SID
     );
 
     return TEST_RESULT_PASS;
@@ -581,7 +575,7 @@ TEST_FUNC(test_cff_parser_read_sid_eof) {
     CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
 
     CffSID sid;
-    TEST_PDF_REQUIRE_ERR(cff_parser_read_sid(&parser, &sid), PDF_ERR_CFF_EOF);
+    TEST_PDF_REQUIRE_ERR(cff_parser_read_sid(&parser, &sid), CFF_ERR_EOF);
 
     return TEST_RESULT_PASS;
 }
@@ -606,10 +600,7 @@ TEST_FUNC(test_cff_parser_read_token_eof) {
     CffParser parser = cff_parser_new(buffer, 0);
 
     CffToken token;
-    TEST_PDF_REQUIRE_ERR(
-        cff_parser_read_token(&parser, &token),
-        PDF_ERR_CFF_EOF
-    );
+    TEST_PDF_REQUIRE_ERR(cff_parser_read_token(&parser, &token), CFF_ERR_EOF);
 
     return TEST_RESULT_PASS;
 }
@@ -625,7 +616,7 @@ TEST_FUNC(test_cff_parser_read_token_reserved) {
         CffToken token;
         TEST_PDF_REQUIRE_ERR(
             cff_parser_read_token(&parser, &token),
-            PDF_ERR_CFF_RESERVED
+            CFF_ERR_RESERVED
         );
     }
 
@@ -713,7 +704,7 @@ TEST_FUNC(test_cff_parser_read_real_operand_fractional_exp_err) {
     CffToken token;
     TEST_PDF_REQUIRE_ERR(
         cff_parser_read_token(&parser, &token),
-        PDF_ERR_CFF_INVALID_REAL_OPERAND
+        CFF_ERR_INVALID_REAL_OPERAND
     );
 
     return TEST_RESULT_PASS;
@@ -738,7 +729,7 @@ TEST_FUNC(test_cff_parser_read_real_operand_reserved_nibble) {
     CffToken token;
     TEST_PDF_REQUIRE_ERR(
         cff_parser_read_token(&parser, &token),
-        PDF_ERR_CFF_RESERVED
+        CFF_ERR_RESERVED
     );
 
     return TEST_RESULT_PASS;

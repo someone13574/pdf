@@ -11,7 +11,7 @@ PdfError* sfnt_parse_hhea(SfntParser* parser, SfntHhea* hhea) {
     PDF_PROPAGATE(sfnt_parser_read_fixed(parser, &hhea->version));
     if (hhea->version != 0x10000) {
         return PDF_ERROR(
-            PDF_ERR_SFNT_INVALID_VERSION,
+            SFNT_ERR_INVALID_VERSION,
             "Invalid hhea version %u",
             hhea->version
         );
@@ -36,7 +36,7 @@ PdfError* sfnt_parse_hhea(SfntParser* parser, SfntHhea* hhea) {
 
         if (reserved != 0) {
             return PDF_ERROR(
-                PDF_ERR_SFNT_RESERVED,
+                SFNT_ERR_RESERVED,
                 "Reserved value in hhea was not 0"
             );
         }
@@ -45,7 +45,7 @@ PdfError* sfnt_parse_hhea(SfntParser* parser, SfntHhea* hhea) {
     PDF_PROPAGATE(sfnt_parser_read_int16(parser, &hhea->metric_data_format));
     if (hhea->metric_data_format != 0) {
         return PDF_ERROR(
-            PDF_ERR_SFNT_INVALID_VERSION,
+            SFNT_ERR_INVALID_VERSION,
             "hhea metricDataFormat not 0"
         );
     }

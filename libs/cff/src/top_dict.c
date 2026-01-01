@@ -142,7 +142,7 @@ static PdfError* cff_top_dict_interpret_key(
             two_byte_keys[operator1 - 20 + 9]; // SyntheticBase is 12 20.
                                                // We pack in a single array.
     } else {
-        return PDF_ERROR(PDF_ERR_CFF_EXPECTED_OPERATOR);
+        return PDF_ERROR(CFF_ERR_EXPECTED_OPERATOR);
     }
 
     return NULL;
@@ -155,17 +155,17 @@ pop_sid(CffToken* operand_stack, size_t* operand_count, CffSID* sid_out) {
     RELEASE_ASSERT(sid_out);
 
     if (*operand_count == 0) {
-        return PDF_ERROR(PDF_ERR_CFF_MISSING_OPERAND);
+        return PDF_ERROR(CFF_ERR_MISSING_OPERAND);
     }
 
     CffToken token = operand_stack[--*operand_count];
     if (token.type != CFF_TOKEN_INT_OPERAND) {
-        return PDF_ERROR(PDF_ERR_CFF_INCORRECT_OPERAND, "Expected SID operand");
+        return PDF_ERROR(CFF_ERR_INCORRECT_OPERAND, "Expected SID operand");
     }
 
     if (token.value.integer < 0 || token.value.integer >= 65000) {
         return PDF_ERROR(
-            PDF_ERR_CFF_INVALID_SID,
+            CFF_ERR_INVALID_SID,
             "SIDs must be in the range 0-64999"
         );
     }
@@ -183,15 +183,12 @@ pop_int(CffToken* operand_stack, size_t* operand_count, int32_t* int_out) {
     RELEASE_ASSERT(int_out);
 
     if (*operand_count == 0) {
-        return PDF_ERROR(PDF_ERR_CFF_MISSING_OPERAND);
+        return PDF_ERROR(CFF_ERR_MISSING_OPERAND);
     }
 
     CffToken token = operand_stack[--*operand_count];
     if (token.type != CFF_TOKEN_INT_OPERAND) {
-        return PDF_ERROR(
-            PDF_ERR_CFF_INCORRECT_OPERAND,
-            "Expected integer operand"
-        );
+        return PDF_ERROR(CFF_ERR_INCORRECT_OPERAND, "Expected integer operand");
     }
 
     *int_out = token.value.integer;
@@ -209,7 +206,7 @@ static PdfError* pop_number(
     RELEASE_ASSERT(number_out);
 
     if (*operand_count == 0) {
-        return PDF_ERROR(PDF_ERR_CFF_MISSING_OPERAND);
+        return PDF_ERROR(CFF_ERR_MISSING_OPERAND);
     }
 
     CffToken token = operand_stack[--*operand_count];
@@ -227,7 +224,7 @@ static PdfError* pop_number(
         }
         default: {
             return PDF_ERROR(
-                PDF_ERR_CFF_INCORRECT_OPERAND,
+                CFF_ERR_INCORRECT_OPERAND,
                 "Expected number operand"
             );
         }
@@ -235,10 +232,7 @@ static PdfError* pop_number(
 
     if (token.type != CFF_TOKEN_INT_OPERAND
         && token.type != CFF_TOKEN_REAL_OPERAND) {
-        return PDF_ERROR(
-            PDF_ERR_CFF_INCORRECT_OPERAND,
-            "Expected number operand"
-        );
+        return PDF_ERROR(CFF_ERR_INCORRECT_OPERAND, "Expected number operand");
     }
 
     return NULL;

@@ -27,10 +27,10 @@ static PdfError* zlib_decode_cmf(BitStream* bitstream, ZlibCMF* cmf_out) {
             break;
         }
         case 15: {
-            return PDF_ERROR(PDF_ERR_ZLIB_RESERVED_CM);
+            return PDF_ERROR(CODEC_ERR_ZLIB_RESERVED_CM);
         }
         default: {
-            return PDF_ERROR(PDF_ERR_ZLIB_INVALID_CM);
+            return PDF_ERROR(CODEC_ERR_ZLIB_INVALID_CM);
         }
     }
 
@@ -86,7 +86,7 @@ PdfError* decode_zlib_data(
                        | (flg.dict_enable << 5) | (flg.check);
     if (check_val % 31 != 0) {
         return PDF_ERROR(
-            PDF_ERR_ZLIB_INVALID_FCHECK,
+            CODEC_ERR_ZLIB_INVALID_FCHECK,
             "Zlib stream has invalid FCHECK"
         );
     } else {
@@ -114,7 +114,7 @@ PdfError* decode_zlib_data(
 
     if (computed_checksum != stored_checksum) {
         return PDF_ERROR(
-            PDF_ERR_ZLIB_INVALID_CHECKSUM,
+            CODEC_ERR_ZLIB_INVALID_CHECKSUM,
             "Adler32 of decoded deflate stream didn't match (0x%08x (computed) != 0x%08x)",
             (unsigned int)computed_checksum,
             (unsigned int)stored_checksum

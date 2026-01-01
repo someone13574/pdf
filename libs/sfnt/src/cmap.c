@@ -173,7 +173,7 @@ parse_cmap_format0(Arena* arena, SfntParser* parser, SfntCmapFormat0* data) {
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->language));
     if (data->length != 262) {
         return PDF_ERROR(
-            PDF_ERR_SFNT_INVALID_LENGTH,
+            SFNT_ERR_INVALID_LENGTH,
             "Cmap format0 length must be 262"
         );
     }
@@ -228,7 +228,7 @@ parse_cmap_format4(Arena* arena, SfntParser* parser, SfntCmapFormat4* data) {
 
     if (reserved_pad != 0) {
         return PDF_ERROR(
-            PDF_ERR_SFNT_RESERVED,
+            SFNT_ERR_RESERVED,
             "The cmap format4 reserved pad word wasn't zero"
         );
     }
@@ -247,7 +247,7 @@ parse_cmap_format6(Arena* arena, SfntParser* parser, SfntCmapFormat6* data) {
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->first_code));
     PDF_PROPAGATE(sfnt_parser_read_uint16(parser, &data->entry_count));
     if (data->length != 10 + data->entry_count * 2) {
-        return PDF_ERROR(PDF_ERR_SFNT_INVALID_LENGTH);
+        return PDF_ERROR(SFNT_ERR_INVALID_LENGTH);
     }
 
     data->glyph_index_array = uint16_array_new(arena, data->entry_count);

@@ -75,7 +75,7 @@ PdfError* sfnt_directory_get_entry(
     }
 
     return PDF_ERROR(
-        PDF_ERR_SFNT_MISSING_TABLE,
+        SFNT_ERR_MISSING_TABLE,
         "Couldn't find the entry for the table `%c%c%c%c` in the directory",
         (tag >> 24) & 0xff,
         (tag >> 16) & 0xff,

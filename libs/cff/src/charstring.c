@@ -167,7 +167,7 @@ check_operands_available(size_t required_count, CharstrState* state) {
     RELEASE_ASSERT(state);
 
     if (num_operands_available(state) < required_count) {
-        return PDF_ERROR(PDF_ERR_CFF_MISSING_OPERAND);
+        return PDF_ERROR(CFF_ERR_MISSING_OPERAND);
     }
 
     return NULL;
@@ -434,7 +434,7 @@ static PdfError* charstring_interpret_operator(
             PDF_PROPAGATE(pop_operand(state, &unbiased_subr_num));
             if (unbiased_subr_num.type != CHARSTR_OPERAND_INT) {
                 return PDF_ERROR(
-                    PDF_ERR_CFF_INCORRECT_OPERAND,
+                    CFF_ERR_INCORRECT_OPERAND,
                     "Expected an integer operand"
                 );
             }
@@ -443,7 +443,7 @@ static PdfError* charstring_interpret_operator(
             int64_t subr_idx = unbiased_subr_num.value.integer + bias;
             if (subr_idx < 0 || subr_idx >= local_subr_index.count) {
                 return PDF_ERROR(
-                    PDF_ERR_CFF_INVALID_SUBR,
+                    CFF_ERR_INVALID_SUBR,
                     "Invalid local subroutine #%lld",
                     (long long int)subr_idx
                 );
@@ -599,7 +599,7 @@ static PdfError* charstring_interpret_operator(
             PDF_PROPAGATE(pop_operand(state, &unbiased_subr_num));
             if (unbiased_subr_num.type != CHARSTR_OPERAND_INT) {
                 return PDF_ERROR(
-                    PDF_ERR_CFF_INCORRECT_OPERAND,
+                    CFF_ERR_INCORRECT_OPERAND,
                     "Expected an integer operand"
                 );
             }
@@ -608,7 +608,7 @@ static PdfError* charstring_interpret_operator(
             int64_t subr_idx = unbiased_subr_num.value.integer + bias;
             if (subr_idx < 0 || subr_idx >= global_subr_index.count) {
                 return PDF_ERROR(
-                    PDF_ERR_CFF_INVALID_SUBR,
+                    CFF_ERR_INVALID_SUBR,
                     "Invalid global subroutine #%lld",
                     (long long int)subr_idx
                 );

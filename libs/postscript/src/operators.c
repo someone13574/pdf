@@ -176,7 +176,7 @@ PdfError* ps_builtin_op_index(PSInterpreter* interpreter) {
     size_t len = ps_object_list_len(stack);
     if (idx_object.data.integer >= (int32_t)len
         || idx_object.data.integer < 0) {
-        return PDF_ERROR(PDF_ERR_PS_OPERANDS_EMPTY);
+        return PDF_ERROR(PS_ERR_OPERANDS_EMPTY);
     }
 
     PSObject object;
@@ -185,7 +185,7 @@ PdfError* ps_builtin_op_index(PSInterpreter* interpreter) {
             len - (size_t)idx_object.data.integer - 1,
             &object
         )) {
-        return PDF_ERROR(PDF_ERR_PS_OPERANDS_EMPTY);
+        return PDF_ERROR(PS_ERR_OPERANDS_EMPTY);
     }
 
     return NULL;
@@ -214,7 +214,7 @@ PdfError* ps_builtin_op_roll(PSInterpreter* interpreter) {
     int32_t j = j_object.data.integer;
 
     if (n < 0) {
-        return PDF_ERROR(PDF_ERR_PS_OPERANDS_EMPTY);
+        return PDF_ERROR(PS_ERR_OPERANDS_EMPTY);
     }
     if (n == 0) {
         return NULL;
@@ -255,7 +255,7 @@ static PdfError* object_to_double(PSObject obj, double* out) {
         return NULL;
     } else {
         return PDF_ERROR(
-            PDF_ERR_PS_OPERAND_TYPE,
+            PS_ERR_OPERAND_TYPE,
             "Postscript numbers must be an integer or real"
         );
     }
@@ -416,7 +416,7 @@ static PdfError* unary_numeric_op(
         return NULL;
     }
 
-    return PDF_ERROR(PDF_ERR_PS_OPERAND_TYPE);
+    return PDF_ERROR(PS_ERR_OPERAND_TYPE);
 }
 
 static int32_t integer_neg(int32_t a) {
@@ -512,7 +512,7 @@ PdfError* ps_builtin_op_cvi(PSInterpreter* interpreter) {
         push_integer(interpreter, (int32_t)trunc(x.data.real));
         return NULL;
     } else {
-        return PDF_ERROR(PDF_ERR_PS_OPERAND_TYPE);
+        return PDF_ERROR(PS_ERR_OPERAND_TYPE);
     }
 }
 
@@ -529,7 +529,7 @@ PdfError* ps_builtin_op_cvr(PSInterpreter* interpreter) {
         push_real(interpreter, (double)x.data.integer);
         return NULL;
     } else {
-        return PDF_ERROR(PDF_ERR_PS_OPERAND_TYPE);
+        return PDF_ERROR(PS_ERR_OPERAND_TYPE);
     }
 }
 
@@ -634,7 +634,7 @@ PdfError* ps_builtin_op_defineresource(PSInterpreter* interpreter) {
     );
     if (!category) {
         return PDF_ERROR(
-            PDF_ERR_PS_UNKNOWN_RESOURCE,
+            PS_ERR_UNKNOWN_RESOURCE,
             "Unknown resource category %s",
             category_name.data.name
         );
@@ -675,7 +675,7 @@ PdfError* ps_builtin_op_findresource(PSInterpreter* interpreter) {
     );
     if (!category) {
         return PDF_ERROR(
-            PDF_ERR_PS_UNKNOWN_RESOURCE,
+            PS_ERR_UNKNOWN_RESOURCE,
             "Unknown resource category for resource %s/%s",
             category_name_object.data.name,
             resource_name_object.data.name
@@ -688,7 +688,7 @@ PdfError* ps_builtin_op_findresource(PSInterpreter* interpreter) {
     );
     if (!resource) {
         return PDF_ERROR(
-            PDF_ERR_PS_UNKNOWN_RESOURCE,
+            PS_ERR_UNKNOWN_RESOURCE,
             "Unknown resource %s in category %s",
             resource_name_object.data.name,
             category_name_object.data.name

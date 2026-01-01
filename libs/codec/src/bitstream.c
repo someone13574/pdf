@@ -19,7 +19,7 @@ PdfError* bitstream_next(BitStream* bitstream, uint32_t* out) {
 
     if (byte_offset >= bitstream->length_bytes) {
         return PDF_ERROR(
-            PDF_ERR_CODEC_BITSTREAM_EOD,
+            CODEC_ERR_BITSTREAM_EOD,
             "Bitstream reached end-of-data"
         );
     }
@@ -53,7 +53,7 @@ PdfError* bitstream_read_n(BitStream* bitstream, size_t n_bits, uint32_t* out) {
 
         if (byte_offset >= bitstream->length_bytes) {
             return PDF_ERROR(
-                PDF_ERR_CODEC_BITSTREAM_EOD,
+                CODEC_ERR_BITSTREAM_EOD,
                 "Bitstream reached end-of-data during %zu bit read (start offset %zu in %zu bit stream)",
                 n_bits + write_offset,
                 bitstream->offset,
@@ -151,7 +151,7 @@ TEST_FUNC(test_bitstream_next_eod) {
     uint32_t out;
     TEST_PDF_REQUIRE_ERR(
         bitstream_next(&bitstream, &out),
-        PDF_ERR_CODEC_BITSTREAM_EOD
+        CODEC_ERR_BITSTREAM_EOD
     );
 
     return TEST_RESULT_PASS;
@@ -230,7 +230,7 @@ TEST_FUNC(test_bitstream_read_n_eod) {
 
     TEST_PDF_REQUIRE_ERR(
         bitstream_read_n(&bitstream, 32, &out),
-        PDF_ERR_CODEC_BITSTREAM_EOD
+        CODEC_ERR_BITSTREAM_EOD
     );
 
     return TEST_RESULT_PASS;

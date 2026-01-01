@@ -376,7 +376,7 @@ PdfError* ps_interpret_token(PSInterpreter* interpreter, PSToken token) {
             ));
 
             if (sink.data.sink.type != PS_SINK_ARRAY) {
-                return PDF_ERROR(PDF_ERR_PS_OPERAND_TYPE, "Wrong sink type");
+                return PDF_ERROR(PS_ERR_OPERAND_TYPE, "Wrong sink type");
             }
 
             ps_interpreter_operand_push(
@@ -411,7 +411,7 @@ PdfError* ps_interpret_token(PSInterpreter* interpreter, PSToken token) {
             ));
 
             if (sink.data.sink.type != PS_SINK_PROC) {
-                return PDF_ERROR(PDF_ERR_PS_OPERAND_TYPE, "Wrong sink type");
+                return PDF_ERROR(PS_ERR_OPERAND_TYPE, "Wrong sink type");
             }
 
             ps_interpreter_operand_push(
@@ -446,12 +446,12 @@ PdfError* ps_interpret_token(PSInterpreter* interpreter, PSToken token) {
             ));
 
             if (sink.data.sink.type != PS_SINK_DICT) {
-                return PDF_ERROR(PDF_ERR_PS_OPERAND_TYPE, "Wrong sink type");
+                return PDF_ERROR(PS_ERR_OPERAND_TYPE, "Wrong sink type");
             }
 
             if (ps_object_list_len(sink.data.sink.list) % 2 != 0) {
                 return PDF_ERROR(
-                    PDF_ERR_PS_OPERAND_TYPE,
+                    PS_ERR_OPERAND_TYPE,
                     "Invalid number of object in dict"
                 );
             }
@@ -523,7 +523,7 @@ ps_interpreter_pop_operand(PSInterpreter* interpreter, PSObject* object_out) {
     RELEASE_ASSERT(object_out);
 
     if (!ps_object_list_pop_back(interpreter->operands, object_out)) {
-        return PDF_ERROR(PDF_ERR_PS_OPERANDS_EMPTY, "No operands to pop");
+        return PDF_ERROR(PS_ERR_OPERANDS_EMPTY, "No operands to pop");
     }
 
     LOG_DIAG(
@@ -549,14 +549,14 @@ PdfError* ps_interpreter_pop_operand_typed(
     PDF_PROPAGATE(ps_interpreter_pop_operand(interpreter, object_out));
     if (object_out->type != expected_type) {
         return PDF_ERROR(
-            PDF_ERR_PS_OPERAND_TYPE,
+            PS_ERR_OPERAND_TYPE,
             "Incorrect operand type: expected %d, found %d",
             (int)expected_type,
             (int)object_out->type
         );
     } else if (object_out->literal != literal) {
         return PDF_ERROR(
-            PDF_ERR_PS_OPERAND_TYPE,
+            PS_ERR_OPERAND_TYPE,
             "Incorrect operand type: expected literal=%d, found literal=%d",
             (int)literal,
             (int)object_out->literal
@@ -620,7 +620,7 @@ PdfError* ps_interpreter_dict_pop(PSInterpreter* interpreter) {
 
     if (ps_object_list_len(interpreter->dict_stack) <= 2) {
         return PDF_ERROR(
-            PDF_ERR_PS_POP_STANDARD_DICT,
+            PS_ERR_POP_STANDARD_DICT,
             "Cannot pop userdict from dictionary stack"
         );
     }
@@ -672,7 +672,7 @@ PdfError* ps_interpreter_dict_entry(
     }
 
     return PDF_ERROR(
-        PDF_ERR_PS_KEY_MISSING,
+        PS_ERR_KEY_MISSING,
         "Entry with key `%s` not found in dictionary stack",
         ps_object_fmt(interpreter->arena, key)
     );
@@ -691,7 +691,7 @@ PdfError* ps_interpreter_define(
 
     if (current_dict.access != PS_ACCESS_UNLIMITED) {
         return PDF_ERROR(
-            PDF_ERR_PS_ACCESS_VIOLATION,
+            PS_ERR_ACCESS_VIOLATION,
             "The current top of the dictionary stack doesn't have write access"
         );
     }
@@ -721,14 +721,14 @@ PdfError* ps_interpreter_user_data(
             &user_data_top
         )) {
         return PDF_ERROR(
-            PDF_ERR_PS_USER_DATA_INVALID,
+            PS_ERR_USER_DATA_INVALID,
             "The user-data stack is empty"
         );
     }
 
     if (strcmp(expected_name, user_data_top.name) != 0) {
         return PDF_ERROR(
-            PDF_ERR_PS_USER_DATA_INVALID,
+            PS_ERR_USER_DATA_INVALID,
             "The user-data at the top of the stack had an unexpected name"
         );
     }
@@ -768,14 +768,14 @@ PdfError* ps_interpreter_user_data_pop(
             &user_data_top
         )) {
         return PDF_ERROR(
-            PDF_ERR_PS_USER_DATA_INVALID,
+            PS_ERR_USER_DATA_INVALID,
             "The user-data stack is empty"
         );
     }
 
     if (strcmp(expected_name, user_data_top.name) != 0) {
         return PDF_ERROR(
-            PDF_ERR_PS_USER_DATA_INVALID,
+            PS_ERR_USER_DATA_INVALID,
             "The user-data at the top of the stack had an unexpected name"
         );
     }

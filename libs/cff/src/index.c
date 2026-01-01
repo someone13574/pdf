@@ -89,7 +89,7 @@ PdfError* cff_index_seek_object(
 
     if (object_idx >= index->count) {
         return PDF_ERROR(
-            PDF_ERR_CFF_INVALID_OBJECT_IDX,
+            CFF_ERR_INVALID_OBJECT_IDX,
             "Cannot seek object %u in index of %u objects",
             (unsigned int)object_idx,
             (unsigned int)index->count
@@ -107,7 +107,7 @@ PdfError* cff_index_seek_object(
 
     if (end_offset < start_offset) {
         return PDF_ERROR(
-            PDF_ERR_CFF_INVALID_INDEX,
+            CFF_ERR_INVALID_INDEX,
             "Objects in INDEX not in order"
         );
     }
@@ -144,7 +144,7 @@ TEST_FUNC(test_cff_index_empty_seek_object) {
     size_t object_size;
     TEST_PDF_REQUIRE_ERR(
         cff_index_seek_object(&index, &parser, 0, &object_size),
-        PDF_ERR_CFF_INVALID_OBJECT_IDX
+        CFF_ERR_INVALID_OBJECT_IDX
     );
 
     return TEST_RESULT_PASS;
@@ -190,7 +190,7 @@ TEST_FUNC(test_cff_index_seek_offset_size_1) {
 
     TEST_PDF_REQUIRE_ERR(
         cff_index_seek_object(&index, &parser, 4, &object_size),
-        PDF_ERR_CFF_INVALID_OBJECT_IDX
+        CFF_ERR_INVALID_OBJECT_IDX
     );
 
     return TEST_RESULT_PASS;
@@ -240,7 +240,7 @@ TEST_FUNC(test_cff_index_seek_offset_size_2) {
 
     TEST_PDF_REQUIRE_ERR(
         cff_index_seek_object(&index, &parser, 4, &object_size),
-        PDF_ERR_CFF_INVALID_OBJECT_IDX
+        CFF_ERR_INVALID_OBJECT_IDX
     );
 
     return TEST_RESULT_PASS;

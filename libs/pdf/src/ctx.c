@@ -156,9 +156,8 @@ PdfError* pdf_ctx_expect(PdfCtx* ctx, const char* text) {
             pdf_error_free_is_ok(pdf_ctx_seek(ctx, restore_offset));
             return PDF_ERROR(
                 PDF_ERR_CTX_EXPECT,
-                "Unexpected character `%c` (ctx: `%.8s`) at %zu in stream (expected `%c` for `%s`)",
+                "Unexpected character `%c` at %zu in stream (expected `%c` for `%s`)",
                 peeked,
-                ctx->buffer + ctx->offset,
                 ctx->offset,
                 *offset_text,
                 offset_text

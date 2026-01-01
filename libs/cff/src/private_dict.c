@@ -59,7 +59,7 @@ static PdfError* cff_private_dict_interpret_key(
         *key_out = (CffPrivateDictKey)(operator0 - 19 + CFF_PRIVATE_DICT_SUBRS);
         return NULL;
     } else if (operator0 != 12) {
-        return PDF_ERROR(PDF_ERR_CFF_INVALID_OPERATOR);
+        return PDF_ERROR(CFF_ERR_INVALID_OPERATOR);
     }
 
     CffCard8 operator1;
@@ -75,7 +75,7 @@ static PdfError* cff_private_dict_interpret_key(
         return NULL;
     }
 
-    return PDF_ERROR(PDF_ERR_CFF_INVALID_OPERATOR);
+    return PDF_ERROR(CFF_ERR_INVALID_OPERATOR);
 }
 
 static PdfError* read_delta_array(
@@ -95,7 +95,7 @@ static PdfError* read_delta_array(
     for (size_t idx = 0; idx < *operand_count; idx++) {
         if (operand_stack[idx].type != CFF_TOKEN_INT_OPERAND) {
             // TODO: can these be reals as well for some keys?
-            return PDF_ERROR(PDF_ERR_CFF_INCORRECT_OPERAND);
+            return PDF_ERROR(CFF_ERR_INCORRECT_OPERAND);
         }
 
         int32_t value = prev + operand_stack[idx].value.integer;
@@ -115,15 +115,12 @@ pop_int(CffToken* operand_stack, size_t* operand_count, int32_t* int_out) {
     RELEASE_ASSERT(int_out);
 
     if (*operand_count == 0) {
-        return PDF_ERROR(PDF_ERR_CFF_MISSING_OPERAND);
+        return PDF_ERROR(CFF_ERR_MISSING_OPERAND);
     }
 
     CffToken token = operand_stack[--*operand_count];
     if (token.type != CFF_TOKEN_INT_OPERAND) {
-        return PDF_ERROR(
-            PDF_ERR_CFF_INCORRECT_OPERAND,
-            "Expected integer operand"
-        );
+        return PDF_ERROR(CFF_ERR_INCORRECT_OPERAND, "Expected integer operand");
     }
 
     *int_out = token.value.integer;
@@ -141,7 +138,7 @@ static PdfError* pop_number(
     RELEASE_ASSERT(number_out);
 
     if (*operand_count == 0) {
-        return PDF_ERROR(PDF_ERR_CFF_MISSING_OPERAND);
+        return PDF_ERROR(CFF_ERR_MISSING_OPERAND);
     }
 
     CffToken token = operand_stack[--*operand_count];
@@ -159,7 +156,7 @@ static PdfError* pop_number(
         }
         default: {
             return PDF_ERROR(
-                PDF_ERR_CFF_INCORRECT_OPERAND,
+                CFF_ERR_INCORRECT_OPERAND,
                 "Expected number operand"
             );
         }
@@ -167,10 +164,7 @@ static PdfError* pop_number(
 
     if (token.type != CFF_TOKEN_INT_OPERAND
         && token.type != CFF_TOKEN_REAL_OPERAND) {
-        return PDF_ERROR(
-            PDF_ERR_CFF_INCORRECT_OPERAND,
-            "Expected number operand"
-        );
+        return PDF_ERROR(CFF_ERR_INCORRECT_OPERAND, "Expected number operand");
     }
 
     return NULL;

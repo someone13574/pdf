@@ -15,7 +15,7 @@ PdfError* sfnt_parse_maxp(SfntParser* parser, SfntMaxp* maxp) {
         return NULL;
     } else if (maxp->version != 0x10000) {
         return PDF_ERROR(
-            PDF_ERR_SFNT_INVALID_VERSION,
+            SFNT_ERR_INVALID_VERSION,
             "Invalid maxp version %u",
             maxp->version
         );

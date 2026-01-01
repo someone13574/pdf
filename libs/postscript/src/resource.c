@@ -73,7 +73,7 @@ PdfError* ps_resource_category_add_resource(
 
     if (ps_resource_category_get_resource(category, resource.name)) {
         PDF_ERROR(
-            PDF_ERR_PS_RESOURCE_DEFINED,
+            PS_ERR_RESOURCE_DEFINED,
             "Resource `%s` is already defined",
             resource.name
         );

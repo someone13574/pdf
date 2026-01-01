@@ -44,7 +44,7 @@ PdfError* text_state_render(
     RELEASE_ASSERT(text.data);
 
     if (!state->font_set) {
-        return PDF_ERROR(PDF_ERR_RENDER_FONT_NOT_SET);
+        return PDF_ERROR(RENDER_ERR_FONT_NOT_SET);
     }
 
     size_t offset = 0;

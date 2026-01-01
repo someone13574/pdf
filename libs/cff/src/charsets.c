@@ -23,7 +23,7 @@ PdfError* cff_parse_charset(
 
     if (num_glyphs == 0) {
         return PDF_ERROR(
-            PDF_ERR_CFF_INVALID_CHARSET,
+            CFF_ERR_INVALID_CHARSET,
             "TODO: Check for num_glyphs == 0 elsewhere and error there instead or check for no glyphs and skip everything"
         );
     }
@@ -59,11 +59,11 @@ PdfError* cff_parse_charset(
                 for (size_t idx = 0; idx <= (size_t)n_left; idx++) {
                     if (glyph_idx == num_glyphs - 1) {
                         return PDF_ERROR(
-                            PDF_ERR_CFF_INVALID_CHARSET,
+                            CFF_ERR_INVALID_CHARSET,
                             "Charset covers more glyphs than exist"
                         );
                     } else if (sid == 65000) {
-                        return PDF_ERROR(PDF_ERR_CFF_INVALID_SID);
+                        return PDF_ERROR(CFF_ERR_INVALID_SID);
                     }
 
                     cff_sid_array_set(
@@ -90,11 +90,11 @@ PdfError* cff_parse_charset(
                 for (size_t idx = 0; idx <= (size_t)n_left; idx++) {
                     if (glyph_idx == num_glyphs - 1) {
                         return PDF_ERROR(
-                            PDF_ERR_CFF_INVALID_CHARSET,
+                            CFF_ERR_INVALID_CHARSET,
                             "Charset covers more glyphs than exist"
                         );
                     } else if (sid == 65000) {
-                        return PDF_ERROR(PDF_ERR_CFF_INVALID_SID);
+                        return PDF_ERROR(CFF_ERR_INVALID_SID);
                     }
 
                     cff_sid_array_set(
@@ -108,7 +108,7 @@ PdfError* cff_parse_charset(
         }
         default: {
             return PDF_ERROR(
-                PDF_ERR_CFF_INVALID_CHARSET,
+                CFF_ERR_INVALID_CHARSET,
                 "Invalid charset format %d",
                 (int)format
             );
