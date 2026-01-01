@@ -24,13 +24,13 @@ typedef struct {
     PdfInteger supplement;
 } PdfCIDSystemInfo;
 
-Error* pdf_deser_cid_system_info(
+Error* pdf_deserde_cid_system_info(
     const PdfObject* object,
     PdfCIDSystemInfo* target_ptr,
     PdfResolver* resolver
 );
 
-DESER_DECL_TRAMPOLINE(pdf_deser_cid_system_info_trampoline)
+DESERDE_DECL_TRAMPOLINE(pdf_deserde_cid_system_info_trampoline)
 
 typedef struct PdfCMap PdfCMap;
 

@@ -6,16 +6,16 @@
 #include "pdf/resources.h"
 
 typedef struct PdfPages PdfPages;
-DESER_DECL_RESOLVABLE(
+DESERDE_DECL_RESOLVABLE(
     PdfPagesRef,
     PdfPages,
     pdf_pages_ref_init,
     pdf_resolve_pages
 )
-DESER_DECL_OPTIONAL(PdfPagesRefOptional, PdfPagesRef, pdf_pages_ref_op_init)
+DESERDE_DECL_OPTIONAL(PdfPagesRefOptional, PdfPagesRef, pdf_pages_ref_op_init)
 
 typedef struct PdfPageTree PdfPageTree;
-DESER_DECL_RESOLVABLE(
+DESERDE_DECL_RESOLVABLE(
     PdfPageTreeRef,
     PdfPageTree,
     pdf_page_tree_ref_init,
@@ -192,13 +192,18 @@ typedef struct {
     PdfUnimplemented vp;
 } PdfPage;
 
-Error* pdf_deser_page(
+Error* pdf_deserde_page(
     const PdfObject* object,
     PdfPage* target_ptr,
     PdfResolver* resolver
 );
 
-DESER_DECL_RESOLVABLE(PdfPageRef, PdfPage, pdf_page_ref_init, pdf_resolve_page)
+DESERDE_DECL_RESOLVABLE(
+    PdfPageRef,
+    PdfPage,
+    pdf_page_ref_init,
+    pdf_resolve_page
+)
 
 struct PdfPages {
     /// (Required) The type of PDF object that this dictionary describes; shall
@@ -246,7 +251,7 @@ struct PdfPages {
     PdfIntegerOptional rotate;
 };
 
-Error* pdf_deser_pages(
+Error* pdf_deserde_pages(
     const PdfObject* object,
     PdfPages* target_ptr,
     PdfResolver* resolver
@@ -260,7 +265,7 @@ struct PdfPageTree {
     } value;
 };
 
-Error* pdf_deser_page_tree(
+Error* pdf_deserde_page_tree(
     const PdfObject* object,
     PdfPageTree* target_ptr,
     PdfResolver* resolver

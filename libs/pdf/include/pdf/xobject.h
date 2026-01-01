@@ -96,7 +96,7 @@ typedef struct {
     } data;
 } PdfXObject;
 
-Error* pdf_deser_xobject(
+Error* pdf_deserde_xobject(
     const PdfObject* object,
     PdfXObject* target_ptr,
     PdfResolver* resolver

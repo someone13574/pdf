@@ -18,7 +18,7 @@
 #include "postscript/object.h"
 #include "postscript/tokenizer.h"
 
-Error* pdf_deser_cid_system_info(
+Error* pdf_deserde_cid_system_info(
     const PdfObject* object,
     PdfCIDSystemInfo* target_ptr,
     PdfResolver* resolver
@@ -31,21 +31,21 @@ Error* pdf_deser_cid_system_info(
         PDF_FIELD(
             "Registry",
             &target_ptr->registry,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_STRING)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
         ),
         PDF_FIELD(
             "Ordering",
             &target_ptr->ordering,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_STRING)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
         ),
         PDF_FIELD(
             "Supplement",
             &target_ptr->supplement,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         )
     };
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -57,9 +57,9 @@ Error* pdf_deser_cid_system_info(
     return NULL;
 }
 
-DESER_IMPL_TRAMPOLINE(
-    pdf_deser_cid_system_info_trampoline,
-    pdf_deser_cid_system_info
+DESERDE_IMPL_TRAMPOLINE(
+    pdf_deserde_cid_system_info_trampoline,
+    pdf_deserde_cid_system_info
 )
 
 typedef struct {

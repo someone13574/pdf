@@ -1,4 +1,4 @@
-#include "deser.h"
+#include "pdf/deserde.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -13,11 +13,11 @@
 static Error* deser(
     const PdfObject* object,
     void* target_ptr,
-    PdfDeserInfo deser_info,
+    PdfDeserdeInfo deserde_info,
     PdfResolver* resolver
 );
 
-static Error* deser_primitive(
+static Error* deserde_primitive(
     const PdfObject* object,
     void* target_ptr,
     PdfObjectType object_type,
@@ -100,39 +100,39 @@ static Error* deser_primitive(
     return NULL;
 }
 
-static Error* deser_optional(
+static Error* deserde_optional(
     const PdfObject* object,
     void* target_ptr,
-    PdfDeserOptionalInfo deser_info,
+    PdfDeserdeOptionalInfo deserde_info,
     PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(deser_info.init_optional);
+    RELEASE_ASSERT(deserde_info.init_optional);
     RELEASE_ASSERT(resolver);
 
     LOG_DIAG(TRACE, DESER, "Deserializing optional");
 
     // Initializes the optional and gets a pointer to it's inner field
-    void* value_ptr = deser_info.init_optional(target_ptr, true);
+    void* value_ptr = deserde_info.init_optional(target_ptr, true);
 
-    TRY(deser(object, value_ptr, *deser_info.inner_deser_info, resolver));
+    TRY(deser(object, value_ptr, *deserde_info.inner_deserde_info, resolver));
 
     return NULL;
 }
 
 static void
-set_none_optional(void* target_ptr, PdfDeserOptionalInfo deser_info) {
+set_none_optional(void* target_ptr, PdfDeserdeOptionalInfo deserde_info) {
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(deser_info.init_optional);
+    RELEASE_ASSERT(deserde_info.init_optional);
 
-    deser_info.init_optional(target_ptr, false);
+    deserde_info.init_optional(target_ptr, false);
 }
 
-static Error* deser_resolvable(
+static Error* deserde_resolvable(
     const PdfObject* object,
     void* target_ptr,
-    PdfDeserInitResolvable init_fn
+    PdfDeserdeInitResolvable init_fn
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
@@ -153,20 +153,20 @@ static Error* deser_resolvable(
     return NULL;
 }
 
-static Error* deser_array(
+static Error* deserde_array(
     const PdfObject* object,
     void* target_ptr, // Represents a pointer to the vec pointer
-    PdfDeserArrayInfo deser_info,
+    PdfDeserdeArrayInfo deserde_info,
     PdfResolver* resolver,
     void* first_element_ptr // When deserializing 'as-array' types, it will
-                            // first attempt to deser the singular
+                            // first attempt to deserialize the singular
                             // unwrapped element, but this can fail and we don't
                             // have a way to clear the array, so we will need to
                             // reuse the allocated element.
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(deser_info.vec_push_uninit);
+    RELEASE_ASSERT(deserde_info.vec_push_uninit);
     RELEASE_ASSERT(resolver);
 
     LOG_DIAG(TRACE, DESER, "Deserializing array");
@@ -211,7 +211,7 @@ static Error* deser_array(
                 *(void**)target_ptr = NULL;
             }
 
-            element_target_ptr = deser_info.vec_push_uninit(
+            element_target_ptr = deserde_info.vec_push_uninit(
                 target_ptr,
                 pdf_resolver_arena(resolver)
             );
@@ -220,7 +220,7 @@ static Error* deser_array(
         TRY(deser(
                 element,
                 element_target_ptr,
-                *deser_info.element_deser_info,
+                *deserde_info.element_deserde_info,
                 resolver
             ),
             "While deserializing array element");
@@ -231,15 +231,15 @@ static Error* deser_array(
 
 // This function differs from normal array deserialization since it allows
 // singular elements which aren't in an array to be treated as if they were.
-static Error* deser_as_array(
+static Error* deserde_as_array(
     const PdfObject* object,
     void* target_ptr, // represents a pointer to the vec pointer
-    PdfDeserArrayInfo deser_info,
+    PdfDeserdeArrayInfo deserde_info,
     PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
     RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(deser_info.vec_push_uninit);
+    RELEASE_ASSERT(deserde_info.vec_push_uninit);
     RELEASE_ASSERT(resolver);
 
     LOG_DIAG(TRACE, DESER, "Deserializing as-array");
@@ -248,15 +248,15 @@ static Error* deser_as_array(
 
     // Attempt unwrapped-element deserialization first
     void* element_target_ptr =
-        deser_info.vec_push_uninit(target_ptr, pdf_resolver_arena(resolver));
-    Error* unwrapped_deser_err = deser(
+        deserde_info.vec_push_uninit(target_ptr, pdf_resolver_arena(resolver));
+    Error* unwrapped_deserde_err = deser(
         object,
         element_target_ptr,
-        *deser_info.element_deser_info,
+        *deserde_info.element_deserde_info,
         resolver
     );
 
-    if (!unwrapped_deser_err) {
+    if (!unwrapped_deserde_err) {
         LOG_DIAG(TRACE, DESER, "Deserialized single element as array");
         return NULL;
     }
@@ -266,14 +266,14 @@ static Error* deser_as_array(
     // Fall-back to normal array deserialization. Reuse allocated
     // `element_target_ptr`.
     TRY(error_conditional_context(
-        deser_array(
+        deserde_array(
             object,
             target_ptr,
-            deser_info,
+            deserde_info,
             resolver,
             element_target_ptr
         ),
-        unwrapped_deser_err
+        unwrapped_deserde_err
     ));
 
     return NULL;
@@ -282,69 +282,69 @@ static Error* deser_as_array(
 static Error* deser(
     const PdfObject* object,
     void* target_ptr,
-    PdfDeserInfo deser_info,
+    PdfDeserdeInfo deserde_info,
     PdfResolver* resolver
 ) {
     RELEASE_ASSERT(object);
-    RELEASE_ASSERT(deser_info.type != PDF_DESER_TYPE_UNIMPLEMENTED);
-    RELEASE_ASSERT(target_ptr || deser_info.type == PDF_DESER_TYPE_IGNORED);
+    RELEASE_ASSERT(deserde_info.type != PDF_DESERDE_TYPE_UNIMPLEMENTED);
+    RELEASE_ASSERT(target_ptr || deserde_info.type == PDF_DESERDE_TYPE_IGNORED);
     RELEASE_ASSERT(resolver);
 
-    switch (deser_info.type) {
-        case PDF_DESER_TYPE_UNIMPLEMENTED:
-        case PDF_DESER_TYPE_IGNORED: {
+    switch (deserde_info.type) {
+        case PDF_DESERDE_TYPE_UNIMPLEMENTED:
+        case PDF_DESERDE_TYPE_IGNORED: {
             if (target_ptr) {
                 *(PdfObject*)target_ptr = *object;
             }
             break;
         }
-        case PDF_DESER_TYPE_OBJECT: {
-            TRY(deser_primitive(
+        case PDF_DESERDE_TYPE_OBJECT: {
+            TRY(deserde_primitive(
                 object,
                 target_ptr,
-                deser_info.value.object_info,
+                deserde_info.value.object_info,
                 resolver
             ));
             break;
         }
-        case PDF_DESER_TYPE_OPTIONAL: {
-            TRY(deser_optional(
+        case PDF_DESERDE_TYPE_OPTIONAL: {
+            TRY(deserde_optional(
                 object,
                 target_ptr,
-                deser_info.value.optional_info,
+                deserde_info.value.optional_info,
                 resolver
             ));
             break;
         }
-        case PDF_DESER_TYPE_RESOLVABLE: {
-            TRY(deser_resolvable(
+        case PDF_DESERDE_TYPE_RESOLVABLE: {
+            TRY(deserde_resolvable(
                 object,
                 target_ptr,
-                deser_info.value.resolvable_info
+                deserde_info.value.resolvable_info
             ));
             break;
         }
-        case PDF_DESER_TYPE_ARRAY: {
-            TRY(deser_array(
+        case PDF_DESERDE_TYPE_ARRAY: {
+            TRY(deserde_array(
                 object,
                 target_ptr,
-                deser_info.value.array_info,
+                deserde_info.value.array_info,
                 resolver,
                 NULL
             ));
             break;
         }
-        case PDF_DESER_TYPE_AS_ARRAY: {
-            TRY(deser_as_array(
+        case PDF_DESERDE_TYPE_AS_ARRAY: {
+            TRY(deserde_as_array(
                 object,
                 target_ptr,
-                deser_info.value.array_info,
+                deserde_info.value.array_info,
                 resolver
             ));
             break;
         }
-        case PDF_DESER_TYPE_CUSTOM: {
-            TRY(deser_info.value.custom_fn(object, target_ptr, resolver));
+        case PDF_DESERDE_TYPE_CUSTOM: {
+            TRY(deserde_info.value.custom_fn(object, target_ptr, resolver));
             break;
         }
     }
@@ -352,7 +352,7 @@ static Error* deser(
     return NULL;
 }
 
-Error* pdf_deser_dict(
+Error* pdf_deserde_fields(
     const PdfObject* object,
     const PdfFieldDescriptor* fields,
     size_t num_fields,
@@ -451,7 +451,7 @@ Error* pdf_deser_dict(
                 continue;
             }
 
-            if (field->deser_info.type == PDF_DESER_TYPE_UNIMPLEMENTED) {
+            if (field->deserde_info.type == PDF_DESERDE_TYPE_UNIMPLEMENTED) {
                 LOG_PANIC(
                     "Unimplemented field `%s` (\x1b[4m%s:%lu\x1b[0m)",
                     field->key,
@@ -463,7 +463,7 @@ Error* pdf_deser_dict(
             TRY(deser(
                     entry.value,
                     field->target_ptr,
-                    field->deser_info,
+                    field->deserde_info,
                     resolver
                 ),
                 "Error while deserializing field `%s` (\x1b[4m%s:%lu\x1b[0m)",
@@ -476,13 +476,15 @@ Error* pdf_deser_dict(
         }
 
         if (!found) {
-            if (field->deser_info.type == PDF_DESER_TYPE_OPTIONAL) {
+            if (field->deserde_info.type == PDF_DESERDE_TYPE_OPTIONAL) {
                 set_none_optional(
                     field->target_ptr,
-                    field->deser_info.value.optional_info
+                    field->deserde_info.value.optional_info
                 );
-            } else if (field->deser_info.type != PDF_DESER_TYPE_UNIMPLEMENTED
-                       && field->deser_info.type != PDF_DESER_TYPE_IGNORED) {
+            } else if (field->deserde_info.type
+                           != PDF_DESERDE_TYPE_UNIMPLEMENTED
+                       && field->deserde_info.type
+                              != PDF_DESERDE_TYPE_IGNORED) {
                 return ERROR(
                     PDF_ERR_MISSING_DICT_KEY,
                     "Missing key `%s`",
@@ -497,7 +499,7 @@ Error* pdf_deser_dict(
     return NULL;
 }
 
-Error* pdf_deser_operands(
+Error* pdf_deserde_operands(
     const PdfObjectVec* operands,
     const PdfOperandDescriptor* descriptors,
     size_t num_descriptors,
@@ -533,7 +535,7 @@ Error* pdf_deser_operands(
         TRY(deser(
             operand,
             descriptor.target_ptr,
-            descriptor.deser_info,
+            descriptor.deserde_info,
             resolver
         ));
     }
@@ -550,7 +552,7 @@ Error* pdf_deser_operands(
 
 #define DESERIALIZER_IMPL_HELPER()                                             \
     do {                                                                       \
-        TRY(pdf_deser_dict(                                                    \
+        TRY(pdf_deserde_fields(                                                \
             object,                                                            \
             fields,                                                            \
             sizeof(fields) / sizeof(PdfFieldDescriptor),                       \
@@ -585,7 +587,7 @@ typedef struct {
     PdfIndirectRef indirect_ref;
 } TestDeserObjectsStruct;
 
-Error* deser_test_objects_struct(
+Error* deserde_test_objects_struct(
     PdfObject* object,
     TestDeserObjectsStruct* deserialized,
     PdfResolver* resolver
@@ -594,61 +596,61 @@ Error* deser_test_objects_struct(
         PDF_FIELD(
             "Boolean",
             &deserialized->boolean,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
         ),
         PDF_FIELD(
             "Integer",
             &deserialized->integer,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         ),
         PDF_FIELD(
             "Real",
             &deserialized->real,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_REAL)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_REAL)
         ),
         PDF_FIELD(
             "String",
             &deserialized->string,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_STRING)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
         ),
         PDF_FIELD(
             "Name",
             &deserialized->name,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
         ),
         PDF_FIELD(
             "Array",
             &deserialized->array,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_ARRAY)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_ARRAY)
         ),
         PDF_FIELD(
             "Dict",
             &deserialized->dict,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
         ),
         PDF_FIELD(
             "Stream",
             &deserialized->stream,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_STREAM)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STREAM)
         ),
         PDF_FIELD(
             "IndirectRef",
             &deserialized->indirect_ref,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INDIRECT_REF)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INDIRECT_REF)
         )
     };
 
     DESERIALIZER_IMPL_HELPER();
 }
 
-TEST_FUNC(test_deser_objects) {
+TEST_FUNC(test_deserde_objects) {
     Arena* arena = arena_new(1024);
     const char* objects[] = {
         "<< /Boolean true /Integer 42 /Real 42.5 /String (test) /Name /Hello /Array [1 2 3] /Dict << /A 1 /B 2 >> /Stream 2 0 R /IndirectRef 1 0 R >>",
         "<< /Length 8 >> stream\n01234567\nendstream\n"
     };
 
-    char* buffer = pdf_construct_deser_test_doc(
+    char* buffer = pdf_construct_deserde_test_doc(
         objects,
         2,
         "<< /Size 3 /Root 404 0 R >>",
@@ -658,7 +660,7 @@ TEST_FUNC(test_deser_objects) {
     DESERIALIZER_TEST_HELPER();
 
     TestDeserObjectsStruct deserialized;
-    TEST_REQUIRE(deser_test_objects_struct(&object, &deserialized, resolver));
+    TEST_REQUIRE(deserde_test_objects_struct(&object, &deserialized, resolver));
 
     TEST_ASSERT(deserialized.boolean);
     TEST_ASSERT_EQ(42, deserialized.integer);
@@ -724,7 +726,7 @@ typedef struct {
     PdfInteger world;
 } TestDeserInnerStruct;
 
-Error* deser_test_inner_struct(
+Error* deserde_test_inner_struct(
     const PdfObject* object,
     TestDeserInnerStruct* deserialized,
     PdfResolver* resolver
@@ -733,40 +735,43 @@ Error* deser_test_inner_struct(
         PDF_FIELD(
             "Hello",
             &deserialized->hello,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
         ),
         PDF_FIELD(
             "World",
             &deserialized->world,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         )
     };
 
     DESERIALIZER_IMPL_HELPER();
 }
 
-DESER_IMPL_TRAMPOLINE(deser_test_inner_struct_untyped, deser_test_inner_struct)
-
-DESER_DECL_RESOLVABLE(
-    TestDeserInnerStructRef,
-    TestDeserInnerStruct,
-    test_deser_inner_struct_ref_init,
-    test_deser_resolve_inner_struct
+DESERDE_IMPL_TRAMPOLINE(
+    deserde_test_inner_struct_untyped,
+    deserde_test_inner_struct
 )
 
-DESER_IMPL_RESOLVABLE(
+DESERDE_DECL_RESOLVABLE(
     TestDeserInnerStructRef,
     TestDeserInnerStruct,
-    test_deser_inner_struct_ref_init,
-    test_deser_resolve_inner_struct,
-    deser_test_inner_struct
+    test_deserde_inner_struct_ref_init,
+    test_deserde_resolve_inner_struct
+)
+
+DESERDE_IMPL_RESOLVABLE(
+    TestDeserInnerStructRef,
+    TestDeserInnerStruct,
+    test_deserde_inner_struct_ref_init,
+    test_deserde_resolve_inner_struct,
+    deserde_test_inner_struct
 )
 
 typedef struct {
     TestDeserInnerStructRef reference;
 } TestDeserRefStruct;
 
-Error* deser_test_ref_struct(
+Error* deserde_test_ref_struct(
     PdfObject* object,
     TestDeserRefStruct* deserialized,
     PdfResolver* resolver
@@ -774,20 +779,20 @@ Error* deser_test_ref_struct(
     PdfFieldDescriptor fields[] = {PDF_FIELD(
         "Reference",
         &deserialized->reference,
-        PDF_DESER_RESOLVABLE(test_deser_inner_struct_ref_init)
+        PDF_DESERDE_RESOLVABLE(test_deserde_inner_struct_ref_init)
     )};
 
     DESERIALIZER_IMPL_HELPER();
 }
 
-TEST_FUNC(test_deser_ref) {
+TEST_FUNC(test_deserde_ref) {
     Arena* arena = arena_new(1024);
     const char* objects[] = {
         "<< /Reference 2 0 R >>",
         "<< /Hello /There /World 42 >>"
     };
 
-    char* buffer = pdf_construct_deser_test_doc(
+    char* buffer = pdf_construct_deserde_test_doc(
         objects,
         2,
         "<< /Size 3 /Root 404 0 R >>",
@@ -797,10 +802,10 @@ TEST_FUNC(test_deser_ref) {
     DESERIALIZER_TEST_HELPER();
 
     TestDeserRefStruct deserialized;
-    TEST_REQUIRE(deser_test_ref_struct(&object, &deserialized, resolver));
+    TEST_REQUIRE(deserde_test_ref_struct(&object, &deserialized, resolver));
 
     TestDeserInnerStruct resolved;
-    TEST_REQUIRE(test_deser_resolve_inner_struct(
+    TEST_REQUIRE(test_deserde_resolve_inner_struct(
         deserialized.reference,
         resolver,
         &resolved
@@ -816,7 +821,7 @@ typedef struct {
     TestDeserInnerStruct inner;
 } TestDeserInlineStruct;
 
-Error* deser_test_inline_struct(
+Error* deserde_test_inline_struct(
     PdfObject* object,
     TestDeserInlineStruct* deserialized,
     PdfResolver* resolver
@@ -824,20 +829,20 @@ Error* deser_test_inline_struct(
     PdfFieldDescriptor fields[] = {PDF_FIELD(
         "Inner",
         &deserialized->inner,
-        PDF_DESER_CUSTOM(deser_test_inner_struct_untyped)
+        PDF_DESERDE_CUSTOM(deserde_test_inner_struct_untyped)
     )};
 
     DESERIALIZER_IMPL_HELPER();
 }
 
-TEST_FUNC(test_deser_inline_struct) {
+TEST_FUNC(test_deserde_inline_struct) {
     Arena* arena = arena_new(1024);
     const char* objects[] = {
         "<< /Inner 2 0 R >>",
         "<< /Hello /There /World 42 >>"
     };
 
-    char* buffer = pdf_construct_deser_test_doc(
+    char* buffer = pdf_construct_deserde_test_doc(
         objects,
         2,
         "<< /Size 3 /Root 404 0 R >>",
@@ -857,7 +862,7 @@ TEST_FUNC(test_deser_inline_struct) {
     ));
 
     TestDeserInlineStruct deserialized;
-    TEST_REQUIRE(deser_test_inline_struct(&object, &deserialized, resolver));
+    TEST_REQUIRE(deserde_test_inline_struct(&object, &deserialized, resolver));
 
     TEST_ASSERT_EQ("There", deserialized.inner.hello);
     TEST_ASSERT_EQ(42, deserialized.inner.world);
@@ -865,19 +870,19 @@ TEST_FUNC(test_deser_inline_struct) {
     return TEST_RESULT_PASS;
 }
 
-DESER_DECL_OPTIONAL(
+DESERDE_DECL_OPTIONAL(
     TestDeserInnerOptional,
     TestDeserInnerStruct,
-    test_deser_inner_struct_op_init
+    test_deserde_inner_struct_op_init
 )
 
-DESER_IMPL_OPTIONAL(TestDeserInnerOptional, test_deser_inner_struct_op_init)
+DESERDE_IMPL_OPTIONAL(TestDeserInnerOptional, test_deserde_inner_struct_op_init)
 
 typedef struct {
     TestDeserInnerOptional inner;
 } TestDeserInlineOptional;
 
-Error* deser_test_inline_optional(
+Error* deserde_test_inline_optional(
     PdfObject* object,
     TestDeserInlineOptional* deserialized,
     PdfResolver* resolver
@@ -885,23 +890,23 @@ Error* deser_test_inline_optional(
     PdfFieldDescriptor fields[] = {PDF_FIELD(
         "Inner",
         &deserialized->inner,
-        PDF_DESER_OPTIONAL(
-            test_deser_inner_struct_op_init,
-            PDF_DESER_CUSTOM(deser_test_inner_struct_untyped)
+        PDF_DESERDE_OPTIONAL(
+            test_deserde_inner_struct_op_init,
+            PDF_DESERDE_CUSTOM(deserde_test_inner_struct_untyped)
         )
     )};
 
     DESERIALIZER_IMPL_HELPER();
 }
 
-TEST_FUNC(test_deser_inline_optional) {
+TEST_FUNC(test_deserde_inline_optional) {
     Arena* arena = arena_new(1024);
     const char* objects[] = {
         "<< /Inner 2 0 R >>",
         "<< /Hello /There /World 42 >>"
     };
 
-    char* buffer = pdf_construct_deser_test_doc(
+    char* buffer = pdf_construct_deserde_test_doc(
         objects,
         2,
         "<< /Size 3 /Root 404 0 R >>",
@@ -911,7 +916,9 @@ TEST_FUNC(test_deser_inline_optional) {
     DESERIALIZER_TEST_HELPER();
 
     TestDeserInlineOptional deserialized;
-    TEST_REQUIRE(deser_test_inline_optional(&object, &deserialized, resolver));
+    TEST_REQUIRE(
+        deserde_test_inline_optional(&object, &deserialized, resolver)
+    );
 
     TEST_ASSERT(deserialized.inner.has_value);
     TEST_ASSERT_EQ("There", deserialized.inner.value.hello);
@@ -920,11 +927,11 @@ TEST_FUNC(test_deser_inline_optional) {
     return TEST_RESULT_PASS;
 }
 
-TEST_FUNC(test_deser_inline_optional_none) {
+TEST_FUNC(test_deserde_inline_optional_none) {
     Arena* arena = arena_new(1024);
     const char* objects[] = {"<< >>"};
 
-    char* buffer = pdf_construct_deser_test_doc(
+    char* buffer = pdf_construct_deserde_test_doc(
         objects,
         1,
         "<< /Size 2 /Root 404 0 R >>",
@@ -934,7 +941,9 @@ TEST_FUNC(test_deser_inline_optional_none) {
     DESERIALIZER_TEST_HELPER();
 
     TestDeserInlineOptional deserialized = {.inner.has_value = true};
-    TEST_REQUIRE(deser_test_inline_optional(&object, &deserialized, resolver));
+    TEST_REQUIRE(
+        deserde_test_inline_optional(&object, &deserialized, resolver)
+    );
 
     TEST_ASSERT(!deserialized.inner.has_value);
 
@@ -942,12 +951,12 @@ TEST_FUNC(test_deser_inline_optional_none) {
 }
 
 #define DVEC_NAME DeserializeTestStringArray
-#define DVEC_LOWERCASE_NAME deser_test_string_array
+#define DVEC_LOWERCASE_NAME deserde_test_string_array
 #define DVEC_TYPE PdfString
 #include "arena/dvec_impl.h"
 
 #define DVEC_NAME DeserializeTestIntegerArray
-#define DVEC_LOWERCASE_NAME deser_test_integer_array
+#define DVEC_LOWERCASE_NAME deserde_test_integer_array
 #define DVEC_TYPE PdfInteger
 #include "arena/dvec_impl.h"
 
@@ -956,7 +965,7 @@ typedef struct {
     DeserializeTestIntegerArray* integers;
 } TestDeserPrimitiveArrays;
 
-Error* deser_test_primitive_arrays(
+Error* deserde_test_primitive_arrays(
     PdfObject* object,
     PdfResolver* resolver,
     TestDeserPrimitiveArrays* deserialized
@@ -965,17 +974,17 @@ Error* deser_test_primitive_arrays(
         PDF_FIELD(
             "Strings",
             &deserialized->strings,
-            PDF_DESER_ARRAY(
-                deser_test_string_array_push_uninit,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_STRING)
+            PDF_DESERDE_ARRAY(
+                deserde_test_string_array_push_uninit,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
             )
         ),
         PDF_FIELD(
             "Integers",
             &deserialized->integers,
-            PDF_DESER_ARRAY(
-                deser_test_integer_array_push_uninit,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            PDF_DESERDE_ARRAY(
+                deserde_test_integer_array_push_uninit,
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
             )
         )
     };
@@ -983,13 +992,13 @@ Error* deser_test_primitive_arrays(
     DESERIALIZER_IMPL_HELPER();
 }
 
-TEST_FUNC(test_deser_primitive_arrays) {
+TEST_FUNC(test_deserde_primitive_arrays) {
     Arena* arena = arena_new(1024);
     const char* objects[] = {
         "<< /Strings [(Hello) (World)] /Integers [4 5 6] >>"
     };
 
-    char* buffer = pdf_construct_deser_test_doc(
+    char* buffer = pdf_construct_deserde_test_doc(
         objects,
         1,
         "<< /Size 2 /Root 404 0 R >>",
@@ -999,37 +1008,43 @@ TEST_FUNC(test_deser_primitive_arrays) {
     DESERIALIZER_TEST_HELPER();
 
     TestDeserPrimitiveArrays deserialized;
-    TEST_REQUIRE(deser_test_primitive_arrays(&object, resolver, &deserialized));
+    TEST_REQUIRE(
+        deserde_test_primitive_arrays(&object, resolver, &deserialized)
+    );
 
     TEST_ASSERT(deserialized.strings);
     TEST_ASSERT_EQ(
         (size_t)2,
-        deser_test_string_array_len(deserialized.strings)
+        deserde_test_string_array_len(deserialized.strings)
     );
 
     PdfString out_str;
-    TEST_ASSERT(deser_test_string_array_get(deserialized.strings, 0, &out_str));
+    TEST_ASSERT(
+        deserde_test_string_array_get(deserialized.strings, 0, &out_str)
+    );
     TEST_ASSERT_EQ("Hello", pdf_string_as_cstr(out_str, arena));
-    TEST_ASSERT(deser_test_string_array_get(deserialized.strings, 1, &out_str));
+    TEST_ASSERT(
+        deserde_test_string_array_get(deserialized.strings, 1, &out_str)
+    );
     TEST_ASSERT_EQ("World", pdf_string_as_cstr(out_str, arena));
 
     TEST_ASSERT(deserialized.integers);
     TEST_ASSERT_EQ(
         (size_t)3,
-        deser_test_integer_array_len(deserialized.integers)
+        deserde_test_integer_array_len(deserialized.integers)
     );
 
     PdfInteger out_int;
     TEST_ASSERT(
-        deser_test_integer_array_get(deserialized.integers, 0, &out_int)
+        deserde_test_integer_array_get(deserialized.integers, 0, &out_int)
     );
     TEST_ASSERT_EQ((PdfInteger)4, out_int);
     TEST_ASSERT(
-        deser_test_integer_array_get(deserialized.integers, 1, &out_int)
+        deserde_test_integer_array_get(deserialized.integers, 1, &out_int)
     );
     TEST_ASSERT_EQ((PdfInteger)5, out_int);
     TEST_ASSERT(
-        deser_test_integer_array_get(deserialized.integers, 2, &out_int)
+        deserde_test_integer_array_get(deserialized.integers, 2, &out_int)
     );
     TEST_ASSERT_EQ((PdfInteger)6, out_int);
 
@@ -1037,7 +1052,7 @@ TEST_FUNC(test_deser_primitive_arrays) {
 }
 
 #define DVEC_NAME DeserializeTestStructArray
-#define DVEC_LOWERCASE_NAME deser_test_struct_array
+#define DVEC_LOWERCASE_NAME deserde_test_struct_array
 #define DVEC_TYPE TestDeserInnerStruct
 #include "arena/dvec_impl.h"
 
@@ -1045,7 +1060,7 @@ typedef struct {
     DeserializeTestStructArray* inners;
 } TestDeserTestComplexArray;
 
-Error* deser_test_complex_array(
+Error* deserde_test_complex_array(
     PdfObject* object,
     TestDeserTestComplexArray* deserialized,
     PdfResolver* resolver
@@ -1053,22 +1068,22 @@ Error* deser_test_complex_array(
     PdfFieldDescriptor fields[] = {PDF_FIELD(
         "Inners",
         &deserialized->inners,
-        PDF_DESER_ARRAY(
-            deser_test_struct_array_push_uninit,
-            PDF_DESER_CUSTOM(deser_test_inner_struct_untyped)
+        PDF_DESERDE_ARRAY(
+            deserde_test_struct_array_push_uninit,
+            PDF_DESERDE_CUSTOM(deserde_test_inner_struct_untyped)
         )
     )};
 
     DESERIALIZER_IMPL_HELPER();
 }
 
-TEST_FUNC(test_deser_custom_array) {
+TEST_FUNC(test_deserde_custom_array) {
     Arena* arena = arena_new(1024);
     const char* objects[] = {
         "<< /Inners [<< /Hello /There /World 42 >> << /Hello /Example /World 5 >>] >>"
     };
 
-    char* buffer = pdf_construct_deser_test_doc(
+    char* buffer = pdf_construct_deserde_test_doc(
         objects,
         1,
         "<< /Size 2 /Root 404 0 R >>",
@@ -1078,18 +1093,25 @@ TEST_FUNC(test_deser_custom_array) {
     DESERIALIZER_TEST_HELPER();
 
     TestDeserTestComplexArray deserialized;
-    TEST_REQUIRE(deser_test_complex_array(&object, &deserialized, resolver));
+    TEST_REQUIRE(deserde_test_complex_array(&object, &deserialized, resolver));
 
     TEST_ASSERT(deserialized.inners);
-    TEST_ASSERT_EQ((size_t)2, deser_test_struct_array_len(deserialized.inners));
+    TEST_ASSERT_EQ(
+        (size_t)2,
+        deserde_test_struct_array_len(deserialized.inners)
+    );
 
     TestDeserInnerStruct element0;
-    TEST_ASSERT(deser_test_struct_array_get(deserialized.inners, 0, &element0));
+    TEST_ASSERT(
+        deserde_test_struct_array_get(deserialized.inners, 0, &element0)
+    );
     TEST_ASSERT_EQ("There", element0.hello);
     TEST_ASSERT_EQ(42, element0.world);
 
     TestDeserInnerStruct element1;
-    TEST_ASSERT(deser_test_struct_array_get(deserialized.inners, 1, &element1));
+    TEST_ASSERT(
+        deserde_test_struct_array_get(deserialized.inners, 1, &element1)
+    );
     TEST_ASSERT_EQ("Example", element1.hello);
     TEST_ASSERT_EQ(5, element1.world);
 

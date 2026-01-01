@@ -21,7 +21,7 @@ typedef struct {
     PdfIntegerOptional prev;
 } StubTrailer;
 
-static Error* deser_stub_trailer(
+static Error* deserde_stub_trailer(
     const PdfObject* object,
     StubTrailer* target_ptr,
     PdfResolver* resolver
@@ -33,13 +33,13 @@ static Error* deser_stub_trailer(
     PdfFieldDescriptor fields[] = {PDF_FIELD(
         "Prev",
         &target_ptr->prev,
-        PDF_DESER_OPTIONAL(
+        PDF_DESERDE_OPTIONAL(
             pdf_integer_op_init,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         )
     )};
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -161,7 +161,7 @@ static Error* parse_stub_trailer(PdfResolver* resolver, StubTrailer* trailer) {
     PdfObject trailer_object;
     TRY(pdf_parse_object(resolver, &trailer_object, false));
 
-    TRY(deser_stub_trailer(&trailer_object, trailer, resolver));
+    TRY(deserde_stub_trailer(&trailer_object, trailer, resolver));
     return NULL;
 }
 
@@ -176,7 +176,7 @@ static Error* parse_trailer(PdfResolver* resolver, PdfTrailer* trailer) {
     PdfObject trailer_object;
     TRY(pdf_parse_object(resolver, &trailer_object, false));
 
-    TRY(pdf_deser_trailer(&trailer_object, trailer, resolver));
+    TRY(pdf_deserde_trailer(&trailer_object, trailer, resolver));
     return NULL;
 }
 

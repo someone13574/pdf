@@ -19,7 +19,7 @@
 
 #define DVEC_NAME PdfObjectVec
 #define DVEC_LOWERCASE_NAME pdf_object_vec
-#define DVEC_TYPE PdfObject*
+#define DVEC_TYPE PdfObject
 #include "arena/dvec_impl.h"
 
 #define DVEC_NAME PdfDictEntryVec
@@ -32,7 +32,7 @@
 #define DVEC_TYPE PdfBoolean
 #include "arena/dvec_impl.h"
 
-DESER_IMPL_OPTIONAL(PdfBooleanVecOptional, pdf_boolean_vec_op_init)
+DESERDE_IMPL_OPTIONAL(PdfBooleanVecOptional, pdf_boolean_vec_op_init)
 
 PdfObject* pdf_dict_get(const PdfDict* dict, PdfName key) {
     RELEASE_ASSERT(dict);
@@ -843,7 +843,7 @@ Error* pdf_parse_stream(
         ctx
     ); // If there is an indirect length, we don't want the offset to move
     PdfStreamDict stream_dict;
-    REQUIRE(pdf_deser_stream_dict(stream_dict_obj, &stream_dict, resolver));
+    REQUIRE(pdf_deserde_stream_dict(stream_dict_obj, &stream_dict, resolver));
     pdf_ctx_seek(ctx, resume_offset);
 
     if (stream_dict.length < 0) {

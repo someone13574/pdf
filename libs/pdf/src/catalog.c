@@ -7,7 +7,7 @@
 #include "pdf/page.h"
 #include "pdf/resolver.h"
 
-Error* pdf_deser_catalog(
+Error* pdf_deserde_catalog(
     const PdfObject* object,
     PdfCatalog* target_ptr,
     PdfResolver* resolver
@@ -20,46 +20,46 @@ Error* pdf_deser_catalog(
         PDF_FIELD(
             "Type",
             &target_ptr->type,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
         ),
-        PDF_UNIMPLEMENTED_FIELD("Version"),
-        PDF_UNIMPLEMENTED_FIELD("Extensions"),
+        pdf_unimplemented_field("Version"),
+        pdf_unimplemented_field("Extensions"),
         PDF_FIELD(
             "Pages",
             &target_ptr->pages,
-            PDF_DESER_RESOLVABLE(pdf_pages_ref_init)
+            PDF_DESERDE_RESOLVABLE(pdf_pages_ref_init)
         ),
-        PDF_UNIMPLEMENTED_FIELD("PageLabels"),
-        PDF_UNIMPLEMENTED_FIELD("Names"),
-        PDF_IGNORED_FIELD("Dests", &target_ptr->dests),
-        PDF_IGNORED_FIELD("ViewerPreferences", &target_ptr->viewer_preferences),
-        PDF_IGNORED_FIELD("PageLayout", &target_ptr->page_layout),
-        PDF_IGNORED_FIELD("PageMode", &target_ptr->page_mode),
-        PDF_IGNORED_FIELD("Outlines", &target_ptr->outlines),
-        PDF_IGNORED_FIELD("Threads", &target_ptr->threads),
-        PDF_IGNORED_FIELD("OpenAction", &target_ptr->open_action),
-        PDF_IGNORED_FIELD("AA", &target_ptr->aa),
-        PDF_IGNORED_FIELD("URI", &target_ptr->uri),
-        PDF_IGNORED_FIELD("AcroForm", &target_ptr->acro_form),
-        PDF_IGNORED_FIELD("Metadata", &target_ptr->metadata),
-        PDF_UNIMPLEMENTED_FIELD("StructTreeRoot"),
-        PDF_IGNORED_FIELD("MarkInfo", &target_ptr->mark_info),
-        PDF_IGNORED_FIELD("Lang", &target_ptr->lang),
-        PDF_IGNORED_FIELD("SpiderInfo", &target_ptr->spider_info),
-        PDF_UNIMPLEMENTED_FIELD("OutputIntents"),
-        PDF_IGNORED_FIELD("PieceInfo", &target_ptr->piece_info),
-        PDF_IGNORED_FIELD(
+        pdf_unimplemented_field("PageLabels"),
+        pdf_unimplemented_field("Names"),
+        pdf_ignored_field("Dests", &target_ptr->dests),
+        pdf_ignored_field("ViewerPreferences", &target_ptr->viewer_preferences),
+        pdf_ignored_field("PageLayout", &target_ptr->page_layout),
+        pdf_ignored_field("PageMode", &target_ptr->page_mode),
+        pdf_ignored_field("Outlines", &target_ptr->outlines),
+        pdf_ignored_field("Threads", &target_ptr->threads),
+        pdf_ignored_field("OpenAction", &target_ptr->open_action),
+        pdf_ignored_field("AA", &target_ptr->aa),
+        pdf_ignored_field("URI", &target_ptr->uri),
+        pdf_ignored_field("AcroForm", &target_ptr->acro_form),
+        pdf_ignored_field("Metadata", &target_ptr->metadata),
+        pdf_unimplemented_field("StructTreeRoot"),
+        pdf_ignored_field("MarkInfo", &target_ptr->mark_info),
+        pdf_ignored_field("Lang", &target_ptr->lang),
+        pdf_ignored_field("SpiderInfo", &target_ptr->spider_info),
+        pdf_unimplemented_field("OutputIntents"),
+        pdf_ignored_field("PieceInfo", &target_ptr->piece_info),
+        pdf_ignored_field(
             "OCProperties",
             &target_ptr->oc_properties
         ), // TODO: Optional content
-        PDF_UNIMPLEMENTED_FIELD("Perms"),
-        PDF_IGNORED_FIELD("Legal", &target_ptr->legal),
-        PDF_UNIMPLEMENTED_FIELD("Requirements"),
-        PDF_UNIMPLEMENTED_FIELD("Collection"),
-        PDF_IGNORED_FIELD("NeedsRendering", &target_ptr->needs_rendering),
+        pdf_unimplemented_field("Perms"),
+        pdf_ignored_field("Legal", &target_ptr->legal),
+        pdf_unimplemented_field("Requirements"),
+        pdf_unimplemented_field("Collection"),
+        pdf_ignored_field("NeedsRendering", &target_ptr->needs_rendering),
     };
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -71,10 +71,10 @@ Error* pdf_deser_catalog(
     return NULL;
 }
 
-DESER_IMPL_RESOLVABLE(
+DESERDE_IMPL_RESOLVABLE(
     PdfCatalogRef,
     PdfCatalog,
     pdf_catalog_ref_init,
     pdf_resolve_catalog,
-    pdf_deser_catalog
+    pdf_deserde_catalog
 )

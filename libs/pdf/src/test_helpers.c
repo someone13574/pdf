@@ -26,7 +26,7 @@ static char* format_alloc(Arena* arena, const char* fmt, ...) {
     return buffer;
 }
 
-char* pdf_construct_deser_test_doc(
+char* pdf_construct_deserde_test_doc(
     const char** objects,
     size_t num_objects,
     const char* trailer_dict,

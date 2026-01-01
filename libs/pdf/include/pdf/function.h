@@ -78,7 +78,7 @@ struct PdfFunction {
     } data;
 };
 
-Error* pdf_deser_function(
+Error* pdf_deserde_function(
     const PdfObject* object,
     PdfFunction* target_ptr,
     PdfResolver* resolver
@@ -88,4 +88,4 @@ Error* pdf_deser_function(
 Error*
 pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io);
 
-DESER_DECL_TRAMPOLINE(pdf_deser_function_trampoline)
+DESERDE_DECL_TRAMPOLINE(pdf_deserde_function_trampoline)

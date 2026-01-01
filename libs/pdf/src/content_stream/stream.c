@@ -15,7 +15,7 @@
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
-Error* pdf_deser_content_stream(
+Error* pdf_deserde_content_stream(
     const PdfObject* object,
     PdfContentStream* deserialized,
     PdfResolver* resolver
@@ -102,7 +102,9 @@ Error* pdf_deser_content_stream(
 
         // Deserialize operation
         if (operator != PDF_OPERATOR_UNSET) {
-            TRY(pdf_deser_content_op(operator, operands, resolver, operations));
+            TRY(
+                pdf_deserde_content_op(operator, operands, resolver, operations)
+            );
         }
     }
 
@@ -111,12 +113,12 @@ Error* pdf_deser_content_stream(
     return NULL;
 }
 
-DESER_IMPL_RESOLVABLE(
+DESERDE_IMPL_RESOLVABLE(
     PdfContentStreamRef,
     PdfContentStream,
     pdf_content_stream_ref_init,
     pdf_resolve_content_stream,
-    pdf_deser_content_stream
+    pdf_deserde_content_stream
 )
 
 #define DVEC_NAME PdfContentStreamRefVec
@@ -124,7 +126,7 @@ DESER_IMPL_RESOLVABLE(
 #define DVEC_TYPE PdfContentStreamRef
 #include "arena/dvec_impl.h"
 
-DESER_IMPL_OPTIONAL(
+DESERDE_IMPL_OPTIONAL(
     PdfContentsStreamRefVecOptional,
     pdf_content_stream_ref_vec_op_init
 )

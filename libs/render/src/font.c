@@ -141,7 +141,7 @@ Error* cid_to_gid(
                 LOG_TODO("Embedded Type2 font");
             } else if (font_descriptor.font_file3.has_value) {
                 PdfFontStreamDict stream_dict;
-                TRY(pdf_deser_font_stream_dict(
+                TRY(pdf_deserde_font_stream_dict(
                     font_descriptor.font_file3.value.stream_dict->raw_dict,
                     &stream_dict,
                     resolver
@@ -300,7 +300,7 @@ Error* render_glyph(
                 LOG_TODO("Embedded Type2 font");
             } else if (font_descriptor.font_file3.has_value) {
                 PdfFontStreamDict stream_dict;
-                TRY(pdf_deser_font_stream_dict(
+                TRY(pdf_deserde_font_stream_dict(
                     font_descriptor.font_file3.value.stream_dict->raw_dict,
                     &stream_dict,
                     resolver
@@ -574,7 +574,7 @@ Error* get_font_matrix(
                 LOG_TODO("Embedded Type2 font");
             } else if (font_descriptor.font_file3.has_value) {
                 PdfFontStreamDict stream_dict;
-                TRY(pdf_deser_font_stream_dict(
+                TRY(pdf_deserde_font_stream_dict(
                     font_descriptor.font_file3.value.stream_dict->raw_dict,
                     &stream_dict,
                     resolver

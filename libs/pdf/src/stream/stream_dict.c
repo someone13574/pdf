@@ -6,7 +6,7 @@
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
-Error* pdf_deser_stream_dict(
+Error* pdf_deserde_stream_dict(
     const PdfObject* object,
     PdfStreamDict* target_ptr,
     PdfResolver* resolver
@@ -19,25 +19,25 @@ Error* pdf_deser_stream_dict(
         PDF_FIELD(
             "Length",
             &target_ptr->length,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         ),
         PDF_FIELD(
             "Filter",
             &target_ptr->filter,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_name_vec_op_init,
-                PDF_DESER_AS_ARRAY(
+                PDF_DESERDE_AS_ARRAY(
                     pdf_name_vec_push_uninit,
-                    PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
+                    PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
                 )
             )
         ),
         // Panic if we find any of these fields
-        PDF_UNIMPLEMENTED_FIELD("DecodeParams"),
-        PDF_UNIMPLEMENTED_FIELD("F"),
-        PDF_UNIMPLEMENTED_FIELD("FFilter"),
-        PDF_UNIMPLEMENTED_FIELD("FDecodeParams"),
-        PDF_UNIMPLEMENTED_FIELD("DL")
+        pdf_unimplemented_field("DecodeParams"),
+        pdf_unimplemented_field("F"),
+        pdf_unimplemented_field("FFilter"),
+        pdf_unimplemented_field("FDecodeParams"),
+        pdf_unimplemented_field("DL")
     };
 
     // Need to do a copy since the stream will take over the original
@@ -56,7 +56,7 @@ Error* pdf_deser_stream_dict(
     );
     arena_free(temp_arena);
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         copied_object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),

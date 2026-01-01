@@ -428,7 +428,7 @@ const char* pdf_decode_adobe_standard_codepoint(uint8_t codepoint) {
     return pdf_encoding_adobe_standard_lookup[codepoint];
 }
 
-Error* pdf_deser_encoding_dict(
+Error* pdf_deserde_encoding_dict(
     const PdfObject* object,
     PdfEncodingDict* target_ptr,
     PdfResolver* resolver
@@ -441,7 +441,7 @@ Error* pdf_deser_encoding_dict(
     PdfObject resolved;
     TRY(pdf_resolve_object(resolver, object, &resolved, true));
 
-    // Attempt to deser name
+    // Attempt to deserialize name
     if (resolved.type == PDF_OBJECT_TYPE_NAME) {
         target_ptr->type = (PdfNameOptional) {.has_value = false};
         target_ptr->base_encoding =
@@ -455,30 +455,30 @@ Error* pdf_deser_encoding_dict(
         PDF_FIELD(
             "Type",
             &target_ptr->type,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_name_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
             )
         ),
         PDF_FIELD(
             "BaseEncoding",
             &target_ptr->base_encoding,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_name_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
             )
         ),
         PDF_FIELD(
             "Differences",
             &target_ptr->differences,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_array_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_ARRAY)
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_ARRAY)
             )
         )
     };
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -538,9 +538,9 @@ const char* pdf_encoding_map_codepoint(
     return base;
 }
 
-DESER_IMPL_TRAMPOLINE(
-    pdf_deser_encoding_dict_trampoline,
-    pdf_deser_encoding_dict
+DESERDE_IMPL_TRAMPOLINE(
+    pdf_deserde_encoding_dict_trampoline,
+    pdf_deserde_encoding_dict
 )
 
-DESER_IMPL_OPTIONAL(PdfEncodingDictOptional, pdf_encoding_dict_op_init)
+DESERDE_IMPL_OPTIONAL(PdfEncodingDictOptional, pdf_encoding_dict_op_init)

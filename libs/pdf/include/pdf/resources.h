@@ -3,6 +3,7 @@
 #include "err/error.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
 // TODO: Use typed lazy refs
 typedef struct {
@@ -41,14 +42,11 @@ typedef struct {
     PdfDictOptional properties;
 } PdfResources;
 
-Error* pdf_deser_resources(
+Error* pdf_deserde_resources(
     const PdfObject* object,
     PdfResources* target_ptr,
     PdfResolver* resolver
 );
-
-DESER_DECL_OPTIONAL(PdfResourcesOptional, PdfResources, pdf_resources_op_init)
-DESER_DECL_TRAMPOLINE(pdf_deser_resources_trampoline)
 
 typedef enum {
     PDF_LINE_CAP_STYLE_BUTT,
@@ -204,7 +202,7 @@ typedef struct {
     PdfUnimplemented tk;
 } PdfGStateParams;
 
-Error* pdf_deser_gstate_params(
+Error* pdf_deserde_gstate_params(
     const PdfObject* object,
     PdfGStateParams* target_ptr,
     PdfResolver* resolver

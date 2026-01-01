@@ -16,7 +16,7 @@
 #define DVEC_TYPE PdfPageTreeRef
 #include "arena/dvec_impl.h"
 
-Error* pdf_deser_page(
+Error* pdf_deserde_page(
     const PdfObject* object,
     PdfPage* target_ptr,
     PdfResolver* resolver
@@ -29,106 +29,106 @@ Error* pdf_deser_page(
         PDF_FIELD(
             "Type",
             &target_ptr->type,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
         ),
         PDF_FIELD(
             "Parent",
             &target_ptr->parent,
-            PDF_DESER_RESOLVABLE(pdf_pages_ref_init)
+            PDF_DESERDE_RESOLVABLE(pdf_pages_ref_init)
         ),
-        PDF_IGNORED_FIELD("LastModified", &target_ptr->last_modified),
+        pdf_ignored_field("LastModified", &target_ptr->last_modified),
         PDF_FIELD(
             "Resources",
             &target_ptr->resources,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_resources_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_resources_trampoline)
+                PDF_DESERDE_CUSTOM(pdf_deserde_resources_trampoline)
             )
         ),
         PDF_FIELD(
             "MediaBox",
             &target_ptr->media_box,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
+                PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
             )
         ),
         PDF_FIELD(
             "CropBox",
             &target_ptr->crop_box,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
+                PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
             )
         ),
         PDF_FIELD(
             "BleedBox",
             &target_ptr->bleed_box,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
+                PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
             )
         ),
         PDF_FIELD(
             "TrimBox",
             &target_ptr->trim_box,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
+                PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
             )
         ),
         PDF_FIELD(
             "ArtBox",
             &target_ptr->art_box,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
+                PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
             )
         ),
-        PDF_UNIMPLEMENTED_FIELD("BoxColorInfo"),
+        pdf_unimplemented_field("BoxColorInfo"),
         PDF_FIELD(
             "Contents",
             &target_ptr->contents,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_content_stream_ref_vec_op_init,
-                PDF_DESER_AS_ARRAY(
+                PDF_DESERDE_AS_ARRAY(
                     pdf_content_stream_ref_vec_push_uninit,
-                    PDF_DESER_RESOLVABLE(pdf_content_stream_ref_init)
+                    PDF_DESERDE_RESOLVABLE(pdf_content_stream_ref_init)
                 )
             )
         ),
         PDF_FIELD(
             "Rotate",
             &target_ptr->rotate,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_integer_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
             )
         ),
-        PDF_IGNORED_FIELD("Group", &target_ptr->group), // TODO: group
-        PDF_IGNORED_FIELD("Thumb", &target_ptr->thumb),
-        PDF_IGNORED_FIELD("B", &target_ptr->b),
-        PDF_IGNORED_FIELD("Dur", &target_ptr->dur),
-        PDF_IGNORED_FIELD("Trans", &target_ptr->trans),
-        PDF_IGNORED_FIELD("Annots", &target_ptr->annots),
-        PDF_IGNORED_FIELD("AA", &target_ptr->aa),
-        PDF_IGNORED_FIELD("Metadata", &target_ptr->metadata),
-        PDF_IGNORED_FIELD("PieceInfo", &target_ptr->piece_info),
-        PDF_UNIMPLEMENTED_FIELD("StructParents"),
-        PDF_IGNORED_FIELD("ID", &target_ptr->id),
-        PDF_IGNORED_FIELD("PZ", &target_ptr->pz),
-        PDF_UNIMPLEMENTED_FIELD("SeparationInfo"),
-        PDF_IGNORED_FIELD("Tabs", &target_ptr->tabs),
-        PDF_IGNORED_FIELD(
+        pdf_ignored_field("Group", &target_ptr->group), // TODO: group
+        pdf_ignored_field("Thumb", &target_ptr->thumb),
+        pdf_ignored_field("B", &target_ptr->b),
+        pdf_ignored_field("Dur", &target_ptr->dur),
+        pdf_ignored_field("Trans", &target_ptr->trans),
+        pdf_ignored_field("Annots", &target_ptr->annots),
+        pdf_ignored_field("AA", &target_ptr->aa),
+        pdf_ignored_field("Metadata", &target_ptr->metadata),
+        pdf_ignored_field("PieceInfo", &target_ptr->piece_info),
+        pdf_unimplemented_field("StructParents"),
+        pdf_ignored_field("ID", &target_ptr->id),
+        pdf_ignored_field("PZ", &target_ptr->pz),
+        pdf_unimplemented_field("SeparationInfo"),
+        pdf_ignored_field("Tabs", &target_ptr->tabs),
+        pdf_ignored_field(
             "TemplateInstantiated",
             &target_ptr->template_instantiated
         ),
-        PDF_IGNORED_FIELD("PresSteps", &target_ptr->pres_steps),
-        PDF_UNIMPLEMENTED_FIELD("UserUnit"),
-        PDF_UNIMPLEMENTED_FIELD("VP")
+        pdf_ignored_field("PresSteps", &target_ptr->pres_steps),
+        pdf_unimplemented_field("UserUnit"),
+        pdf_unimplemented_field("VP")
     };
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -144,15 +144,15 @@ Error* pdf_deser_page(
     return NULL;
 }
 
-DESER_IMPL_RESOLVABLE(
+DESERDE_IMPL_RESOLVABLE(
     PdfPageRef,
     PdfPage,
     pdf_page_ref_init,
     pdf_resolve_page,
-    pdf_deser_page
+    pdf_deserde_page
 )
 
-Error* pdf_deser_pages(
+Error* pdf_deserde_pages(
     const PdfObject* object,
     PdfPages* target_ptr,
     PdfResolver* resolver
@@ -165,64 +165,64 @@ Error* pdf_deser_pages(
         PDF_FIELD(
             "Type",
             &target_ptr->type,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
         ),
         PDF_FIELD(
             "Parent",
             &target_ptr->parent,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_pages_ref_op_init,
-                PDF_DESER_RESOLVABLE(pdf_pages_ref_init)
+                PDF_DESERDE_RESOLVABLE(pdf_pages_ref_init)
             )
         ),
         PDF_FIELD(
             "Kids",
             &target_ptr->kids,
-            PDF_DESER_ARRAY(
+            PDF_DESERDE_ARRAY(
                 pdf_page_tree_ref_vec_push_uninit,
-                PDF_DESER_RESOLVABLE(pdf_page_tree_ref_init)
+                PDF_DESERDE_RESOLVABLE(pdf_page_tree_ref_init)
             )
         ),
         PDF_FIELD(
             "Count",
             &target_ptr->count,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         ),
         PDF_FIELD(
             "Resources",
             &target_ptr->resources,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_resources_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_resources_trampoline)
+                PDF_DESERDE_CUSTOM(pdf_deserde_resources_trampoline)
             )
         ),
         PDF_FIELD(
             "MediaBox",
             &target_ptr->media_box,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
+                PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
             )
         ),
         PDF_FIELD(
             "CropBox",
             &target_ptr->crop_box,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
+                PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
             )
         ),
         PDF_FIELD(
             "Rotate",
             &target_ptr->rotate,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_integer_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
             )
         ),
     };
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -238,7 +238,7 @@ Error* pdf_deser_pages(
     return NULL;
 }
 
-Error* pdf_deser_page_tree(
+Error* pdf_deserde_page_tree(
     const PdfObject* object,
     PdfPageTree* target_ptr,
     PdfResolver* resolver
@@ -249,10 +249,10 @@ Error* pdf_deser_page_tree(
 
     PdfName type = NULL;
     PdfFieldDescriptor stub_fields[] = {
-        PDF_FIELD("Type", &type, PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME))
+        PDF_FIELD("Type", &type, PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME))
     };
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         stub_fields,
         1,
@@ -263,10 +263,10 @@ Error* pdf_deser_page_tree(
 
     if (strcmp(type, "Page") == 0) {
         target_ptr->kind = PDF_PAGE_TREE_PAGE;
-        TRY(pdf_deser_page(object, &target_ptr->value.page, resolver));
+        TRY(pdf_deserde_page(object, &target_ptr->value.page, resolver));
     } else if (strcmp(type, "Page") == 0) {
         target_ptr->kind = PDF_PAGE_TREE_PAGES;
-        TRY(pdf_deser_pages(object, &target_ptr->value.pages, resolver));
+        TRY(pdf_deserde_pages(object, &target_ptr->value.pages, resolver));
     } else {
         return ERROR(
             PDF_ERR_INVALID_SUBTYPE,
@@ -316,22 +316,22 @@ void pdf_page_tree_inherit(PdfPageTree* dst, PdfPages* src) {
     }
 }
 
-DESER_IMPL_RESOLVABLE(
+DESERDE_IMPL_RESOLVABLE(
     PdfPagesRef,
     PdfPages,
     pdf_pages_ref_init,
     pdf_resolve_pages,
-    pdf_deser_pages
+    pdf_deserde_pages
 )
 
-DESER_IMPL_OPTIONAL(PdfPagesRefOptional, pdf_pages_ref_op_init)
+DESERDE_IMPL_OPTIONAL(PdfPagesRefOptional, pdf_pages_ref_op_init)
 
-DESER_IMPL_RESOLVABLE(
+DESERDE_IMPL_RESOLVABLE(
     PdfPageTreeRef,
     PdfPageTree,
     pdf_page_tree_ref_init,
     pdf_resolve_page_tree,
-    pdf_deser_page_tree
+    pdf_deserde_page_tree
 )
 
 typedef struct {

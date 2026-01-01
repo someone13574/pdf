@@ -63,13 +63,13 @@ typedef struct {
     PdfCIDToGIDMapOptional cid_to_gid_map;
 } PdfCIDFont;
 
-Error* pdf_deser_cid_font(
+Error* pdf_deserde_cid_font(
     const PdfObject* object,
     PdfCIDFont* target_ptr,
     PdfResolver* resolver
 );
 
-DESER_DECL_TRAMPOLINE(pdf_deser_cid_font_trampoline)
+DESERDE_DECL_TRAMPOLINE(pdf_deserde_cid_font_trampoline)
 
 #define DVEC_NAME PdfCIDFontVec
 #define DVEC_LOWERCASE_NAME pdf_cid_font_vec
@@ -108,7 +108,7 @@ typedef struct {
     PdfStreamOptional to_unicode;
 } PdfType0font;
 
-Error* pdf_deser_type0_font(
+Error* pdf_deserde_type0_font(
     const PdfObject* object,
     PdfType0font* target_ptr,
     PdfResolver* resolver
@@ -183,7 +183,7 @@ typedef struct {
     PdfStreamOptional to_unicode;
 } PdfTrueTypeFont;
 
-Error* pdf_deser_truetype_font_dict(
+Error* pdf_deserde_truetype_font_dict(
     const PdfObject* object,
     PdfTrueTypeFont* target_ptr,
     PdfResolver* resolver
@@ -228,7 +228,7 @@ typedef struct {
     } data;
 } PdfFont;
 
-Error* pdf_deser_font(
+Error* pdf_deserde_font(
     const PdfObject* object,
     PdfFont* deserialized,
     PdfResolver* resolver

@@ -61,13 +61,13 @@ typedef struct {
     PdfColorSpaceParams params;
 } PdfColorSpace;
 
-Error* pdf_deser_color_space(
+Error* pdf_deserde_color_space(
     const PdfObject* object,
     PdfColorSpace* target_ptr,
     PdfResolver* resolver
 );
 
-DESER_DECL_TRAMPOLINE(pdf_deser_color_space_trampoline)
+DESERDE_DECL_TRAMPOLINE(pdf_deserde_color_space_trampoline)
 
 GeomVec3 pdf_map_color(
     double* components,

@@ -12,7 +12,7 @@
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
-static Error* deser_cal_rgb_params(
+static Error* deserde_cal_rgb_params(
     const PdfObject* object,
     PdfCalRGBParams* target_ptr,
     PdfResolver* resolver
@@ -25,35 +25,35 @@ static Error* deser_cal_rgb_params(
         PDF_FIELD(
             "WhitePoint",
             &target_ptr->whitepoint,
-            PDF_DESER_CUSTOM(pdf_deser_geom_vec3_trampoline)
+            PDF_DESERDE_CUSTOM(pdf_deserde_geom_vec3_trampoline)
         ),
         PDF_FIELD(
             "BlackPoint",
             &target_ptr->blackpoint,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_geom_vec3_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_geom_vec3_trampoline)
+                PDF_DESERDE_CUSTOM(pdf_deserde_geom_vec3_trampoline)
             )
         ),
         PDF_FIELD(
             "Gamma",
             &target_ptr->gamma,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_geom_vec3_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_geom_vec3_trampoline)
+                PDF_DESERDE_CUSTOM(pdf_deserde_geom_vec3_trampoline)
             )
         ),
         PDF_FIELD(
             "Matrix",
             &target_ptr->matrix,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_geom_mat3_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_geom_mat3_trampoline)
+                PDF_DESERDE_CUSTOM(pdf_deserde_geom_mat3_trampoline)
             )
         )
     };
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -64,7 +64,7 @@ static Error* deser_cal_rgb_params(
     return NULL;
 }
 
-Error* pdf_deser_color_space(
+Error* pdf_deserde_color_space(
     const PdfObject* object,
     PdfColorSpace* target_ptr,
     PdfResolver* resolver
@@ -145,7 +145,7 @@ Error* pdf_deser_color_space(
                 );
             }
 
-            TRY(deser_cal_rgb_params(
+            TRY(deserde_cal_rgb_params(
                 second,
                 &target_ptr->params.cal_rgb,
                 resolver
@@ -173,7 +173,10 @@ Error* pdf_deser_color_space(
     return NULL;
 }
 
-DESER_IMPL_TRAMPOLINE(pdf_deser_color_space_trampoline, pdf_deser_color_space)
+DESERDE_IMPL_TRAMPOLINE(
+    pdf_deserde_color_space_trampoline,
+    pdf_deserde_color_space
+)
 
 static GeomVec3 linear_srgb_to_nonlinear(
     GeomVec3 linear,

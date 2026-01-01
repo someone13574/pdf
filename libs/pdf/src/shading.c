@@ -8,7 +8,7 @@
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
-Error* pdf_deser_shading_dict(
+Error* pdf_deserde_shading_dict(
     const PdfObject* object,
     PdfShadingDict* target_ptr,
     PdfResolver* resolver
@@ -21,33 +21,33 @@ Error* pdf_deser_shading_dict(
         PDF_FIELD(
             "ShadingType",
             &target_ptr->shading_type,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         ),
         PDF_FIELD(
             "ColorSpace",
             &target_ptr->color_space,
-            PDF_DESER_CUSTOM(pdf_deser_color_space_trampoline)
+            PDF_DESERDE_CUSTOM(pdf_deserde_color_space_trampoline)
         ),
-        PDF_UNIMPLEMENTED_FIELD("Background"),
+        pdf_unimplemented_field("Background"),
         PDF_FIELD(
             "BBox",
             &target_ptr->bbox,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
+                PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
             )
         ),
         PDF_FIELD(
             "AntiAlias",
             &target_ptr->anti_alias,
-            PDF_DESER_OPTIONAL(
+            PDF_DESERDE_OPTIONAL(
                 pdf_boolean_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
             )
         )
     };
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -59,52 +59,52 @@ Error* pdf_deser_shading_dict(
     switch (target_ptr->shading_type) {
         case 2: {
             PdfFieldDescriptor specific_fields[] = {
-                PDF_IGNORED_FIELD("ShadingType", NULL),
-                PDF_IGNORED_FIELD("ColorSpace", NULL),
-                PDF_IGNORED_FIELD("Background", NULL),
-                PDF_IGNORED_FIELD("BBox", NULL),
-                PDF_IGNORED_FIELD("AntiAlias", NULL),
+                pdf_ignored_field("ShadingType", NULL),
+                pdf_ignored_field("ColorSpace", NULL),
+                pdf_ignored_field("Background", NULL),
+                pdf_ignored_field("BBox", NULL),
+                pdf_ignored_field("AntiAlias", NULL),
                 PDF_FIELD(
                     "Coords",
                     &target_ptr->data.type2.coords,
-                    PDF_DESER_ARRAY(
+                    PDF_DESERDE_ARRAY(
                         pdf_number_vec_push_uninit,
-                        PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
+                        PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline)
                     )
                 ),
                 PDF_FIELD(
                     "Domain",
                     &target_ptr->data.type2.domain,
-                    PDF_DESER_OPTIONAL(
+                    PDF_DESERDE_OPTIONAL(
                         pdf_number_vec_op_init,
-                        PDF_DESER_ARRAY(
+                        PDF_DESERDE_ARRAY(
                             pdf_number_vec_push_uninit,
-                            PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
+                            PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline)
                         )
                     )
                 ),
                 PDF_FIELD(
                     "Function",
                     &target_ptr->data.type2.function,
-                    PDF_DESER_AS_ARRAY(
+                    PDF_DESERDE_AS_ARRAY(
                         pdf_function_vec_push_uninit,
-                        PDF_DESER_CUSTOM(pdf_deser_function_trampoline)
+                        PDF_DESERDE_CUSTOM(pdf_deserde_function_trampoline)
                     )
                 ),
                 PDF_FIELD(
                     "Extend",
                     &target_ptr->data.type2.extend,
-                    PDF_DESER_OPTIONAL(
+                    PDF_DESERDE_OPTIONAL(
                         pdf_boolean_vec_op_init,
-                        PDF_DESER_ARRAY(
+                        PDF_DESERDE_ARRAY(
                             pdf_boolean_vec_push_uninit,
-                            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+                            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
                         )
                     )
                 )
             };
 
-            TRY(pdf_deser_dict(
+            TRY(pdf_deserde_fields(
                 object,
                 specific_fields,
                 sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
@@ -133,52 +133,52 @@ Error* pdf_deser_shading_dict(
         }
         case 3: {
             PdfFieldDescriptor specific_fields[] = {
-                PDF_IGNORED_FIELD("ShadingType", NULL),
-                PDF_IGNORED_FIELD("ColorSpace", NULL),
-                PDF_IGNORED_FIELD("Background", NULL),
-                PDF_IGNORED_FIELD("BBox", NULL),
-                PDF_IGNORED_FIELD("AntiAlias", NULL),
+                pdf_ignored_field("ShadingType", NULL),
+                pdf_ignored_field("ColorSpace", NULL),
+                pdf_ignored_field("Background", NULL),
+                pdf_ignored_field("BBox", NULL),
+                pdf_ignored_field("AntiAlias", NULL),
                 PDF_FIELD(
                     "Coords",
                     &target_ptr->data.type3.coords,
-                    PDF_DESER_ARRAY(
+                    PDF_DESERDE_ARRAY(
                         pdf_number_vec_push_uninit,
-                        PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
+                        PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline)
                     )
                 ),
                 PDF_FIELD(
                     "Domain",
                     &target_ptr->data.type3.domain,
-                    PDF_DESER_OPTIONAL(
+                    PDF_DESERDE_OPTIONAL(
                         pdf_number_vec_op_init,
-                        PDF_DESER_ARRAY(
+                        PDF_DESERDE_ARRAY(
                             pdf_number_vec_push_uninit,
-                            PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
+                            PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline)
                         )
                     )
                 ),
                 PDF_FIELD(
                     "Function",
                     &target_ptr->data.type3.function,
-                    PDF_DESER_AS_ARRAY(
+                    PDF_DESERDE_AS_ARRAY(
                         pdf_function_vec_push_uninit,
-                        PDF_DESER_CUSTOM(pdf_deser_function_trampoline)
+                        PDF_DESERDE_CUSTOM(pdf_deserde_function_trampoline)
                     )
                 ),
                 PDF_FIELD(
                     "Extend",
                     &target_ptr->data.type3.extend,
-                    PDF_DESER_OPTIONAL(
+                    PDF_DESERDE_OPTIONAL(
                         pdf_boolean_vec_op_init,
-                        PDF_DESER_ARRAY(
+                        PDF_DESERDE_ARRAY(
                             pdf_boolean_vec_push_uninit,
-                            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+                            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
                         )
                     )
                 )
             };
 
-            TRY(pdf_deser_dict(
+            TRY(pdf_deserde_fields(
                 object,
                 specific_fields,
                 sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
