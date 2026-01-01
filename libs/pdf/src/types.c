@@ -1,5 +1,7 @@
 // TODO: Since PdfNumber has been moved to object, this should probably move to,
 // but I'm not sure if it will stay in object or not.
+#include <math.h>
+
 #include "deserialize.h"
 #include "geom/mat3.h"
 #include "logger/log.h"
@@ -83,6 +85,40 @@ PdfReal pdf_number_as_real(PdfNumber number) {
         default: {
             LOG_PANIC("Unreachable");
         }
+    }
+}
+
+PdfObject pdf_number_as_object(PdfNumber number) {
+    if (number.type == PDF_NUMBER_TYPE_INTEGER) {
+        return (PdfObject) {.type = PDF_OBJECT_TYPE_INTEGER,
+                            .data.integer = number.value.integer};
+    } else {
+        return (PdfObject) {.type = PDF_OBJECT_TYPE_REAL,
+                            .data.real = number.value.real};
+    }
+}
+
+int pdf_number_cmp(PdfNumber lhs, PdfNumber rhs) {
+    if (lhs.type == PDF_NUMBER_TYPE_INTEGER
+        && rhs.type == PDF_NUMBER_TYPE_INTEGER) {
+        if (lhs.value.integer < rhs.value.integer) {
+            return -1;
+        } else if (lhs.value.integer > rhs.value.integer) {
+            return 1;
+        } else {
+            return 0;
+        }
+    }
+
+    PdfReal lhs_real = pdf_number_as_real(lhs);
+    PdfReal rhs_real = pdf_number_as_real(rhs);
+
+    if (fabs(lhs_real - rhs_real) < 1e-6) {
+        return 0;
+    } else if (lhs_real < rhs_real) {
+        return -1;
+    } else {
+        return 1;
     }
 }
 

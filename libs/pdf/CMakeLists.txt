@@ -16,6 +16,7 @@ add_library(pdf
     src/fonts/cmap.c
     src/fonts/cmap_paths.c
     src/fonts/encoding.c
+    src/fonts/stream_dict.c
     src/object.c
     src/page.c
     src/pdf.c
@@ -25,10 +26,12 @@ add_library(pdf
     src/deserialize.c
     src/test_helpers.c
     src/xobject.c
+    src/shading.c
+    src/function.c
     src/xref.c)
 target_include_directories(pdf PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(pdf PUBLIC arena geom pdf-error)
-target_link_libraries(pdf PRIVATE codec pdf-logger pdf-test postscript)
+target_link_libraries(pdf PUBLIC arena geom pdf-error postscript)
+target_link_libraries(pdf PRIVATE codec pdf-logger pdf-test)
 target_compile_features(pdf PUBLIC c_std_11)
 if (NOT MSVC)
     target_compile_options(pdf PRIVATE -fsanitize=address,undefined)

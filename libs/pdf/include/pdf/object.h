@@ -58,7 +58,7 @@ typedef struct PdfStreamDict PdfStreamDict;
 typedef struct {
     PdfStreamDict* stream_dict;
 
-    uint8_t* stream_bytes;
+    const uint8_t* stream_bytes;
     size_t decoded_stream_len;
 } PdfStream;
 
@@ -93,6 +93,17 @@ typedef struct {
         void* target_ptr,                                                      \
         PdfResolver* resolver                                                  \
     );
+
+#define DVEC_NAME PdfBooleanVec
+#define DVEC_LOWERCASE_NAME pdf_boolean_vec
+#define DVEC_TYPE PdfBoolean
+#include "arena/dvec_decl.h"
+
+DESERDE_DECL_OPTIONAL(
+    PdfBooleanVecOptional,
+    PdfBooleanVec*,
+    pdf_boolean_vec_op_init
+)
 
 /// Placeholder type for unimplemented deserialization fields. Choice is
 /// arbitrary. This is different from PdfIgnored because it is planned to be
@@ -129,6 +140,11 @@ PdfError* pdf_deserialize_num_as_real(
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_num_as_real_trampoline)
 
 PdfReal pdf_number_as_real(PdfNumber number);
+PdfObject pdf_number_as_object(PdfNumber number);
+
+/// Compares two numbers. If lhs < rhs, -1 is returned. If they are equal
+/// (eps=1e-6), then 0 is returned. If lhs > rhs, 1 is returned.
+int pdf_number_cmp(PdfNumber lhs, PdfNumber rhs);
 
 #define DVEC_NAME PdfNumberVec
 #define DVEC_LOWERCASE_NAME pdf_number_vec
@@ -213,14 +229,6 @@ DESERDE_DECL_OPTIONAL(
 struct PdfStreamDict {
     PdfInteger length;
     PdfNameVecOptional filter;
-
-    // Additional entries in an embedded font stream dictionary. TODO: Since
-    // unknown fields are now allowed, this should be a different structure.
-    PdfIntegerOptional length1;
-    PdfIntegerOptional length2;
-    PdfIntegerOptional length3;
-    PdfNameOptional subtype;
-    PdfStreamOptional metadata;
 
     const PdfObject* raw_dict;
 };

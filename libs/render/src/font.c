@@ -17,6 +17,7 @@
 #include "pdf/fonts/encoding.h"
 #include "pdf/fonts/font.h"
 #include "pdf/fonts/font_descriptor.h"
+#include "pdf/fonts/stream_dict.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
@@ -139,16 +140,21 @@ PdfError* cid_to_gid(
             } else if (font_descriptor.font_file2.has_value) {
                 LOG_TODO("Embedded Type2 font");
             } else if (font_descriptor.font_file3.has_value) {
-                if (!font_descriptor.font_file3.value.stream_dict->subtype
-                         .has_value) {
+                PdfFontStreamDict stream_dict;
+                PDF_PROPAGATE(pdf_deserialize_font_stream_dict(
+                    font_descriptor.font_file3.value.stream_dict->raw_dict,
+                    &stream_dict,
+                    resolver
+                ));
+
+                if (!stream_dict.subtype.has_value) {
                     return PDF_ERROR(
                         PDF_ERR_MISSING_DICT_KEY,
-                        "Subtype field in stream-dict is required if referenced from FontFile3 in a FontDescriptor"
+                        "`Subtype` is required for FontFile3"
                     );
                 }
 
-                PdfName subtype =
-                    font_descriptor.font_file3.value.stream_dict->subtype.value;
+                PdfName subtype = stream_dict.subtype.value;
                 if (strcmp(subtype, "Type1C") == 0) {
                     LOG_TODO("Type1C FontFile3 embedded font");
                 } else if (strcmp(subtype, "CIDFontType0C") == 0) {
@@ -183,8 +189,7 @@ PdfError* cid_to_gid(
                 PdfCMap* to_unicode = NULL;
                 PDF_PROPAGATE(pdf_parse_cmap(
                     arena,
-                    (const char*)
-                        font->data.true_type.to_unicode.value.stream_bytes,
+                    font->data.true_type.to_unicode.value.stream_bytes,
                     font->data.true_type.to_unicode.value.decoded_stream_len,
                     &to_unicode
                 ));
@@ -294,16 +299,21 @@ PdfError* render_glyph(
             } else if (font_descriptor.font_file2.has_value) {
                 LOG_TODO("Embedded Type2 font");
             } else if (font_descriptor.font_file3.has_value) {
-                if (!font_descriptor.font_file3.value.stream_dict->subtype
-                         .has_value) {
+                PdfFontStreamDict stream_dict;
+                PDF_PROPAGATE(pdf_deserialize_font_stream_dict(
+                    font_descriptor.font_file3.value.stream_dict->raw_dict,
+                    &stream_dict,
+                    resolver
+                ));
+
+                if (!stream_dict.subtype.has_value) {
                     return PDF_ERROR(
                         PDF_ERR_MISSING_DICT_KEY,
-                        "Subtype field in stream-dict is required if referenced from FontFile3 in a FontDescriptor"
+                        "`Subtype` is required for FontFile3"
                     );
                 }
 
-                PdfName subtype =
-                    font_descriptor.font_file3.value.stream_dict->subtype.value;
+                PdfName subtype = stream_dict.subtype.value;
                 if (strcmp(subtype, "Type1C") == 0) {
                     LOG_TODO("Type1C FontFile3 embedded font");
                 } else if (strcmp(subtype, "CIDFontType0C") == 0) {
@@ -565,16 +575,21 @@ PdfError* get_font_matrix(
             } else if (font_descriptor.font_file2.has_value) {
                 LOG_TODO("Embedded Type2 font");
             } else if (font_descriptor.font_file3.has_value) {
-                if (!font_descriptor.font_file3.value.stream_dict->subtype
-                         .has_value) {
+                PdfFontStreamDict stream_dict;
+                PDF_PROPAGATE(pdf_deserialize_font_stream_dict(
+                    font_descriptor.font_file3.value.stream_dict->raw_dict,
+                    &stream_dict,
+                    resolver
+                ));
+
+                if (!stream_dict.subtype.has_value) {
                     return PDF_ERROR(
                         PDF_ERR_MISSING_DICT_KEY,
-                        "Subtype field in stream-dict is required if referenced from FontFile3 in a FontDescriptor"
+                        "`Subtype` is required for FontFile3"
                     );
                 }
 
-                PdfName subtype =
-                    font_descriptor.font_file3.value.stream_dict->subtype.value;
+                PdfName subtype = stream_dict.subtype.value;
                 if (strcmp(subtype, "Type1C") == 0) {
                     LOG_TODO("Type1C FontFile3 embedded font");
                 } else if (strcmp(subtype, "CIDFontType0C") == 0) {

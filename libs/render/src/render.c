@@ -20,6 +20,7 @@
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/resources.h"
+#include "pdf/shading.h"
 #include "pdf/xobject.h"
 #include "pdf_error/error.h"
 #include "text_state.h"
@@ -660,6 +661,35 @@ static PdfError* process_content_stream(
                     4,
                     graphics_state->nonstroking_color_space
                 );
+
+                break;
+            }
+            case PDF_OPERATOR_sh: {
+                RELEASE_ASSERT(resources->has_value);
+                RELEASE_ASSERT(resources->value.shading.has_value);
+
+                PdfObject* shading_object = pdf_dict_get(
+                    &resources->value.shading.value,
+                    op.data.paint_shading
+                );
+                RELEASE_ASSERT(shading_object);
+
+                PdfObject resolved;
+                PDF_PROPAGATE(pdf_resolve_object(
+                    resolver,
+                    shading_object,
+                    &resolved,
+                    true
+                ));
+
+                PdfShadingDict shading_dict;
+                PDF_PROPAGATE(pdf_deserialize_shading_dict(
+                    &resolved,
+                    &shading_dict,
+                    resolver
+                ));
+
+                // LOG_PANIC("here");
 
                 break;
             }
