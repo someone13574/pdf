@@ -13,7 +13,6 @@
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf_error/error.h"
-#include "postscript/object.h"
 #include "resolver.h"
 #include "stream/filters.h"
 
@@ -206,93 +205,6 @@ pdf_parse_operand_object(Arena* arena, PdfCtx* ctx, PdfObject* object) {
         "There wasn't a valid signaler for the object. peeked=`%c`",
         peeked
     );
-}
-
-PdfError*
-pdf_object_into_postscript(const PdfObject* object, PSObject* out) {
-    RELEASE_ASSERT(object);
-    RELEASE_ASSERT(out);
-
-    out->literal = true;
-    out->access = PS_ACCESS_UNLIMITED;
-
-    switch (object->type) {
-        case PDF_OBJECT_TYPE_BOOLEAN: {
-            out->type = PS_OBJECT_BOOLEAN;
-            out->data.boolean = object->data.boolean;
-            break;
-        }
-        case PDF_OBJECT_TYPE_INTEGER: {
-            out->type = PS_OBJECT_INTEGER;
-            out->data.integer = object->data.integer;
-            break;
-        }
-        case PDF_OBJECT_TYPE_REAL: {
-            out->type = PS_OBJECT_REAL;
-            out->data.real = object->data.real;
-            break;
-        }
-        case PDF_OBJECT_TYPE_STRING: {
-            out->type = PS_OBJECT_STRING;
-            out->data.string.data = object->data.string.data;
-            out->data.string.len = object->data.string.len;
-            break;
-        }
-        case PDF_OBJECT_TYPE_NAME: {
-            out->type = PS_OBJECT_NAME;
-            out->data.name = object->data.name;
-            break;
-        }
-        default: {
-            return PDF_ERROR(
-                PDF_ERR_INVALID_OBJECT,
-                "Only primitive objects can be converted to postscript"
-            );
-        }
-    }
-
-    return NULL;
-}
-
-PdfError* pdf_object_from_postscript(PSObject object, PdfObject* out) {
-    RELEASE_ASSERT(out);
-
-    switch (object.type) {
-        case PS_OBJECT_BOOLEAN: {
-            out->type = PDF_OBJECT_TYPE_BOOLEAN;
-            out->data.boolean = object.data.boolean;
-            break;
-        }
-        case PS_OBJECT_INTEGER: {
-            out->type = PDF_OBJECT_TYPE_INTEGER;
-            out->data.integer = object.data.integer;
-            break;
-        }
-        case PS_OBJECT_NAME: {
-            out->type = PDF_OBJECT_TYPE_NAME;
-            out->data.name = object.data.name;
-            break;
-        }
-        case PS_OBJECT_REAL: {
-            out->type = PDF_OBJECT_TYPE_REAL;
-            out->data.real = object.data.real;
-            break;
-        }
-        case PS_OBJECT_STRING: {
-            out->type = PDF_OBJECT_TYPE_STRING;
-            out->data.string.data = object.data.string.data;
-            out->data.string.len = object.data.string.len;
-            break;
-        }
-        default: {
-            return PDF_ERROR(
-                PDF_ERR_INVALID_OBJECT,
-                "Only primitive objects can be converted to pdf objects"
-            );
-        }
-    }
-
-    return NULL;
 }
 
 PdfError* pdf_parse_true(PdfCtx* ctx, PdfObject* object) {

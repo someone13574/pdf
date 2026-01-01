@@ -129,6 +129,11 @@ PdfError* pdf_deserialize_num_as_real(
 DESERDE_DECL_TRAMPOLINE(pdf_deserialize_num_as_real_trampoline)
 
 PdfReal pdf_number_as_real(PdfNumber number);
+PdfObject pdf_number_as_object(PdfNumber number);
+
+/// Compares two numbers. If lhs < rhs, -1 is returned. If they are equal
+/// (eps=1e-6), then 0 is returned. If lhs > rhs, 1 is returned.
+int pdf_number_cmp(PdfNumber lhs, PdfNumber rhs);
 
 #define DVEC_NAME PdfNumberVec
 #define DVEC_LOWERCASE_NAME pdf_number_vec

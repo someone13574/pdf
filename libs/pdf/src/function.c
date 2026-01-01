@@ -120,6 +120,55 @@ PdfError* pdf_deserialize_function(
     return NULL;
 }
 
+static PdfError*
+clip_num(PdfObject object, PdfNumber min, PdfNumber max, PdfObject* out) {
+    PdfNumber val;
+    switch (object.type) {
+        case PDF_OBJECT_TYPE_INTEGER: {
+            val.type = PDF_NUMBER_TYPE_INTEGER;
+            val.value.integer = object.data.integer;
+            break;
+        }
+        case PDF_OBJECT_TYPE_REAL: {
+            val.type = PDF_NUMBER_TYPE_REAL;
+            val.value.real = object.data.real;
+            break;
+        }
+        case PDF_OBJECT_TYPE_BOOLEAN: {
+            *out = object;
+            return NULL;
+        }
+        default: {
+            return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+        }
+    }
+
+    switch (pdf_number_cmp(val, min)) {
+        case -1: {
+            *out = pdf_number_as_object(min);
+            return NULL;
+        }
+        case 0: {
+            *out = object;
+            break;
+        }
+        case 1: {
+            break;
+        }
+        default: {
+            LOG_PANIC("Unreachable");
+        }
+    }
+
+    if (pdf_number_cmp(val, max) <= 0) {
+        *out = object;
+    } else {
+        *out = pdf_number_as_object(max);
+    }
+
+    return NULL;
+}
+
 PdfError*
 pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
     RELEASE_ASSERT(function);
@@ -132,10 +181,35 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
                 PdfObject* pdf_operand = NULL;
                 RELEASE_ASSERT(pdf_object_vec_get(io, idx, &pdf_operand));
 
-                PSObject operand;
-                PDF_PROPAGATE(
-                    pdf_object_into_postscript(pdf_operand, &operand)
-                );
+                PdfObject clipped;
+                PdfNumber min;
+                PdfNumber max;
+                if (!pdf_number_vec_get(function->domain, 2 * idx, &min)
+                    || !pdf_number_vec_get(
+                        function->domain,
+                        2 * idx + 1,
+                        &max
+                    )) {
+                    return PDF_ERROR(PDF_ERR_EXCESS_OPERAND);
+                }
+                PDF_PROPAGATE(clip_num(*pdf_operand, min, max, &clipped));
+
+                PSObject operand = {
+                    .literal = true,
+                    .access = PS_ACCESS_UNLIMITED
+                };
+                if (clipped.type == PDF_OBJECT_TYPE_INTEGER) {
+                    operand.type = PS_OBJECT_INTEGER;
+                    operand.data.integer = clipped.data.integer;
+                } else if (clipped.type == PDF_OBJECT_TYPE_REAL) {
+                    operand.type = PS_OBJECT_REAL;
+                    operand.data.real = clipped.data.real;
+                } else if (clipped.type == PDF_OBJECT_TYPE_BOOLEAN) {
+                    operand.type = PS_OBJECT_BOOLEAN;
+                    operand.data.boolean = clipped.data.boolean;
+                } else {
+                    return PDF_ERROR(PDF_ERR_INCORRECT_TYPE);
+                }
 
                 PDF_PROPAGATE(
                     ps_interpret_object(function->data.type4, operand)
@@ -155,11 +229,39 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
                 RELEASE_ASSERT(ps_object_list_get(stack, idx, &output));
 
                 PdfObject converted;
-                pdf_object_from_postscript(output, &converted);
+                if (output.type == PS_OBJECT_INTEGER) {
+                    converted.type = PDF_OBJECT_TYPE_INTEGER;
+                    converted.data.integer = output.data.integer;
+                } else if (output.type == PS_OBJECT_REAL) {
+                    converted.type = PDF_OBJECT_TYPE_REAL;
+                    converted.data.real = output.data.real;
+                } else if (output.type == PS_OBJECT_BOOLEAN) {
+                    converted.type = PDF_OBJECT_TYPE_BOOLEAN;
+                    converted.data.boolean = output.data.boolean;
+                } else {
+                    return PDF_ERROR(PDF_ERR_PS_OPERAND_TYPE);
+                }
 
                 PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
-                *object = converted;
 
+                if (function->range.has_value) {
+                    PdfNumber min, max;
+                    if (!pdf_number_vec_get(
+                            function->range.value,
+                            2 * idx,
+                            &min
+                        )
+                        || !pdf_number_vec_get(
+                            function->range.value,
+                            2 * idx + 1,
+                            &max
+                        )) {
+                        return PDF_ERROR(PDF_ERR_EXCESS_OPERAND);
+                    }
+                    PDF_PROPAGATE(clip_num(converted, min, max, object));
+                } else {
+                    *object = converted;
+                }
                 pdf_object_vec_push(io, object);
             }
 
