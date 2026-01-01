@@ -38,13 +38,13 @@ typedef struct {
     PdfIgnored needs_rendering;
 } PdfCatalog;
 
-Error* pdf_deserialize_catalog(
+Error* pdf_deser_catalog(
     const PdfObject* object,
     PdfCatalog* target_ptr,
     PdfResolver* resolver
 );
 
-DESERDE_DECL_RESOLVABLE(
+DESER_DECL_RESOLVABLE(
     PdfCatalogRef,
     PdfCatalog,
     pdf_catalog_ref_init,

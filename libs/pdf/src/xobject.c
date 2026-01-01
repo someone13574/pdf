@@ -2,14 +2,14 @@
 
 #include <string.h>
 
-#include "deserialize.h"
+#include "deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/resources.h"
 
-Error* pdf_deserialize_form_xobject(
+Error* pdf_deser_form_xobject(
     const PdfObject* object,
     PdfFormXObject* target_ptr,
     PdfResolver* resolver
@@ -22,51 +22,51 @@ Error* pdf_deserialize_form_xobject(
         PDF_FIELD(
             "Type",
             &target_ptr->type,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_name_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
             )
         ),
         PDF_FIELD(
             "Subtype",
             &target_ptr->subtype,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
         ),
         PDF_FIELD(
             "FormType",
             &target_ptr->form_type,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_integer_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
             )
         ),
         PDF_FIELD(
             "BBox",
             &target_ptr->bbox,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_rectangle_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
         ),
         PDF_FIELD(
             "Matrix",
             &target_ptr->matrix,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_geom_mat3_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_pdf_mat_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_pdf_mat_trampoline)
             )
         ),
         PDF_FIELD(
             "Resources",
             &target_ptr->resources,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_resources_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_resources_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_resources_trampoline)
             )
         ),
         PDF_FIELD(
             "Group",
             &target_ptr->group,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_dict_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         ),
         PDF_UNIMPLEMENTED_FIELD("Ref"),
@@ -86,7 +86,7 @@ Error* pdf_deserialize_form_xobject(
         return ERROR(PDF_ERR_INCORRECT_TYPE, "Expected xobject to be a stream");
     }
 
-    TRY(pdf_deserialize_dict(
+    TRY(pdf_deser_dict(
         resolved.data.stream.stream_dict->raw_dict,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -95,12 +95,12 @@ Error* pdf_deserialize_form_xobject(
         "PdfFormXObject"
     ));
 
-    TRY(pdf_deserialize_content_stream(
+    TRY(pdf_deser_content_stream(
             &resolved,
             &target_ptr->content_stream,
             resolver
         ),
-        "Failed to deserialize form context stream");
+        "Failed to deser form context stream");
 
     if (target_ptr->type.has_value
         && strcmp(target_ptr->type.value, "XObject") != 0) {
@@ -126,7 +126,7 @@ typedef struct {
     PdfName subtype;
 } XObjectUntyped;
 
-Error* pdf_deserialize_xobject(
+Error* pdf_deser_xobject(
     const PdfObject* object,
     PdfXObject* target_ptr,
     PdfResolver* resolver
@@ -139,7 +139,7 @@ Error* pdf_deserialize_xobject(
     PdfFieldDescriptor fields[] = {PDF_FIELD(
         "Subtype",
         &untyped.subtype,
-        PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+        PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
     )};
 
     PdfObject resolved;
@@ -148,7 +148,7 @@ Error* pdf_deserialize_xobject(
         return ERROR(PDF_ERR_INCORRECT_TYPE, "Expected xobject to be a stream");
     }
 
-    TRY(pdf_deserialize_dict(
+    TRY(pdf_deser_dict(
         resolved.data.stream.stream_dict->raw_dict,
         fields,
         true,
@@ -159,11 +159,7 @@ Error* pdf_deserialize_xobject(
 
     if (strcmp(untyped.subtype, "Form") == 0) {
         target_ptr->type = PDF_XOBJECT_FORM;
-        TRY(pdf_deserialize_form_xobject(
-            object,
-            &target_ptr->data.form,
-            resolver
-        ));
+        TRY(pdf_deser_form_xobject(object, &target_ptr->data.form, resolver));
     } else if (strcmp(untyped.subtype, "Image") == 0) {
         LOG_TODO();
     } else {

@@ -2,7 +2,7 @@
 
 #include <stdbool.h>
 
-#include "../deserialize.h"
+#include "../deser.h"
 #include "err/error.h"
 #include "geom/mat3.h"
 #include "logger/log.h"
@@ -29,7 +29,7 @@ new_queue_op(PdfContentOpVec* operation_queue, PdfOperator op) {
     );
 }
 
-static Error* deserialize_line_cap_style(
+static Error* deser_line_cap_style(
     PdfLineCapStyle* target_ptr,
     const PdfObjectVec* operands,
     PdfResolver* resolver
@@ -40,10 +40,10 @@ static Error* deserialize_line_cap_style(
 
     PdfInteger type;
     PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(&type, PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER))
+        PDF_OPERAND(&type, PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER))
     };
 
-    TRY(pdf_deserialize_operands(
+    TRY(pdf_deser_operands(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
@@ -74,7 +74,7 @@ static Error* deserialize_line_cap_style(
     return NULL;
 }
 
-static Error* deserialize_line_join_style(
+static Error* deser_line_join_style(
     PdfLineJoinStyle* target_ptr,
     const PdfObjectVec* operands,
     PdfResolver* resolver
@@ -85,10 +85,10 @@ static Error* deserialize_line_join_style(
 
     PdfInteger type;
     PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(&type, PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER))
+        PDF_OPERAND(&type, PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER))
     };
 
-    TRY(pdf_deserialize_operands(
+    TRY(pdf_deser_operands(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
@@ -119,7 +119,7 @@ static Error* deserialize_line_join_style(
     return NULL;
 }
 
-static Error* deserialize_matrix(
+static Error* deser_matrix(
     GeomMat3* target,
     const PdfObjectVec* operands,
     PdfResolver* resolver
@@ -130,33 +130,15 @@ static Error* deserialize_matrix(
 
     PdfReal a, b, c, d, e, f;
     PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(
-            &a,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &b,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &c,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &d,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &e,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &f,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
-        )
+        PDF_OPERAND(&a, PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)),
+        PDF_OPERAND(&b, PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)),
+        PDF_OPERAND(&c, PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)),
+        PDF_OPERAND(&d, PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)),
+        PDF_OPERAND(&e, PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)),
+        PDF_OPERAND(&f, PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline))
     };
 
-    TRY(pdf_deserialize_operands(
+    TRY(pdf_deser_operands(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
@@ -168,7 +150,7 @@ static Error* deserialize_matrix(
     return NULL;
 }
 
-static Error* deserialize_cubic_bezier(
+static Error* deser_cubic_bezier(
     PdfOpParamsCubicBezier* target_ptr,
     const PdfObjectVec* operands,
     PdfResolver* resolver
@@ -180,31 +162,31 @@ static Error* deserialize_cubic_bezier(
     PdfOperandDescriptor descriptors[] = {
         PDF_OPERAND(
             &target_ptr->c1.x,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         ),
         PDF_OPERAND(
             &target_ptr->c1.y,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         ),
         PDF_OPERAND(
             &target_ptr->c2.x,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         ),
         PDF_OPERAND(
             &target_ptr->c2.y,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         ),
         PDF_OPERAND(
             &target_ptr->end.x,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         ),
         PDF_OPERAND(
             &target_ptr->end.y,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         )
     };
 
-    TRY(pdf_deserialize_operands(
+    TRY(pdf_deser_operands(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
@@ -214,7 +196,7 @@ static Error* deserialize_cubic_bezier(
     return NULL;
 }
 
-static Error* deserialize_part_cubic_bezier(
+static Error* deser_part_cubic_bezier(
     PdfOpParamsPartCubicBezier* target_ptr,
     const PdfObjectVec* operands,
     PdfResolver* resolver
@@ -226,23 +208,23 @@ static Error* deserialize_part_cubic_bezier(
     PdfOperandDescriptor descriptors[] = {
         PDF_OPERAND(
             &target_ptr->a.x,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         ),
         PDF_OPERAND(
             &target_ptr->a.y,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         ),
         PDF_OPERAND(
             &target_ptr->b.x,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         ),
         PDF_OPERAND(
             &target_ptr->b.y,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         )
     };
 
-    TRY(pdf_deserialize_operands(
+    TRY(pdf_deser_operands(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
@@ -252,7 +234,7 @@ static Error* deserialize_part_cubic_bezier(
     return NULL;
 }
 
-static Error* deserialize_draw_rectangle(
+static Error* deser_draw_rectangle(
     PdfContentOpVec* operation_queue,
     const PdfObjectVec* operands,
     PdfResolver* resolver
@@ -264,19 +246,13 @@ static Error* deserialize_draw_rectangle(
     PdfNumber x, y, width, height;
 
     PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(&x, PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)),
-        PDF_OPERAND(&y, PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)),
-        PDF_OPERAND(
-            &width,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-        ),
-        PDF_OPERAND(
-            &height,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
-        )
+        PDF_OPERAND(&x, PDF_DESER_CUSTOM(pdf_deser_number_trampoline)),
+        PDF_OPERAND(&y, PDF_DESER_CUSTOM(pdf_deser_number_trampoline)),
+        PDF_OPERAND(&width, PDF_DESER_CUSTOM(pdf_deser_number_trampoline)),
+        PDF_OPERAND(&height, PDF_DESER_CUSTOM(pdf_deser_number_trampoline))
     };
 
-    TRY(pdf_deserialize_operands(
+    TRY(pdf_deser_operands(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
@@ -307,7 +283,7 @@ static Error* deserialize_draw_rectangle(
     return NULL;
 }
 
-static Error* deserialize_set_font(
+static Error* deser_set_font(
     PdfContentOpVec* operation_queue,
     const PdfObjectVec* operands,
     PdfResolver* resolver
@@ -321,15 +297,15 @@ static Error* deserialize_set_font(
     PdfOperandDescriptor descriptors[] = {
         PDF_OPERAND(
             &queue_op->data.set_font.font,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
         ),
         PDF_OPERAND(
             &queue_op->data.set_font.size,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         )
     };
 
-    TRY(pdf_deserialize_operands(
+    TRY(pdf_deser_operands(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
@@ -339,7 +315,7 @@ static Error* deserialize_set_font(
     return NULL;
 }
 
-static Error* deserialize_vec2(
+static Error* deser_vec2(
     GeomVec2* target_ptr,
     const PdfObjectVec* operands,
     PdfResolver* resolver
@@ -351,15 +327,15 @@ static Error* deserialize_vec2(
     PdfOperandDescriptor descriptors[] = {
         PDF_OPERAND(
             &target_ptr->x,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         ),
         PDF_OPERAND(
             &target_ptr->y,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         )
     };
 
-    TRY(pdf_deserialize_operands(
+    TRY(pdf_deser_operands(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
@@ -369,7 +345,7 @@ static Error* deserialize_vec2(
     return NULL;
 }
 
-static Error* deserialize_text_op(
+static Error* deser_text_op(
     PdfOpParamsPositionedTextVec** target_vec,
     const PdfObjectVec* operands,
     PdfResolver* resolver
@@ -380,9 +356,9 @@ static Error* deserialize_text_op(
 
     PdfString string;
     PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(&string, PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING))
+        PDF_OPERAND(&string, PDF_DESER_OBJECT(PDF_OBJECT_TYPE_STRING))
     };
-    TRY(pdf_deserialize_operands(operands, descriptors, 1, resolver));
+    TRY(pdf_deser_operands(operands, descriptors, 1, resolver));
 
     PdfOpParamsPositionedTextElement* element =
         pdf_op_params_positioned_text_vec_push_uninit(
@@ -395,7 +371,7 @@ static Error* deserialize_text_op(
     return NULL;
 }
 
-static Error* deserialize_positioned_text_element(
+static Error* deser_positioned_text_element(
     const PdfObject* object,
     PdfOpParamsPositionedTextElement* target_ptr,
     PdfResolver* resolver
@@ -432,12 +408,12 @@ static Error* deserialize_positioned_text_element(
     return NULL;
 }
 
-DESERDE_IMPL_TRAMPOLINE(
-    deserialize_positioned_text_element_trampoline,
-    deserialize_positioned_text_element
+DESER_IMPL_TRAMPOLINE(
+    deser_positioned_text_element_trampoline,
+    deser_positioned_text_element
 )
 
-static Error* deserialize_positioned_text_op(
+static Error* deser_positioned_text_op(
     PdfOpParamsPositionedTextVec** target_vec,
     const PdfObjectVec* operands,
     PdfResolver* resolver
@@ -448,13 +424,13 @@ static Error* deserialize_positioned_text_op(
 
     PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
         target_vec,
-        PDF_DESERDE_ARRAY(
+        PDF_DESER_ARRAY(
             pdf_op_params_positioned_text_vec_push_uninit,
-            PDF_DESERDE_CUSTOM(deserialize_positioned_text_element_trampoline)
+            PDF_DESER_CUSTOM(deser_positioned_text_element_trampoline)
         )
     )};
 
-    TRY(pdf_deserialize_operands(
+    TRY(pdf_deser_operands(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
@@ -464,7 +440,7 @@ static Error* deserialize_positioned_text_op(
     return NULL;
 }
 
-static Error* deserialize_set_gray(
+static Error* deser_set_gray(
     bool stroking,
     PdfContentOpVec* operation_queue,
     const PdfObjectVec* operands,
@@ -481,10 +457,10 @@ static Error* deserialize_set_gray(
 
     PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
         &queue_op->data.set_gray,
-        PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+        PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
     )};
 
-    TRY(pdf_deserialize_operands(
+    TRY(pdf_deser_operands(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
@@ -494,7 +470,7 @@ static Error* deserialize_set_gray(
     return NULL;
 }
 
-static Error* deserialize_set_rgb(
+static Error* deser_set_rgb(
     bool stroking,
     PdfContentOpVec* operation_queue,
     const PdfObjectVec* operands,
@@ -512,19 +488,19 @@ static Error* deserialize_set_rgb(
     PdfOperandDescriptor descriptors[] = {
         PDF_OPERAND(
             &queue_op->data.set_rgb.r,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         ),
         PDF_OPERAND(
             &queue_op->data.set_rgb.g,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         ),
         PDF_OPERAND(
             &queue_op->data.set_rgb.b,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         )
     };
 
-    TRY(pdf_deserialize_operands(
+    TRY(pdf_deser_operands(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
@@ -534,7 +510,7 @@ static Error* deserialize_set_rgb(
     return NULL;
 }
 
-static Error* deserialize_set_cmyk(
+static Error* deser_set_cmyk(
     bool stroking,
     PdfContentOpVec* operation_queue,
     const PdfObjectVec* operands,
@@ -552,23 +528,23 @@ static Error* deserialize_set_cmyk(
     PdfOperandDescriptor descriptors[] = {
         PDF_OPERAND(
             &queue_op->data.set_cmyk.c,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         ),
         PDF_OPERAND(
             &queue_op->data.set_cmyk.m,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         ),
         PDF_OPERAND(
             &queue_op->data.set_cmyk.y,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         ),
         PDF_OPERAND(
             &queue_op->data.set_cmyk.k,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
         )
     };
 
-    TRY(pdf_deserialize_operands(
+    TRY(pdf_deser_operands(
         operands,
         descriptors,
         sizeof(descriptors) / sizeof(PdfOperandDescriptor),
@@ -578,7 +554,7 @@ static Error* deserialize_set_cmyk(
     return NULL;
 }
 
-static Error* deserialize_num_as_real(
+static Error* deser_num_as_real(
     PdfReal* target,
     const PdfObjectVec* operands,
     PdfResolver* resolver
@@ -587,16 +563,15 @@ static Error* deserialize_num_as_real(
     RELEASE_ASSERT(operands);
     RELEASE_ASSERT(resolver);
 
-    PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
-        target,
-        PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
-    )};
-    TRY(pdf_deserialize_operands(operands, descriptors, 1, resolver));
+    PdfOperandDescriptor descriptors[] = {
+        PDF_OPERAND(target, PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline))
+    };
+    TRY(pdf_deser_operands(operands, descriptors, 1, resolver));
 
     return NULL;
 }
 
-static Error* deserialize_name(
+static Error* deser_name(
     PdfName* target,
     const PdfObjectVec* operands,
     PdfResolver* resolver
@@ -606,14 +581,14 @@ static Error* deserialize_name(
     RELEASE_ASSERT(resolver);
 
     PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(target, PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME))
+        PDF_OPERAND(target, PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME))
     };
-    TRY(pdf_deserialize_operands(operands, descriptors, 1, resolver));
+    TRY(pdf_deser_operands(operands, descriptors, 1, resolver));
 
     return NULL;
 }
 
-Error* pdf_deserialize_content_op(
+Error* pdf_deser_content_op(
     PdfOperator op,
     const PdfObjectVec* operands,
     PdfResolver* resolver,
@@ -628,7 +603,7 @@ Error* pdf_deserialize_content_op(
         case PDF_OPERATOR_w: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_w);
-            TRY(deserialize_num_as_real(
+            TRY(deser_num_as_real(
                 &queue_op->data.set_line_width,
                 operands,
                 resolver
@@ -638,7 +613,7 @@ Error* pdf_deserialize_content_op(
         case PDF_OPERATOR_J: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_J);
-            TRY(deserialize_line_cap_style(
+            TRY(deser_line_cap_style(
                 &queue_op->data.set_line_cap,
                 operands,
                 resolver
@@ -648,7 +623,7 @@ Error* pdf_deserialize_content_op(
         case PDF_OPERATOR_j: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_J);
-            TRY(deserialize_line_join_style(
+            TRY(deser_line_join_style(
                 &queue_op->data.set_join_style,
                 operands,
                 resolver
@@ -658,7 +633,7 @@ Error* pdf_deserialize_content_op(
         case PDF_OPERATOR_M: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_M);
-            TRY(deserialize_num_as_real(
+            TRY(deser_num_as_real(
                 &queue_op->data.miter_limit,
                 operands,
                 resolver
@@ -672,19 +647,15 @@ Error* pdf_deserialize_content_op(
         case PDF_OPERATOR_i: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_i);
-            TRY(deserialize_num_as_real(
-                &queue_op->data.flatness,
-                operands,
-                resolver
-            ));
+            TRY(
+                deser_num_as_real(&queue_op->data.flatness, operands, resolver)
+            );
             return NULL;
         }
         case PDF_OPERATOR_gs: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_gs);
-            TRY(
-                deserialize_name(&queue_op->data.set_gstate, operands, resolver)
-            );
+            TRY(deser_name(&queue_op->data.set_gstate, operands, resolver));
             return NULL;
         }
         case PDF_OPERATOR_q: {
@@ -698,31 +669,25 @@ Error* pdf_deserialize_content_op(
         case PDF_OPERATOR_cm: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_cm);
-            TRY(
-                deserialize_matrix(&queue_op->data.set_ctm, operands, resolver)
-            );
+            TRY(deser_matrix(&queue_op->data.set_ctm, operands, resolver));
             return NULL;
         }
         case PDF_OPERATOR_m: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_m);
-            TRY(deserialize_vec2(
-                &queue_op->data.new_subpath,
-                operands,
-                resolver
-            ));
+            TRY(deser_vec2(&queue_op->data.new_subpath, operands, resolver));
             return NULL;
         }
         case PDF_OPERATOR_l: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_l);
-            TRY(deserialize_vec2(&queue_op->data.line_to, operands, resolver));
+            TRY(deser_vec2(&queue_op->data.line_to, operands, resolver));
             return NULL;
         }
         case PDF_OPERATOR_c: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_c);
-            TRY(deserialize_cubic_bezier(
+            TRY(deser_cubic_bezier(
                 &queue_op->data.cubic_bezier,
                 operands,
                 resolver
@@ -732,7 +697,7 @@ Error* pdf_deserialize_content_op(
         case PDF_OPERATOR_v:
         case PDF_OPERATOR_y: {
             PdfContentOp* queue_op = new_queue_op(operation_queue, op);
-            TRY(deserialize_part_cubic_bezier(
+            TRY(deser_part_cubic_bezier(
                 &queue_op->data.part_cubic_bezier,
                 operands,
                 resolver
@@ -744,9 +709,7 @@ Error* pdf_deserialize_content_op(
             return NULL;
         }
         case PDF_OPERATOR_re: {
-            TRY(
-                deserialize_draw_rectangle(operation_queue, operands, resolver)
-            );
+            TRY(deser_draw_rectangle(operation_queue, operands, resolver));
             return NULL;
         }
         case PDF_OPERATOR_S: {
@@ -782,7 +745,7 @@ Error* pdf_deserialize_content_op(
         case PDF_OPERATOR_Tz:
         case PDF_OPERATOR_TL: {
             PdfContentOp* queue_op = new_queue_op(operation_queue, op);
-            TRY(deserialize_num_as_real(
+            TRY(deser_num_as_real(
                 &queue_op->data.set_text_metric,
                 operands,
                 resolver
@@ -790,23 +753,19 @@ Error* pdf_deserialize_content_op(
             return NULL;
         };
         case PDF_OPERATOR_Tf: {
-            TRY(deserialize_set_font(operation_queue, operands, resolver));
+            TRY(deser_set_font(operation_queue, operands, resolver));
             return NULL;
         }
         case PDF_OPERATOR_Td:
         case PDF_OPERATOR_TD: {
             PdfContentOp* queue_op = new_queue_op(operation_queue, op);
-            TRY(deserialize_vec2(
-                &queue_op->data.text_offset,
-                operands,
-                resolver
-            ));
+            TRY(deser_vec2(&queue_op->data.text_offset, operands, resolver));
             return NULL;
         }
         case PDF_OPERATOR_Tm: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_Tm);
-            TRY(deserialize_matrix(
+            TRY(deser_matrix(
                 &queue_op->data.set_text_matrix,
                 operands,
                 resolver
@@ -820,7 +779,7 @@ Error* pdf_deserialize_content_op(
         case PDF_OPERATOR_Tj: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_TJ);
-            TRY(deserialize_text_op(
+            TRY(deser_text_op(
                 &queue_op->data.positioned_text,
                 operands,
                 resolver
@@ -830,7 +789,7 @@ Error* pdf_deserialize_content_op(
         case PDF_OPERATOR_TJ: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_TJ);
-            TRY(deserialize_positioned_text_op(
+            TRY(deser_positioned_text_op(
                 &queue_op->data.positioned_text,
                 operands,
                 resolver
@@ -840,11 +799,9 @@ Error* pdf_deserialize_content_op(
         case PDF_OPERATOR_CS:
         case PDF_OPERATOR_cs: {
             PdfContentOp* queue_op = new_queue_op(operation_queue, op);
-            TRY(deserialize_name(
-                &queue_op->data.set_color_space,
-                operands,
-                resolver
-            ));
+            TRY(
+                deser_name(&queue_op->data.set_color_space, operands, resolver)
+            );
             return NULL;
         }
         case PDF_OPERATOR_SC:
@@ -857,7 +814,7 @@ Error* pdf_deserialize_content_op(
         }
         case PDF_OPERATOR_G:
         case PDF_OPERATOR_g: {
-            TRY(deserialize_set_gray(
+            TRY(deser_set_gray(
                 op == PDF_OPERATOR_G,
                 operation_queue,
                 operands,
@@ -867,7 +824,7 @@ Error* pdf_deserialize_content_op(
         }
         case PDF_OPERATOR_RG:
         case PDF_OPERATOR_rg: {
-            TRY(deserialize_set_rgb(
+            TRY(deser_set_rgb(
                 op == PDF_OPERATOR_RG,
                 operation_queue,
                 operands,
@@ -877,7 +834,7 @@ Error* pdf_deserialize_content_op(
         }
         case PDF_OPERATOR_K:
         case PDF_OPERATOR_k: {
-            TRY(deserialize_set_cmyk(
+            TRY(deser_set_cmyk(
                 op == PDF_OPERATOR_K,
                 operation_queue,
                 operands,
@@ -888,21 +845,13 @@ Error* pdf_deserialize_content_op(
         case PDF_OPERATOR_sh: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_sh);
-            TRY(deserialize_name(
-                &queue_op->data.paint_shading,
-                operands,
-                resolver
-            ));
+            TRY(deser_name(&queue_op->data.paint_shading, operands, resolver));
             return NULL;
         }
         case PDF_OPERATOR_Do: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_Do);
-            TRY(deserialize_name(
-                &queue_op->data.paint_xobject,
-                operands,
-                resolver
-            ));
+            TRY(deser_name(&queue_op->data.paint_xobject, operands, resolver));
             return NULL;
         }
         case PDF_OPERATOR_BDC:

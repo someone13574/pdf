@@ -5,7 +5,7 @@
 
 #include "arena/arena.h"
 #include "ctx.h"
-#include "deserialize.h"
+#include "deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "object.h"
@@ -16,7 +16,7 @@
 #include "postscript/tokenizer.h"
 #include "test_helpers.h"
 
-Error* pdf_deserialize_function(
+Error* pdf_deser_function(
     const PdfObject* object,
     PdfFunction* target_ptr,
     PdfResolver* resolver
@@ -32,31 +32,31 @@ Error* pdf_deserialize_function(
         PDF_FIELD(
             "FunctionType",
             &target_ptr->function_type,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         ),
         PDF_FIELD(
             "Domain",
             &target_ptr->domain,
-            PDF_DESERDE_ARRAY(
+            PDF_DESER_ARRAY(
                 pdf_number_vec_push_uninit,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
             )
         ),
         PDF_FIELD(
             "Range",
             &target_ptr->range,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_number_vec_op_init,
-                PDF_DESERDE_ARRAY(
+                PDF_DESER_ARRAY(
                     pdf_number_vec_push_uninit,
-                    PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+                    PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
                 )
             )
         )
     };
 
     if (resolved.type == PDF_OBJECT_TYPE_DICT) {
-        TRY(pdf_deserialize_dict(
+        TRY(pdf_deser_dict(
             &resolved,
             fields,
             sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -65,7 +65,7 @@ Error* pdf_deserialize_function(
             "Function"
         ));
     } else if (resolved.type == PDF_OBJECT_TYPE_STREAM) {
-        TRY(pdf_deserialize_dict(
+        TRY(pdf_deser_dict(
             resolved.data.stream.stream_dict->raw_dict,
             fields,
             sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -89,37 +89,33 @@ Error* pdf_deserialize_function(
                 PDF_FIELD(
                     "C0",
                     &target_ptr->data.type2.c0,
-                    PDF_DESERDE_OPTIONAL(
+                    PDF_DESER_OPTIONAL(
                         pdf_number_vec_op_init,
-                        PDF_DESERDE_ARRAY(
+                        PDF_DESER_ARRAY(
                             pdf_number_vec_push_uninit,
-                            PDF_DESERDE_CUSTOM(
-                                pdf_deserialize_number_trampoline
-                            )
+                            PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
                         )
                     )
                 ),
                 PDF_FIELD(
                     "C1",
                     &target_ptr->data.type2.c1,
-                    PDF_DESERDE_OPTIONAL(
+                    PDF_DESER_OPTIONAL(
                         pdf_number_vec_op_init,
-                        PDF_DESERDE_ARRAY(
+                        PDF_DESER_ARRAY(
                             pdf_number_vec_push_uninit,
-                            PDF_DESERDE_CUSTOM(
-                                pdf_deserialize_number_trampoline
-                            )
+                            PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
                         )
                     )
                 ),
                 PDF_FIELD(
                     "N",
                     &target_ptr->data.type2.n,
-                    PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+                    PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
                 )
             };
 
-            TRY(pdf_deserialize_dict(
+            TRY(pdf_deser_dict(
                 object,
                 specific_fields,
                 sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
@@ -137,30 +133,30 @@ Error* pdf_deserialize_function(
                 PDF_FIELD(
                     "Functions",
                     &target_ptr->data.type3.functions,
-                    PDF_DESERDE_ARRAY(
+                    PDF_DESER_ARRAY(
                         pdf_function_vec_push_uninit,
-                        PDF_DESERDE_CUSTOM(pdf_deserialize_function_trampoline)
+                        PDF_DESER_CUSTOM(pdf_deser_function_trampoline)
                     )
                 ),
                 PDF_FIELD(
                     "Bounds",
                     &target_ptr->data.type3.bounds,
-                    PDF_DESERDE_ARRAY(
+                    PDF_DESER_ARRAY(
                         pdf_number_vec_push_uninit,
-                        PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+                        PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
                     )
                 ),
                 PDF_FIELD(
                     "Encode",
                     &target_ptr->data.type3.encode,
-                    PDF_DESERDE_ARRAY(
+                    PDF_DESER_ARRAY(
                         pdf_number_vec_push_uninit,
-                        PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+                        PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
                     )
                 )
             };
 
-            TRY(pdf_deserialize_dict(
+            TRY(pdf_deser_dict(
                 object,
                 specific_fields,
                 sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
@@ -383,10 +379,7 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
     return NULL;
 }
 
-DESERDE_IMPL_TRAMPOLINE(
-    pdf_deserialize_function_trampoline,
-    pdf_deserialize_function
-)
+DESER_IMPL_TRAMPOLINE(pdf_deser_function_trampoline, pdf_deser_function)
 
 #define DVEC_NAME PdfFunctionVec
 #define DVEC_LOWERCASE_NAME pdf_function_vec
@@ -420,7 +413,7 @@ TEST_FUNC(test_pdf_function) {
     TEST_REQUIRE(pdf_parse_object(resolver, &object, false));
 
     PdfFunction func;
-    TEST_REQUIRE(pdf_deserialize_function(&object, &func, resolver));
+    TEST_REQUIRE(pdf_deser_function(&object, &func, resolver));
 
     PdfObject* a = arena_alloc(arena, sizeof(PdfObject));
     PdfObject* b = arena_alloc(arena, sizeof(PdfObject));

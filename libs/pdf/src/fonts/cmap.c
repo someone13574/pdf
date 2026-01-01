@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../deserialize.h"
+#include "../deser.h"
 #include "arena/arena.h"
 #include "arena/common.h"
 #include "cmap_paths.h"
@@ -18,7 +18,7 @@
 #include "postscript/object.h"
 #include "postscript/tokenizer.h"
 
-Error* pdf_deserialize_cid_system_info(
+Error* pdf_deser_cid_system_info(
     const PdfObject* object,
     PdfCIDSystemInfo* target_ptr,
     PdfResolver* resolver
@@ -31,21 +31,21 @@ Error* pdf_deserialize_cid_system_info(
         PDF_FIELD(
             "Registry",
             &target_ptr->registry,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
+            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_STRING)
         ),
         PDF_FIELD(
             "Ordering",
             &target_ptr->ordering,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
+            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_STRING)
         ),
         PDF_FIELD(
             "Supplement",
             &target_ptr->supplement,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         )
     };
 
-    TRY(pdf_deserialize_dict(
+    TRY(pdf_deser_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -57,9 +57,9 @@ Error* pdf_deserialize_cid_system_info(
     return NULL;
 }
 
-DESERDE_IMPL_TRAMPOLINE(
-    pdf_deserialize_cid_system_info_trampoline,
-    pdf_deserialize_cid_system_info
+DESER_IMPL_TRAMPOLINE(
+    pdf_deser_cid_system_info_trampoline,
+    pdf_deser_cid_system_info
 )
 
 typedef struct {

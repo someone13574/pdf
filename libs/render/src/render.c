@@ -156,11 +156,7 @@ static Error* process_content_stream(
                 RELEASE_ASSERT(gstate_object);
 
                 PdfGStateParams params;
-                TRY(pdf_deserialize_gstate_params(
-                    gstate_object,
-                    &params,
-                    resolver
-                ));
+                TRY(pdf_deser_gstate_params(gstate_object, &params, resolver));
 
                 graphics_state_apply_params(
                     current_graphics_state(state),
@@ -341,7 +337,7 @@ static Error* process_content_stream(
                     op.data.set_font.font
                 );
 
-                TRY(pdf_deserialize_font(
+                TRY(pdf_deser_font(
                     font_object,
                     &current_graphics_state(state)->text_state.text_font,
                     resolver
@@ -453,7 +449,7 @@ static Error* process_content_stream(
                 );
                 RELEASE_ASSERT(color_space_object);
 
-                TRY(pdf_deserialize_color_space(
+                TRY(pdf_deser_color_space(
                     color_space_object,
                     &graphics_state->nonstroking_color_space,
                     resolver
@@ -531,7 +527,7 @@ static Error* process_content_stream(
                                 &component
                             ));
 
-                            TRY(pdf_deserialize_num_as_real(
+                            TRY(pdf_deser_num_as_real(
                                 component,
                                 &components[component_idx],
                                 resolver
@@ -683,11 +679,7 @@ static Error* process_content_stream(
                 ));
 
                 PdfShadingDict shading_dict;
-                TRY(pdf_deserialize_shading_dict(
-                    &resolved,
-                    &shading_dict,
-                    resolver
-                ));
+                TRY(pdf_deser_shading_dict(&resolved, &shading_dict, resolver));
 
                 // LOG_PANIC("here");
 
@@ -704,9 +696,7 @@ static Error* process_content_stream(
                 RELEASE_ASSERT(xobject_object);
 
                 PdfXObject xobject;
-                TRY(
-                    pdf_deserialize_xobject(xobject_object, &xobject, resolver)
-                );
+                TRY(pdf_deser_xobject(xobject_object, &xobject, resolver));
 
                 switch (xobject.type) {
                     case PDF_XOBJECT_IMAGE: {

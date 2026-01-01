@@ -25,16 +25,16 @@ typedef struct {
     PdfFontWidthVec* cid_to_width;
 } PdfFontWidths;
 
-DESERDE_DECL_OPTIONAL(
+DESER_DECL_OPTIONAL(
     PdfFontWidthsOptional,
     PdfFontWidths,
     pdf_font_widths_op_init
 )
 
-Error* pdf_deserialize_font_widths(
+Error* pdf_deser_font_widths(
     const PdfObject* object,
     PdfFontWidths* deserialized,
     PdfResolver* resolver
 );
 
-DESERDE_DECL_TRAMPOLINE(pdf_deserialize_font_widths_trampoline)
+DESER_DECL_TRAMPOLINE(pdf_deser_font_widths_trampoline)

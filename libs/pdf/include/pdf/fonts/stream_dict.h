@@ -12,7 +12,7 @@ typedef struct {
     PdfStreamOptional metadata;
 } PdfFontStreamDict;
 
-Error* pdf_deserialize_font_stream_dict(
+Error* pdf_deser_font_stream_dict(
     const PdfObject* object,
     PdfFontStreamDict* target_ptr,
     PdfResolver* resolver

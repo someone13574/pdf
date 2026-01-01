@@ -23,7 +23,7 @@ add_library(pdf
     src/trailer.c
     src/types.c
     src/ctx.c
-    src/deserialize.c
+    src/deser.c
     src/test_helpers.c
     src/xobject.c
     src/shading.c

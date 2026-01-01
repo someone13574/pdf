@@ -33,7 +33,7 @@ typedef struct {
     PdfArrayOptional id;
 } PdfTrailer;
 
-Error* pdf_deserialize_trailer(
+Error* pdf_deser_trailer(
     const PdfObject* object,
     PdfTrailer* target_ptr,
     PdfResolver* resolver

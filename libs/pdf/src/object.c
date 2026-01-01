@@ -9,7 +9,7 @@
 #include "arena/arena.h"
 #include "arena/string.h"
 #include "ctx.h"
-#include "deserialize.h"
+#include "deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
@@ -32,7 +32,7 @@
 #define DVEC_TYPE PdfBoolean
 #include "arena/dvec_impl.h"
 
-DESERDE_IMPL_OPTIONAL(PdfBooleanVecOptional, pdf_boolean_vec_op_init)
+DESER_IMPL_OPTIONAL(PdfBooleanVecOptional, pdf_boolean_vec_op_init)
 
 PdfObject* pdf_dict_get(const PdfDict* dict, PdfName key) {
     RELEASE_ASSERT(dict);
@@ -843,9 +843,7 @@ Error* pdf_parse_stream(
         ctx
     ); // If there is an indirect length, we don't want the offset to move
     PdfStreamDict stream_dict;
-    REQUIRE(
-        pdf_deserialize_stream_dict(stream_dict_obj, &stream_dict, resolver)
-    );
+    REQUIRE(pdf_deser_stream_dict(stream_dict_obj, &stream_dict, resolver));
     pdf_ctx_seek(ctx, resume_offset);
 
     if (stream_dict.length < 0) {

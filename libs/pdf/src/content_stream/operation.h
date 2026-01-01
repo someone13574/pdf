@@ -6,7 +6,7 @@
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
-Error* pdf_deserialize_content_op(
+Error* pdf_deser_content_op(
     PdfOperator op,
     const PdfObjectVec* operands,
     PdfResolver* resolver,

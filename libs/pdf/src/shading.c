@@ -2,13 +2,13 @@
 
 #include <stdio.h>
 
-#include "deserialize.h"
+#include "deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
-Error* pdf_deserialize_shading_dict(
+Error* pdf_deser_shading_dict(
     const PdfObject* object,
     PdfShadingDict* target_ptr,
     PdfResolver* resolver
@@ -21,33 +21,33 @@ Error* pdf_deserialize_shading_dict(
         PDF_FIELD(
             "ShadingType",
             &target_ptr->shading_type,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         ),
         PDF_FIELD(
             "ColorSpace",
             &target_ptr->color_space,
-            PDF_DESERDE_CUSTOM(pdf_deserialize_color_space_trampoline)
+            PDF_DESER_CUSTOM(pdf_deser_color_space_trampoline)
         ),
         PDF_UNIMPLEMENTED_FIELD("Background"),
         PDF_FIELD(
             "BBox",
             &target_ptr->bbox,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_rectangle_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_rectangle_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
             )
         ),
         PDF_FIELD(
             "AntiAlias",
             &target_ptr->anti_alias,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_boolean_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
             )
         )
     };
 
-    TRY(pdf_deserialize_dict(
+    TRY(pdf_deser_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -67,46 +67,44 @@ Error* pdf_deserialize_shading_dict(
                 PDF_FIELD(
                     "Coords",
                     &target_ptr->data.type2.coords,
-                    PDF_DESERDE_ARRAY(
+                    PDF_DESER_ARRAY(
                         pdf_number_vec_push_uninit,
-                        PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+                        PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
                     )
                 ),
                 PDF_FIELD(
                     "Domain",
                     &target_ptr->data.type2.domain,
-                    PDF_DESERDE_OPTIONAL(
+                    PDF_DESER_OPTIONAL(
                         pdf_number_vec_op_init,
-                        PDF_DESERDE_ARRAY(
+                        PDF_DESER_ARRAY(
                             pdf_number_vec_push_uninit,
-                            PDF_DESERDE_CUSTOM(
-                                pdf_deserialize_number_trampoline
-                            )
+                            PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
                         )
                     )
                 ),
                 PDF_FIELD(
                     "Function",
                     &target_ptr->data.type2.function,
-                    PDF_DESERDE_AS_ARRAY(
+                    PDF_DESER_AS_ARRAY(
                         pdf_function_vec_push_uninit,
-                        PDF_DESERDE_CUSTOM(pdf_deserialize_function_trampoline)
+                        PDF_DESER_CUSTOM(pdf_deser_function_trampoline)
                     )
                 ),
                 PDF_FIELD(
                     "Extend",
                     &target_ptr->data.type2.extend,
-                    PDF_DESERDE_OPTIONAL(
+                    PDF_DESER_OPTIONAL(
                         pdf_boolean_vec_op_init,
-                        PDF_DESERDE_ARRAY(
+                        PDF_DESER_ARRAY(
                             pdf_boolean_vec_push_uninit,
-                            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+                            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
                         )
                     )
                 )
             };
 
-            TRY(pdf_deserialize_dict(
+            TRY(pdf_deser_dict(
                 object,
                 specific_fields,
                 sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
@@ -143,46 +141,44 @@ Error* pdf_deserialize_shading_dict(
                 PDF_FIELD(
                     "Coords",
                     &target_ptr->data.type3.coords,
-                    PDF_DESERDE_ARRAY(
+                    PDF_DESER_ARRAY(
                         pdf_number_vec_push_uninit,
-                        PDF_DESERDE_CUSTOM(pdf_deserialize_number_trampoline)
+                        PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
                     )
                 ),
                 PDF_FIELD(
                     "Domain",
                     &target_ptr->data.type3.domain,
-                    PDF_DESERDE_OPTIONAL(
+                    PDF_DESER_OPTIONAL(
                         pdf_number_vec_op_init,
-                        PDF_DESERDE_ARRAY(
+                        PDF_DESER_ARRAY(
                             pdf_number_vec_push_uninit,
-                            PDF_DESERDE_CUSTOM(
-                                pdf_deserialize_number_trampoline
-                            )
+                            PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
                         )
                     )
                 ),
                 PDF_FIELD(
                     "Function",
                     &target_ptr->data.type3.function,
-                    PDF_DESERDE_AS_ARRAY(
+                    PDF_DESER_AS_ARRAY(
                         pdf_function_vec_push_uninit,
-                        PDF_DESERDE_CUSTOM(pdf_deserialize_function_trampoline)
+                        PDF_DESER_CUSTOM(pdf_deser_function_trampoline)
                     )
                 ),
                 PDF_FIELD(
                     "Extend",
                     &target_ptr->data.type3.extend,
-                    PDF_DESERDE_OPTIONAL(
+                    PDF_DESER_OPTIONAL(
                         pdf_boolean_vec_op_init,
-                        PDF_DESERDE_ARRAY(
+                        PDF_DESER_ARRAY(
                             pdf_boolean_vec_push_uninit,
-                            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+                            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
                         )
                     )
                 )
             };
 
-            TRY(pdf_deserialize_dict(
+            TRY(pdf_deser_dict(
                 object,
                 specific_fields,
                 sizeof(specific_fields) / sizeof(PdfFieldDescriptor),

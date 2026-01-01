@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "../deserialize.h"
+#include "../deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
@@ -428,7 +428,7 @@ const char* pdf_decode_adobe_standard_codepoint(uint8_t codepoint) {
     return pdf_encoding_adobe_standard_lookup[codepoint];
 }
 
-Error* pdf_deserialize_encoding_dict(
+Error* pdf_deser_encoding_dict(
     const PdfObject* object,
     PdfEncodingDict* target_ptr,
     PdfResolver* resolver
@@ -441,7 +441,7 @@ Error* pdf_deserialize_encoding_dict(
     PdfObject resolved;
     TRY(pdf_resolve_object(resolver, object, &resolved, true));
 
-    // Attempt to deserialize name
+    // Attempt to deser name
     if (resolved.type == PDF_OBJECT_TYPE_NAME) {
         target_ptr->type = (PdfNameOptional) {.has_value = false};
         target_ptr->base_encoding =
@@ -455,30 +455,30 @@ Error* pdf_deserialize_encoding_dict(
         PDF_FIELD(
             "Type",
             &target_ptr->type,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_name_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
             )
         ),
         PDF_FIELD(
             "BaseEncoding",
             &target_ptr->base_encoding,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_name_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
             )
         ),
         PDF_FIELD(
             "Differences",
             &target_ptr->differences,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_array_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_ARRAY)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_ARRAY)
             )
         )
     };
 
-    TRY(pdf_deserialize_dict(
+    TRY(pdf_deser_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -538,9 +538,9 @@ const char* pdf_encoding_map_codepoint(
     return base;
 }
 
-DESERDE_IMPL_TRAMPOLINE(
-    pdf_deserialize_encoding_dict_trampoline,
-    pdf_deserialize_encoding_dict
+DESER_IMPL_TRAMPOLINE(
+    pdf_deser_encoding_dict_trampoline,
+    pdf_deser_encoding_dict
 )
 
-DESERDE_IMPL_OPTIONAL(PdfEncodingDictOptional, pdf_encoding_dict_op_init)
+DESER_IMPL_OPTIONAL(PdfEncodingDictOptional, pdf_encoding_dict_op_init)

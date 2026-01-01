@@ -2,13 +2,13 @@
 
 #include <string.h>
 
-#include "deserialize.h"
+#include "deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
-Error* pdf_deserialize_resources(
+Error* pdf_deser_resources(
     const PdfObject* object,
     PdfResources* target_ptr,
     PdfResolver* resolver
@@ -21,73 +21,73 @@ Error* pdf_deserialize_resources(
         PDF_FIELD(
             "ExtGState",
             &target_ptr->ext_gstate,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_dict_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         ),
         PDF_FIELD(
             "ColorSpace",
             &target_ptr->color_space,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_dict_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         ),
         PDF_FIELD(
             "Pattern",
             &target_ptr->pattern,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_dict_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         ),
         PDF_FIELD(
             "Shading",
             &target_ptr->shading,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_dict_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         ),
         PDF_FIELD(
             "XObject",
             &target_ptr->xobject,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_dict_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         ),
         PDF_FIELD(
             "Font",
             &target_ptr->font,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_dict_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         ),
         PDF_FIELD(
             "ProcSet",
             &target_ptr->proc_set,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_name_vec_op_init,
-                PDF_DESERDE_ARRAY(
+                PDF_DESER_ARRAY(
                     pdf_name_vec_push_uninit,
-                    PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+                    PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
                 )
             )
         ),
         PDF_FIELD(
             "Properties",
             &target_ptr->properties,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_dict_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
             )
         ),
     };
 
-    TRY(pdf_deserialize_dict(
+    TRY(pdf_deser_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -99,13 +99,10 @@ Error* pdf_deserialize_resources(
     return NULL;
 }
 
-DESERDE_IMPL_TRAMPOLINE(
-    pdf_deserialize_resources_trampoline,
-    pdf_deserialize_resources
-)
-DESERDE_IMPL_OPTIONAL(PdfResourcesOptional, pdf_resources_op_init)
+DESER_IMPL_TRAMPOLINE(pdf_deser_resources_trampoline, pdf_deser_resources)
+DESER_IMPL_OPTIONAL(PdfResourcesOptional, pdf_resources_op_init)
 
-Error* pdf_deserialize_gstate_params(
+Error* pdf_deser_gstate_params(
     const PdfObject* object,
     PdfGStateParams* target_ptr,
     PdfResolver* resolver
@@ -118,9 +115,9 @@ Error* pdf_deserialize_gstate_params(
         PDF_FIELD(
             "Type",
             &target_ptr->type,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_name_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
             )
         ),
         PDF_UNIMPLEMENTED_FIELD("LW"),
@@ -132,25 +129,25 @@ Error* pdf_deserialize_gstate_params(
         PDF_FIELD(
             "OP",
             &target_ptr->overprint_upper,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_boolean_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
             )
         ),
         PDF_FIELD(
             "op",
             &target_ptr->overprint_lower,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_boolean_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
             )
         ),
         PDF_FIELD(
             "OPM",
             &target_ptr->overprint_mode,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_integer_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
             )
         ),
         PDF_UNIMPLEMENTED_FIELD("Font"),
@@ -165,17 +162,17 @@ Error* pdf_deserialize_gstate_params(
         PDF_FIELD(
             "SM",
             &target_ptr->sm,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_real_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
             )
         ),
         PDF_FIELD(
             "SA",
             &target_ptr->sa,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_boolean_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
             )
         ),
         PDF_IGNORED_FIELD("BM", &target_ptr->bm),       // TODO: blend mode
@@ -183,31 +180,31 @@ Error* pdf_deserialize_gstate_params(
         PDF_FIELD(
             "CA",
             &target_ptr->ca_stroking,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_real_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
             )
         ),
         PDF_FIELD(
             "ca",
             &target_ptr->ca_nonstroking,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_real_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserialize_num_as_real_trampoline)
+                PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
             )
         ),
         PDF_FIELD(
             "AIS",
             &target_ptr->ais,
-            PDF_DESERDE_OPTIONAL(
+            PDF_DESER_OPTIONAL(
                 pdf_boolean_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
+                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
             )
         ),
         PDF_UNIMPLEMENTED_FIELD("TK")
     };
 
-    TRY(pdf_deserialize_dict(
+    TRY(pdf_deser_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),

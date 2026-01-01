@@ -113,7 +113,7 @@ typedef struct {
     PdfShadingDictData data;
 } PdfShadingDict;
 
-Error* pdf_deserialize_shading_dict(
+Error* pdf_deser_shading_dict(
     const PdfObject* object,
     PdfShadingDict* target_ptr,
     PdfResolver* resolver

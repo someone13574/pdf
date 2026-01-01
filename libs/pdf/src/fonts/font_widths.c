@@ -2,7 +2,7 @@
 
 #include <stdbool.h>
 
-#include "../deserialize.h"
+#include "../deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
@@ -13,7 +13,7 @@
 #define DVEC_TYPE PdfFontWidthEntry
 #include "arena/dvec_impl.h"
 
-Error* pdf_deserialize_font_widths(
+Error* pdf_deser_font_widths(
     const PdfObject* object,
     PdfFontWidths* deserialized,
     PdfResolver* resolver
@@ -165,8 +165,5 @@ Error* pdf_deserialize_font_widths(
     return NULL;
 }
 
-DESERDE_IMPL_TRAMPOLINE(
-    pdf_deserialize_font_widths_trampoline,
-    pdf_deserialize_font_widths
-)
-DESERDE_IMPL_OPTIONAL(PdfFontWidthsOptional, pdf_font_widths_op_init)
+DESER_IMPL_TRAMPOLINE(pdf_deser_font_widths_trampoline, pdf_deser_font_widths)
+DESER_IMPL_OPTIONAL(PdfFontWidthsOptional, pdf_font_widths_op_init)

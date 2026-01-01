@@ -14,7 +14,7 @@ typedef struct PdfObject PdfObject;
 typedef bool PdfBoolean;
 typedef int32_t PdfInteger;
 typedef double PdfReal; // Be *very* careful if you change this to anything
-                        // other than double, since sometimes we deserialize
+                        // other than double, since sometimes we deser
                         // directly into a non-typedef'ed double, such as into
                         // GeomMat3 members.
 typedef char* PdfName;
@@ -68,14 +68,14 @@ typedef struct {
     PdfObject* object;
 } PdfIndirectObject;
 
-#define DESERDE_DECL_OPTIONAL(new_type, base_type, init_fn)                    \
+#define DESER_DECL_OPTIONAL(new_type, base_type, init_fn)                      \
     typedef struct {                                                           \
         _Bool has_value;                                                       \
         base_type value;                                                       \
     } new_type;                                                                \
     void* init_fn(void* ptr_to_optional, _Bool has_value);
 
-#define DESERDE_DECL_RESOLVABLE(new_type, base_type, init_fn, resolve_fn)      \
+#define DESER_DECL_RESOLVABLE(new_type, base_type, init_fn, resolve_fn)        \
     typedef struct {                                                           \
         PdfIndirectRef ref;                                                    \
         base_type* resolved;                                                   \
@@ -87,7 +87,7 @@ typedef struct {
         base_type* resolved_out                                                \
     );
 
-#define DESERDE_DECL_TRAMPOLINE(trampoline_name)                               \
+#define DESER_DECL_TRAMPOLINE(trampoline_name)                                 \
     Error* trampoline_name(                                                    \
         const PdfObject* object,                                               \
         void* target_ptr,                                                      \
@@ -99,7 +99,7 @@ typedef struct {
 #define DVEC_TYPE PdfBoolean
 #include "arena/dvec_decl.h"
 
-DESERDE_DECL_OPTIONAL(
+DESER_DECL_OPTIONAL(
     PdfBooleanVecOptional,
     PdfBooleanVec*,
     pdf_boolean_vec_op_init
@@ -123,21 +123,21 @@ typedef struct {
     } value;
 } PdfNumber;
 
-DESERDE_DECL_OPTIONAL(PdfNumberOptional, PdfNumber, pdf_number_op_init)
+DESER_DECL_OPTIONAL(PdfNumberOptional, PdfNumber, pdf_number_op_init)
 
-Error* pdf_deserialize_number(
+Error* pdf_deser_number(
     const PdfObject* object,
     PdfNumber* target_ptr,
     PdfResolver* resolver
 );
-DESERDE_DECL_TRAMPOLINE(pdf_deserialize_number_trampoline)
+DESER_DECL_TRAMPOLINE(pdf_deser_number_trampoline)
 
-Error* pdf_deserialize_num_as_real(
+Error* pdf_deser_num_as_real(
     const PdfObject* object,
     PdfReal* target_ptr,
     PdfResolver* resolver
 );
-DESERDE_DECL_TRAMPOLINE(pdf_deserialize_num_as_real_trampoline)
+DESER_DECL_TRAMPOLINE(pdf_deser_num_as_real_trampoline)
 
 PdfReal pdf_number_as_real(PdfNumber number);
 PdfObject pdf_number_as_object(PdfNumber number);
@@ -151,20 +151,16 @@ int pdf_number_cmp(PdfNumber lhs, PdfNumber rhs);
 #define DVEC_TYPE PdfNumber
 #include "arena/dvec_decl.h"
 
-DESERDE_DECL_OPTIONAL(
-    PdfNumberVecOptional,
-    PdfNumberVec*,
-    pdf_number_vec_op_init
-)
+DESER_DECL_OPTIONAL(PdfNumberVecOptional, PdfNumberVec*, pdf_number_vec_op_init)
 
-Error* pdf_deserialize_geom_vec3(
+Error* pdf_deser_geom_vec3(
     const PdfObject* object,
     GeomVec3* target_ptr,
     PdfResolver* resolver
 );
 
-DESERDE_DECL_TRAMPOLINE(pdf_deserialize_geom_vec3_trampoline)
-DESERDE_DECL_OPTIONAL(PdfGeomVec3Optional, GeomVec3, pdf_geom_vec3_op_init)
+DESER_DECL_TRAMPOLINE(pdf_deser_geom_vec3_trampoline)
+DESER_DECL_OPTIONAL(PdfGeomVec3Optional, GeomVec3, pdf_geom_vec3_op_init)
 
 typedef struct {
     PdfNumber lower_left_x;
@@ -173,53 +169,53 @@ typedef struct {
     PdfNumber upper_right_y;
 } PdfRectangle;
 
-DESERDE_DECL_OPTIONAL(PdfRectangleOptional, PdfRectangle, pdf_rectangle_op_init)
+DESER_DECL_OPTIONAL(PdfRectangleOptional, PdfRectangle, pdf_rectangle_op_init)
 
-Error* pdf_deserialize_rectangle(
+Error* pdf_deser_rectangle(
     const PdfObject* object,
     PdfRectangle* target_ptr,
     PdfResolver* resolver
 );
 
-DESERDE_DECL_TRAMPOLINE(pdf_deserialize_rectangle_trampoline)
+DESER_DECL_TRAMPOLINE(pdf_deser_rectangle_trampoline)
 
-Error* pdf_deserialize_pdf_mat(
+Error* pdf_deser_pdf_mat(
     const PdfObject* object,
     GeomMat3* target_ptr,
     PdfResolver* resolver
 );
 
-DESERDE_DECL_TRAMPOLINE(pdf_deserialize_pdf_mat_trampoline)
-DESERDE_DECL_OPTIONAL(PdfGeomMat3Optional, GeomMat3, pdf_geom_mat3_op_init)
+DESER_DECL_TRAMPOLINE(pdf_deser_pdf_mat_trampoline)
+DESER_DECL_OPTIONAL(PdfGeomMat3Optional, GeomMat3, pdf_geom_mat3_op_init)
 
-Error* pdf_deserialize_geom_mat3(
+Error* pdf_deser_geom_mat3(
     const PdfObject* object,
     GeomMat3* target_ptr,
     PdfResolver* resolver
 );
 
-DESERDE_DECL_TRAMPOLINE(pdf_deserialize_geom_mat3_trampoline)
+DESER_DECL_TRAMPOLINE(pdf_deser_geom_mat3_trampoline)
 
 #define DVEC_NAME PdfNameVec
 #define DVEC_LOWERCASE_NAME pdf_name_vec
 #define DVEC_TYPE PdfName
 #include "arena/dvec_decl.h"
-DESERDE_DECL_OPTIONAL(PdfNameVecOptional, PdfNameVec*, pdf_name_vec_op_init)
+DESER_DECL_OPTIONAL(PdfNameVecOptional, PdfNameVec*, pdf_name_vec_op_init)
 
-DESERDE_DECL_OPTIONAL(PdfBooleanOptional, PdfBoolean, pdf_boolean_op_init)
-DESERDE_DECL_OPTIONAL(PdfIntegerOptional, PdfInteger, pdf_integer_op_init)
-DESERDE_DECL_OPTIONAL(PdfRealOptional, PdfReal, pdf_real_op_init)
-DESERDE_DECL_OPTIONAL(PdfStringOptional, PdfString, pdf_string_op_init)
-DESERDE_DECL_OPTIONAL(PdfNameOptional, PdfName, pdf_name_op_init)
-DESERDE_DECL_OPTIONAL(PdfArrayOptional, PdfArray, pdf_array_op_init)
-DESERDE_DECL_OPTIONAL(PdfDictOptional, PdfDict, pdf_dict_op_init)
-DESERDE_DECL_OPTIONAL(PdfStreamOptional, PdfStream, pdf_stream_op_init)
-DESERDE_DECL_OPTIONAL(
+DESER_DECL_OPTIONAL(PdfBooleanOptional, PdfBoolean, pdf_boolean_op_init)
+DESER_DECL_OPTIONAL(PdfIntegerOptional, PdfInteger, pdf_integer_op_init)
+DESER_DECL_OPTIONAL(PdfRealOptional, PdfReal, pdf_real_op_init)
+DESER_DECL_OPTIONAL(PdfStringOptional, PdfString, pdf_string_op_init)
+DESER_DECL_OPTIONAL(PdfNameOptional, PdfName, pdf_name_op_init)
+DESER_DECL_OPTIONAL(PdfArrayOptional, PdfArray, pdf_array_op_init)
+DESER_DECL_OPTIONAL(PdfDictOptional, PdfDict, pdf_dict_op_init)
+DESER_DECL_OPTIONAL(PdfStreamOptional, PdfStream, pdf_stream_op_init)
+DESER_DECL_OPTIONAL(
     PdfIndirectObjectOptional,
     PdfIndirectObject,
     pdf_indirect_object_op_init
 )
-DESERDE_DECL_OPTIONAL(
+DESER_DECL_OPTIONAL(
     PdfIndirectRefOptional,
     PdfIndirectRef,
     pdf_indirect_ref_op_init
@@ -233,7 +229,7 @@ struct PdfStreamDict {
     const PdfObject* raw_dict;
 };
 
-Error* pdf_deserialize_stream_dict(
+Error* pdf_deser_stream_dict(
     const PdfObject* object,
     PdfStreamDict* deserialized,
     PdfResolver* resolver

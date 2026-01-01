@@ -6,7 +6,7 @@
 
 #include "arena/arena.h"
 #include "ctx.h"
-#include "deserialize.h"
+#include "deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "object.h"
@@ -21,7 +21,7 @@ typedef struct {
     PdfIntegerOptional prev;
 } StubTrailer;
 
-static Error* deserialize_stub_trailer(
+static Error* deser_stub_trailer(
     const PdfObject* object,
     StubTrailer* target_ptr,
     PdfResolver* resolver
@@ -33,13 +33,13 @@ static Error* deserialize_stub_trailer(
     PdfFieldDescriptor fields[] = {PDF_FIELD(
         "Prev",
         &target_ptr->prev,
-        PDF_DESERDE_OPTIONAL(
+        PDF_DESER_OPTIONAL(
             pdf_integer_op_init,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
+            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
         )
     )};
 
-    TRY(pdf_deserialize_dict(
+    TRY(pdf_deser_dict(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -161,7 +161,7 @@ static Error* parse_stub_trailer(PdfResolver* resolver, StubTrailer* trailer) {
     PdfObject trailer_object;
     TRY(pdf_parse_object(resolver, &trailer_object, false));
 
-    TRY(deserialize_stub_trailer(&trailer_object, trailer, resolver));
+    TRY(deser_stub_trailer(&trailer_object, trailer, resolver));
     return NULL;
 }
 
@@ -176,7 +176,7 @@ static Error* parse_trailer(PdfResolver* resolver, PdfTrailer* trailer) {
     PdfObject trailer_object;
     TRY(pdf_parse_object(resolver, &trailer_object, false));
 
-    TRY(pdf_deserialize_trailer(&trailer_object, trailer, resolver));
+    TRY(pdf_deser_trailer(&trailer_object, trailer, resolver));
     return NULL;
 }
 
