@@ -75,9 +75,6 @@ Error* pdf_deserde_number(
     return NULL;
 }
 
-DESERDE_IMPL_TRAMPOLINE(pdf_deserde_number_trampoline, pdf_deserde_number)
-DESERDE_IMPL_OPTIONAL(PdfNumberOptional, pdf_number_op_init)
-
 Error* pdf_deserde_num_as_real(
     const PdfObject* object,
     PdfReal* target_ptr,
@@ -93,18 +90,6 @@ Error* pdf_deserde_num_as_real(
 
     return NULL;
 }
-
-#define DVEC_NAME PdfNumberVec
-#define DVEC_LOWERCASE_NAME pdf_number_vec
-#define DVEC_TYPE PdfNumber
-#include "arena/dvec_impl.h"
-
-DESERDE_IMPL_OPTIONAL(PdfNumberVecOptional, pdf_number_vec_op_init)
-
-DESERDE_IMPL_TRAMPOLINE(
-    pdf_deserde_num_as_real_trampoline,
-    pdf_deserde_num_as_real
-)
 
 PdfReal pdf_number_as_real(PdfNumber number) {
     switch (number.type) {
@@ -174,7 +159,7 @@ Error* pdf_deserde_geom_vec3(
 
             PdfReal array[3] = {0};
             for (size_t idx = 0; idx < 3; idx++) {
-                PdfObject* element = NULL;
+                PdfObject element;
                 RELEASE_ASSERT(pdf_object_vec_get(
                     object->data.array.elements,
                     idx,
@@ -182,7 +167,7 @@ Error* pdf_deserde_geom_vec3(
                 ));
 
                 PdfNumber number;
-                TRY(pdf_deserde_number(element, &number, resolver));
+                TRY(pdf_deserde_number(&element, &number, resolver));
 
                 array[idx] = pdf_number_as_real(number);
             }
@@ -197,9 +182,6 @@ Error* pdf_deserde_geom_vec3(
 
     return NULL;
 }
-
-DESERDE_IMPL_TRAMPOLINE(pdf_deserde_geom_vec3_trampoline, pdf_deserde_geom_vec3)
-DESERDE_IMPL_OPTIONAL(PdfGeomVec3Optional, pdf_geom_vec3_op_init)
 
 Error* pdf_deserde_rectangle(
     const PdfObject* object,
@@ -218,29 +200,33 @@ Error* pdf_deserde_rectangle(
                 );
             }
 
-            PdfObject* ll_x = NULL;
+            PdfObject ll_x;
             RELEASE_ASSERT(
                 pdf_object_vec_get(object->data.array.elements, 0, &ll_x)
             );
-            TRY(pdf_deserde_number(ll_x, &target_ptr->lower_left_x, resolver));
+            TRY(pdf_deserde_number(&ll_x, &target_ptr->lower_left_x, resolver));
 
-            PdfObject* ll_y = NULL;
+            PdfObject ll_y;
             RELEASE_ASSERT(
                 pdf_object_vec_get(object->data.array.elements, 1, &ll_y)
             );
-            TRY(pdf_deserde_number(ll_y, &target_ptr->lower_left_y, resolver));
+            TRY(pdf_deserde_number(&ll_y, &target_ptr->lower_left_y, resolver));
 
-            PdfObject* ur_x = NULL;
+            PdfObject ur_x;
             RELEASE_ASSERT(
                 pdf_object_vec_get(object->data.array.elements, 2, &ur_x)
             );
-            TRY(pdf_deserde_number(ur_x, &target_ptr->upper_right_x, resolver));
+            TRY(
+                pdf_deserde_number(&ur_x, &target_ptr->upper_right_x, resolver)
+            );
 
-            PdfObject* ur_y = NULL;
+            PdfObject ur_y;
             RELEASE_ASSERT(
                 pdf_object_vec_get(object->data.array.elements, 3, &ur_y)
             );
-            TRY(pdf_deserde_number(ur_y, &target_ptr->upper_right_y, resolver));
+            TRY(
+                pdf_deserde_number(&ur_y, &target_ptr->upper_right_y, resolver)
+            );
             break;
         }
         default: {
@@ -250,9 +236,6 @@ Error* pdf_deserde_rectangle(
 
     return NULL;
 }
-
-DESERDE_IMPL_TRAMPOLINE(pdf_deserde_rectangle_trampoline, pdf_deserde_rectangle)
-DESERDE_IMPL_OPTIONAL(PdfRectangleOptional, pdf_rectangle_op_init)
 
 Error* pdf_deserde_pdf_mat(
     const PdfObject* object,
@@ -274,7 +257,7 @@ Error* pdf_deserde_pdf_mat(
 
             PdfReal array[6] = {0};
             for (size_t idx = 0; idx < 6; idx++) {
-                PdfObject* element = NULL;
+                PdfObject element;
                 RELEASE_ASSERT(pdf_object_vec_get(
                     object->data.array.elements,
                     idx,
@@ -282,7 +265,7 @@ Error* pdf_deserde_pdf_mat(
                 ));
 
                 PdfNumber number;
-                TRY(pdf_deserde_number(element, &number, resolver));
+                TRY(pdf_deserde_number(&element, &number, resolver));
 
                 array[idx] = pdf_number_as_real(number);
             }
@@ -305,10 +288,6 @@ Error* pdf_deserde_pdf_mat(
     return NULL;
 }
 
-DESERDE_IMPL_TRAMPOLINE(pdf_deserde_pdf_mat_trampoline, pdf_deserde_pdf_mat)
-
-DESERDE_IMPL_OPTIONAL(PdfGeomMat3Optional, pdf_geom_mat3_op_init)
-
 Error* pdf_deserde_geom_mat3(
     const PdfObject* object,
     GeomMat3* target_ptr,
@@ -329,7 +308,7 @@ Error* pdf_deserde_geom_mat3(
 
             PdfReal array[9] = {0};
             for (size_t idx = 0; idx < 9; idx++) {
-                PdfObject* element = NULL;
+                PdfObject element;
                 RELEASE_ASSERT(pdf_object_vec_get(
                     object->data.array.elements,
                     idx,
@@ -337,7 +316,7 @@ Error* pdf_deserde_geom_mat3(
                 ));
 
                 PdfNumber number;
-                TRY(pdf_deserde_number(element, &number, resolver));
+                TRY(pdf_deserde_number(&element, &number, resolver));
 
                 array[idx] = pdf_number_as_real(number);
             }
@@ -362,22 +341,3 @@ Error* pdf_deserde_geom_mat3(
 
     return NULL;
 }
-
-DESERDE_IMPL_TRAMPOLINE(pdf_deserde_geom_mat3_trampoline, pdf_deserde_geom_mat3)
-
-#define DVEC_NAME PdfNameVec
-#define DVEC_LOWERCASE_NAME pdf_name_vec
-#define DVEC_TYPE PdfName
-#include "arena/dvec_impl.h"
-DESERDE_IMPL_OPTIONAL(PdfNameVecOptional, pdf_name_vec_op_init)
-
-DESERDE_IMPL_OPTIONAL(PdfBooleanOptional, pdf_boolean_op_init)
-DESERDE_IMPL_OPTIONAL(PdfIntegerOptional, pdf_integer_op_init)
-DESERDE_IMPL_OPTIONAL(PdfRealOptional, pdf_real_op_init)
-DESERDE_IMPL_OPTIONAL(PdfStringOptional, pdf_string_op_init)
-DESERDE_IMPL_OPTIONAL(PdfNameOptional, pdf_name_op_init)
-DESERDE_IMPL_OPTIONAL(PdfArrayOptional, pdf_array_op_init)
-DESERDE_IMPL_OPTIONAL(PdfDictOptional, pdf_dict_op_init)
-DESERDE_IMPL_OPTIONAL(PdfStreamOptional, pdf_stream_op_init)
-DESERDE_IMPL_OPTIONAL(PdfIndirectObjectOptional, pdf_indirect_object_op_init)
-DESERDE_IMPL_OPTIONAL(PdfIndirectRefOptional, pdf_indirect_ref_op_init)

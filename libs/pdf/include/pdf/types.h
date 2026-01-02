@@ -79,6 +79,8 @@ PDF_DECL_OPTIONAL_FIELD(PdfNumberVec*, PdfNumberVecOptional, number_vec)
 PdfFieldDescriptor
 pdf_num_as_real_optional_field(const char* key, PdfRealOptional* target_ptr);
 
+PdfReal pdf_number_as_real(PdfNumber number);
+PdfObject pdf_number_as_object(PdfNumber number);
 int pdf_number_cmp(PdfNumber lhs, PdfNumber rhs);
 
 typedef struct {

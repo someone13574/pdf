@@ -2,14 +2,15 @@
 
 #include <stdbool.h>
 
-#include "../deser.h"
 #include "err/error.h"
 #include "geom/mat3.h"
 #include "logger/log.h"
 #include "operation.h"
 #include "pdf/content_stream/operator.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
 #define DVEC_NAME PdfContentOpVec
 #define DVEC_LOWERCASE_NAME pdf_content_op_vec
@@ -39,9 +40,7 @@ static Error* deserde_line_cap_style(
     RELEASE_ASSERT(resolver);
 
     PdfInteger type;
-    PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(&type, PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER))
-    };
+    PdfOperandDescriptor descriptors[] = {pdf_integer_operand(&type)};
 
     TRY(pdf_deserde_operands(
         operands,
@@ -84,9 +83,7 @@ static Error* deserde_line_join_style(
     RELEASE_ASSERT(resolver);
 
     PdfInteger type;
-    PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(&type, PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER))
-    };
+    PdfOperandDescriptor descriptors[] = {pdf_integer_operand(&type)};
 
     TRY(pdf_deserde_operands(
         operands,
@@ -130,12 +127,12 @@ static Error* deserde_matrix(
 
     PdfReal a, b, c, d, e, f;
     PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(&a, PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)),
-        PDF_OPERAND(&b, PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)),
-        PDF_OPERAND(&c, PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)),
-        PDF_OPERAND(&d, PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)),
-        PDF_OPERAND(&e, PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)),
-        PDF_OPERAND(&f, PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline))
+        pdf_num_as_real_operand(&a),
+        pdf_num_as_real_operand(&b),
+        pdf_num_as_real_operand(&c),
+        pdf_num_as_real_operand(&d),
+        pdf_num_as_real_operand(&e),
+        pdf_num_as_real_operand(&f)
     };
 
     TRY(pdf_deserde_operands(
@@ -160,30 +157,12 @@ static Error* deserde_cubic_bezier(
     RELEASE_ASSERT(resolver);
 
     PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(
-            &target_ptr->c1.x,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &target_ptr->c1.y,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &target_ptr->c2.x,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &target_ptr->c2.y,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &target_ptr->end.x,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &target_ptr->end.y,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        )
+        pdf_num_as_real_operand(&target_ptr->c1.x),
+        pdf_num_as_real_operand(&target_ptr->c1.y),
+        pdf_num_as_real_operand(&target_ptr->c2.x),
+        pdf_num_as_real_operand(&target_ptr->c2.y),
+        pdf_num_as_real_operand(&target_ptr->end.x),
+        pdf_num_as_real_operand(&target_ptr->end.y)
     };
 
     TRY(pdf_deserde_operands(
@@ -206,22 +185,10 @@ static Error* deserde_part_cubic_bezier(
     RELEASE_ASSERT(resolver);
 
     PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(
-            &target_ptr->a.x,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &target_ptr->a.y,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &target_ptr->b.x,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &target_ptr->b.y,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        )
+        pdf_num_as_real_operand(&target_ptr->a.x),
+        pdf_num_as_real_operand(&target_ptr->a.y),
+        pdf_num_as_real_operand(&target_ptr->b.x),
+        pdf_num_as_real_operand(&target_ptr->b.y)
     };
 
     TRY(pdf_deserde_operands(
@@ -243,13 +210,13 @@ static Error* deserde_draw_rectangle(
     RELEASE_ASSERT(operands);
     RELEASE_ASSERT(resolver);
 
-    PdfNumber x, y, width, height;
+    PdfReal x, y, width, height;
 
     PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(&x, PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline)),
-        PDF_OPERAND(&y, PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline)),
-        PDF_OPERAND(&width, PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline)),
-        PDF_OPERAND(&height, PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline))
+        pdf_num_as_real_operand(&x),
+        pdf_num_as_real_operand(&y),
+        pdf_num_as_real_operand(&width),
+        pdf_num_as_real_operand(&height)
     };
 
     TRY(pdf_deserde_operands(
@@ -259,11 +226,6 @@ static Error* deserde_draw_rectangle(
         resolver
     ));
 
-    double x_real = pdf_number_as_real(x);
-    double y_real = pdf_number_as_real(y);
-    double width_real = pdf_number_as_real(width);
-    double height_real = pdf_number_as_real(height);
-
     PdfContentOp* new_subpath_op =
         new_queue_op(operation_queue, PDF_OPERATOR_m);
     PdfContentOp* line_op_a = new_queue_op(operation_queue, PDF_OPERATOR_l);
@@ -271,14 +233,14 @@ static Error* deserde_draw_rectangle(
     PdfContentOp* line_op_c = new_queue_op(operation_queue, PDF_OPERATOR_l);
     new_queue_op(operation_queue, PDF_OPERATOR_h);
 
-    new_subpath_op->data.new_subpath.x = x_real;
-    new_subpath_op->data.new_subpath.y = y_real;
-    line_op_a->data.line_to.x = x_real + width_real;
-    line_op_a->data.line_to.y = y_real;
-    line_op_b->data.line_to.x = x_real + width_real;
-    line_op_b->data.line_to.y = y_real + height_real;
-    line_op_c->data.line_to.x = x_real;
-    line_op_c->data.line_to.y = y_real + height_real;
+    new_subpath_op->data.new_subpath.x = x;
+    new_subpath_op->data.new_subpath.y = y;
+    line_op_a->data.line_to.x = x + width;
+    line_op_a->data.line_to.y = y;
+    line_op_b->data.line_to.x = x + width;
+    line_op_b->data.line_to.y = y + height;
+    line_op_c->data.line_to.x = x;
+    line_op_c->data.line_to.y = y + height;
 
     return NULL;
 }
@@ -295,14 +257,8 @@ static Error* deserde_set_font(
     PdfContentOp* queue_op = new_queue_op(operation_queue, PDF_OPERATOR_Tf);
 
     PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(
-            &queue_op->data.set_font.font,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_OPERAND(
-            &queue_op->data.set_font.size,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        )
+        pdf_name_operand(&queue_op->data.set_font.font),
+        pdf_num_as_real_operand(&queue_op->data.set_font.size)
     };
 
     TRY(pdf_deserde_operands(
@@ -325,14 +281,8 @@ static Error* deserde_vec2(
     RELEASE_ASSERT(resolver);
 
     PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(
-            &target_ptr->x,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &target_ptr->y,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        )
+        pdf_num_as_real_operand(&target_ptr->x),
+        pdf_num_as_real_operand(&target_ptr->y)
     };
 
     TRY(pdf_deserde_operands(
@@ -355,9 +305,7 @@ static Error* deserde_text_op(
     RELEASE_ASSERT(resolver);
 
     PdfString string;
-    PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(&string, PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING))
-    };
+    PdfOperandDescriptor descriptors[] = {pdf_string_operand(&string)};
     TRY(pdf_deserde_operands(operands, descriptors, 1, resolver));
 
     PdfOpParamsPositionedTextElement* element =
@@ -371,7 +319,7 @@ static Error* deserde_text_op(
     return NULL;
 }
 
-static Error* deserde_positioned_text_element(
+static Error* pdf_deserde_op_params_positioned_text_element(
     const PdfObject* object,
     PdfOpParamsPositionedTextElement* target_ptr,
     PdfResolver* resolver
@@ -408,12 +356,18 @@ static Error* deserde_positioned_text_element(
     return NULL;
 }
 
-DESERDE_IMPL_TRAMPOLINE(
-    deserde_positioned_text_element_trampoline,
-    deserde_positioned_text_element
+PDF_IMPL_FIELD(
+    PdfOpParamsPositionedTextElement,
+    op_params_positioned_text_element
 )
 
-static Error* deserde_positioned_text_op(
+PDF_IMPL_ARRAY_FIELD(
+    PdfOpParamsPositionedTextVec,
+    op_params_positioned_text_vec,
+    op_params_positioned_text_element
+)
+
+static Error* pdf_deserde_positioned_text_op(
     PdfOpParamsPositionedTextVec** target_vec,
     const PdfObjectVec* operands,
     PdfResolver* resolver
@@ -422,13 +376,9 @@ static Error* deserde_positioned_text_op(
     RELEASE_ASSERT(operands);
     RELEASE_ASSERT(resolver);
 
-    PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
-        target_vec,
-        PDF_DESERDE_ARRAY(
-            pdf_op_params_positioned_text_vec_push_uninit,
-            PDF_DESERDE_CUSTOM(deserde_positioned_text_element_trampoline)
-        )
-    )};
+    PdfOperandDescriptor descriptors[] = {
+        pdf_op_params_positioned_text_vec_operand(target_vec)
+    };
 
     TRY(pdf_deserde_operands(
         operands,
@@ -455,10 +405,9 @@ static Error* deserde_set_gray(
         stroking ? PDF_OPERATOR_g : PDF_OPERATOR_G
     );
 
-    PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
-        &queue_op->data.set_gray,
-        PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-    )};
+    PdfOperandDescriptor descriptors[] = {
+        pdf_num_as_real_operand(&queue_op->data.set_gray)
+    };
 
     TRY(pdf_deserde_operands(
         operands,
@@ -486,18 +435,9 @@ static Error* deserde_set_rgb(
     );
 
     PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(
-            &queue_op->data.set_rgb.r,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &queue_op->data.set_rgb.g,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &queue_op->data.set_rgb.b,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        )
+        pdf_num_as_real_operand(&queue_op->data.set_rgb.r),
+        pdf_num_as_real_operand(&queue_op->data.set_rgb.g),
+        pdf_num_as_real_operand(&queue_op->data.set_rgb.b),
     };
 
     TRY(pdf_deserde_operands(
@@ -526,22 +466,10 @@ static Error* deserde_set_cmyk(
     );
 
     PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(
-            &queue_op->data.set_cmyk.c,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &queue_op->data.set_cmyk.m,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &queue_op->data.set_cmyk.y,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        ),
-        PDF_OPERAND(
-            &queue_op->data.set_cmyk.k,
-            PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-        )
+        pdf_num_as_real_operand(&queue_op->data.set_cmyk.c),
+        pdf_num_as_real_operand(&queue_op->data.set_cmyk.y),
+        pdf_num_as_real_operand(&queue_op->data.set_cmyk.m),
+        pdf_num_as_real_operand(&queue_op->data.set_cmyk.k),
     };
 
     TRY(pdf_deserde_operands(
@@ -563,10 +491,7 @@ static Error* deserde_num_as_real(
     RELEASE_ASSERT(operands);
     RELEASE_ASSERT(resolver);
 
-    PdfOperandDescriptor descriptors[] = {PDF_OPERAND(
-        target,
-        PDF_DESERDE_CUSTOM(pdf_deserde_num_as_real_trampoline)
-    )};
+    PdfOperandDescriptor descriptors[] = {pdf_num_as_real_operand(target)};
     TRY(pdf_deserde_operands(operands, descriptors, 1, resolver));
 
     return NULL;
@@ -581,9 +506,7 @@ static Error* deserde_name(
     RELEASE_ASSERT(operands);
     RELEASE_ASSERT(resolver);
 
-    PdfOperandDescriptor descriptors[] = {
-        PDF_OPERAND(target, PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME))
-    };
+    PdfOperandDescriptor descriptors[] = {pdf_name_operand(target)};
     TRY(pdf_deserde_operands(operands, descriptors, 1, resolver));
 
     return NULL;
@@ -792,7 +715,7 @@ Error* pdf_deserde_content_op(
         case PDF_OPERATOR_TJ: {
             PdfContentOp* queue_op =
                 new_queue_op(operation_queue, PDF_OPERATOR_TJ);
-            TRY(deserde_positioned_text_op(
+            TRY(pdf_deserde_positioned_text_op(
                 &queue_op->data.positioned_text,
                 operands,
                 resolver

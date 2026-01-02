@@ -33,10 +33,7 @@ typedef struct {
     PdfObjectVec* elements;
 } PdfArray;
 
-typedef struct {
-    PdfName key;
-    PdfObject* value;
-} PdfDictEntry;
+typedef struct PdfDictEntry PdfDictEntry;
 
 #define DVEC_NAME PdfDictEntryVec
 #define DVEC_LOWERCASE_NAME pdf_dict_entry_vec
@@ -100,3 +97,8 @@ pdf_object_dict_get(const PdfObject* dict, const char* key, PdfObject* object);
 
 // Generates a pretty-printed PdfObject string.
 char* pdf_fmt_object(Arena* arena, const PdfObject* object);
+
+struct PdfDictEntry {
+    PdfName key;
+    PdfObject value;
+};

@@ -223,7 +223,7 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
     switch (function->function_type) {
         case 4: {
             for (size_t idx = 0; idx < pdf_object_vec_len(io); idx++) {
-                PdfObject* pdf_operand = NULL;
+                PdfObject pdf_operand;
                 RELEASE_ASSERT(pdf_object_vec_get(io, idx, &pdf_operand));
 
                 PdfObject clipped;
@@ -237,7 +237,7 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
                     )) {
                     return ERROR(PDF_ERR_EXCESS_OPERAND);
                 }
-                TRY(clip_num(*pdf_operand, min, max, &clipped));
+                TRY(clip_num(pdf_operand, min, max, &clipped));
 
                 PSObject operand = {
                     .literal = true,
@@ -285,9 +285,7 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
                     return ERROR(PS_ERR_OPERAND_TYPE);
                 }
 
-                PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
-
-                if (function->range.has_value) {
+                if (function->range.is_some) {
                     PdfNumber min, max;
                     if (!pdf_number_vec_get(
                             function->range.value,
@@ -301,11 +299,13 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
                         )) {
                         return ERROR(PDF_ERR_EXCESS_OPERAND);
                     }
-                    TRY(clip_num(converted, min, max, object));
+
+                    PdfObject clipped;
+                    TRY(clip_num(converted, min, max, &clipped));
+                    pdf_object_vec_push(io, clipped);
                 } else {
-                    *object = converted;
+                    pdf_object_vec_push(io, converted);
                 }
-                pdf_object_vec_push(io, object);
             }
 
             break;
@@ -317,13 +317,6 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
 
     return NULL;
 }
-
-DESERDE_IMPL_TRAMPOLINE(pdf_deserde_function_trampoline, pdf_deserde_function)
-
-#define DVEC_NAME PdfFunctionVec
-#define DVEC_LOWERCASE_NAME pdf_function_vec
-#define DVEC_TYPE PdfFunction
-#include "arena/dvec_impl.h"
 
 #ifdef TEST
 
@@ -354,23 +347,22 @@ TEST_FUNC(test_pdf_function) {
     PdfFunction func;
     TEST_REQUIRE(pdf_deserde_function(&object, &func, resolver));
 
-    PdfObject* a = arena_alloc(arena, sizeof(PdfObject));
-    PdfObject* b = arena_alloc(arena, sizeof(PdfObject));
-    a->type = PDF_OBJECT_TYPE_REAL;
-    a->data.real = 0.25;
-    b->type = PDF_OBJECT_TYPE_REAL;
-    b->data.real = 0.5;
-
     PdfObjectVec* io = pdf_object_vec_new(arena);
-    pdf_object_vec_push(io, a);
-    pdf_object_vec_push(io, b);
+    pdf_object_vec_push(
+        io,
+        (PdfObject) {.type = PDF_OBJECT_TYPE_REAL, .data.real = 0.25}
+    );
+    pdf_object_vec_push(
+        io,
+        (PdfObject) {.type = PDF_OBJECT_TYPE_REAL, .data.real = 0.5}
+    );
     TEST_REQUIRE(pdf_run_function(&func, arena, io));
 
-    PdfObject* out = NULL;
+    PdfObject out;
     TEST_ASSERT(pdf_object_vec_pop(io, &out));
 
-    TEST_ASSERT_EQ((int)out->type, (int)PDF_OBJECT_TYPE_REAL);
-    TEST_ASSERT_EQ(out->data.real, 0.5);
+    TEST_ASSERT_EQ((int)out.type, (int)PDF_OBJECT_TYPE_REAL);
+    TEST_ASSERT_EQ(out.data.real, 0.5);
 
     return TEST_RESULT_PASS;
 }
