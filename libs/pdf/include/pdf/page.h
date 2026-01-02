@@ -19,7 +19,7 @@ PDF_DECL_RESOLVABLE_FIELD(PdfPageTree, PdfPageTreeRef, page_tree)
 #define DVEC_TYPE PdfPageTreeRef
 #include "arena/dvec_decl.h"
 
-PDF_DECL_ARRAY_FIELD(PdfPageTreeRefVec, pdf_page_tree_ref_vec)
+PDF_DECL_ARRAY_FIELD(PdfPageTreeRefVec, page_tree_ref_vec)
 
 typedef struct {
     /// (Required) The type of PDF object that this dictionary describes; shall

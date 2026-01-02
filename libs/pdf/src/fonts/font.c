@@ -14,11 +14,6 @@
 #include "pdf/resolver.h"
 #include "pdf/types.h"
 
-#define DVEC_NAME PdfCIDFontVec
-#define DVEC_LOWERCASE_NAME pdf_cid_font_vec
-#define DVEC_TYPE PdfCIDFont
-#include "arena/dvec_impl.h"
-
 Error* pdf_deserde_cid_font(
     const PdfObject* object,
     PdfCIDFont* target_ptr,
@@ -72,6 +67,15 @@ Error* pdf_deserde_cid_font(
 
     return NULL;
 }
+
+PDF_IMPL_FIELD(PdfCIDFont, cid_font)
+
+#define DVEC_NAME PdfCIDFontVec
+#define DVEC_LOWERCASE_NAME pdf_cid_font_vec
+#define DVEC_TYPE PdfCIDFont
+#include "arena/dvec_impl.h"
+
+PDF_IMPL_ARRAY_FIELD(PdfCIDFontVec, cid_font_vec, cid_font)
 
 Error* pdf_deserde_type0_font(
     const PdfObject* object,

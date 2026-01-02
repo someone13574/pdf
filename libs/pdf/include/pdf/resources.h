@@ -164,7 +164,7 @@ typedef struct {
 
     /// (Optional; PDF 1.3) The smoothness tolerance (see 10.6.3, "Smoothness
     /// Tolerance").
-    PdfRealOptional sm;
+    PdfNumAsRealOptional sm;
 
     /// (Optional) A flag specifying whether to apply automatic stroke
     /// adjustment (see 10.6.5, "Automatic Stroke Adjustment").
@@ -189,10 +189,10 @@ typedef struct {
     /// constant shape or constant opacity value that shall be used for stroking
     /// operations in the transparent imaging model (see 11.3.7.2, "Source Shape
     /// and Opacity" and 11.6.4.4, "Constant Shape and Opacity").
-    PdfRealOptional ca_stroking;
+    PdfNumAsRealOptional ca_stroking;
 
     /// (Optional; PDF 1.4) Same as CA, but for nonstroking operations.
-    PdfRealOptional ca_nonstroking;
+    PdfNumAsRealOptional ca_nonstroking;
 
     /// (Optional; PDF 1.4) The alpha source flag (“alpha is shape”), specifying
     /// whether the current soft mask and alpha constant shall be interpreted as

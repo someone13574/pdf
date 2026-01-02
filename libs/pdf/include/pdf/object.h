@@ -93,7 +93,7 @@ struct PdfObject {
 
 // Gets the value associated with a given key in a dictionary object
 Error*
-pdf_object_dict_get(const PdfObject* dict, const char* key, PdfObject* object);
+pdf_object_dict_get(const PdfDict* dict, const char* key, PdfObject* object);
 
 // Generates a pretty-printed PdfObject string.
 char* pdf_fmt_object(Arena* arena, const PdfObject* object);

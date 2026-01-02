@@ -490,6 +490,8 @@ Error* pdf_deserde_encoding_dict(
     return NULL;
 }
 
+PDF_IMPL_OPTIONAL_FIELD(PdfEncodingDict, PdfEncodingDictOptional, encoding_dict)
+
 const char* pdf_encoding_map_codepoint(
     const PdfEncodingDict* encoding_dict,
     uint8_t codepoint

@@ -149,6 +149,8 @@ Error* pdf_deserde_color_space(
     return NULL;
 }
 
+PDF_IMPL_FIELD(PdfColorSpace, color_space)
+
 static GeomVec3 linear_srgb_to_nonlinear(
     GeomVec3 linear,
     GeomVec3 whitepoint,

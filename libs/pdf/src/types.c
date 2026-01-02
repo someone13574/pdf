@@ -9,27 +9,18 @@
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
-Error* pdf_deserde_boolean_optional_trampoline(
-    const PdfObject* object,
-    void* target_ptr,
-    PdfResolver* resolver
-) {
-    PdfBooleanOptional* target = target_ptr;
-    target->is_some = 1;
-    return pdf_deserde_boolean(object, (PdfBoolean*)&target->value, resolver);
-}
-void pdf_boolean_init_none(void* target_ptr) {
-    PdfBooleanOptional* target = target_ptr;
-    target->is_some = 0;
-}
-inline PdfFieldDescriptor
-pdf_boolean_optional_field(const char* key, PdfBooleanOptional* target_ptr) {
-    return (PdfFieldDescriptor) {.key = key,
-                                 .target_ptr = (void*)target_ptr,
-                                 .deserializer =
-                                     pdf_deserde_boolean_optional_trampoline,
-                                 .init_none = pdf_boolean_init_none};
-}
+PDF_IMPL_FIELD(PdfBoolean, boolean)
+PDF_IMPL_FIELD(PdfInteger, integer)
+PDF_IMPL_FIELD(PdfReal, real)
+PDF_IMPL_FIELD(PdfString, string)
+PDF_IMPL_FIELD(PdfName, name)
+PDF_IMPL_FIELD(PdfArray, array)
+PDF_IMPL_FIELD(PdfDict, dict)
+PDF_IMPL_FIELD(PdfStream, stream)
+PDF_IMPL_FIELD(PdfIndirectObject, indirect_object)
+PDF_IMPL_FIELD(PdfIndirectRef, indirect_ref)
+
+PDF_IMPL_OPTIONAL_FIELD(PdfBoolean, PdfBooleanOptional, boolean)
 PDF_IMPL_OPTIONAL_FIELD(PdfInteger, PdfIntegerOptional, integer)
 PDF_IMPL_OPTIONAL_FIELD(PdfReal, PdfRealOptional, real)
 PDF_IMPL_OPTIONAL_FIELD(PdfString, PdfStringOptional, string)
@@ -43,6 +34,24 @@ PDF_IMPL_OPTIONAL_FIELD(
     indirect_object
 )
 PDF_IMPL_OPTIONAL_FIELD(PdfIndirectRef, PdfIndirectRefOptional, indirect_ref)
+
+#define DVEC_NAME PdfBooleanVec
+#define DVEC_LOWERCASE_NAME pdf_boolean_vec
+#define DVEC_TYPE PdfBoolean
+#include "arena/dvec_impl.h"
+
+PDF_IMPL_ARRAY_FIELD(PdfBooleanVec, boolean_vec, boolean)
+PDF_IMPL_OPTIONAL_FIELD(PdfBooleanVec*, PdfBooleanVecOptional, boolean_vec)
+
+#define DVEC_NAME PdfNameVec
+#define DVEC_LOWERCASE_NAME pdf_name_vec
+#define DVEC_TYPE PdfName
+#include "arena/dvec_impl.h"
+
+PDF_IMPL_ARRAY_FIELD(PdfNameVec, name_vec, name)
+PDF_IMPL_AS_ARRAY_FIELD(PdfNameVec, name_vec, name)
+PDF_IMPL_OPTIONAL_FIELD(PdfNameVec*, PdfNameVecOptional, name_vec)
+PDF_IMPL_OPTIONAL_FIELD(PdfNameVec*, PdfAsNameVecOptional, as_name_vec)
 
 Error* pdf_deserde_number(
     const PdfObject* object,
@@ -91,6 +100,19 @@ Error* pdf_deserde_num_as_real(
     return NULL;
 }
 
+PDF_IMPL_FIELD(PdfNumber, number)
+PDF_IMPL_FIELD(PdfReal, num_as_real)
+PDF_IMPL_OPTIONAL_FIELD(PdfNumber, PdfNumberOptional, number)
+PDF_IMPL_OPTIONAL_FIELD(PdfReal, PdfNumAsRealOptional, num_as_real)
+
+#define DVEC_NAME PdfNumberVec
+#define DVEC_LOWERCASE_NAME pdf_number_vec
+#define DVEC_TYPE PdfNumber
+#include "arena/dvec_impl.h"
+
+PDF_IMPL_ARRAY_FIELD(PdfNumberVec, number_vec, number)
+PDF_IMPL_OPTIONAL_FIELD(PdfNumberVec*, PdfNumberVecOptional, number_vec)
+
 PdfReal pdf_number_as_real(PdfNumber number) {
     switch (number.type) {
         case PDF_NUMBER_TYPE_INTEGER: {
@@ -137,50 +159,6 @@ int pdf_number_cmp(PdfNumber lhs, PdfNumber rhs) {
     } else {
         return 1;
     }
-}
-
-Error* pdf_deserde_geom_vec3(
-    const PdfObject* object,
-    GeomVec3* target_ptr,
-    PdfResolver* resolver
-) {
-    RELEASE_ASSERT(object);
-    RELEASE_ASSERT(target_ptr);
-    RELEASE_ASSERT(resolver);
-
-    switch (object->type) {
-        case PDF_OBJECT_TYPE_ARRAY: {
-            if (pdf_object_vec_len(object->data.array.elements) != 3) {
-                return ERROR(
-                    PDF_ERR_INCORRECT_TYPE,
-                    "Incorrect number of elements in vec array (expected 3)"
-                );
-            }
-
-            PdfReal array[3] = {0};
-            for (size_t idx = 0; idx < 3; idx++) {
-                PdfObject element;
-                RELEASE_ASSERT(pdf_object_vec_get(
-                    object->data.array.elements,
-                    idx,
-                    &element
-                ));
-
-                PdfNumber number;
-                TRY(pdf_deserde_number(&element, &number, resolver));
-
-                array[idx] = pdf_number_as_real(number);
-            }
-
-            *target_ptr = geom_vec3_new(array[0], array[1], array[2]);
-            break;
-        }
-        default: {
-            return ERROR(PDF_ERR_INCORRECT_TYPE, "Vec must be an array");
-        }
-    }
-
-    return NULL;
 }
 
 Error* pdf_deserde_rectangle(
@@ -236,6 +214,56 @@ Error* pdf_deserde_rectangle(
 
     return NULL;
 }
+
+PDF_IMPL_FIELD(PdfRectangle, rectangle)
+PDF_IMPL_OPTIONAL_FIELD(PdfRectangle, PdfRectangleOptional, rectangle)
+
+Error* pdf_deserde_geom_vec3(
+    const PdfObject* object,
+    GeomVec3* target_ptr,
+    PdfResolver* resolver
+) {
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    switch (object->type) {
+        case PDF_OBJECT_TYPE_ARRAY: {
+            if (pdf_object_vec_len(object->data.array.elements) != 3) {
+                return ERROR(
+                    PDF_ERR_INCORRECT_TYPE,
+                    "Incorrect number of elements in vec array (expected 3)"
+                );
+            }
+
+            PdfReal array[3] = {0};
+            for (size_t idx = 0; idx < 3; idx++) {
+                PdfObject element;
+                RELEASE_ASSERT(pdf_object_vec_get(
+                    object->data.array.elements,
+                    idx,
+                    &element
+                ));
+
+                PdfNumber number;
+                TRY(pdf_deserde_number(&element, &number, resolver));
+
+                array[idx] = pdf_number_as_real(number);
+            }
+
+            *target_ptr = geom_vec3_new(array[0], array[1], array[2]);
+            break;
+        }
+        default: {
+            return ERROR(PDF_ERR_INCORRECT_TYPE, "Vec must be an array");
+        }
+    }
+
+    return NULL;
+}
+
+PDF_IMPL_FIELD(GeomVec3, geom_vec3)
+PDF_IMPL_OPTIONAL_FIELD(GeomVec3, PdfGeomVec3Optional, geom_vec3)
 
 Error* pdf_deserde_pdf_mat(
     const PdfObject* object,
@@ -341,3 +369,8 @@ Error* pdf_deserde_geom_mat3(
 
     return NULL;
 }
+
+PDF_IMPL_FIELD(GeomMat3, geom_mat3)
+PDF_IMPL_FIELD(GeomMat3, pdf_mat)
+PDF_IMPL_OPTIONAL_FIELD(GeomMat3, PdfGeomMat3Optional, geom_mat3)
+PDF_IMPL_OPTIONAL_FIELD(GeomMat3, PdfGeomPdfMatOptional, pdf_mat)

@@ -40,6 +40,8 @@ Error* pdf_deserde_resources(
     return NULL;
 }
 
+PDF_IMPL_OPTIONAL_FIELD(PdfResources, PdfResourcesOptional, resources)
+
 Error* pdf_deserde_gstate_params(
     const PdfObject* object,
     PdfGStateParams* target_ptr,

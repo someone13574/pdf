@@ -46,6 +46,8 @@ Error* pdf_deserde_cid_system_info(
     return NULL;
 }
 
+PDF_IMPL_FIELD(PdfCIDSystemInfo, cid_system_info)
+
 typedef struct {
     size_t start_code;
     size_t len;

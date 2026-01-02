@@ -3,7 +3,7 @@
 
 struct PdfStreamDict {
     PdfInteger length;
-    PdfNameVecOptional filter;
+    PdfAsNameVecOptional filter;
 
     const PdfObject* raw_dict;
 };

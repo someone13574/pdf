@@ -11,12 +11,22 @@
 #include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf/stream.h"
+#include "pdf/stream_dict.h"
 #include "pdf/types.h"
 #include "postscript/interpreter.h"
 #include "postscript/object.h"
 #include "postscript/tokenizer.h"
 #include "test_helpers.h"
+
+PDF_IMPL_FIELD(PdfFunction, function)
+
+#define DVEC_NAME PdfFunctionVec
+#define DVEC_LOWERCASE_NAME pdf_function_vec
+#define DVEC_TYPE PdfFunction
+#include "arena/dvec_impl.h"
+
+PDF_IMPL_ARRAY_FIELD(PdfFunctionVec, function_vec, function)
+PDF_IMPL_AS_ARRAY_FIELD(PdfFunctionVec, function_vec, function)
 
 Error* pdf_deserde_function(
     const PdfObject* object,
@@ -103,13 +113,6 @@ Error* pdf_deserde_function(
                 resolver,
                 "Type3 PdfFunction"
             ));
-
-            if (!target_ptr->data.type3.bounds) {
-                // TODO: Remove ugly workaround. Deserialization needs another
-                // rewrite.
-                target_ptr->data.type3.bounds =
-                    pdf_number_vec_new(pdf_resolver_arena(resolver));
-            }
 
             size_t k = pdf_function_vec_len(target_ptr->data.type3.functions);
             if (k == 0) {

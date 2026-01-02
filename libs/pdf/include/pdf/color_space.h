@@ -2,6 +2,7 @@
 
 #include "err/error.h"
 #include "geom/vec3.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/types.h"
@@ -67,6 +68,8 @@ Error* pdf_deserde_color_space(
     PdfColorSpace* target_ptr,
     PdfResolver* resolver
 );
+
+PDF_DECL_FIELD(PdfColorSpace, color_space)
 
 GeomVec3 pdf_map_color(
     double* components,

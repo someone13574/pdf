@@ -70,6 +70,8 @@ Error* pdf_deserde_cid_font(
     PdfResolver* resolver
 );
 
+PDF_DECL_FIELD(PdfCIDFont, cid_font)
+
 #define DVEC_NAME PdfCIDFontVec
 #define DVEC_LOWERCASE_NAME pdf_cid_font_vec
 #define DVEC_TYPE PdfCIDFont

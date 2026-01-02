@@ -1,5 +1,6 @@
 #pragma once
 
+#include "geom/mat3.h"
 #include "geom/vec3.h"
 #include "pdf/deserde.h"
 #include "pdf/object.h"
@@ -39,6 +40,7 @@ PDF_DECL_OPTIONAL_FIELD(PdfIndirectRef, PdfIndirectRefOptional, indirect_ref)
 #define DVEC_TYPE PdfBoolean
 #include "arena/dvec_decl.h"
 
+PDF_DECL_ARRAY_FIELD(PdfBooleanVec, boolean_vec)
 PDF_DECL_OPTIONAL_FIELD(PdfBooleanVec*, PdfBooleanVecOptional, boolean_vec)
 
 #define DVEC_NAME PdfNameVec
@@ -46,8 +48,10 @@ PDF_DECL_OPTIONAL_FIELD(PdfBooleanVec*, PdfBooleanVecOptional, boolean_vec)
 #define DVEC_TYPE PdfName
 #include "arena/dvec_decl.h"
 
+PDF_DECL_ARRAY_FIELD(PdfNameVec, name_vec)
 PDF_DECL_AS_ARRAY_FIELD(PdfNameVec, name_vec)
-PDF_DECL_OPTIONAL_FIELD(PdfNameVec*, PdfNameVecOptional, as_name_vec)
+PDF_DECL_OPTIONAL_FIELD(PdfNameVec*, PdfNameVecOptional, name_vec)
+PDF_DECL_OPTIONAL_FIELD(PdfNameVec*, PdfAsNameVecOptional, as_name_vec)
 
 typedef struct {
     enum { PDF_NUMBER_TYPE_INTEGER, PDF_NUMBER_TYPE_REAL } type;
@@ -64,9 +68,16 @@ Error* pdf_deserde_number(
     PdfResolver* resolver
 );
 
+Error* pdf_deserde_num_as_real(
+    const PdfObject* object,
+    PdfReal* target_ptr,
+    PdfResolver* resolver
+);
+
 PDF_DECL_FIELD(PdfNumber, number)
 PDF_DECL_FIELD(PdfReal, num_as_real)
 PDF_DECL_OPTIONAL_FIELD(PdfNumber, PdfNumberOptional, number)
+PDF_DECL_OPTIONAL_FIELD(PdfReal, PdfNumAsRealOptional, num_as_real)
 
 #define DVEC_NAME PdfNumberVec
 #define DVEC_LOWERCASE_NAME pdf_number_vec
@@ -75,9 +86,6 @@ PDF_DECL_OPTIONAL_FIELD(PdfNumber, PdfNumberOptional, number)
 
 PDF_DECL_ARRAY_FIELD(PdfNumberVec, number_vec)
 PDF_DECL_OPTIONAL_FIELD(PdfNumberVec*, PdfNumberVecOptional, number_vec)
-
-PdfFieldDescriptor
-pdf_num_as_real_optional_field(const char* key, PdfRealOptional* target_ptr);
 
 PdfReal pdf_number_as_real(PdfNumber number);
 PdfObject pdf_number_as_object(PdfNumber number);
@@ -96,6 +104,7 @@ Error* pdf_deserde_rectangle(
     PdfResolver* resolver
 );
 
+PDF_DECL_FIELD(PdfRectangle, rectangle)
 PDF_DECL_OPTIONAL_FIELD(PdfRectangle, PdfRectangleOptional, rectangle)
 
 Error* pdf_deserde_geom_vec3(
@@ -120,4 +129,6 @@ Error* pdf_deserde_geom_mat3(
 );
 
 PDF_DECL_FIELD(GeomMat3, geom_mat3)
+PDF_DECL_FIELD(GeomMat3, pdf_mat)
 PDF_DECL_OPTIONAL_FIELD(GeomMat3, PdfGeomMat3Optional, geom_mat3)
+PDF_DECL_OPTIONAL_FIELD(GeomMat3, PdfGeomPdfMatOptional, pdf_mat)

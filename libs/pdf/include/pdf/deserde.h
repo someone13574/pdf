@@ -14,13 +14,13 @@ typedef Error* (*PdfDeserdeFn)(
     PdfResolver* resolver
 );
 
-typedef void (*PdfInitNoneFn)(void* target_ptr);
+typedef Error* (*PdfOnFieldMissing)(void* target_ptr);
 
 typedef struct {
     const char* key;
     void* target_ptr;
     PdfDeserdeFn deserializer;
-    PdfInitNoneFn init_none;
+    PdfOnFieldMissing on_missing;
 } PdfFieldDescriptor;
 
 typedef struct {
@@ -37,6 +37,13 @@ Error* pdf_deserde_fields(
     const char* debug_name
 );
 
+Error* pdf_deserde_operands(
+    const PdfObjectVec* operands,
+    const PdfOperandDescriptor* descriptors,
+    size_t num_descriptors,
+    PdfResolver* resolver
+);
+
 Error* pdf_deserde_typed_array(
     const PdfObject* object,
     PdfDeserdeFn deserializer,
@@ -44,13 +51,6 @@ Error* pdf_deserde_typed_array(
     bool allow_single_element,
     void* (*push_uninit)(void* ptr_to_vec_ptr, Arena* arena),
     void** ptr_to_vec_ptr
-);
-
-Error* pdf_deserde_operands(
-    const PdfObjectVec* operands,
-    const PdfOperandDescriptor* descriptors,
-    size_t num_descriptors,
-    PdfResolver* resolver
 );
 
 Error* pdf_deserde_boolean(
@@ -148,7 +148,7 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfObject* target_ptr);
                                      .target_ptr = (void*)target_ptr,          \
                                      .deserializer =                           \
                                          pdf_deserde_##lowercase##_trampoline, \
-                                     .init_none = NULL};                       \
+                                     .on_missing = NULL};                      \
     }                                                                          \
     PdfOperandDescriptor pdf_##lowercase##_operand(field_type* target_ptr) {   \
         return (PdfOperandDescriptor) {                                        \
@@ -181,9 +181,10 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfObject* target_ptr);
             resolver                                                           \
         );                                                                     \
     }                                                                          \
-    void pdf_##lowercase_base##_init_none(void* target_ptr) {                  \
+    Error* pdf_##lowercase_base##_init_none(void* target_ptr) {                \
         optional_type* target = target_ptr;                                    \
         target->is_some = false;                                               \
+        return NULL;                                                           \
     }                                                                          \
     PdfFieldDescriptor pdf_##lowercase_base##_optional_field(                  \
         const char* key,                                                       \
@@ -194,7 +195,7 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfObject* target_ptr);
         ) {.key = key,                                                         \
            .target_ptr = (void*)target_ptr,                                    \
            .deserializer = pdf_deserde_##lowercase_base##_optional_trampoline, \
-           .init_none = pdf_##lowercase_base##_init_none};                     \
+           .on_missing = pdf_##lowercase_base##_init_none};                    \
     }
 
 #define PDF_DECL_ARRAY_FIELD(vec_type, lowercase_vec_type)                     \

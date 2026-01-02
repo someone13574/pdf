@@ -162,3 +162,5 @@ Error* pdf_deserde_font_widths(
 
     return NULL;
 }
+
+PDF_IMPL_OPTIONAL_FIELD(PdfFontWidths, PdfFontWidthsOptional, font_widths)

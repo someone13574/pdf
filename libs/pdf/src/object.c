@@ -13,7 +13,7 @@
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-#include "pdf/stream.h"
+#include "pdf/stream_dict.h"
 #include "resolver.h"
 #include "stream/filters.h"
 
@@ -923,6 +923,25 @@ Error* pdf_parse_indirect(
 
         return NULL;
     }
+}
+
+Error*
+pdf_object_dict_get(const PdfDict* dict, const char* key, PdfObject* object) {
+    RELEASE_ASSERT(dict);
+    RELEASE_ASSERT(key);
+    RELEASE_ASSERT(object);
+
+    for (size_t idx = 0; idx < pdf_dict_entry_vec_len(dict->entries); idx++) {
+        PdfDictEntry entry;
+        RELEASE_ASSERT(pdf_dict_entry_vec_get(dict->entries, idx, &entry));
+
+        if (strcmp(key, entry.key) == 0) {
+            *object = entry.value;
+            return NULL;
+        }
+    }
+
+    return ERROR(PDF_ERR_MISSING_DICT_KEY, "Dict key `%s` not found", key);
 }
 
 ArenaString* pdf_fmt_object_indented(

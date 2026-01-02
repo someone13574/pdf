@@ -12,12 +12,15 @@
 
 typedef struct PdfFunction PdfFunction;
 
+PDF_DECL_FIELD(PdfFunction, function)
+
 #define DVEC_NAME PdfFunctionVec
 #define DVEC_LOWERCASE_NAME pdf_function_vec
 #define DVEC_TYPE PdfFunction
 #include "arena/dvec_decl.h"
 
 PDF_DECL_ARRAY_FIELD(PdfFunctionVec, function_vec)
+PDF_DECL_AS_ARRAY_FIELD(PdfFunctionVec, function_vec)
 
 typedef struct {
     /// (Optional) An array of n numbers that shall define the function result

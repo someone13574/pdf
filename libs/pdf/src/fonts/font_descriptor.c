@@ -79,3 +79,15 @@ Error* pdf_deserde_font_descriptor(
 
     return NULL;
 }
+
+PDF_IMPL_RESOLVABLE_FIELD(
+    PdfFontDescriptor,
+    PdfFontDescriptorRef,
+    font_descriptor
+)
+
+PDF_IMPL_OPTIONAL_FIELD(
+    PdfFontDescriptorRef,
+    PdfFontDescriptorRefOptional,
+    font_descriptor_ref
+)

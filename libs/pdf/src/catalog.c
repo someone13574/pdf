@@ -63,3 +63,5 @@ Error* pdf_deserde_catalog(
 
     return NULL;
 }
+
+PDF_IMPL_RESOLVABLE_FIELD(PdfCatalog, PdfCatalogRef, catalog)

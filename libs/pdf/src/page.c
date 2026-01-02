@@ -7,15 +7,22 @@
 #include "err/error.h"
 #include "logger/log.h"
 #include "pdf/content_stream/stream.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/resources.h"
 #include "pdf/types.h"
 
+PDF_IMPL_RESOLVABLE_FIELD(PdfPages, PdfPagesRef, pages)
+PDF_IMPL_OPTIONAL_FIELD(PdfPagesRef, PdfPagesRefOptional, pages_ref)
+PDF_IMPL_RESOLVABLE_FIELD(PdfPageTree, PdfPageTreeRef, page_tree)
+
 #define DVEC_NAME PdfPageTreeRefVec
 #define DVEC_LOWERCASE_NAME pdf_page_tree_ref_vec
 #define DVEC_TYPE PdfPageTreeRef
 #include "arena/dvec_impl.h"
+
+PDF_IMPL_ARRAY_FIELD(PdfPageTreeRefVec, page_tree_ref_vec, page_tree_ref)
 
 Error* pdf_deserde_page(
     const PdfObject* object,
@@ -95,7 +102,7 @@ Error* pdf_deserde_pages(
     PdfFieldDescriptor fields[] = {
         pdf_name_field("Type", &target_ptr->type),
         pdf_pages_ref_optional_field("Parent", &target_ptr->parent),
-        pdf_pdf_page_tree_ref_vec_field("Kids", &target_ptr->kids),
+        pdf_page_tree_ref_vec_field("Kids", &target_ptr->kids),
         pdf_integer_field("Count", &target_ptr->count),
         pdf_resources_optional_field("Resources", &target_ptr->resources),
         pdf_rectangle_optional_field("MediaBox", &target_ptr->media_box),

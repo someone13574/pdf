@@ -1,4 +1,4 @@
-#include "pdf/stream.h"
+#include "pdf/stream_dict.h"
 
 #include <string.h>
 

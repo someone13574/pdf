@@ -2,12 +2,13 @@
 
 #include <string.h>
 
-#include "deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/resources.h"
+#include "pdf/stream_dict.h"
+#include "pdf/types.h"
 
 Error* pdf_deserde_form_xobject(
     const PdfObject* object,
@@ -19,56 +20,13 @@ Error* pdf_deserde_form_xobject(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "Type",
-            &target_ptr->type,
-            PDF_DESERDE_OPTIONAL(
-                pdf_name_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-            )
-        ),
-        PDF_FIELD(
-            "Subtype",
-            &target_ptr->subtype,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_FIELD(
-            "FormType",
-            &target_ptr->form_type,
-            PDF_DESERDE_OPTIONAL(
-                pdf_integer_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-            )
-        ),
-        PDF_FIELD(
-            "BBox",
-            &target_ptr->bbox,
-            PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
-        ),
-        PDF_FIELD(
-            "Matrix",
-            &target_ptr->matrix,
-            PDF_DESERDE_OPTIONAL(
-                pdf_geom_mat3_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_pdf_mat_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "Resources",
-            &target_ptr->resources,
-            PDF_DESERDE_OPTIONAL(
-                pdf_resources_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_resources_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "Group",
-            &target_ptr->group,
-            PDF_DESERDE_OPTIONAL(
-                pdf_dict_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
-            )
-        ),
+        pdf_name_optional_field("Type", &target_ptr->type),
+        pdf_name_field("Subtype", &target_ptr->subtype),
+        pdf_integer_optional_field("FormType", &target_ptr->form_type),
+        pdf_rectangle_field("BBox", &target_ptr->bbox),
+        pdf_pdf_mat_field("Matrix", &target_ptr->matrix),
+        pdf_resources_optional_field("Resources", &target_ptr->resources),
+        pdf_dict_optional_field("Group", &target_ptr->group),
         pdf_unimplemented_field("Ref"),
         pdf_unimplemented_field("Metadata"),
         pdf_unimplemented_field("PieceInfo"),
@@ -102,7 +60,7 @@ Error* pdf_deserde_form_xobject(
         ),
         "Failed to deserialize form context stream");
 
-    if (target_ptr->type.has_value
+    if (target_ptr->type.is_some
         && strcmp(target_ptr->type.value, "XObject") != 0) {
         return ERROR(
             PDF_ERR_INCORRECT_TYPE,
@@ -122,10 +80,6 @@ Error* pdf_deserde_form_xobject(
     return NULL;
 }
 
-typedef struct {
-    PdfName subtype;
-} XObjectUntyped;
-
 Error* pdf_deserde_xobject(
     const PdfObject* object,
     PdfXObject* target_ptr,
@@ -135,12 +89,10 @@ Error* pdf_deserde_xobject(
     RELEASE_ASSERT(target_ptr);
     RELEASE_ASSERT(resolver);
 
-    XObjectUntyped untyped = {0};
-    PdfFieldDescriptor fields[] = {PDF_FIELD(
-        "Subtype",
-        &untyped.subtype,
-        PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-    )};
+    PdfName subtype;
+    PdfFieldDescriptor fields[] = {
+        pdf_name_field("Subtype", &subtype),
+    };
 
     PdfObject resolved;
     TRY(pdf_resolve_object(resolver, object, &resolved, true));
@@ -157,16 +109,16 @@ Error* pdf_deserde_xobject(
         "XObjectUntyped"
     ));
 
-    if (strcmp(untyped.subtype, "Form") == 0) {
+    if (strcmp(subtype, "Form") == 0) {
         target_ptr->type = PDF_XOBJECT_FORM;
         TRY(pdf_deserde_form_xobject(object, &target_ptr->data.form, resolver));
-    } else if (strcmp(untyped.subtype, "Image") == 0) {
+    } else if (strcmp(subtype, "Image") == 0) {
         LOG_TODO();
     } else {
         return ERROR(
             PDF_ERR_INVALID_SUBTYPE,
             "Invalid xobject subtype `%s`",
-            untyped.subtype
+            subtype
         );
     }
 

@@ -37,6 +37,8 @@ Error* pdf_deserde_cid_to_gid_map(
     return NULL;
 }
 
+PDF_IMPL_OPTIONAL_FIELD(PdfCIDToGIDMap, PdfCIDToGIDMapOptional, cid_to_gid_map)
+
 Error*
 pdf_map_cid_to_gid(PdfCIDToGIDMap* map, uint32_t cid, uint32_t* gid_out) {
     RELEASE_ASSERT(map);
