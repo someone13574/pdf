@@ -4,7 +4,7 @@
 
 #include "arena/arena.h"
 #include "err/error.h"
-#include "pdf/object.h"
+#include "pdf/types.h"
 
 Error* pdf_decode_filtered_stream(
     Arena* arena,

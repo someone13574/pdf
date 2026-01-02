@@ -250,11 +250,10 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfObject* target_ptr);
 #define PDF_DECL_RESOLVABLE_FIELD(base_type, ref_type, lowercase_base)         \
     typedef struct {                                                           \
         PdfIndirectRef ref;                                                    \
-        bool is_resolved;                                                      \
-        base_type resolved;                                                    \
+        base_type* resolved;                                                   \
     } ref_type;                                                                \
     Error* pdf_resolve_##lowercase_base(ref_type* ref, PdfResolver* resolver); \
-    PDF_DECL_FIELD(ref_type, pdf_##lowercase_base##_ref)
+    PDF_DECL_FIELD(ref_type, lowercase_base##_ref)
 
 #define PDF_IMPL_RESOLVABLE_FIELD(base_type, ref_type, lowercase_base)         \
     Error* pdf_resolve_##lowercase_base(                                       \
@@ -263,15 +262,14 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfObject* target_ptr);
     ) {                                                                        \
         RELEASE_ASSERT(ref);                                                   \
         RELEASE_ASSERT(resolver);                                              \
-        if (ref->is_resolved) {                                                \
+        if (ref->resolved) {                                                   \
             return NULL;                                                       \
         }                                                                      \
         PdfObject resolved;                                                    \
         TRY(pdf_resolve_ref(resolver, ref->ref, &resolved));                   \
-        TRY(                                                                   \
-            pdf_deserde_##lowercase_base(&resolved, &ref->resolved, resolver)  \
-        );                                                                     \
-        ref->is_resolved = true;                                               \
+        ref->resolved =                                                        \
+            arena_alloc(pdf_resolver_arena(resolver), sizeof(ref_type));       \
+        TRY(pdf_deserde_##lowercase_base(&resolved, ref->resolved, resolver)); \
         return NULL;                                                           \
     }                                                                          \
     Error* pdf_deserde_##lowercase_base##_ref(                                 \
@@ -282,7 +280,7 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfObject* target_ptr);
         RELEASE_ASSERT(object);                                                \
         RELEASE_ASSERT(target_ptr);                                            \
         RELEASE_ASSERT(resolver);                                              \
-        target_ptr->is_resolved = false;                                       \
+        target_ptr->resolved = NULL;                                           \
         TRY(pdf_deserde_indirect_ref(object, &target_ptr->ref, resolver));     \
         return NULL;                                                           \
     }                                                                          \

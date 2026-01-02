@@ -2,8 +2,10 @@
 
 #include <stdint.h>
 
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
 const char* pdf_decode_mac_roman_codepoint(uint8_t codepoint);
 const char* pdf_decode_win_ansi_codepoint(uint8_t codepoint);
@@ -21,14 +23,9 @@ Error* pdf_deserde_encoding_dict(
     PdfResolver* resolver
 );
 
+PDF_DECL_OPTIONAL_FIELD(PdfEncodingDict, PdfEncodingDictOptional, encoding_dict)
+
 const char* pdf_encoding_map_codepoint(
     const PdfEncodingDict* encoding_dict,
     uint8_t codepoint
 );
-
-DESERDE_DECL_TRAMPOLINE(pdf_deserde_encoding_dict_trampoline)
-DESERDE_DECL_OPTIONAL(
-    PdfEncodingDictOptional,
-    PdfEncodingDict,
-    pdf_encoding_dict_op_init
-)

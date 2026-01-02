@@ -2,7 +2,6 @@
 
 #include <stdbool.h>
 
-#include "../deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
@@ -49,22 +48,22 @@ Error* pdf_deserde_font_widths(
     for (size_t idx = 0;
          idx < pdf_object_vec_len(resolved_object.data.array.elements);
          idx++) {
-        PdfObject* element;
+        PdfObject element;
         RELEASE_ASSERT(pdf_object_vec_get(
             resolved_object.data.array.elements,
             idx,
             &element
         ));
 
-        if (element->type == PDF_OBJECT_TYPE_INTEGER) {
+        if (element.type == PDF_OBJECT_TYPE_INTEGER) {
             switch (integers_read) {
                 case 0: {
-                    start_cid = element->data.integer;
+                    start_cid = element.data.integer;
                     integers_read = 1;
                     break;
                 }
                 case 1: {
-                    end_cid = element->data.integer;
+                    end_cid = element.data.integer;
                     integers_read = 2;
                     break;
                 }
@@ -89,7 +88,7 @@ Error* pdf_deserde_font_widths(
                         ));
 
                         entry->has_value = true;
-                        entry->width = element->data.integer;
+                        entry->width = element.data.integer;
                     }
 
                     integers_read = 0;
@@ -99,7 +98,7 @@ Error* pdf_deserde_font_widths(
                     LOG_PANIC("Unreachable");
                 }
             }
-        } else if (element->type == PDF_OBJECT_TYPE_ARRAY) {
+        } else if (element.type == PDF_OBJECT_TYPE_ARRAY) {
             if (integers_read != 1) {
                 return ERROR(
                     PDF_ERR_INCORRECT_TYPE,
@@ -107,8 +106,7 @@ Error* pdf_deserde_font_widths(
                 );
             }
 
-            size_t num_widths =
-                pdf_object_vec_len(element->data.array.elements);
+            size_t num_widths = pdf_object_vec_len(element.data.array.elements);
             if (num_widths == 0) {
                 LOG_WARN(FONT, "Empty array of widths");
                 continue;
@@ -135,14 +133,14 @@ Error* pdf_deserde_font_widths(
                     &entry
                 ));
 
-                PdfObject* subarray_element;
+                PdfObject subarray_element;
                 RELEASE_ASSERT(pdf_object_vec_get(
-                    element->data.array.elements,
+                    element.data.array.elements,
                     cid - (size_t)start_cid,
                     &subarray_element
                 ));
 
-                if (subarray_element->type != PDF_OBJECT_TYPE_INTEGER) {
+                if (subarray_element.type != PDF_OBJECT_TYPE_INTEGER) {
                     return ERROR(
                         PDF_ERR_INCORRECT_TYPE,
                         "Object type in array of widths must be an integer"
@@ -150,7 +148,7 @@ Error* pdf_deserde_font_widths(
                 }
 
                 entry->has_value = true;
-                entry->width = subarray_element->data.integer;
+                entry->width = subarray_element.data.integer;
             }
 
             integers_read = 0;
@@ -164,9 +162,3 @@ Error* pdf_deserde_font_widths(
 
     return NULL;
 }
-
-DESERDE_IMPL_TRAMPOLINE(
-    pdf_deserde_font_widths_trampoline,
-    pdf_deserde_font_widths
-)
-DESERDE_IMPL_OPTIONAL(PdfFontWidthsOptional, pdf_font_widths_op_init)

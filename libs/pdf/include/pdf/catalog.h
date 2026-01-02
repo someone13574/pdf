@@ -1,6 +1,7 @@
 #pragma once
 
 #include "err/error.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/page.h"
 #include "pdf/resolver.h"
@@ -45,9 +46,4 @@ Error* pdf_deserde_catalog(
     PdfResolver* resolver
 );
 
-DESERDE_DECL_RESOLVABLE(
-    PdfCatalogRef,
-    PdfCatalog,
-    pdf_catalog_ref_init,
-    pdf_resolve_catalog
-)
+PDF_DECL_RESOLVABLE_FIELD(PdfCatalog, PdfCatalogRef, catalog)

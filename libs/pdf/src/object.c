@@ -9,11 +9,11 @@
 #include "arena/arena.h"
 #include "arena/string.h"
 #include "ctx.h"
-#include "deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/stream.h"
 #include "resolver.h"
 #include "stream/filters.h"
 

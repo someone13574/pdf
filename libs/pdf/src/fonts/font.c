@@ -2,15 +2,17 @@
 
 #include <string.h>
 
-#include "../deser.h"
 #include "err/error.h"
 #include "logger/log.h"
+#include "pdf/deserde.h"
+#include "pdf/fonts/cid_to_gid_map.h"
+#include "pdf/fonts/cmap.h"
 #include "pdf/fonts/encoding.h"
 #include "pdf/fonts/font_descriptor.h"
+#include "pdf/fonts/font_widths.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
-
-DESERDE_IMPL_TRAMPOLINE(pdf_deserde_cid_font_trampoline, pdf_deserde_cid_font)
+#include "pdf/types.h"
 
 #define DVEC_NAME PdfCIDFontVec
 #define DVEC_LOWERCASE_NAME pdf_cid_font_vec
@@ -27,56 +29,21 @@ Error* pdf_deserde_cid_font(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "Type",
-            &target_ptr->type,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_FIELD(
-            "Subtype",
-            &target_ptr->subtype,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_FIELD(
-            "BaseFont",
-            &target_ptr->base_font,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_FIELD(
-            "CIDSystemInfo",
-            &target_ptr->cid_system_info,
-            PDF_DESERDE_CUSTOM(pdf_deserde_cid_system_info_trampoline)
-        ),
-        PDF_FIELD(
+        pdf_name_field("Type", &target_ptr->type),
+        pdf_name_field("Subtype", &target_ptr->subtype),
+        pdf_name_field("BaseFont", &target_ptr->base_font),
+        pdf_cid_system_info_field("CIDSystemIfo", &target_ptr->cid_system_info),
+        pdf_font_descriptor_ref_field(
             "FontDescriptor",
-            &target_ptr->font_descriptor,
-            PDF_DESERDE_RESOLVABLE(pdf_font_descriptor_ref_init)
+            &target_ptr->font_descriptor
         ),
-        PDF_FIELD(
-            "DW",
-            &target_ptr->dw,
-            PDF_DESERDE_OPTIONAL(
-                pdf_integer_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-            )
-        ),
-        PDF_FIELD(
-            "W",
-            &target_ptr->w,
-            PDF_DESERDE_OPTIONAL(
-                pdf_font_widths_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_font_widths_trampoline)
-            )
-        ),
+        pdf_integer_optional_field("DW", &target_ptr->dw),
+        pdf_font_widths_optional_field("W", &target_ptr->w),
         pdf_unimplemented_field("DW2"),
         pdf_unimplemented_field("W2"),
-        PDF_FIELD(
+        pdf_cid_to_gid_map_optional_field(
             "CIDToGIDMap",
-            &target_ptr->cid_to_gid_map,
-            PDF_DESERDE_OPTIONAL(
-                pdf_cid_to_gid_map_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_cid_to_gid_map_trampoline)
-            )
+            &target_ptr->cid_to_gid_map
         )
     };
 
@@ -116,42 +83,15 @@ Error* pdf_deserde_type0_font(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "Type",
-            &target_ptr->type,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_FIELD(
-            "Subtype",
-            &target_ptr->subtype,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_FIELD(
-            "BaseFont",
-            &target_ptr->base_font,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_FIELD(
-            "Encoding",
-            &target_ptr->encoding,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_FIELD(
+        pdf_name_field("Type", &target_ptr->type),
+        pdf_name_field("Subtype", &target_ptr->subtype),
+        pdf_name_field("BaseFont", &target_ptr->base_font),
+        pdf_name_field("Encoding", &target_ptr->encoding),
+        pdf_cid_font_vec_field(
             "DescendantFonts",
-            &target_ptr->descendant_fonts,
-            PDF_DESERDE_ARRAY(
-                pdf_cid_font_vec_push_uninit,
-                PDF_DESERDE_CUSTOM(pdf_deserde_cid_font_trampoline)
-            )
+            &target_ptr->descendant_fonts
         ),
-        PDF_FIELD(
-            "ToUnicode",
-            &target_ptr->to_unicode,
-            PDF_DESERDE_OPTIONAL(
-                pdf_stream_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STREAM)
-            )
-        )
+        pdf_stream_optional_field("Tounicode", &target_ptr->to_unicode)
     };
 
     TRY(pdf_deserde_fields(
@@ -199,72 +139,18 @@ Error* pdf_deserde_truetype_font_dict(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "Type",
-            &target_ptr->type,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_FIELD(
-            "Subtype",
-            &target_ptr->subtype,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_FIELD(
-            "BaseFont",
-            &target_ptr->base_font,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_FIELD(
-            "FirstChar",
-            &target_ptr->first_char,
-            PDF_DESERDE_OPTIONAL(
-                pdf_integer_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-            )
-        ),
-        PDF_FIELD(
-            "LastChar",
-            &target_ptr->last_char,
-            PDF_DESERDE_OPTIONAL(
-                pdf_integer_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-            )
-        ),
-        PDF_FIELD(
-            "Widths",
-            &target_ptr->widths,
-            PDF_DESERDE_OPTIONAL(
-                pdf_number_vec_op_init,
-                PDF_DESERDE_ARRAY(
-                    pdf_number_vec_push_uninit,
-                    PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline)
-                )
-            )
-        ),
-        PDF_FIELD(
+        pdf_name_field("Type", &target_ptr->type),
+        pdf_name_field("Subtype", &target_ptr->subtype),
+        pdf_name_field("BaseFont", &target_ptr->base_font),
+        pdf_integer_optional_field("FirstChar", &target_ptr->first_char),
+        pdf_integer_optional_field("LastChar", &target_ptr->last_char),
+        pdf_number_vec_optional_field("Widths", &target_ptr->widths),
+        pdf_font_descriptor_ref_optional_field(
             "FontDescriptor",
-            &target_ptr->font_descriptor,
-            PDF_DESERDE_OPTIONAL(
-                pdf_font_descriptor_ref_op_init,
-                PDF_DESERDE_RESOLVABLE(pdf_font_descriptor_ref_init)
-            )
+            &target_ptr->font_descriptor
         ),
-        PDF_FIELD(
-            "Encoding",
-            &target_ptr->encoding,
-            PDF_DESERDE_OPTIONAL(
-                pdf_encoding_dict_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_encoding_dict_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "ToUnicode",
-            &target_ptr->to_unicode,
-            PDF_DESERDE_OPTIONAL(
-                pdf_stream_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STREAM)
-            )
-        )
+        pdf_encoding_dict_optional_field("Encoding", &target_ptr->encoding),
+        pdf_stream_optional_field("ToUnicode", &target_ptr->to_unicode)
     };
 
     TRY(pdf_deserde_fields(
@@ -308,16 +194,8 @@ Error* pdf_deserde_font(
 
     PdfFontInfo font_info;
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "Type",
-            &font_info.type,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_FIELD(
-            "Subtype",
-            &font_info.subtype,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        )
+        pdf_name_field("Type", &font_info.type),
+        pdf_name_field("Subtype", &font_info.subtype)
     };
 
     TRY(pdf_deserde_fields(

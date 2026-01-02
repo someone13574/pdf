@@ -5,12 +5,14 @@
 
 #include "arena/arena.h"
 #include "ctx.h"
-#include "deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "object.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/stream.h"
+#include "pdf/types.h"
 #include "postscript/interpreter.h"
 #include "postscript/object.h"
 #include "postscript/tokenizer.h"
@@ -29,30 +31,9 @@ Error* pdf_deserde_function(
     TRY(pdf_resolve_object(resolver, object, &resolved, true));
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "FunctionType",
-            &target_ptr->function_type,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-        ),
-        PDF_FIELD(
-            "Domain",
-            &target_ptr->domain,
-            PDF_DESERDE_ARRAY(
-                pdf_number_vec_push_uninit,
-                PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "Range",
-            &target_ptr->range,
-            PDF_DESERDE_OPTIONAL(
-                pdf_number_vec_op_init,
-                PDF_DESERDE_ARRAY(
-                    pdf_number_vec_push_uninit,
-                    PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline)
-                )
-            )
-        )
+        pdf_integer_field("FunctionType", &target_ptr->function_type),
+        pdf_number_vec_field("Domain", &target_ptr->domain),
+        pdf_number_vec_optional_field("Range", &target_ptr->range)
     };
 
     if (resolved.type == PDF_OBJECT_TYPE_DICT) {
@@ -86,33 +67,9 @@ Error* pdf_deserde_function(
                 pdf_ignored_field("FunctionType", NULL),
                 pdf_ignored_field("Domain", NULL),
                 pdf_ignored_field("Range", NULL),
-                PDF_FIELD(
-                    "C0",
-                    &target_ptr->data.type2.c0,
-                    PDF_DESERDE_OPTIONAL(
-                        pdf_number_vec_op_init,
-                        PDF_DESERDE_ARRAY(
-                            pdf_number_vec_push_uninit,
-                            PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline)
-                        )
-                    )
-                ),
-                PDF_FIELD(
-                    "C1",
-                    &target_ptr->data.type2.c1,
-                    PDF_DESERDE_OPTIONAL(
-                        pdf_number_vec_op_init,
-                        PDF_DESERDE_ARRAY(
-                            pdf_number_vec_push_uninit,
-                            PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline)
-                        )
-                    )
-                ),
-                PDF_FIELD(
-                    "N",
-                    &target_ptr->data.type2.n,
-                    PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline)
-                )
+                pdf_number_vec_optional_field("C0", &target_ptr->data.type2.c0),
+                pdf_number_vec_optional_field("C1", &target_ptr->data.type2.c1),
+                pdf_number_field("N", &target_ptr->data.type2.n)
             };
 
             TRY(pdf_deserde_fields(
@@ -130,30 +87,12 @@ Error* pdf_deserde_function(
                 pdf_ignored_field("FunctionType", NULL),
                 pdf_ignored_field("Domain", NULL),
                 pdf_ignored_field("Range", NULL),
-                PDF_FIELD(
+                pdf_function_vec_field(
                     "Functions",
-                    &target_ptr->data.type3.functions,
-                    PDF_DESERDE_ARRAY(
-                        pdf_function_vec_push_uninit,
-                        PDF_DESERDE_CUSTOM(pdf_deserde_function_trampoline)
-                    )
+                    &target_ptr->data.type3.functions
                 ),
-                PDF_FIELD(
-                    "Bounds",
-                    &target_ptr->data.type3.bounds,
-                    PDF_DESERDE_ARRAY(
-                        pdf_number_vec_push_uninit,
-                        PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline)
-                    )
-                ),
-                PDF_FIELD(
-                    "Encode",
-                    &target_ptr->data.type3.encode,
-                    PDF_DESERDE_ARRAY(
-                        pdf_number_vec_push_uninit,
-                        PDF_DESERDE_CUSTOM(pdf_deserde_number_trampoline)
-                    )
-                )
+                pdf_number_vec_field("Bounds", &target_ptr->data.type3.bounds),
+                pdf_number_vec_field("Encode", &target_ptr->data.type3.encode)
             };
 
             TRY(pdf_deserde_fields(

@@ -5,6 +5,7 @@
 #include "pdf/function.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
 /// Axial shadings
 typedef struct {

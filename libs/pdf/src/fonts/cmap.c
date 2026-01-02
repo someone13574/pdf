@@ -6,14 +6,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../deser.h"
 #include "arena/arena.h"
 #include "arena/common.h"
 #include "cmap_paths.h"
 #include "err/error.h"
 #include "logger/log.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 #include "postscript/interpreter.h"
 #include "postscript/object.h"
 #include "postscript/tokenizer.h"
@@ -28,21 +29,9 @@ Error* pdf_deserde_cid_system_info(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "Registry",
-            &target_ptr->registry,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
-        ),
-        PDF_FIELD(
-            "Ordering",
-            &target_ptr->ordering,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
-        ),
-        PDF_FIELD(
-            "Supplement",
-            &target_ptr->supplement,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-        )
+        pdf_string_field("Registry", &target_ptr->registry),
+        pdf_string_field("Ordering", &target_ptr->ordering),
+        pdf_integer_field("Supplement", &target_ptr->supplement)
     };
 
     TRY(pdf_deserde_fields(
@@ -56,11 +45,6 @@ Error* pdf_deserde_cid_system_info(
 
     return NULL;
 }
-
-DESERDE_IMPL_TRAMPOLINE(
-    pdf_deserde_cid_system_info_trampoline,
-    pdf_deserde_cid_system_info
-)
 
 typedef struct {
     size_t start_code;

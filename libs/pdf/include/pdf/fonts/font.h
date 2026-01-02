@@ -1,6 +1,7 @@
 #pragma once
 
 #include "err/error.h"
+#include "pdf/deserde.h"
 #include "pdf/fonts/cid_to_gid_map.h"
 #include "pdf/fonts/cmap.h"
 #include "pdf/fonts/encoding.h"
@@ -69,12 +70,12 @@ Error* pdf_deserde_cid_font(
     PdfResolver* resolver
 );
 
-DESERDE_DECL_TRAMPOLINE(pdf_deserde_cid_font_trampoline)
-
 #define DVEC_NAME PdfCIDFontVec
 #define DVEC_LOWERCASE_NAME pdf_cid_font_vec
 #define DVEC_TYPE PdfCIDFont
 #include "arena/dvec_decl.h"
+
+PDF_DECL_ARRAY_FIELD(PdfCIDFontVec, cid_font_vec)
 
 typedef struct {
     /// The type of PDF object that this dictionary describes; shall be Font for

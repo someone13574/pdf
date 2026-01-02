@@ -4,12 +4,13 @@
 #include <string.h>
 
 #include "arena/arena.h"
-#include "deser.h"
 #include "err/error.h"
 #include "logger/log.h"
+#include "pdf/content_stream/stream.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/resources.h"
+#include "pdf/types.h"
 
 #define DVEC_NAME PdfPageTreeRefVec
 #define DVEC_LOWERCASE_NAME pdf_page_tree_ref_vec
@@ -26,85 +27,21 @@ Error* pdf_deserde_page(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "Type",
-            &target_ptr->type,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_FIELD(
-            "Parent",
-            &target_ptr->parent,
-            PDF_DESERDE_RESOLVABLE(pdf_pages_ref_init)
-        ),
+        pdf_name_field("Type", &target_ptr->type),
+        pdf_pages_ref_field("Parent", &target_ptr->parent),
         pdf_ignored_field("LastModified", &target_ptr->last_modified),
-        PDF_FIELD(
-            "Resources",
-            &target_ptr->resources,
-            PDF_DESERDE_OPTIONAL(
-                pdf_resources_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_resources_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "MediaBox",
-            &target_ptr->media_box,
-            PDF_DESERDE_OPTIONAL(
-                pdf_rectangle_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "CropBox",
-            &target_ptr->crop_box,
-            PDF_DESERDE_OPTIONAL(
-                pdf_rectangle_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "BleedBox",
-            &target_ptr->bleed_box,
-            PDF_DESERDE_OPTIONAL(
-                pdf_rectangle_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "TrimBox",
-            &target_ptr->trim_box,
-            PDF_DESERDE_OPTIONAL(
-                pdf_rectangle_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "ArtBox",
-            &target_ptr->art_box,
-            PDF_DESERDE_OPTIONAL(
-                pdf_rectangle_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
-            )
-        ),
+        pdf_resources_optional_field("Resources", &target_ptr->resources),
+        pdf_rectangle_optional_field("MediaBox", &target_ptr->media_box),
+        pdf_rectangle_optional_field("CropBox", &target_ptr->crop_box),
+        pdf_rectangle_optional_field("BleedBox", &target_ptr->bleed_box),
+        pdf_rectangle_optional_field("TrimBox", &target_ptr->trim_box),
+        pdf_rectangle_optional_field("ArtBox", &target_ptr->art_box),
         pdf_unimplemented_field("BoxColorInfo"),
-        PDF_FIELD(
+        pdf_as_content_stream_ref_vec_optional_field(
             "Contents",
-            &target_ptr->contents,
-            PDF_DESERDE_OPTIONAL(
-                pdf_content_stream_ref_vec_op_init,
-                PDF_DESERDE_AS_ARRAY(
-                    pdf_content_stream_ref_vec_push_uninit,
-                    PDF_DESERDE_RESOLVABLE(pdf_content_stream_ref_init)
-                )
-            )
+            &target_ptr->contents
         ),
-        PDF_FIELD(
-            "Rotate",
-            &target_ptr->rotate,
-            PDF_DESERDE_OPTIONAL(
-                pdf_integer_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-            )
-        ),
+        pdf_integer_optional_field("Rotate", &target_ptr->rotate),
         pdf_ignored_field("Group", &target_ptr->group), // TODO: group
         pdf_ignored_field("Thumb", &target_ptr->thumb),
         pdf_ignored_field("B", &target_ptr->b),
@@ -144,13 +81,7 @@ Error* pdf_deserde_page(
     return NULL;
 }
 
-DESERDE_IMPL_RESOLVABLE(
-    PdfPageRef,
-    PdfPage,
-    pdf_page_ref_init,
-    pdf_resolve_page,
-    pdf_deserde_page
-)
+PDF_IMPL_RESOLVABLE_FIELD(PdfPage, PdfPageRef, page)
 
 Error* pdf_deserde_pages(
     const PdfObject* object,
@@ -162,64 +93,14 @@ Error* pdf_deserde_pages(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "Type",
-            &target_ptr->type,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
-        PDF_FIELD(
-            "Parent",
-            &target_ptr->parent,
-            PDF_DESERDE_OPTIONAL(
-                pdf_pages_ref_op_init,
-                PDF_DESERDE_RESOLVABLE(pdf_pages_ref_init)
-            )
-        ),
-        PDF_FIELD(
-            "Kids",
-            &target_ptr->kids,
-            PDF_DESERDE_ARRAY(
-                pdf_page_tree_ref_vec_push_uninit,
-                PDF_DESERDE_RESOLVABLE(pdf_page_tree_ref_init)
-            )
-        ),
-        PDF_FIELD(
-            "Count",
-            &target_ptr->count,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-        ),
-        PDF_FIELD(
-            "Resources",
-            &target_ptr->resources,
-            PDF_DESERDE_OPTIONAL(
-                pdf_resources_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_resources_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "MediaBox",
-            &target_ptr->media_box,
-            PDF_DESERDE_OPTIONAL(
-                pdf_rectangle_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "CropBox",
-            &target_ptr->crop_box,
-            PDF_DESERDE_OPTIONAL(
-                pdf_rectangle_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_rectangle_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "Rotate",
-            &target_ptr->rotate,
-            PDF_DESERDE_OPTIONAL(
-                pdf_integer_op_init,
-                PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-            )
-        ),
+        pdf_name_field("Type", &target_ptr->type),
+        pdf_pages_ref_optional_field("Parent", &target_ptr->parent),
+        pdf_pdf_page_tree_ref_vec_field("Kids", &target_ptr->kids),
+        pdf_integer_field("Count", &target_ptr->count),
+        pdf_resources_optional_field("Resources", &target_ptr->resources),
+        pdf_rectangle_optional_field("MediaBox", &target_ptr->media_box),
+        pdf_rectangle_optional_field("CropBox", &target_ptr->crop_box),
+        pdf_integer_optional_field("Rotate", &target_ptr->rotate)
     };
 
     TRY(pdf_deserde_fields(
@@ -248,9 +129,7 @@ Error* pdf_deserde_page_tree(
     RELEASE_ASSERT(resolver);
 
     PdfName type = NULL;
-    PdfFieldDescriptor stub_fields[] = {
-        PDF_FIELD("Type", &type, PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME))
-    };
+    PdfFieldDescriptor stub_fields[] = {pdf_name_field("Type", &type)};
 
     TRY(pdf_deserde_fields(
         object,
@@ -282,57 +161,39 @@ void pdf_page_tree_inherit(PdfPageTree* dst, PdfPages* src) {
     RELEASE_ASSERT(src);
 
     if (dst->kind == PDF_PAGE_TREE_PAGE) {
-        if (src->resources.has_value && !dst->value.page.resources.has_value) {
+        if (src->resources.is_some && !dst->value.page.resources.is_some) {
             dst->value.page.resources = src->resources;
         }
 
-        if (src->media_box.has_value && !dst->value.page.media_box.has_value) {
+        if (src->media_box.is_some && !dst->value.page.media_box.is_some) {
             dst->value.page.media_box = src->media_box;
         }
 
-        if (src->crop_box.has_value && !dst->value.page.crop_box.has_value) {
+        if (src->crop_box.is_some && !dst->value.page.crop_box.is_some) {
             dst->value.page.crop_box = src->crop_box;
         }
 
-        if (src->rotate.has_value && !dst->value.page.rotate.has_value) {
+        if (src->rotate.is_some && !dst->value.page.rotate.is_some) {
             dst->value.page.rotate = src->rotate;
         }
     } else {
-        if (src->resources.has_value && !dst->value.pages.resources.has_value) {
+        if (src->resources.is_some && !dst->value.pages.resources.is_some) {
             dst->value.pages.resources = src->resources;
         }
 
-        if (src->media_box.has_value && !dst->value.pages.media_box.has_value) {
+        if (src->media_box.is_some && !dst->value.pages.media_box.is_some) {
             dst->value.pages.media_box = src->media_box;
         }
 
-        if (src->crop_box.has_value && !dst->value.pages.crop_box.has_value) {
+        if (src->crop_box.is_some && !dst->value.pages.crop_box.is_some) {
             dst->value.pages.crop_box = src->crop_box;
         }
 
-        if (src->rotate.has_value && !dst->value.pages.rotate.has_value) {
+        if (src->rotate.is_some && !dst->value.pages.rotate.is_some) {
             dst->value.pages.rotate = src->rotate;
         }
     }
 }
-
-DESERDE_IMPL_RESOLVABLE(
-    PdfPagesRef,
-    PdfPages,
-    pdf_pages_ref_init,
-    pdf_resolve_pages,
-    pdf_deserde_pages
-)
-
-DESERDE_IMPL_OPTIONAL(PdfPagesRefOptional, pdf_pages_ref_op_init)
-
-DESERDE_IMPL_RESOLVABLE(
-    PdfPageTreeRef,
-    PdfPageTree,
-    pdf_page_tree_ref_init,
-    pdf_resolve_page_tree,
-    pdf_deserde_page_tree
-)
 
 typedef struct {
     PdfPages node;
@@ -365,11 +226,10 @@ Error* pdf_page_iter_new(
     iter->stack = pdf_page_iter_frame_vec_new(pdf_resolver_arena(resolver));
     iter->page_idx = 0;
 
-    PdfPages root;
-    TRY(pdf_resolve_pages(root_ref, resolver, &root));
+    TRY(pdf_resolve_pages(&root_ref, resolver));
     pdf_page_iter_frame_vec_push(
         iter->stack,
-        (PdfPageIterFrame) {.node = root, .next_child_idx = 0}
+        (PdfPageIterFrame) {.node = *root_ref.resolved, .next_child_idx = 0}
     );
 
     *iter_out = iter;
@@ -402,13 +262,12 @@ Error* pdf_page_iter_next(PdfPageIter* iter, PdfPage* out_page, bool* done) {
         }
         curr_frame->next_child_idx += 1;
 
-        PdfPageTree kid;
-        TRY(pdf_resolve_page_tree(kid_ref, iter->resolver, &kid));
-        pdf_page_tree_inherit(&kid, &curr_frame->node);
+        TRY(pdf_resolve_page_tree(&kid_ref, iter->resolver));
+        pdf_page_tree_inherit(kid_ref.resolved, &curr_frame->node);
 
-        if (kid.kind == PDF_PAGE_TREE_PAGE) {
+        if (kid_ref.resolved->kind == PDF_PAGE_TREE_PAGE) {
             if (out_page) {
-                *out_page = kid.value.page;
+                *out_page = kid_ref.resolved->value.page;
             }
             *done = false;
             iter->page_idx += 1;
@@ -416,7 +275,7 @@ Error* pdf_page_iter_next(PdfPageIter* iter, PdfPage* out_page, bool* done) {
         } else {
             pdf_page_iter_frame_vec_push(
                 iter->stack,
-                (PdfPageIterFrame) {.node = kid.value.pages,
+                (PdfPageIterFrame) {.node = kid_ref.resolved->value.pages,
                                     .next_child_idx = 0}
             );
             RELEASE_ASSERT(pdf_page_iter_frame_vec_len(iter->stack) <= 1024);

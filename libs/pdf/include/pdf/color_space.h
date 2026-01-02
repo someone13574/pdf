@@ -4,6 +4,7 @@
 #include "geom/vec3.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
 typedef struct {
     /// (Required) An array of three numbers [ XW YW ZW ] specifying the
@@ -66,8 +67,6 @@ Error* pdf_deserde_color_space(
     PdfColorSpace* target_ptr,
     PdfResolver* resolver
 );
-
-DESERDE_DECL_TRAMPOLINE(pdf_deserde_color_space_trampoline)
 
 GeomVec3 pdf_map_color(
     double* components,

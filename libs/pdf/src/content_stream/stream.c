@@ -4,14 +4,13 @@
 #include <string.h>
 
 #include "../ctx.h"
-#include "../deser.h"
 #include "../object.h"
-#include "arena/arena.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "operation.h"
 #include "operator.h"
 #include "pdf/content_stream/operator.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
@@ -66,10 +65,7 @@ Error* pdf_deserde_content_stream(
                 break;
             }
 
-            PdfObject* operand_alloc =
-                arena_alloc(pdf_resolver_arena(resolver), sizeof(PdfObject));
-            *operand_alloc = operand;
-            pdf_object_vec_push(operands, operand_alloc);
+            pdf_object_vec_push(operands, operand);
 
             TRY(pdf_ctx_consume_whitespace(ctx));
             restore_offset = pdf_ctx_offset(ctx);
@@ -113,20 +109,21 @@ Error* pdf_deserde_content_stream(
     return NULL;
 }
 
-DESERDE_IMPL_RESOLVABLE(
-    PdfContentStreamRef,
-    PdfContentStream,
-    pdf_content_stream_ref_init,
-    pdf_resolve_content_stream,
-    pdf_deserde_content_stream
-)
+PDF_IMPL_RESOLVABLE_FIELD(PdfContentStream, PdfContentStreamRef, content_stream)
 
 #define DVEC_NAME PdfContentStreamRefVec
 #define DVEC_LOWERCASE_NAME pdf_content_stream_ref_vec
 #define DVEC_TYPE PdfContentStreamRef
 #include "arena/dvec_impl.h"
 
-DESERDE_IMPL_OPTIONAL(
-    PdfContentsStreamRefVecOptional,
-    pdf_content_stream_ref_vec_op_init
+PDF_IMPL_AS_ARRAY_FIELD(
+    PdfContentStreamRefVec,
+    content_stream_ref_vec,
+    content_stream_ref
+)
+
+PDF_IMPL_OPTIONAL_FIELD(
+    PdfContentStreamRefVec*,
+    PdfContentStreamRefVecOptional,
+    as_content_stream_ref_vec
 )

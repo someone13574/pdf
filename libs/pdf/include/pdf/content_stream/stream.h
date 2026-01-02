@@ -23,8 +23,10 @@ PDF_DECL_RESOLVABLE_FIELD(PdfContentStream, PdfContentStreamRef, content_stream)
 #define DVEC_TYPE PdfContentStreamRef
 #include "arena/dvec_decl.h"
 
+PDF_DECL_AS_ARRAY_FIELD(PdfContentStreamRefVec, content_stream_ref_vec)
+
 PDF_DECL_OPTIONAL_FIELD(
     PdfContentStreamRefVec*,
     PdfContentStreamRefVecOptional,
-    content_stream_ref_vec
+    as_content_stream_ref_vec
 )

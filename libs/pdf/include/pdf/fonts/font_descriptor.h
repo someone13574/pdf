@@ -1,6 +1,8 @@
 #pragma once
 
+#include "pdf/deserde.h"
 #include "pdf/object.h"
+#include "pdf/types.h"
 
 typedef struct {
     /// The type of PDF object that this dictionary describes; shall be
@@ -13,7 +15,7 @@ typedef struct {
     PdfName font_name;
 
     /// A byte string specifying the preferred font family name.
-    PdfNameOptional font_family;
+    PdfStringOptional font_family;
 
     /// The font stretch value. It shall be one of these names (ordered from
     /// narrowest to widest): UltraCondensed, ExtraCondensed, Condensed,
@@ -138,15 +140,14 @@ Error* pdf_deserde_font_descriptor(
     PdfResolver* resolver
 );
 
-DESERDE_DECL_RESOLVABLE(
-    PdfFontDescriptorRef,
+PDF_DECL_RESOLVABLE_FIELD(
     PdfFontDescriptor,
-    pdf_font_descriptor_ref_init,
-    pdf_resolve_font_descriptor
+    PdfFontDescriptorRef,
+    font_descriptor
 )
 
-DESERDE_DECL_OPTIONAL(
-    PdfFontDescriptorRefOptional,
+PDF_DECL_OPTIONAL_FIELD(
     PdfFontDescriptorRef,
-    pdf_font_descriptor_ref_op_init
+    PdfFontDescriptorRefOptional,
+    font_descriptor_ref
 )

@@ -5,8 +5,6 @@
 #include <stdlib.h>
 
 #include "err/error.h"
-#include "geom/mat3.h"
-#include "geom/vec3.h"
 #include "pdf/resolver.h"
 
 typedef struct PdfObject PdfObject;
@@ -49,12 +47,7 @@ typedef struct {
     PdfDictEntryVec* entries;
 } PdfDict;
 
-typedef struct {
-    PdfInteger length;
-    // PdfNameVecOptional filter;
-
-    const PdfObject* raw_dict;
-} PdfStreamDict;
+typedef struct PdfStreamDict PdfStreamDict;
 
 typedef struct {
     PdfStreamDict* stream_dict;
@@ -62,12 +55,6 @@ typedef struct {
     const uint8_t* stream_bytes;
     size_t decoded_stream_len;
 } PdfStream;
-
-Error* pdf_deserde_stream_dict(
-    const PdfObject* object,
-    PdfStreamDict* deserialized,
-    PdfResolver* resolver
-);
 
 typedef struct {
     size_t object_id;

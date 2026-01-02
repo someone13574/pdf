@@ -1,10 +1,13 @@
+#include "pdf/stream.h"
+
 #include <string.h>
 
-#include "../deser.h"
 #include "arena/arena.h"
 #include "logger/log.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
 Error* pdf_deserde_stream_dict(
     const PdfObject* object,
@@ -16,23 +19,8 @@ Error* pdf_deserde_stream_dict(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "Length",
-            &target_ptr->length,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-        ),
-        PDF_FIELD(
-            "Filter",
-            &target_ptr->filter,
-            PDF_DESERDE_OPTIONAL(
-                pdf_name_vec_op_init,
-                PDF_DESERDE_AS_ARRAY(
-                    pdf_name_vec_push_uninit,
-                    PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-                )
-            )
-        ),
-        // Panic if we find any of these fields
+        pdf_integer_field("Length", &target_ptr->length),
+        pdf_as_name_vec_optional_field("Filter", &target_ptr->filter),
         pdf_unimplemented_field("DecodeParams"),
         pdf_unimplemented_field("F"),
         pdf_unimplemented_field("FFilter"),

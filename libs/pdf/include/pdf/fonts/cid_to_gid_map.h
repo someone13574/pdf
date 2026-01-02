@@ -1,5 +1,6 @@
 #pragma once
 
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
@@ -17,12 +18,6 @@ Error* pdf_deserde_cid_to_gid_map(
     PdfResolver* resolver
 );
 
+PDF_DECL_OPTIONAL_FIELD(PdfCIDToGIDMap, PdfCIDToGIDMapOptional, cid_to_gid_map)
+
 Error* pdf_map_cid_to_gid(PdfCIDToGIDMap* map, uint32_t cid, uint32_t* gid_out);
-
-DESERDE_DECL_OPTIONAL(
-    PdfCIDToGIDMapOptional,
-    PdfCIDToGIDMap,
-    pdf_cid_to_gid_map_op_init
-)
-
-DESERDE_DECL_TRAMPOLINE(pdf_deserde_cid_to_gid_map_trampoline)

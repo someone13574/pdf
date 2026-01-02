@@ -1,11 +1,12 @@
 #include "pdf/catalog.h"
 
-#include "deser.h"
 #include "err/error.h"
 #include "logger/log.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/page.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
 Error* pdf_deserde_catalog(
     const PdfObject* object,
@@ -17,18 +18,10 @@ Error* pdf_deserde_catalog(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "Type",
-            &target_ptr->type,
-            PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-        ),
+        pdf_name_field("Type", &target_ptr->type),
         pdf_unimplemented_field("Version"),
         pdf_unimplemented_field("Extensions"),
-        PDF_FIELD(
-            "Pages",
-            &target_ptr->pages,
-            PDF_DESERDE_RESOLVABLE(pdf_pages_ref_init)
-        ),
+        pdf_pages_ref_field("Pages", &target_ptr->pages),
         pdf_unimplemented_field("PageLabels"),
         pdf_unimplemented_field("Names"),
         pdf_ignored_field("Dests", &target_ptr->dests),
@@ -70,11 +63,3 @@ Error* pdf_deserde_catalog(
 
     return NULL;
 }
-
-DESERDE_IMPL_RESOLVABLE(
-    PdfCatalogRef,
-    PdfCatalog,
-    pdf_catalog_ref_init,
-    pdf_resolve_catalog,
-    pdf_deserde_catalog
-)

@@ -4,13 +4,14 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "deser.h"
 #include "err/error.h"
 #include "geom/mat3.h"
 #include "geom/vec3.h"
 #include "logger/log.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
 static Error* deserde_cal_rgb_params(
     const PdfObject* object,
@@ -22,35 +23,10 @@ static Error* deserde_cal_rgb_params(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "WhitePoint",
-            &target_ptr->whitepoint,
-            PDF_DESERDE_CUSTOM(pdf_deserde_geom_vec3_trampoline)
-        ),
-        PDF_FIELD(
-            "BlackPoint",
-            &target_ptr->blackpoint,
-            PDF_DESERDE_OPTIONAL(
-                pdf_geom_vec3_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_geom_vec3_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "Gamma",
-            &target_ptr->gamma,
-            PDF_DESERDE_OPTIONAL(
-                pdf_geom_vec3_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_geom_vec3_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "Matrix",
-            &target_ptr->matrix,
-            PDF_DESERDE_OPTIONAL(
-                pdf_geom_mat3_op_init,
-                PDF_DESERDE_CUSTOM(pdf_deserde_geom_mat3_trampoline)
-            )
-        )
+        pdf_geom_vec3_field("WhitePoint", &target_ptr->whitepoint),
+        pdf_geom_vec3_optional_field("BlackPoint", &target_ptr->blackpoint),
+        pdf_geom_vec3_optional_field("Gamma", &target_ptr->gamma),
+        pdf_geom_mat3_optional_field("Matrix", &target_ptr->matrix)
     };
 
     TRY(pdf_deserde_fields(
@@ -80,18 +56,18 @@ Error* pdf_deserde_color_space(
     if (resolved.type == PDF_OBJECT_TYPE_NAME) {
         family = resolved.data.name;
     } else if (resolved.type == PDF_OBJECT_TYPE_ARRAY) {
-        PdfObject* first = NULL;
+        PdfObject first;
         bool has_first =
             pdf_object_vec_get(resolved.data.array.elements, 0, &first);
 
-        if (!has_first || first->type != PDF_OBJECT_TYPE_NAME) {
+        if (!has_first || first.type != PDF_OBJECT_TYPE_NAME) {
             return ERROR(
                 PDF_ERR_INCORRECT_TYPE,
                 "First element of color space array must be a name"
             );
         }
 
-        family = first->data.name;
+        family = first.data.name;
     } else {
         return ERROR(
             PDF_ERR_INCORRECT_TYPE,
@@ -134,7 +110,7 @@ Error* pdf_deserde_color_space(
             break;
         }
         case PDF_COLOR_SPACE_CAL_RGB: {
-            PdfObject* second = NULL;
+            PdfObject second;
             bool has_second =
                 pdf_object_vec_get(resolved.data.array.elements, 1, &second);
 
@@ -146,7 +122,7 @@ Error* pdf_deserde_color_space(
             }
 
             TRY(deserde_cal_rgb_params(
-                second,
+                &second,
                 &target_ptr->params.cal_rgb,
                 resolver
             ));
@@ -172,11 +148,6 @@ Error* pdf_deserde_color_space(
 
     return NULL;
 }
-
-DESERDE_IMPL_TRAMPOLINE(
-    pdf_deserde_color_space_trampoline,
-    pdf_deserde_color_space
-)
 
 static GeomVec3 linear_srgb_to_nonlinear(
     GeomVec3 linear,
@@ -261,14 +232,14 @@ GeomVec3 pdf_map_color(
             RELEASE_ASSERT(n_components == 3);
 
             PdfCalRGBParams params = color_space.params.cal_rgb;
-            GeomVec3 blackpoint = params.blackpoint.has_value
+            GeomVec3 blackpoint = params.blackpoint.is_some
                                     ? params.blackpoint.value
                                     : geom_vec3_new(0.0, 0.0, 0.0);
-            GeomVec3 gamma = params.gamma.has_value
+            GeomVec3 gamma = params.gamma.is_some
                                ? params.gamma.value
                                : geom_vec3_new(0.0, 0.0, 0.0);
-            GeomMat3 matrix = params.matrix.has_value ? params.matrix.value
-                                                      : geom_mat3_identity();
+            GeomMat3 matrix = params.matrix.is_some ? params.matrix.value
+                                                    : geom_mat3_identity();
 
             GeomVec3 xyz = geom_vec3_new(
                 matrix.mat[0][0] * pow(components[0], gamma.x)

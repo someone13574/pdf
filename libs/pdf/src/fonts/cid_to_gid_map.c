@@ -2,7 +2,6 @@
 
 #include <string.h>
 
-#include "../deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
@@ -61,10 +60,3 @@ pdf_map_cid_to_gid(PdfCIDToGIDMap* map, uint32_t cid, uint32_t* gid_out) {
 
     return NULL;
 }
-
-DESERDE_IMPL_OPTIONAL(PdfCIDToGIDMapOptional, pdf_cid_to_gid_map_op_init)
-
-DESERDE_IMPL_TRAMPOLINE(
-    pdf_deserde_cid_to_gid_map_trampoline,
-    pdf_deserde_cid_to_gid_map
-)

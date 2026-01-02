@@ -1,31 +1,25 @@
 #pragma once
 
 #include "pdf/content_stream/stream.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/resources.h"
 
 typedef struct PdfPages PdfPages;
-DESERDE_DECL_RESOLVABLE(
-    PdfPagesRef,
-    PdfPages,
-    pdf_pages_ref_init,
-    pdf_resolve_pages
-)
-DESERDE_DECL_OPTIONAL(PdfPagesRefOptional, PdfPagesRef, pdf_pages_ref_op_init)
+
+PDF_DECL_RESOLVABLE_FIELD(PdfPages, PdfPagesRef, pages)
+PDF_DECL_OPTIONAL_FIELD(PdfPagesRef, PdfPagesRefOptional, pages_ref)
 
 typedef struct PdfPageTree PdfPageTree;
-DESERDE_DECL_RESOLVABLE(
-    PdfPageTreeRef,
-    PdfPageTree,
-    pdf_page_tree_ref_init,
-    pdf_resolve_page_tree
-)
+PDF_DECL_RESOLVABLE_FIELD(PdfPageTree, PdfPageTreeRef, page_tree)
 
 #define DVEC_NAME PdfPageTreeRefVec
 #define DVEC_LOWERCASE_NAME pdf_page_tree_ref_vec
 #define DVEC_TYPE PdfPageTreeRef
 #include "arena/dvec_decl.h"
+
+PDF_DECL_ARRAY_FIELD(PdfPageTreeRefVec, pdf_page_tree_ref_vec)
 
 typedef struct {
     /// (Required) The type of PDF object that this dictionary describes; shall
@@ -42,7 +36,7 @@ typedef struct {
     /// the modification date shall be used to ascertain which of the
     /// application data dictionaries that it contains correspond to the current
     /// content of the page (see 14.5, "Page-Piece Dictionaries")
-    PdfObject* last_modified;
+    PdfIgnored last_modified;
 
     /// (Required; inheritable) A dictionary containing any resources required
     /// by the page (see 7.8.3, "Resource Dictionaries"). If the page requires
@@ -93,7 +87,7 @@ typedef struct {
     /// (Optional) A content stream (see 7.8.2, "Content Streams") that shall
     /// describe the contents of this page. If this entry is absent, the page
     /// shall be empty.
-    PdfContentsStreamRefVecOptional contents;
+    PdfContentStreamRefVecOptional contents;
 
     /// (Optional; inheritable) The number of degrees by which the page shall be
     /// rotated clockwise when displayed or printed. The value shall be a
@@ -198,12 +192,7 @@ Error* pdf_deserde_page(
     PdfResolver* resolver
 );
 
-DESERDE_DECL_RESOLVABLE(
-    PdfPageRef,
-    PdfPage,
-    pdf_page_ref_init,
-    pdf_resolve_page
-)
+PDF_DECL_RESOLVABLE_FIELD(PdfPage, PdfPageRef, page)
 
 struct PdfPages {
     /// (Required) The type of PDF object that this dictionary describes; shall

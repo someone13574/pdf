@@ -1,6 +1,7 @@
 #pragma once
 
 #include "err/error.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/types.h"
@@ -47,6 +48,8 @@ Error* pdf_deserde_resources(
     PdfResources* target_ptr,
     PdfResolver* resolver
 );
+
+PDF_DECL_OPTIONAL_FIELD(PdfResources, PdfResourcesOptional, resources)
 
 typedef enum {
     PDF_LINE_CAP_STYLE_BUTT,

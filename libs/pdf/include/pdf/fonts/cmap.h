@@ -2,8 +2,8 @@
 
 #include <stdint.h>
 
-#include "arena/arena.h"
 #include "err/error.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
@@ -30,7 +30,7 @@ Error* pdf_deserde_cid_system_info(
     PdfResolver* resolver
 );
 
-DESERDE_DECL_TRAMPOLINE(pdf_deserde_cid_system_info_trampoline)
+PDF_DECL_FIELD(PdfCIDSystemInfo, cid_system_info)
 
 typedef struct PdfCMap PdfCMap;
 
