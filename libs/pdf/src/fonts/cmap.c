@@ -6,19 +6,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../deser.h"
 #include "arena/arena.h"
 #include "arena/common.h"
 #include "cmap_paths.h"
 #include "err/error.h"
 #include "logger/log.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 #include "postscript/interpreter.h"
 #include "postscript/object.h"
 #include "postscript/tokenizer.h"
 
-Error* pdf_deser_cid_system_info(
+Error* pdf_deserde_cid_system_info(
     const PdfObject* object,
     PdfCIDSystemInfo* target_ptr,
     PdfResolver* resolver
@@ -28,24 +29,12 @@ Error* pdf_deser_cid_system_info(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "Registry",
-            &target_ptr->registry,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_STRING)
-        ),
-        PDF_FIELD(
-            "Ordering",
-            &target_ptr->ordering,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_STRING)
-        ),
-        PDF_FIELD(
-            "Supplement",
-            &target_ptr->supplement,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-        )
+        pdf_string_field("Registry", &target_ptr->registry),
+        pdf_string_field("Ordering", &target_ptr->ordering),
+        pdf_integer_field("Supplement", &target_ptr->supplement)
     };
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -57,10 +46,7 @@ Error* pdf_deser_cid_system_info(
     return NULL;
 }
 
-DESER_IMPL_TRAMPOLINE(
-    pdf_deser_cid_system_info_trampoline,
-    pdf_deser_cid_system_info
-)
+PDF_IMPL_FIELD(PdfCIDSystemInfo, cid_system_info)
 
 typedef struct {
     size_t start_code;

@@ -22,6 +22,7 @@
 #include "pdf/resolver.h"
 #include "pdf/resources.h"
 #include "pdf/shading.h"
+#include "pdf/types.h"
 #include "pdf/xobject.h"
 #include "text_state.h"
 
@@ -144,19 +145,20 @@ static Error* process_content_stream(
                 break;
             }
             case PDF_OPERATOR_gs: {
-                RELEASE_ASSERT(
-                    resources->has_value
-                ); // TODO: Make this an error
-                RELEASE_ASSERT(resources->value.ext_gstate.has_value);
+                RELEASE_ASSERT(resources->is_some); // TODO: Make this an error
+                RELEASE_ASSERT(resources->value.ext_gstate.is_some);
 
-                PdfObject* gstate_object = pdf_dict_get(
+                PdfObject gstate_object;
+                TRY(pdf_object_dict_get(
                     &resources->value.ext_gstate.value,
-                    op.data.set_gstate
-                );
-                RELEASE_ASSERT(gstate_object);
+                    op.data.set_gstate,
+                    &gstate_object
+                ));
 
                 PdfGStateParams params;
-                TRY(pdf_deser_gstate_params(gstate_object, &params, resolver));
+                TRY(
+                    pdf_deserde_gstate_params(&gstate_object, &params, resolver)
+                );
 
                 graphics_state_apply_params(
                     current_graphics_state(state),
@@ -328,17 +330,19 @@ static Error* process_content_stream(
                 );
 
                 RELEASE_ASSERT(
-                    resources->has_value
+                    resources->is_some
                 ); // TODO: This should be an error, and ideally a function
-                RELEASE_ASSERT(resources->value.font.has_value);
+                RELEASE_ASSERT(resources->value.font.is_some);
 
-                PdfObject* font_object = pdf_dict_get(
+                PdfObject font_object;
+                TRY(pdf_object_dict_get(
                     &resources->value.font.value,
-                    op.data.set_font.font
-                );
+                    op.data.set_font.font,
+                    &font_object
+                ));
 
-                TRY(pdf_deser_font(
-                    font_object,
+                TRY(pdf_deserde_font(
+                    &font_object,
                     &current_graphics_state(state)->text_state.text_font,
                     resolver
                 ));
@@ -439,18 +443,20 @@ static Error* process_content_stream(
                 break;
             }
             case PDF_OPERATOR_cs: {
-                RELEASE_ASSERT(resources->has_value);
-                RELEASE_ASSERT(resources->value.color_space.has_value);
+                RELEASE_ASSERT(resources->is_some);
+                RELEASE_ASSERT(resources->value.color_space.is_some);
 
                 GraphicsState* graphics_state = current_graphics_state(state);
-                PdfObject* color_space_object = pdf_dict_get(
-                    &resources->value.color_space.value,
-                    op.data.set_color_space
-                );
-                RELEASE_ASSERT(color_space_object);
 
-                TRY(pdf_deser_color_space(
-                    color_space_object,
+                PdfObject color_space_object;
+                TRY(pdf_object_dict_get(
+                    &resources->value.color_space.value,
+                    op.data.set_color_space,
+                    &color_space_object
+                ));
+
+                TRY(pdf_deserde_color_space(
+                    &color_space_object,
                     &graphics_state->nonstroking_color_space,
                     resolver
                 ));
@@ -520,15 +526,15 @@ static Error* process_content_stream(
                         PdfReal components[3];
                         for (size_t component_idx = 0; component_idx < 3;
                              component_idx++) {
-                            PdfObject* component = NULL;
+                            PdfObject component;
                             RELEASE_ASSERT(pdf_object_vec_get(
                                 op.data.set_color,
                                 component_idx,
                                 &component
                             ));
 
-                            TRY(pdf_deser_num_as_real(
-                                component,
+                            TRY(pdf_deserde_num_as_real(
+                                &component,
                                 &components[component_idx],
                                 resolver
                             ));
@@ -661,42 +667,46 @@ static Error* process_content_stream(
                 break;
             }
             case PDF_OPERATOR_sh: {
-                RELEASE_ASSERT(resources->has_value);
-                RELEASE_ASSERT(resources->value.shading.has_value);
+                RELEASE_ASSERT(resources->is_some);
+                RELEASE_ASSERT(resources->value.shading.is_some);
 
-                PdfObject* shading_object = pdf_dict_get(
+                PdfObject shading_object;
+                TRY(pdf_object_dict_get(
                     &resources->value.shading.value,
-                    op.data.paint_shading
-                );
-                RELEASE_ASSERT(shading_object);
+                    op.data.paint_shading,
+                    &shading_object
+                ));
 
                 PdfObject resolved;
                 TRY(pdf_resolve_object(
                     resolver,
-                    shading_object,
+                    &shading_object,
                     &resolved,
                     true
                 ));
 
                 PdfShadingDict shading_dict;
-                TRY(pdf_deser_shading_dict(&resolved, &shading_dict, resolver));
+                TRY(
+                    pdf_deserde_shading_dict(&resolved, &shading_dict, resolver)
+                );
 
                 // LOG_PANIC("here");
 
                 break;
             }
             case PDF_OPERATOR_Do: {
-                RELEASE_ASSERT(resources->has_value);
-                RELEASE_ASSERT(resources->value.xobject.has_value);
+                RELEASE_ASSERT(resources->is_some);
+                RELEASE_ASSERT(resources->value.xobject.is_some);
 
-                PdfObject* xobject_object = pdf_dict_get(
+                PdfObject xobject_object;
+                TRY(pdf_object_dict_get(
                     &resources->value.xobject.value,
-                    op.data.paint_xobject
-                );
-                RELEASE_ASSERT(xobject_object);
+                    op.data.paint_xobject,
+                    &xobject_object
+                ));
 
                 PdfXObject xobject;
-                TRY(pdf_deser_xobject(xobject_object, &xobject, resolver));
+                TRY(pdf_deserde_xobject(&xobject_object, &xobject, resolver));
 
                 switch (xobject.type) {
                     case PDF_XOBJECT_IMAGE: {
@@ -704,11 +714,17 @@ static Error* process_content_stream(
                     }
                     case PDF_XOBJECT_FORM: {
                         PdfFormXObject* form = &xobject.data.form;
+                        GeomMat3 matrix;
+                        if (form->matrix.is_some) {
+                            matrix = form->matrix.value;
+                        } else {
+                            matrix = geom_mat3_identity();
+                        }
 
                         save_graphics_state(state);
                         geom_mat3_mul(
                             current_graphics_state(state)->ctm,
-                            form->matrix
+                            matrix
                         );
                         // TODO: clip with bbox
 
@@ -747,7 +763,7 @@ Error* render_page(
     RELEASE_ASSERT(page);
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(!*canvas);
-    RELEASE_ASSERT(page->media_box.has_value);
+    RELEASE_ASSERT(page->media_box.is_some);
 
     PdfRectangle mediabox = page->media_box.value;
 
@@ -798,7 +814,7 @@ Error* render_page(
         0xffffffff
     );
 
-    if (page->contents.has_value) {
+    if (page->contents.is_some) {
         for (size_t contents_idx = 0;
              contents_idx
              < pdf_content_stream_ref_vec_len(page->contents.value);
@@ -810,13 +826,13 @@ Error* render_page(
                 &stream_ref
             ));
 
-            PdfContentStream stream;
-            TRY(pdf_resolve_content_stream(stream_ref, resolver, &stream));
+            TRY(pdf_resolve_content_stream(&stream_ref, resolver));
+            PdfContentStream* stream = stream_ref.resolved;
 
             TRY(process_content_stream(
                 arena,
                 &state,
-                &stream,
+                stream,
                 &page->resources,
                 resolver,
                 *canvas

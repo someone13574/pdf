@@ -5,18 +5,18 @@
 #include <stdlib.h>
 
 #include "err/error.h"
-#include "geom/mat3.h"
-#include "geom/vec3.h"
 #include "pdf/resolver.h"
 
 typedef struct PdfObject PdfObject;
 
+#define DVEC_NAME PdfObjectVec
+#define DVEC_LOWERCASE_NAME pdf_object_vec
+#define DVEC_TYPE PdfObject
+#include "arena/dvec_decl.h"
+
 typedef bool PdfBoolean;
 typedef int32_t PdfInteger;
-typedef double PdfReal; // Be *very* careful if you change this to anything
-                        // other than double, since sometimes we deser
-                        // directly into a non-typedef'ed double, such as into
-                        // GeomMat3 members.
+typedef double PdfReal;
 typedef char* PdfName;
 
 typedef struct {
@@ -24,22 +24,16 @@ typedef struct {
     size_t len;
 } PdfString;
 
-// TODO: Can this somehow have non-pointer elements? May need to add a variable
-// so that the dvec doesn't forward declare.
-#define DVEC_NAME PdfObjectVec
-#define DVEC_LOWERCASE_NAME pdf_object_vec
-#define DVEC_TYPE PdfObject*
+#define DVEC_NAME PdfNameVec
+#define DVEC_LOWERCASE_NAME pdf_name_vec
+#define DVEC_TYPE PdfName
 #include "arena/dvec_decl.h"
 
 typedef struct {
     PdfObjectVec* elements;
 } PdfArray;
 
-typedef struct {
-    // TODO: Replace key type with PdfName
-    PdfObject* key;
-    PdfObject* value;
-} PdfDictEntry;
+typedef struct PdfDictEntry PdfDictEntry;
 
 #define DVEC_NAME PdfDictEntryVec
 #define DVEC_LOWERCASE_NAME pdf_dict_entry_vec
@@ -49,9 +43,6 @@ typedef struct {
 typedef struct {
     PdfDictEntryVec* entries;
 } PdfDict;
-
-// TODO: remove duplicate of `pdf_object_dict_get`
-PdfObject* pdf_dict_get(const PdfDict* dict, PdfName key);
 
 typedef struct PdfStreamDict PdfStreamDict;
 
@@ -67,173 +58,6 @@ typedef struct {
     size_t generation;
     PdfObject* object;
 } PdfIndirectObject;
-
-#define DESER_DECL_OPTIONAL(new_type, base_type, init_fn)                      \
-    typedef struct {                                                           \
-        _Bool has_value;                                                       \
-        base_type value;                                                       \
-    } new_type;                                                                \
-    void* init_fn(void* ptr_to_optional, _Bool has_value);
-
-#define DESER_DECL_RESOLVABLE(new_type, base_type, init_fn, resolve_fn)        \
-    typedef struct {                                                           \
-        PdfIndirectRef ref;                                                    \
-        base_type* resolved;                                                   \
-    } new_type;                                                                \
-    void init_fn(void* ptr_to_resolvable, PdfIndirectRef ref);                 \
-    Error* resolve_fn(                                                         \
-        new_type resolvable,                                                   \
-        PdfResolver* resolver,                                                 \
-        base_type* resolved_out                                                \
-    );
-
-#define DESER_DECL_TRAMPOLINE(trampoline_name)                                 \
-    Error* trampoline_name(                                                    \
-        const PdfObject* object,                                               \
-        void* target_ptr,                                                      \
-        PdfResolver* resolver                                                  \
-    );
-
-#define DVEC_NAME PdfBooleanVec
-#define DVEC_LOWERCASE_NAME pdf_boolean_vec
-#define DVEC_TYPE PdfBoolean
-#include "arena/dvec_decl.h"
-
-DESER_DECL_OPTIONAL(
-    PdfBooleanVecOptional,
-    PdfBooleanVec*,
-    pdf_boolean_vec_op_init
-)
-
-/// Placeholder type for unimplemented deserialization fields. Choice is
-/// arbitrary. This is different from PdfIgnored because it is planned to be
-/// implemented in the future.
-typedef int PdfUnimplemented;
-
-/// Placeholder types for ignored deserialization fields. This is different from
-/// PdfUnimplemented because deserialization is not planned for this field.
-typedef PdfObject* PdfIgnored;
-
-typedef struct {
-    enum { PDF_NUMBER_TYPE_INTEGER, PDF_NUMBER_TYPE_REAL } type;
-
-    union {
-        PdfInteger integer;
-        PdfReal real;
-    } value;
-} PdfNumber;
-
-DESER_DECL_OPTIONAL(PdfNumberOptional, PdfNumber, pdf_number_op_init)
-
-Error* pdf_deser_number(
-    const PdfObject* object,
-    PdfNumber* target_ptr,
-    PdfResolver* resolver
-);
-DESER_DECL_TRAMPOLINE(pdf_deser_number_trampoline)
-
-Error* pdf_deser_num_as_real(
-    const PdfObject* object,
-    PdfReal* target_ptr,
-    PdfResolver* resolver
-);
-DESER_DECL_TRAMPOLINE(pdf_deser_num_as_real_trampoline)
-
-PdfReal pdf_number_as_real(PdfNumber number);
-PdfObject pdf_number_as_object(PdfNumber number);
-
-/// Compares two numbers. If lhs < rhs, -1 is returned. If they are equal
-/// (eps=1e-6), then 0 is returned. If lhs > rhs, 1 is returned.
-int pdf_number_cmp(PdfNumber lhs, PdfNumber rhs);
-
-#define DVEC_NAME PdfNumberVec
-#define DVEC_LOWERCASE_NAME pdf_number_vec
-#define DVEC_TYPE PdfNumber
-#include "arena/dvec_decl.h"
-
-DESER_DECL_OPTIONAL(PdfNumberVecOptional, PdfNumberVec*, pdf_number_vec_op_init)
-
-Error* pdf_deser_geom_vec3(
-    const PdfObject* object,
-    GeomVec3* target_ptr,
-    PdfResolver* resolver
-);
-
-DESER_DECL_TRAMPOLINE(pdf_deser_geom_vec3_trampoline)
-DESER_DECL_OPTIONAL(PdfGeomVec3Optional, GeomVec3, pdf_geom_vec3_op_init)
-
-typedef struct {
-    PdfNumber lower_left_x;
-    PdfNumber lower_left_y;
-    PdfNumber upper_right_x;
-    PdfNumber upper_right_y;
-} PdfRectangle;
-
-DESER_DECL_OPTIONAL(PdfRectangleOptional, PdfRectangle, pdf_rectangle_op_init)
-
-Error* pdf_deser_rectangle(
-    const PdfObject* object,
-    PdfRectangle* target_ptr,
-    PdfResolver* resolver
-);
-
-DESER_DECL_TRAMPOLINE(pdf_deser_rectangle_trampoline)
-
-Error* pdf_deser_pdf_mat(
-    const PdfObject* object,
-    GeomMat3* target_ptr,
-    PdfResolver* resolver
-);
-
-DESER_DECL_TRAMPOLINE(pdf_deser_pdf_mat_trampoline)
-DESER_DECL_OPTIONAL(PdfGeomMat3Optional, GeomMat3, pdf_geom_mat3_op_init)
-
-Error* pdf_deser_geom_mat3(
-    const PdfObject* object,
-    GeomMat3* target_ptr,
-    PdfResolver* resolver
-);
-
-DESER_DECL_TRAMPOLINE(pdf_deser_geom_mat3_trampoline)
-
-#define DVEC_NAME PdfNameVec
-#define DVEC_LOWERCASE_NAME pdf_name_vec
-#define DVEC_TYPE PdfName
-#include "arena/dvec_decl.h"
-DESER_DECL_OPTIONAL(PdfNameVecOptional, PdfNameVec*, pdf_name_vec_op_init)
-
-DESER_DECL_OPTIONAL(PdfBooleanOptional, PdfBoolean, pdf_boolean_op_init)
-DESER_DECL_OPTIONAL(PdfIntegerOptional, PdfInteger, pdf_integer_op_init)
-DESER_DECL_OPTIONAL(PdfRealOptional, PdfReal, pdf_real_op_init)
-DESER_DECL_OPTIONAL(PdfStringOptional, PdfString, pdf_string_op_init)
-DESER_DECL_OPTIONAL(PdfNameOptional, PdfName, pdf_name_op_init)
-DESER_DECL_OPTIONAL(PdfArrayOptional, PdfArray, pdf_array_op_init)
-DESER_DECL_OPTIONAL(PdfDictOptional, PdfDict, pdf_dict_op_init)
-DESER_DECL_OPTIONAL(PdfStreamOptional, PdfStream, pdf_stream_op_init)
-DESER_DECL_OPTIONAL(
-    PdfIndirectObjectOptional,
-    PdfIndirectObject,
-    pdf_indirect_object_op_init
-)
-DESER_DECL_OPTIONAL(
-    PdfIndirectRefOptional,
-    PdfIndirectRef,
-    pdf_indirect_ref_op_init
-)
-
-// TODO: unfuck the include hierarchy
-struct PdfStreamDict {
-    PdfInteger length;
-    PdfNameVecOptional filter;
-
-    const PdfObject* raw_dict;
-};
-
-Error* pdf_deser_stream_dict(
-    const PdfObject* object,
-    PdfStreamDict* deserialized,
-    PdfResolver* resolver
-);
 
 typedef enum {
     PDF_OBJECT_TYPE_BOOLEAN,
@@ -269,8 +93,12 @@ struct PdfObject {
 
 // Gets the value associated with a given key in a dictionary object
 Error*
-pdf_object_dict_get(const PdfObject* dict, const char* key, PdfObject* object);
+pdf_object_dict_get(const PdfDict* dict, const char* key, PdfObject* object);
 
-// Generates a pretty-printed PdfObject string. If no arena is passed, you must
-// free the string manually.
+// Generates a pretty-printed PdfObject string.
 char* pdf_fmt_object(Arena* arena, const PdfObject* object);
+
+struct PdfDictEntry {
+    PdfName key;
+    PdfObject value;
+};

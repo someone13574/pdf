@@ -5,6 +5,7 @@
 #include "pdf/function.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
 /// Axial shadings
 typedef struct {
@@ -113,7 +114,7 @@ typedef struct {
     PdfShadingDictData data;
 } PdfShadingDict;
 
-Error* pdf_deser_shading_dict(
+Error* pdf_deserde_shading_dict(
     const PdfObject* object,
     PdfShadingDict* target_ptr,
     PdfResolver* resolver

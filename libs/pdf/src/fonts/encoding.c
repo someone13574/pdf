@@ -3,11 +3,12 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "../deser.h"
 #include "err/error.h"
 #include "logger/log.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
 static const char* pdf_encoding_common_lookup[256] = {
     [32] = "space",
@@ -428,7 +429,7 @@ const char* pdf_decode_adobe_standard_codepoint(uint8_t codepoint) {
     return pdf_encoding_adobe_standard_lookup[codepoint];
 }
 
-Error* pdf_deser_encoding_dict(
+Error* pdf_deserde_encoding_dict(
     const PdfObject* object,
     PdfEncodingDict* target_ptr,
     PdfResolver* resolver
@@ -441,44 +442,23 @@ Error* pdf_deser_encoding_dict(
     PdfObject resolved;
     TRY(pdf_resolve_object(resolver, object, &resolved, true));
 
-    // Attempt to deser name
+    // Attempt to deserialize name
     if (resolved.type == PDF_OBJECT_TYPE_NAME) {
-        target_ptr->type = (PdfNameOptional) {.has_value = false};
+        target_ptr->type = (PdfNameOptional) {.is_some = false};
         target_ptr->base_encoding =
-            (PdfNameOptional) {.has_value = true, .value = resolved.data.name};
-        target_ptr->differences = (PdfArrayOptional) {.has_value = false};
+            (PdfNameOptional) {.is_some = true, .value = resolved.data.name};
+        target_ptr->differences = (PdfArrayOptional) {.is_some = false};
         return NULL;
     }
 
     // Deserialize dict
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "Type",
-            &target_ptr->type,
-            PDF_DESER_OPTIONAL(
-                pdf_name_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
-            )
-        ),
-        PDF_FIELD(
-            "BaseEncoding",
-            &target_ptr->base_encoding,
-            PDF_DESER_OPTIONAL(
-                pdf_name_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
-            )
-        ),
-        PDF_FIELD(
-            "Differences",
-            &target_ptr->differences,
-            PDF_DESER_OPTIONAL(
-                pdf_array_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_ARRAY)
-            )
-        )
+        pdf_name_optional_field("Type", &target_ptr->type),
+        pdf_name_optional_field("BaseEncoding", &target_ptr->base_encoding),
+        pdf_array_optional_field("Differences", &target_ptr->differences)
     };
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -487,12 +467,12 @@ Error* pdf_deser_encoding_dict(
         "PdfEncodingDict"
     ));
 
-    if (target_ptr->type.has_value
+    if (target_ptr->type.is_some
         && strcmp(target_ptr->type.value, "Encoding") != 0) {
         return ERROR(PDF_ERR_INCORRECT_TYPE, "`Type` must be `Encoding`");
     }
 
-    if (target_ptr->base_encoding.has_value) {
+    if (target_ptr->base_encoding.is_some) {
         if (strcmp(target_ptr->base_encoding.value, "MacRomanEncoding") != 0
             && strcmp(target_ptr->base_encoding.value, "MacExpertEncoding") != 0
             && strcmp(target_ptr->base_encoding.value, "WinAnsiEncoding")
@@ -505,10 +485,12 @@ Error* pdf_deser_encoding_dict(
         }
     }
 
-    RELEASE_ASSERT(!target_ptr->differences.has_value, "Unimplemented");
+    RELEASE_ASSERT(!target_ptr->differences.is_some, "Unimplemented");
 
     return NULL;
 }
+
+PDF_IMPL_OPTIONAL_FIELD(PdfEncodingDict, PdfEncodingDictOptional, encoding_dict)
 
 const char* pdf_encoding_map_codepoint(
     const PdfEncodingDict* encoding_dict,
@@ -517,7 +499,7 @@ const char* pdf_encoding_map_codepoint(
     RELEASE_ASSERT(encoding_dict);
 
     const char* base = NULL;
-    if (!encoding_dict->base_encoding.has_value) {
+    if (!encoding_dict->base_encoding.is_some) {
         base = pdf_decode_adobe_standard_codepoint(codepoint);
     } else if (strcmp(encoding_dict->base_encoding.value, "MacRomanEncoding")
                == 0) {
@@ -531,16 +513,9 @@ const char* pdf_encoding_map_codepoint(
     }
 
     RELEASE_ASSERT(base);
-    if (encoding_dict->differences.has_value) {
+    if (encoding_dict->differences.is_some) {
         LOG_WARN(FONT, "Encoding has differences array! TODO");
     }
     // TODO: differences array
     return base;
 }
-
-DESER_IMPL_TRAMPOLINE(
-    pdf_deser_encoding_dict_trampoline,
-    pdf_deser_encoding_dict
-)
-
-DESER_IMPL_OPTIONAL(PdfEncodingDictOptional, pdf_encoding_dict_op_init)

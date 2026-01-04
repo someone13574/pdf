@@ -1,6 +1,7 @@
 #pragma once
 
 #include "err/error.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/page.h"
 #include "pdf/resolver.h"
@@ -38,15 +39,10 @@ typedef struct {
     PdfIgnored needs_rendering;
 } PdfCatalog;
 
-Error* pdf_deser_catalog(
+Error* pdf_deserde_catalog(
     const PdfObject* object,
     PdfCatalog* target_ptr,
     PdfResolver* resolver
 );
 
-DESER_DECL_RESOLVABLE(
-    PdfCatalogRef,
-    PdfCatalog,
-    pdf_catalog_ref_init,
-    pdf_resolve_catalog
-)
+PDF_DECL_RESOLVABLE_FIELD(PdfCatalog, PdfCatalogRef, catalog)

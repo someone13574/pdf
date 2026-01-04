@@ -2,11 +2,11 @@
 
 #include <stdbool.h>
 
-#include "../deser.h"
 #include "err/error.h"
 #include "logger/log.h"
+#include "pdf/types.h"
 
-Error* pdf_deser_font_stream_dict(
+Error* pdf_deserde_font_stream_dict(
     const PdfObject* object,
     PdfFontStreamDict* target_ptr,
     PdfResolver* resolver
@@ -16,49 +16,14 @@ Error* pdf_deser_font_stream_dict(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "Length1",
-            &target_ptr->length1,
-            PDF_DESER_OPTIONAL(
-                pdf_integer_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-            )
-        ),
-        PDF_FIELD(
-            "Length2",
-            &target_ptr->length2,
-            PDF_DESER_OPTIONAL(
-                pdf_integer_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-            )
-        ),
-        PDF_FIELD(
-            "Length3",
-            &target_ptr->length3,
-            PDF_DESER_OPTIONAL(
-                pdf_integer_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-            )
-        ),
-        PDF_FIELD(
-            "Subtype",
-            &target_ptr->subtype,
-            PDF_DESER_OPTIONAL(
-                pdf_name_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
-            )
-        ),
-        PDF_FIELD(
-            "Metadata",
-            &target_ptr->metadata,
-            PDF_DESER_OPTIONAL(
-                pdf_stream_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_STREAM)
-            )
-        )
+        pdf_integer_optional_field("Length1", &target_ptr->length1),
+        pdf_integer_optional_field("Length2", &target_ptr->length2),
+        pdf_integer_optional_field("Length3", &target_ptr->length3),
+        pdf_name_optional_field("Subtype", &target_ptr->subtype),
+        pdf_stream_optional_field("Metadata", &target_ptr->metadata)
     };
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),

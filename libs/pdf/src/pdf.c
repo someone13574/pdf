@@ -6,7 +6,6 @@
 
 #include "arena/arena.h"
 #include "ctx.h"
-#include "deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "object.h"
@@ -14,6 +13,7 @@
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 #include "pdf/trailer.h"
+#include "pdf/types.h"
 #include "test_helpers.h"
 #include "xref.h"
 
@@ -21,7 +21,7 @@ typedef struct {
     PdfIntegerOptional prev;
 } StubTrailer;
 
-static Error* deser_stub_trailer(
+static Error* deserde_stub_trailer(
     const PdfObject* object,
     StubTrailer* target_ptr,
     PdfResolver* resolver
@@ -30,16 +30,11 @@ static Error* deser_stub_trailer(
     RELEASE_ASSERT(resolver);
     RELEASE_ASSERT(target_ptr);
 
-    PdfFieldDescriptor fields[] = {PDF_FIELD(
-        "Prev",
-        &target_ptr->prev,
-        PDF_DESER_OPTIONAL(
-            pdf_integer_op_init,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-        )
-    )};
+    PdfFieldDescriptor fields[] = {
+        pdf_integer_optional_field("Prev", &target_ptr->prev)
+    };
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -105,7 +100,7 @@ Error* pdf_resolver_new(
         StubTrailer trailer;
         TRY(parse_stub_trailer(*resolver, &trailer));
 
-        if (trailer.prev.has_value) {
+        if (trailer.prev.is_some) {
             current_xref_offset = (size_t)trailer.prev.value;
         } else {
             current_xref_offset = 0;
@@ -161,7 +156,7 @@ static Error* parse_stub_trailer(PdfResolver* resolver, StubTrailer* trailer) {
     PdfObject trailer_object;
     TRY(pdf_parse_object(resolver, &trailer_object, false));
 
-    TRY(deser_stub_trailer(&trailer_object, trailer, resolver));
+    TRY(deserde_stub_trailer(&trailer_object, trailer, resolver));
     return NULL;
 }
 
@@ -176,7 +171,7 @@ static Error* parse_trailer(PdfResolver* resolver, PdfTrailer* trailer) {
     PdfObject trailer_object;
     TRY(pdf_parse_object(resolver, &trailer_object, false));
 
-    TRY(pdf_deser_trailer(&trailer_object, trailer, resolver));
+    TRY(pdf_deserde_trailer(&trailer_object, trailer, resolver));
     return NULL;
 }
 
@@ -198,10 +193,12 @@ Error* pdf_get_catalog(PdfResolver* resolver, PdfCatalog* catalog) {
 
     PdfTrailer trailer;
     pdf_get_trailer(resolver, &trailer);
-    TRY(pdf_resolve_catalog(trailer.root, resolver, catalog));
+    TRY(pdf_resolve_catalog(&trailer.root, resolver));
 
-    resolver->catalog = arena_alloc(resolver->arena, sizeof(PdfCatalog));
-    *resolver->catalog = *catalog;
+    resolver->catalog =
+        arena_alloc(pdf_resolver_arena(resolver), sizeof(PdfCatalog));
+    *resolver->catalog = *trailer.root.resolved;
+    *catalog = *resolver->catalog;
 
     return NULL;
 }

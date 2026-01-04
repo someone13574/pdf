@@ -5,18 +5,30 @@
 
 #include "arena/arena.h"
 #include "ctx.h"
-#include "deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "object.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/stream_dict.h"
+#include "pdf/types.h"
 #include "postscript/interpreter.h"
 #include "postscript/object.h"
 #include "postscript/tokenizer.h"
 #include "test_helpers.h"
 
-Error* pdf_deser_function(
+PDF_IMPL_FIELD(PdfFunction, function)
+
+#define DVEC_NAME PdfFunctionVec
+#define DVEC_LOWERCASE_NAME pdf_function_vec
+#define DVEC_TYPE PdfFunction
+#include "arena/dvec_impl.h"
+
+PDF_IMPL_ARRAY_FIELD(PdfFunctionVec, function_vec, function)
+PDF_IMPL_AS_ARRAY_FIELD(PdfFunctionVec, function_vec, function)
+
+Error* pdf_deserde_function(
     const PdfObject* object,
     PdfFunction* target_ptr,
     PdfResolver* resolver
@@ -29,34 +41,13 @@ Error* pdf_deser_function(
     TRY(pdf_resolve_object(resolver, object, &resolved, true));
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "FunctionType",
-            &target_ptr->function_type,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-        ),
-        PDF_FIELD(
-            "Domain",
-            &target_ptr->domain,
-            PDF_DESER_ARRAY(
-                pdf_number_vec_push_uninit,
-                PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "Range",
-            &target_ptr->range,
-            PDF_DESER_OPTIONAL(
-                pdf_number_vec_op_init,
-                PDF_DESER_ARRAY(
-                    pdf_number_vec_push_uninit,
-                    PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
-                )
-            )
-        )
+        pdf_integer_field("FunctionType", &target_ptr->function_type),
+        pdf_number_vec_field("Domain", &target_ptr->domain),
+        pdf_number_vec_optional_field("Range", &target_ptr->range)
     };
 
     if (resolved.type == PDF_OBJECT_TYPE_DICT) {
-        TRY(pdf_deser_dict(
+        TRY(pdf_deserde_fields(
             &resolved,
             fields,
             sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -65,7 +56,7 @@ Error* pdf_deser_function(
             "Function"
         ));
     } else if (resolved.type == PDF_OBJECT_TYPE_STREAM) {
-        TRY(pdf_deser_dict(
+        TRY(pdf_deserde_fields(
             resolved.data.stream.stream_dict->raw_dict,
             fields,
             sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -83,39 +74,15 @@ Error* pdf_deser_function(
     switch (target_ptr->function_type) {
         case 2: {
             PdfFieldDescriptor specific_fields[] = {
-                PDF_IGNORED_FIELD("FunctionType", NULL),
-                PDF_IGNORED_FIELD("Domain", NULL),
-                PDF_IGNORED_FIELD("Range", NULL),
-                PDF_FIELD(
-                    "C0",
-                    &target_ptr->data.type2.c0,
-                    PDF_DESER_OPTIONAL(
-                        pdf_number_vec_op_init,
-                        PDF_DESER_ARRAY(
-                            pdf_number_vec_push_uninit,
-                            PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
-                        )
-                    )
-                ),
-                PDF_FIELD(
-                    "C1",
-                    &target_ptr->data.type2.c1,
-                    PDF_DESER_OPTIONAL(
-                        pdf_number_vec_op_init,
-                        PDF_DESER_ARRAY(
-                            pdf_number_vec_push_uninit,
-                            PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
-                        )
-                    )
-                ),
-                PDF_FIELD(
-                    "N",
-                    &target_ptr->data.type2.n,
-                    PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
-                )
+                pdf_ignored_field("FunctionType", NULL),
+                pdf_ignored_field("Domain", NULL),
+                pdf_ignored_field("Range", NULL),
+                pdf_number_vec_optional_field("C0", &target_ptr->data.type2.c0),
+                pdf_number_vec_optional_field("C1", &target_ptr->data.type2.c1),
+                pdf_number_field("N", &target_ptr->data.type2.n)
             };
 
-            TRY(pdf_deser_dict(
+            TRY(pdf_deserde_fields(
                 object,
                 specific_fields,
                 sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
@@ -127,36 +94,18 @@ Error* pdf_deser_function(
         }
         case 3: {
             PdfFieldDescriptor specific_fields[] = {
-                PDF_IGNORED_FIELD("FunctionType", NULL),
-                PDF_IGNORED_FIELD("Domain", NULL),
-                PDF_IGNORED_FIELD("Range", NULL),
-                PDF_FIELD(
+                pdf_ignored_field("FunctionType", NULL),
+                pdf_ignored_field("Domain", NULL),
+                pdf_ignored_field("Range", NULL),
+                pdf_function_vec_field(
                     "Functions",
-                    &target_ptr->data.type3.functions,
-                    PDF_DESER_ARRAY(
-                        pdf_function_vec_push_uninit,
-                        PDF_DESER_CUSTOM(pdf_deser_function_trampoline)
-                    )
+                    &target_ptr->data.type3.functions
                 ),
-                PDF_FIELD(
-                    "Bounds",
-                    &target_ptr->data.type3.bounds,
-                    PDF_DESER_ARRAY(
-                        pdf_number_vec_push_uninit,
-                        PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
-                    )
-                ),
-                PDF_FIELD(
-                    "Encode",
-                    &target_ptr->data.type3.encode,
-                    PDF_DESER_ARRAY(
-                        pdf_number_vec_push_uninit,
-                        PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
-                    )
-                )
+                pdf_number_vec_field("Bounds", &target_ptr->data.type3.bounds),
+                pdf_number_vec_field("Encode", &target_ptr->data.type3.encode)
             };
 
-            TRY(pdf_deser_dict(
+            TRY(pdf_deserde_fields(
                 object,
                 specific_fields,
                 sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
@@ -164,13 +113,6 @@ Error* pdf_deser_function(
                 resolver,
                 "Type3 PdfFunction"
             ));
-
-            if (!target_ptr->data.type3.bounds) {
-                // TODO: Remove ugly workaround. Deserialization needs another
-                // rewrite.
-                target_ptr->data.type3.bounds =
-                    pdf_number_vec_new(pdf_resolver_arena(resolver));
-            }
 
             size_t k = pdf_function_vec_len(target_ptr->data.type3.functions);
             if (k == 0) {
@@ -284,7 +226,7 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
     switch (function->function_type) {
         case 4: {
             for (size_t idx = 0; idx < pdf_object_vec_len(io); idx++) {
-                PdfObject* pdf_operand = NULL;
+                PdfObject pdf_operand;
                 RELEASE_ASSERT(pdf_object_vec_get(io, idx, &pdf_operand));
 
                 PdfObject clipped;
@@ -298,7 +240,7 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
                     )) {
                     return ERROR(PDF_ERR_EXCESS_OPERAND);
                 }
-                TRY(clip_num(*pdf_operand, min, max, &clipped));
+                TRY(clip_num(pdf_operand, min, max, &clipped));
 
                 PSObject operand = {
                     .literal = true,
@@ -346,9 +288,7 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
                     return ERROR(PS_ERR_OPERAND_TYPE);
                 }
 
-                PdfObject* object = arena_alloc(arena, sizeof(PdfObject));
-
-                if (function->range.has_value) {
+                if (function->range.is_some) {
                     PdfNumber min, max;
                     if (!pdf_number_vec_get(
                             function->range.value,
@@ -362,11 +302,13 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
                         )) {
                         return ERROR(PDF_ERR_EXCESS_OPERAND);
                     }
-                    TRY(clip_num(converted, min, max, object));
+
+                    PdfObject clipped;
+                    TRY(clip_num(converted, min, max, &clipped));
+                    pdf_object_vec_push(io, clipped);
                 } else {
-                    *object = converted;
+                    pdf_object_vec_push(io, converted);
                 }
-                pdf_object_vec_push(io, object);
             }
 
             break;
@@ -378,13 +320,6 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
 
     return NULL;
 }
-
-DESER_IMPL_TRAMPOLINE(pdf_deser_function_trampoline, pdf_deser_function)
-
-#define DVEC_NAME PdfFunctionVec
-#define DVEC_LOWERCASE_NAME pdf_function_vec
-#define DVEC_TYPE PdfFunction
-#include "arena/dvec_impl.h"
 
 #ifdef TEST
 
@@ -413,25 +348,24 @@ TEST_FUNC(test_pdf_function) {
     TEST_REQUIRE(pdf_parse_object(resolver, &object, false));
 
     PdfFunction func;
-    TEST_REQUIRE(pdf_deser_function(&object, &func, resolver));
-
-    PdfObject* a = arena_alloc(arena, sizeof(PdfObject));
-    PdfObject* b = arena_alloc(arena, sizeof(PdfObject));
-    a->type = PDF_OBJECT_TYPE_REAL;
-    a->data.real = 0.25;
-    b->type = PDF_OBJECT_TYPE_REAL;
-    b->data.real = 0.5;
+    TEST_REQUIRE(pdf_deserde_function(&object, &func, resolver));
 
     PdfObjectVec* io = pdf_object_vec_new(arena);
-    pdf_object_vec_push(io, a);
-    pdf_object_vec_push(io, b);
+    pdf_object_vec_push(
+        io,
+        (PdfObject) {.type = PDF_OBJECT_TYPE_REAL, .data.real = 0.25}
+    );
+    pdf_object_vec_push(
+        io,
+        (PdfObject) {.type = PDF_OBJECT_TYPE_REAL, .data.real = 0.5}
+    );
     TEST_REQUIRE(pdf_run_function(&func, arena, io));
 
-    PdfObject* out = NULL;
+    PdfObject out;
     TEST_ASSERT(pdf_object_vec_pop(io, &out));
 
-    TEST_ASSERT_EQ((int)out->type, (int)PDF_OBJECT_TYPE_REAL);
-    TEST_ASSERT_EQ(out->data.real, 0.5);
+    TEST_ASSERT_EQ((int)out.type, (int)PDF_OBJECT_TYPE_REAL);
+    TEST_ASSERT_EQ(out.data.real, 0.5);
 
     return TEST_RESULT_PASS;
 }

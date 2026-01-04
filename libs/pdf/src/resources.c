@@ -2,13 +2,14 @@
 
 #include <string.h>
 
-#include "deser.h"
 #include "err/error.h"
 #include "logger/log.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
-Error* pdf_deser_resources(
+Error* pdf_deserde_resources(
     const PdfObject* object,
     PdfResources* target_ptr,
     PdfResolver* resolver
@@ -18,76 +19,16 @@ Error* pdf_deser_resources(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "ExtGState",
-            &target_ptr->ext_gstate,
-            PDF_DESER_OPTIONAL(
-                pdf_dict_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
-            )
-        ),
-        PDF_FIELD(
-            "ColorSpace",
-            &target_ptr->color_space,
-            PDF_DESER_OPTIONAL(
-                pdf_dict_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
-            )
-        ),
-        PDF_FIELD(
-            "Pattern",
-            &target_ptr->pattern,
-            PDF_DESER_OPTIONAL(
-                pdf_dict_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
-            )
-        ),
-        PDF_FIELD(
-            "Shading",
-            &target_ptr->shading,
-            PDF_DESER_OPTIONAL(
-                pdf_dict_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
-            )
-        ),
-        PDF_FIELD(
-            "XObject",
-            &target_ptr->xobject,
-            PDF_DESER_OPTIONAL(
-                pdf_dict_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
-            )
-        ),
-        PDF_FIELD(
-            "Font",
-            &target_ptr->font,
-            PDF_DESER_OPTIONAL(
-                pdf_dict_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
-            )
-        ),
-        PDF_FIELD(
-            "ProcSet",
-            &target_ptr->proc_set,
-            PDF_DESER_OPTIONAL(
-                pdf_name_vec_op_init,
-                PDF_DESER_ARRAY(
-                    pdf_name_vec_push_uninit,
-                    PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
-                )
-            )
-        ),
-        PDF_FIELD(
-            "Properties",
-            &target_ptr->properties,
-            PDF_DESER_OPTIONAL(
-                pdf_dict_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_DICT)
-            )
-        ),
+        pdf_dict_optional_field("ExtGState", &target_ptr->ext_gstate),
+        pdf_dict_optional_field("ColorSpace", &target_ptr->color_space),
+        pdf_dict_optional_field("Pattern", &target_ptr->pattern),
+        pdf_dict_optional_field("XObject", &target_ptr->xobject),
+        pdf_dict_optional_field("Font", &target_ptr->font),
+        pdf_name_vec_optional_field("ProcSet", &target_ptr->proc_set),
+        pdf_dict_optional_field("Properties", &target_ptr->properties)
     };
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -99,10 +40,9 @@ Error* pdf_deser_resources(
     return NULL;
 }
 
-DESER_IMPL_TRAMPOLINE(pdf_deser_resources_trampoline, pdf_deser_resources)
-DESER_IMPL_OPTIONAL(PdfResourcesOptional, pdf_resources_op_init)
+PDF_IMPL_OPTIONAL_FIELD(PdfResources, PdfResourcesOptional, resources)
 
-Error* pdf_deser_gstate_params(
+Error* pdf_deserde_gstate_params(
     const PdfObject* object,
     PdfGStateParams* target_ptr,
     PdfResolver* resolver
@@ -112,99 +52,36 @@ Error* pdf_deser_gstate_params(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "Type",
-            &target_ptr->type,
-            PDF_DESER_OPTIONAL(
-                pdf_name_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_NAME)
-            )
-        ),
-        PDF_UNIMPLEMENTED_FIELD("LW"),
-        PDF_UNIMPLEMENTED_FIELD("LC"),
-        PDF_UNIMPLEMENTED_FIELD("LJ"),
-        PDF_UNIMPLEMENTED_FIELD("ML"),
-        PDF_UNIMPLEMENTED_FIELD("D"),
-        PDF_UNIMPLEMENTED_FIELD("RI"),
-        PDF_FIELD(
-            "OP",
-            &target_ptr->overprint_upper,
-            PDF_DESER_OPTIONAL(
-                pdf_boolean_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
-            )
-        ),
-        PDF_FIELD(
-            "op",
-            &target_ptr->overprint_lower,
-            PDF_DESER_OPTIONAL(
-                pdf_boolean_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
-            )
-        ),
-        PDF_FIELD(
-            "OPM",
-            &target_ptr->overprint_mode,
-            PDF_DESER_OPTIONAL(
-                pdf_integer_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-            )
-        ),
-        PDF_UNIMPLEMENTED_FIELD("Font"),
-        PDF_UNIMPLEMENTED_FIELD("BG"),
-        PDF_UNIMPLEMENTED_FIELD("BG2"),
-        PDF_UNIMPLEMENTED_FIELD("UCR"),
-        PDF_UNIMPLEMENTED_FIELD("UCR2"),
-        PDF_IGNORED_FIELD("TR", &target_ptr->tr), // TODO: functions
-        PDF_UNIMPLEMENTED_FIELD("TR2"),
-        PDF_UNIMPLEMENTED_FIELD("HT"),
-        PDF_UNIMPLEMENTED_FIELD("FL"),
-        PDF_FIELD(
-            "SM",
-            &target_ptr->sm,
-            PDF_DESER_OPTIONAL(
-                pdf_real_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "SA",
-            &target_ptr->sa,
-            PDF_DESER_OPTIONAL(
-                pdf_boolean_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
-            )
-        ),
-        PDF_IGNORED_FIELD("BM", &target_ptr->bm),       // TODO: blend mode
-        PDF_IGNORED_FIELD("SMask", &target_ptr->smask), // TODO: masking
-        PDF_FIELD(
-            "CA",
-            &target_ptr->ca_stroking,
-            PDF_DESER_OPTIONAL(
-                pdf_real_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "ca",
-            &target_ptr->ca_nonstroking,
-            PDF_DESER_OPTIONAL(
-                pdf_real_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_num_as_real_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "AIS",
-            &target_ptr->ais,
-            PDF_DESER_OPTIONAL(
-                pdf_boolean_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
-            )
-        ),
-        PDF_UNIMPLEMENTED_FIELD("TK")
+        pdf_name_optional_field("Type", &target_ptr->type),
+        pdf_unimplemented_field("LW"),
+        pdf_unimplemented_field("LC"),
+        pdf_unimplemented_field("LJ"),
+        pdf_unimplemented_field("ML"),
+        pdf_unimplemented_field("D"),
+        pdf_unimplemented_field("RI"),
+        pdf_boolean_optional_field("OP", &target_ptr->overprint_upper),
+        pdf_boolean_optional_field("op", &target_ptr->overprint_lower),
+        pdf_integer_optional_field("OPM", &target_ptr->overprint_mode),
+        pdf_unimplemented_field("Font"),
+        pdf_unimplemented_field("BG"),
+        pdf_unimplemented_field("BG2"),
+        pdf_unimplemented_field("UCR"),
+        pdf_unimplemented_field("UCR2"),
+        pdf_ignored_field("TR", &target_ptr->tr), // TODO: functions
+        pdf_unimplemented_field("TR2"),
+        pdf_unimplemented_field("HT"),
+        pdf_unimplemented_field("FL"),
+        pdf_num_as_real_optional_field("SM", &target_ptr->sm),
+        pdf_boolean_optional_field("SA", &target_ptr->sa),
+        pdf_ignored_field("BM", &target_ptr->bm),       // TODO: blend mode
+        pdf_ignored_field("SMask", &target_ptr->smask), // TODO: masking
+        pdf_num_as_real_optional_field("CA", &target_ptr->ca_stroking),
+        pdf_num_as_real_optional_field("ca", &target_ptr->ca_nonstroking),
+        pdf_boolean_optional_field("AIS", &target_ptr->ais),
+        pdf_unimplemented_field("TK")
     };
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -213,7 +90,7 @@ Error* pdf_deser_gstate_params(
         "PdfGStateParams"
     ));
 
-    if (target_ptr->type.has_value) {
+    if (target_ptr->type.is_some) {
         if (strcmp(target_ptr->type.value, "ExtGState") != 0) {
             return ERROR(PDF_ERR_INVALID_SUBTYPE, "`Type` must be `ExtGState`");
         }

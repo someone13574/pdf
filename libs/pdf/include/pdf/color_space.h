@@ -2,8 +2,10 @@
 
 #include "err/error.h"
 #include "geom/vec3.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
 typedef struct {
     /// (Required) An array of three numbers [ XW YW ZW ] specifying the
@@ -61,13 +63,13 @@ typedef struct {
     PdfColorSpaceParams params;
 } PdfColorSpace;
 
-Error* pdf_deser_color_space(
+Error* pdf_deserde_color_space(
     const PdfObject* object,
     PdfColorSpace* target_ptr,
     PdfResolver* resolver
 );
 
-DESER_DECL_TRAMPOLINE(pdf_deser_color_space_trampoline)
+PDF_DECL_FIELD(PdfColorSpace, color_space)
 
 GeomVec3 pdf_map_color(
     double* components,

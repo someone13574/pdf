@@ -2,13 +2,15 @@
 
 #include <stdio.h>
 
-#include "deser.h"
 #include "err/error.h"
 #include "logger/log.h"
+#include "pdf/color_space.h"
+#include "pdf/function.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
-Error* pdf_deser_shading_dict(
+Error* pdf_deserde_shading_dict(
     const PdfObject* object,
     PdfShadingDict* target_ptr,
     PdfResolver* resolver
@@ -18,36 +20,14 @@ Error* pdf_deser_shading_dict(
     RELEASE_ASSERT(resolver);
 
     PdfFieldDescriptor fields[] = {
-        PDF_FIELD(
-            "ShadingType",
-            &target_ptr->shading_type,
-            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-        ),
-        PDF_FIELD(
-            "ColorSpace",
-            &target_ptr->color_space,
-            PDF_DESER_CUSTOM(pdf_deser_color_space_trampoline)
-        ),
-        PDF_UNIMPLEMENTED_FIELD("Background"),
-        PDF_FIELD(
-            "BBox",
-            &target_ptr->bbox,
-            PDF_DESER_OPTIONAL(
-                pdf_rectangle_op_init,
-                PDF_DESER_CUSTOM(pdf_deser_rectangle_trampoline)
-            )
-        ),
-        PDF_FIELD(
-            "AntiAlias",
-            &target_ptr->anti_alias,
-            PDF_DESER_OPTIONAL(
-                pdf_boolean_op_init,
-                PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
-            )
-        )
+        pdf_integer_field("ShadingType", &target_ptr->shading_type),
+        pdf_color_space_field("ColorSpace", &target_ptr->color_space),
+        pdf_unimplemented_field("Background"),
+        pdf_rectangle_optional_field("BBox", &target_ptr->bbox),
+        pdf_boolean_optional_field("AntiAlias", &target_ptr->anti_alias)
     };
 
-    TRY(pdf_deser_dict(
+    TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
@@ -59,52 +39,27 @@ Error* pdf_deser_shading_dict(
     switch (target_ptr->shading_type) {
         case 2: {
             PdfFieldDescriptor specific_fields[] = {
-                PDF_IGNORED_FIELD("ShadingType", NULL),
-                PDF_IGNORED_FIELD("ColorSpace", NULL),
-                PDF_IGNORED_FIELD("Background", NULL),
-                PDF_IGNORED_FIELD("BBox", NULL),
-                PDF_IGNORED_FIELD("AntiAlias", NULL),
-                PDF_FIELD(
-                    "Coords",
-                    &target_ptr->data.type2.coords,
-                    PDF_DESER_ARRAY(
-                        pdf_number_vec_push_uninit,
-                        PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
-                    )
-                ),
-                PDF_FIELD(
+                pdf_ignored_field("ShadingType", NULL),
+                pdf_ignored_field("ColorSpace", NULL),
+                pdf_ignored_field("Background", NULL),
+                pdf_ignored_field("BBox", NULL),
+                pdf_ignored_field("AntiAlias", NULL),
+                pdf_number_vec_field("Coords", &target_ptr->data.type2.coords),
+                pdf_number_vec_optional_field(
                     "Domain",
-                    &target_ptr->data.type2.domain,
-                    PDF_DESER_OPTIONAL(
-                        pdf_number_vec_op_init,
-                        PDF_DESER_ARRAY(
-                            pdf_number_vec_push_uninit,
-                            PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
-                        )
-                    )
+                    &target_ptr->data.type2.domain
                 ),
-                PDF_FIELD(
+                pdf_as_function_vec_field(
                     "Function",
-                    &target_ptr->data.type2.function,
-                    PDF_DESER_AS_ARRAY(
-                        pdf_function_vec_push_uninit,
-                        PDF_DESER_CUSTOM(pdf_deser_function_trampoline)
-                    )
+                    &target_ptr->data.type2.function
                 ),
-                PDF_FIELD(
+                pdf_boolean_vec_optional_field(
                     "Extend",
-                    &target_ptr->data.type2.extend,
-                    PDF_DESER_OPTIONAL(
-                        pdf_boolean_vec_op_init,
-                        PDF_DESER_ARRAY(
-                            pdf_boolean_vec_push_uninit,
-                            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
-                        )
-                    )
+                    &target_ptr->data.type2.extend
                 )
             };
 
-            TRY(pdf_deser_dict(
+            TRY(pdf_deserde_fields(
                 object,
                 specific_fields,
                 sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
@@ -117,13 +72,13 @@ Error* pdf_deser_shading_dict(
                 return ERROR(PDF_ERR_INCORRECT_TYPE);
             }
 
-            if (target_ptr->data.type2.domain.has_value
+            if (target_ptr->data.type2.domain.is_some
                 && pdf_number_vec_len(target_ptr->data.type2.domain.value)
                        != 2) {
                 return ERROR(PDF_ERR_INCORRECT_TYPE);
             }
 
-            if (target_ptr->data.type2.extend.has_value
+            if (target_ptr->data.type2.extend.is_some
                 && pdf_boolean_vec_len(target_ptr->data.type2.extend.value)
                        != 2) {
                 return ERROR(PDF_ERR_INCORRECT_TYPE);
@@ -133,52 +88,27 @@ Error* pdf_deser_shading_dict(
         }
         case 3: {
             PdfFieldDescriptor specific_fields[] = {
-                PDF_IGNORED_FIELD("ShadingType", NULL),
-                PDF_IGNORED_FIELD("ColorSpace", NULL),
-                PDF_IGNORED_FIELD("Background", NULL),
-                PDF_IGNORED_FIELD("BBox", NULL),
-                PDF_IGNORED_FIELD("AntiAlias", NULL),
-                PDF_FIELD(
-                    "Coords",
-                    &target_ptr->data.type3.coords,
-                    PDF_DESER_ARRAY(
-                        pdf_number_vec_push_uninit,
-                        PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
-                    )
-                ),
-                PDF_FIELD(
+                pdf_ignored_field("ShadingType", NULL),
+                pdf_ignored_field("ColorSpace", NULL),
+                pdf_ignored_field("Background", NULL),
+                pdf_ignored_field("BBox", NULL),
+                pdf_ignored_field("AntiAlias", NULL),
+                pdf_number_vec_field("Coords", &target_ptr->data.type3.coords),
+                pdf_number_vec_optional_field(
                     "Domain",
-                    &target_ptr->data.type3.domain,
-                    PDF_DESER_OPTIONAL(
-                        pdf_number_vec_op_init,
-                        PDF_DESER_ARRAY(
-                            pdf_number_vec_push_uninit,
-                            PDF_DESER_CUSTOM(pdf_deser_number_trampoline)
-                        )
-                    )
+                    &target_ptr->data.type3.domain
                 ),
-                PDF_FIELD(
+                pdf_as_function_vec_field(
                     "Function",
-                    &target_ptr->data.type3.function,
-                    PDF_DESER_AS_ARRAY(
-                        pdf_function_vec_push_uninit,
-                        PDF_DESER_CUSTOM(pdf_deser_function_trampoline)
-                    )
+                    &target_ptr->data.type3.function
                 ),
-                PDF_FIELD(
+                pdf_boolean_vec_optional_field(
                     "Extend",
-                    &target_ptr->data.type3.extend,
-                    PDF_DESER_OPTIONAL(
-                        pdf_boolean_vec_op_init,
-                        PDF_DESER_ARRAY(
-                            pdf_boolean_vec_push_uninit,
-                            PDF_DESER_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
-                        )
-                    )
+                    &target_ptr->data.type3.extend
                 )
             };
 
-            TRY(pdf_deser_dict(
+            TRY(pdf_deserde_fields(
                 object,
                 specific_fields,
                 sizeof(specific_fields) / sizeof(PdfFieldDescriptor),
@@ -191,13 +121,13 @@ Error* pdf_deser_shading_dict(
                 return ERROR(PDF_ERR_INCORRECT_TYPE);
             }
 
-            if (target_ptr->data.type3.domain.has_value
+            if (target_ptr->data.type3.domain.is_some
                 && pdf_number_vec_len(target_ptr->data.type3.domain.value)
                        != 2) {
                 return ERROR(PDF_ERR_INCORRECT_TYPE);
             }
 
-            if (target_ptr->data.type3.extend.has_value
+            if (target_ptr->data.type3.extend.is_some
                 && pdf_boolean_vec_len(target_ptr->data.type3.extend.value)
                        != 2) {
                 return ERROR(PDF_ERR_INCORRECT_TYPE);

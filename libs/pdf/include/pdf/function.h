@@ -4,16 +4,23 @@
 
 #include "arena/arena.h"
 #include "err/error.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 #include "postscript/object.h"
 
 typedef struct PdfFunction PdfFunction;
+
+PDF_DECL_FIELD(PdfFunction, function)
 
 #define DVEC_NAME PdfFunctionVec
 #define DVEC_LOWERCASE_NAME pdf_function_vec
 #define DVEC_TYPE PdfFunction
 #include "arena/dvec_decl.h"
+
+PDF_DECL_ARRAY_FIELD(PdfFunctionVec, function_vec)
+PDF_DECL_AS_ARRAY_FIELD(PdfFunctionVec, function_vec)
 
 typedef struct {
     /// (Optional) An array of n numbers that shall define the function result
@@ -78,7 +85,7 @@ struct PdfFunction {
     } data;
 };
 
-Error* pdf_deser_function(
+Error* pdf_deserde_function(
     const PdfObject* object,
     PdfFunction* target_ptr,
     PdfResolver* resolver
@@ -87,5 +94,3 @@ Error* pdf_deser_function(
 /// Run a function using the operands in io and returning the outputs in io
 Error*
 pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io);
-
-DESER_DECL_TRAMPOLINE(pdf_deser_function_trampoline)

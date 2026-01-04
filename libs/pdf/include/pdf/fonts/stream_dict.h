@@ -3,6 +3,7 @@
 #include "err/error.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
 typedef struct {
     PdfIntegerOptional length1;
@@ -12,7 +13,7 @@ typedef struct {
     PdfStreamOptional metadata;
 } PdfFontStreamDict;
 
-Error* pdf_deser_font_stream_dict(
+Error* pdf_deserde_font_stream_dict(
     const PdfObject* object,
     PdfFontStreamDict* target_ptr,
     PdfResolver* resolver

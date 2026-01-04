@@ -1,8 +1,10 @@
 #pragma once
 
 #include "err/error.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
 // TODO: Use typed lazy refs
 typedef struct {
@@ -41,14 +43,13 @@ typedef struct {
     PdfDictOptional properties;
 } PdfResources;
 
-Error* pdf_deser_resources(
+Error* pdf_deserde_resources(
     const PdfObject* object,
     PdfResources* target_ptr,
     PdfResolver* resolver
 );
 
-DESER_DECL_OPTIONAL(PdfResourcesOptional, PdfResources, pdf_resources_op_init)
-DESER_DECL_TRAMPOLINE(pdf_deser_resources_trampoline)
+PDF_DECL_OPTIONAL_FIELD(PdfResources, PdfResourcesOptional, resources)
 
 typedef enum {
     PDF_LINE_CAP_STYLE_BUTT,
@@ -163,7 +164,7 @@ typedef struct {
 
     /// (Optional; PDF 1.3) The smoothness tolerance (see 10.6.3, "Smoothness
     /// Tolerance").
-    PdfRealOptional sm;
+    PdfNumAsRealOptional sm;
 
     /// (Optional) A flag specifying whether to apply automatic stroke
     /// adjustment (see 10.6.5, "Automatic Stroke Adjustment").
@@ -188,10 +189,10 @@ typedef struct {
     /// constant shape or constant opacity value that shall be used for stroking
     /// operations in the transparent imaging model (see 11.3.7.2, "Source Shape
     /// and Opacity" and 11.6.4.4, "Constant Shape and Opacity").
-    PdfRealOptional ca_stroking;
+    PdfNumAsRealOptional ca_stroking;
 
     /// (Optional; PDF 1.4) Same as CA, but for nonstroking operations.
-    PdfRealOptional ca_nonstroking;
+    PdfNumAsRealOptional ca_nonstroking;
 
     /// (Optional; PDF 1.4) The alpha source flag (“alpha is shape”), specifying
     /// whether the current soft mask and alpha constant shall be interpreted as
@@ -204,7 +205,7 @@ typedef struct {
     PdfUnimplemented tk;
 } PdfGStateParams;
 
-Error* pdf_deser_gstate_params(
+Error* pdf_deserde_gstate_params(
     const PdfObject* object,
     PdfGStateParams* target_ptr,
     PdfResolver* resolver

@@ -2,13 +2,12 @@
 
 #include <string.h>
 
-#include "../deser.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
-Error* pdf_deser_cid_to_gid_map(
+Error* pdf_deserde_cid_to_gid_map(
     const PdfObject* object,
     PdfCIDToGIDMap* target_ptr,
     PdfResolver* resolver
@@ -38,6 +37,8 @@ Error* pdf_deser_cid_to_gid_map(
     return NULL;
 }
 
+PDF_IMPL_OPTIONAL_FIELD(PdfCIDToGIDMap, PdfCIDToGIDMapOptional, cid_to_gid_map)
+
 Error*
 pdf_map_cid_to_gid(PdfCIDToGIDMap* map, uint32_t cid, uint32_t* gid_out) {
     RELEASE_ASSERT(map);
@@ -61,10 +62,3 @@ pdf_map_cid_to_gid(PdfCIDToGIDMap* map, uint32_t cid, uint32_t* gid_out) {
 
     return NULL;
 }
-
-DESER_IMPL_OPTIONAL(PdfCIDToGIDMapOptional, pdf_cid_to_gid_map_op_init)
-
-DESER_IMPL_TRAMPOLINE(
-    pdf_deser_cid_to_gid_map_trampoline,
-    pdf_deser_cid_to_gid_map
-)

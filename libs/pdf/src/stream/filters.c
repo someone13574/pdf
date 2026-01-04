@@ -12,7 +12,7 @@ Error* pdf_decode_filtered_stream(
     Arena* arena,
     const uint8_t* encoded,
     size_t length,
-    PdfNameVecOptional filters,
+    PdfAsNameVecOptional filters,
     uint8_t** decoded,
     size_t* decoded_len
 ) {
@@ -21,7 +21,7 @@ Error* pdf_decode_filtered_stream(
     RELEASE_ASSERT(decoded);
     RELEASE_ASSERT(decoded_len);
 
-    if (filters.has_value && pdf_name_vec_len(filters.value) != 0) {
+    if (filters.is_some && pdf_name_vec_len(filters.value) != 0) {
         Arena* local_arena = arena_new(1024);
         uint8_t* temp = (uint8_t*)encoded;
         size_t temp_len = length;

@@ -44,38 +44,38 @@ void graphics_state_apply_params(
 ) {
     RELEASE_ASSERT(gstate);
 
-    if (params.overprint_upper.has_value) {
-        gstate->stroking_overprint = params.overprint_upper.has_value;
-        gstate->nonstroking_overprint = params.overprint_upper.has_value;
+    if (params.overprint_upper.is_some) {
+        gstate->stroking_overprint = params.overprint_upper.is_some;
+        gstate->nonstroking_overprint = params.overprint_upper.is_some;
     }
 
-    if (params.overprint_lower.has_value) {
-        gstate->nonstroking_overprint = params.overprint_lower.has_value;
+    if (params.overprint_lower.is_some) {
+        gstate->nonstroking_overprint = params.overprint_lower.is_some;
     }
 
-    if (params.overprint_mode.has_value) {
+    if (params.overprint_mode.is_some) {
         gstate->overprint_mode = params.overprint_mode.value == 0
                                    ? OVERPRINT_MODE_DEFAULT
                                    : OVERPRINT_MODE_NONZERO;
     }
 
-    if (params.sm.has_value) {
+    if (params.sm.is_some) {
         gstate->smoothness = params.sm.value;
     }
 
-    if (params.sa.has_value) {
+    if (params.sa.is_some) {
         gstate->stroke_adjustment = params.sa.value;
     }
 
-    if (params.ca_stroking.has_value) {
+    if (params.ca_stroking.is_some) {
         gstate->stroking_alpha *= params.ca_stroking.value;
     }
 
-    if (params.ca_nonstroking.has_value) {
+    if (params.ca_nonstroking.is_some) {
         gstate->nonstroking_alpha *= params.ca_nonstroking.value;
     }
 
-    if (params.ais.has_value) {
+    if (params.ais.is_some) {
         gstate->alpha_source =
             params.ais.value ? ALPHA_SOURCE_SHAPE : ALPHA_SOURCE_OPACITY;
     }

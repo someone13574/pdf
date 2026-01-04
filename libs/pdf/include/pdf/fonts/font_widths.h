@@ -1,6 +1,7 @@
 #pragma once
 
 #include "err/error.h"
+#include "pdf/deserde.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
@@ -25,16 +26,10 @@ typedef struct {
     PdfFontWidthVec* cid_to_width;
 } PdfFontWidths;
 
-DESER_DECL_OPTIONAL(
-    PdfFontWidthsOptional,
-    PdfFontWidths,
-    pdf_font_widths_op_init
-)
-
-Error* pdf_deser_font_widths(
+Error* pdf_deserde_font_widths(
     const PdfObject* object,
     PdfFontWidths* deserialized,
     PdfResolver* resolver
 );
 
-DESER_DECL_TRAMPOLINE(pdf_deser_font_widths_trampoline)
+PDF_DECL_OPTIONAL_FIELD(PdfFontWidths, PdfFontWidthsOptional, font_widths)
