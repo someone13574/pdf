@@ -5,7 +5,6 @@
 #include "pdf/object.h"
 #include "pdf/page.h"
 #include "pdf/resolver.h"
-#include "pdf/types.h"
 
 // Catalog
 typedef struct {

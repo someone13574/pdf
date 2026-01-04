@@ -195,7 +195,10 @@ Error* pdf_get_catalog(PdfResolver* resolver, PdfCatalog* catalog) {
     pdf_get_trailer(resolver, &trailer);
     TRY(pdf_resolve_catalog(&trailer.root, resolver));
 
+    resolver->catalog =
+        arena_alloc(pdf_resolver_arena(resolver), sizeof(PdfCatalog));
     *resolver->catalog = *trailer.root.resolved;
+    *catalog = *resolver->catalog;
 
     return NULL;
 }

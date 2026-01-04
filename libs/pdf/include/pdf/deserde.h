@@ -44,6 +44,8 @@ Error* pdf_deserde_operands(
     PdfResolver* resolver
 );
 
+/// The caller must create the array before this function, otherwise empty
+/// arrays may be uninitialized
 Error* pdf_deserde_typed_array(
     const PdfObject* object,
     PdfDeserdeFn deserializer,
@@ -113,8 +115,14 @@ Error* pdf_deserde_indirect_ref(
     PdfResolver* resolver
 );
 
+typedef int PdfUnimplemented;
+typedef struct {
+    bool is_some;
+    PdfObject object;
+} PdfIgnored;
+
 PdfFieldDescriptor pdf_unimplemented_field(const char* key);
-PdfFieldDescriptor pdf_ignored_field(const char* key, PdfObject* target_ptr);
+PdfFieldDescriptor pdf_ignored_field(const char* key, PdfIgnored* target_ptr);
 
 #define PDF_DECL_FIELD(field_type, lowercase)                                  \
     Error* pdf_deserde_##lowercase##_trampoline(                               \
@@ -144,6 +152,8 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfObject* target_ptr);
         const char* key,                                                       \
         field_type* target_ptr                                                 \
     ) {                                                                        \
+        RELEASE_ASSERT(key);                                                   \
+        RELEASE_ASSERT(target_ptr);                                            \
         return (PdfFieldDescriptor) {.key = key,                               \
                                      .target_ptr = (void*)target_ptr,          \
                                      .deserializer =                           \
@@ -190,6 +200,8 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfObject* target_ptr);
         const char* key,                                                       \
         optional_type* target_ptr                                              \
     ) {                                                                        \
+        RELEASE_ASSERT(key);                                                   \
+        RELEASE_ASSERT(target_ptr);                                            \
         return (                                                               \
             PdfFieldDescriptor                                                 \
         ) {.key = key,                                                         \
@@ -211,6 +223,10 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfObject* target_ptr);
         vec_type** target_ptr,                                                 \
         PdfResolver* resolver                                                  \
     ) {                                                                        \
+        RELEASE_ASSERT(target_ptr);                                            \
+        RELEASE_ASSERT(resolver);                                              \
+        *target_ptr =                                                          \
+            pdf_##lowercase_vec_type##_new(pdf_resolver_arena(resolver));      \
         TRY(pdf_deserde_typed_array(                                           \
             object,                                                            \
             pdf_deserde_##lowercase_base_type##_trampoline,                    \
@@ -236,6 +252,10 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfObject* target_ptr);
         vec_type** target_ptr,                                                 \
         PdfResolver* resolver                                                  \
     ) {                                                                        \
+        RELEASE_ASSERT(target_ptr);                                            \
+        RELEASE_ASSERT(resolver);                                              \
+        *target_ptr =                                                          \
+            pdf_##lowercase_vec_type##_new(pdf_resolver_arena(resolver));      \
         TRY(pdf_deserde_typed_array(                                           \
             object,                                                            \
             pdf_deserde_##lowercase_base_type##_trampoline,                    \
@@ -269,7 +289,7 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfObject* target_ptr);
         PdfObject resolved;                                                    \
         TRY(pdf_resolve_ref(resolver, ref->ref, &resolved));                   \
         ref->resolved =                                                        \
-            arena_alloc(pdf_resolver_arena(resolver), sizeof(ref_type));       \
+            arena_alloc(pdf_resolver_arena(resolver), sizeof(base_type));      \
         TRY(pdf_deserde_##lowercase_base(&resolved, ref->resolved, resolver)); \
         return NULL;                                                           \
     }                                                                          \

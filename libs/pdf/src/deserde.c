@@ -92,11 +92,11 @@ Error* pdf_deserde_fields(
              < pdf_dict_entry_vec_len(resolved_object.data.dict.entries);
              entry_idx++) {
             PdfDictEntry entry;
-            pdf_dict_entry_vec_get(
+            RELEASE_ASSERT(pdf_dict_entry_vec_get(
                 resolved_object.data.dict.entries,
                 entry_idx,
                 &entry
-            );
+            ));
             if (strcmp(entry.key, fields[field_idx].key) != 0) {
                 continue;
             }
@@ -104,6 +104,7 @@ Error* pdf_deserde_fields(
             TRY(field->deserializer(&entry.value, field->target_ptr, resolver),
                 "Error while deserializing field `%s`",
                 field->key);
+
             found = true;
             break;
         }
@@ -172,7 +173,70 @@ Error* pdf_deserde_typed_array(
     void* (*push_uninit)(void* ptr_to_vec_ptr, Arena* arena),
     void** ptr_to_vec_ptr
 ) {
-    LOG_TODO();
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(deserializer);
+    RELEASE_ASSERT(resolver);
+    RELEASE_ASSERT(push_uninit);
+    RELEASE_ASSERT(ptr_to_vec_ptr);
+
+    Error* single_deserde_error = NULL;
+    void* first_element = NULL;
+    if (allow_single_element) {
+        first_element =
+            push_uninit((void*)ptr_to_vec_ptr, pdf_resolver_arena(resolver));
+        single_deserde_error = deserializer(object, first_element, resolver);
+
+        if (!single_deserde_error) {
+            return NULL;
+        }
+    }
+
+    PdfObject resolved;
+    Error* resolve_error =
+        pdf_resolve_object(resolver, object, &resolved, true);
+    if (resolve_error) {
+        return ERROR_ADD_CONTEXT(
+            error_conditional_context(resolve_error, single_deserde_error)
+        );
+    }
+
+    if (resolved.type == PDF_OBJECT_TYPE_ARRAY) {
+        for (size_t idx = 0;
+             idx < pdf_object_vec_len(resolved.data.array.elements);
+             idx++) {
+            PdfObject element;
+            RELEASE_ASSERT(
+                pdf_object_vec_get(resolved.data.array.elements, idx, &element)
+            );
+
+            void* element_target = first_element;
+            if (!element_target) {
+                element_target = push_uninit(
+                    (void*)ptr_to_vec_ptr,
+                    pdf_resolver_arena(resolver)
+                );
+            }
+
+            Error* deserde_error =
+                deserializer(&element, element_target, resolver);
+            if (deserde_error) {
+                return ERROR_ADD_CONTEXT(error_conditional_context(
+                    deserde_error,
+                    single_deserde_error
+                ));
+            }
+
+            first_element = NULL;
+        }
+        return NULL;
+    } else {
+        return error_conditional_context(
+            ERROR(PDF_ERR_INCORRECT_TYPE),
+            single_deserde_error
+        );
+    }
+
+    return NULL;
 }
 
 Error* pdf_deserde_boolean(
@@ -180,7 +244,23 @@ Error* pdf_deserde_boolean(
     PdfBoolean* target_ptr,
     PdfResolver* resolver
 ) {
-    LOG_TODO();
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    PdfObject resolved;
+    TRY(pdf_resolve_object(resolver, object, &resolved, true));
+
+    if (resolved.type != PDF_OBJECT_TYPE_BOOLEAN) {
+        return ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "Expected boolean, found type %d",
+            resolved.type
+        );
+    }
+
+    *target_ptr = resolved.data.boolean;
+    return NULL;
 }
 
 Error* pdf_deserde_integer(
@@ -188,7 +268,23 @@ Error* pdf_deserde_integer(
     PdfInteger* target_ptr,
     PdfResolver* resolver
 ) {
-    LOG_TODO();
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    PdfObject resolved;
+    TRY(pdf_resolve_object(resolver, object, &resolved, true));
+
+    if (resolved.type != PDF_OBJECT_TYPE_INTEGER) {
+        return ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "Expected integer, found type %d",
+            resolved.type
+        );
+    }
+
+    *target_ptr = resolved.data.integer;
+    return NULL;
 }
 
 Error* pdf_deserde_real(
@@ -196,7 +292,23 @@ Error* pdf_deserde_real(
     PdfReal* target_ptr,
     PdfResolver* resolver
 ) {
-    LOG_TODO();
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    PdfObject resolved;
+    TRY(pdf_resolve_object(resolver, object, &resolved, true));
+
+    if (resolved.type != PDF_OBJECT_TYPE_REAL) {
+        return ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "Expected real, found type %d",
+            resolved.type
+        );
+    }
+
+    *target_ptr = resolved.data.real;
+    return NULL;
 }
 
 Error* pdf_deserde_string(
@@ -204,7 +316,23 @@ Error* pdf_deserde_string(
     PdfString* target_ptr,
     PdfResolver* resolver
 ) {
-    LOG_TODO();
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    PdfObject resolved;
+    TRY(pdf_resolve_object(resolver, object, &resolved, true));
+
+    if (resolved.type != PDF_OBJECT_TYPE_STRING) {
+        return ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "Expected string, found type %d",
+            resolved.type
+        );
+    }
+
+    *target_ptr = resolved.data.string;
+    return NULL;
 }
 
 Error* pdf_deserde_name(
@@ -212,7 +340,23 @@ Error* pdf_deserde_name(
     PdfName* target_ptr,
     PdfResolver* resolver
 ) {
-    LOG_TODO();
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    PdfObject resolved;
+    TRY(pdf_resolve_object(resolver, object, &resolved, true));
+
+    if (resolved.type != PDF_OBJECT_TYPE_NAME) {
+        return ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "Expected name, found type %d",
+            resolved.type
+        );
+    }
+
+    *target_ptr = resolved.data.name;
+    return NULL;
 }
 
 Error* pdf_deserde_array(
@@ -220,7 +364,23 @@ Error* pdf_deserde_array(
     PdfArray* target_ptr,
     PdfResolver* resolver
 ) {
-    LOG_TODO();
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    PdfObject resolved;
+    TRY(pdf_resolve_object(resolver, object, &resolved, true));
+
+    if (resolved.type != PDF_OBJECT_TYPE_ARRAY) {
+        return ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "Expected array, found type %d",
+            resolved.type
+        );
+    }
+
+    *target_ptr = resolved.data.array;
+    return NULL;
 }
 
 Error* pdf_deserde_dict(
@@ -228,7 +388,23 @@ Error* pdf_deserde_dict(
     PdfDict* target_ptr,
     PdfResolver* resolver
 ) {
-    LOG_TODO();
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    PdfObject resolved;
+    TRY(pdf_resolve_object(resolver, object, &resolved, true));
+
+    if (resolved.type != PDF_OBJECT_TYPE_DICT) {
+        return ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "Expected dict, found type %d",
+            resolved.type
+        );
+    }
+
+    *target_ptr = resolved.data.dict;
+    return NULL;
 }
 
 Error* pdf_deserde_stream(
@@ -236,7 +412,23 @@ Error* pdf_deserde_stream(
     PdfStream* target_ptr,
     PdfResolver* resolver
 ) {
-    LOG_TODO();
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    PdfObject resolved;
+    TRY(pdf_resolve_object(resolver, object, &resolved, true));
+
+    if (resolved.type != PDF_OBJECT_TYPE_STREAM) {
+        return ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "Expected stream, found type %d",
+            resolved.type
+        );
+    }
+
+    *target_ptr = resolved.data.stream;
+    return NULL;
 }
 
 Error* pdf_deserde_indirect_object(
@@ -244,7 +436,23 @@ Error* pdf_deserde_indirect_object(
     PdfIndirectObject* target_ptr,
     PdfResolver* resolver
 ) {
-    LOG_TODO();
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    PdfObject resolved;
+    TRY(pdf_resolve_object(resolver, object, &resolved, false));
+
+    if (resolved.type != PDF_OBJECT_TYPE_INDIRECT_OBJECT) {
+        return ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "Expected indirect object, found type %d",
+            resolved.type
+        );
+    }
+
+    *target_ptr = resolved.data.indirect_object;
+    return NULL;
 }
 
 Error* pdf_deserde_indirect_ref(
@@ -252,15 +460,79 @@ Error* pdf_deserde_indirect_ref(
     PdfIndirectRef* target_ptr,
     PdfResolver* resolver
 ) {
-    LOG_TODO();
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    if (object->type != PDF_OBJECT_TYPE_INDIRECT_REF) {
+        return ERROR(
+            PDF_ERR_INCORRECT_TYPE,
+            "Expected indirect ref, found type %d",
+            object->type
+        );
+    }
+
+    *target_ptr = object->data.indirect_ref;
+    return NULL;
+}
+
+static Error* deserialize_unimplemented(
+    const PdfObject* object,
+    void* target_ptr,
+    PdfResolver* resolver
+) {
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(!target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    return ERROR(PDF_ERR_UNIMPLEMENTED_KEY, "Unimplemented");
+}
+
+static Error* on_missing_none(void* target_ptr) {
+    (void)target_ptr;
+    return NULL;
 }
 
 PdfFieldDescriptor pdf_unimplemented_field(const char* key) {
-    LOG_TODO();
+    RELEASE_ASSERT(key);
+    return (PdfFieldDescriptor) {.key = key,
+                                 .target_ptr = NULL,
+                                 .deserializer = deserialize_unimplemented,
+                                 .on_missing = on_missing_none};
 }
 
-PdfFieldDescriptor pdf_ignored_field(const char* key, PdfObject* target_ptr) {
-    LOG_TODO();
+static Error* deserialize_ignored(
+    const PdfObject* object,
+    void* target_ptr,
+    PdfResolver* resolver
+) {
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(resolver);
+
+    if (target_ptr) {
+        PdfIgnored* target = target_ptr;
+        target->is_some = true;
+        target->object = *object;
+    }
+
+    return NULL;
+}
+
+static Error* set_ignored_none(void* target_ptr) {
+    if (target_ptr) {
+        PdfIgnored* target = target_ptr;
+        target->is_some = false;
+    }
+
+    return NULL;
+}
+
+PdfFieldDescriptor pdf_ignored_field(const char* key, PdfIgnored* target_ptr) {
+    RELEASE_ASSERT(key);
+    return (PdfFieldDescriptor) {.key = key,
+                                 .target_ptr = target_ptr,
+                                 .deserializer = deserialize_ignored,
+                                 .on_missing = set_ignored_none};
 }
 
 // TODO: Select less-terrible names for the types in these tests

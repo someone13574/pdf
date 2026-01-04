@@ -6,9 +6,6 @@
 #include "pdf/object.h"
 #include "pdf/resolver.h"
 
-typedef int PdfUnimplemented;
-typedef PdfObject PdfIgnored;
-
 PDF_DECL_FIELD(PdfBoolean, boolean)
 PDF_DECL_FIELD(PdfInteger, integer)
 PDF_DECL_FIELD(PdfReal, real)

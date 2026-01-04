@@ -1060,7 +1060,7 @@ ArenaString* pdf_fmt_object_indented(
                     );
 
                     PdfObject key = {
-                        .type = PDF_OBJECT_TYPE_NULL,
+                        .type = PDF_OBJECT_TYPE_NAME,
                         .data.name = entry.key
                     };
                     ArenaString* key_text =

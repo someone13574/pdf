@@ -24,7 +24,7 @@ Error* pdf_deserde_form_xobject(
         pdf_name_field("Subtype", &target_ptr->subtype),
         pdf_integer_optional_field("FormType", &target_ptr->form_type),
         pdf_rectangle_field("BBox", &target_ptr->bbox),
-        pdf_pdf_mat_field("Matrix", &target_ptr->matrix),
+        pdf_pdf_mat_optional_field("Matrix", &target_ptr->matrix),
         pdf_resources_optional_field("Resources", &target_ptr->resources),
         pdf_dict_optional_field("Group", &target_ptr->group),
         pdf_unimplemented_field("Ref"),

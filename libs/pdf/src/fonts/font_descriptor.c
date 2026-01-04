@@ -26,7 +26,7 @@ Error* pdf_deserde_font_descriptor(
         pdf_number_optional_field("FontWeight", &target_ptr->font_weight),
         pdf_integer_field("Flags", &target_ptr->flags),
         pdf_rectangle_optional_field("FontBBox", &target_ptr->font_bbox),
-        pdf_number_field("ItalicsAngle", &target_ptr->italic_angle),
+        pdf_number_field("ItalicAngle", &target_ptr->italic_angle),
         pdf_number_optional_field("Ascent", &target_ptr->ascent),
         pdf_number_optional_field("Descent", &target_ptr->descent),
         pdf_number_optional_field("Leading", &target_ptr->leading),

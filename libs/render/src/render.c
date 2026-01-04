@@ -714,11 +714,17 @@ static Error* process_content_stream(
                     }
                     case PDF_XOBJECT_FORM: {
                         PdfFormXObject* form = &xobject.data.form;
+                        GeomMat3 matrix;
+                        if (form->matrix.is_some) {
+                            matrix = form->matrix.value;
+                        } else {
+                            matrix = geom_mat3_identity();
+                        }
 
                         save_graphics_state(state);
                         geom_mat3_mul(
                             current_graphics_state(state)->ctm,
-                            form->matrix
+                            matrix
                         );
                         // TODO: clip with bbox
 
