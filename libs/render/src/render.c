@@ -816,7 +816,8 @@ Error* render_page(
         arena,
         (uint32_t)geom_rect_size(rect).x,
         (uint32_t)geom_rect_size(rect).y,
-        0xffffffff
+        0xffffffff,
+        1.0
     );
 
     if (page->contents.is_some) {

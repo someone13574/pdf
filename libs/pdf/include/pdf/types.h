@@ -1,6 +1,7 @@
 #pragma once
 
 #include "geom/mat3.h"
+#include "geom/rect.h"
 #include "geom/vec2.h"
 #include "geom/vec3.h"
 #include "pdf/deserde.h"
@@ -103,6 +104,8 @@ Error* pdf_deserde_rectangle(
     PdfRectangle* target_ptr,
     PdfResolver* resolver
 );
+
+GeomRect pdf_rectangle_to_geom(PdfRectangle rect);
 
 PDF_DECL_FIELD(PdfRectangle, rectangle)
 PDF_DECL_OPTIONAL_FIELD(PdfRectangle, PdfRectangleOptional, rectangle)

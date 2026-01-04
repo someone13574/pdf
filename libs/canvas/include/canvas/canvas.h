@@ -45,8 +45,12 @@ Canvas* canvas_new_scalable(
     Arena* arena,
     uint32_t width,
     uint32_t height,
-    uint32_t rgba
+    uint32_t rgba,
+    double raster_res
 );
+
+bool canvas_is_raster(Canvas* canvas);
+double canvas_raster_res(Canvas* canvas);
 
 void canvas_draw_circle(
     Canvas* canvas,
@@ -84,6 +88,8 @@ void canvas_draw_path(
     const PathBuilder* path,
     CanvasBrush brush
 );
+
+void canvas_draw_pixel(Canvas* canvas, GeomVec2 position, uint32_t rgba);
 
 /// Writes the canvas to a file. Returns `true` on success.
 bool canvas_write_file(Canvas* canvas, const char* path);

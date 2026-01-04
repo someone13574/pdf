@@ -31,3 +31,12 @@ GeomMat3 geom_mat3_translate(double x, double y);
 
 /// Multiply two 3x3 matrices
 GeomMat3 geom_mat3_mul(GeomMat3 lhs, GeomMat3 rhs);
+
+/// Finds the first-minor for a 3x3 matrix
+double geom_mat3_minor(GeomMat3 mat, int y, int x);
+
+/// Find the determinant of a matrix
+double geom_mat3_det(GeomMat3 mat);
+
+/// Get the inverse of a matrix
+GeomMat3 geom_mat3_inverse(GeomMat3 mat);

@@ -14,6 +14,12 @@ GeomVec2 geom_vec2_new(double x, double y);
 /// Computes the sum of vectors a and b.
 GeomVec2 geom_vec2_add(GeomVec2 a, GeomVec2 b);
 
+/// Gets a point made up of the minimum of each axis
+GeomVec2 geom_vec2_min(GeomVec2 a, GeomVec2 b);
+
+/// Gets a point made up of the maximum of each axis
+GeomVec2 geom_vec2_max(GeomVec2 a, GeomVec2 b);
+
 /// Transforms this vector using a 3x3 matrix
 GeomVec2 geom_vec2_transform(GeomVec2 lhs, GeomMat3 rhs);
 

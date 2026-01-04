@@ -4,6 +4,8 @@
 
 #include "err/error.h"
 #include "geom/mat3.h"
+#include "geom/rect.h"
+#include "geom/vec2.h"
 #include "logger/log.h"
 #include "pdf/deserde.h"
 #include "pdf/object.h"
@@ -215,6 +217,17 @@ Error* pdf_deserde_rectangle(
     }
 
     return NULL;
+}
+
+GeomRect pdf_rectangle_to_geom(PdfRectangle rect) {
+    return (GeomRect) {.min = geom_vec2_new(
+                           pdf_number_as_real(rect.lower_left_x),
+                           pdf_number_as_real(rect.lower_left_y)
+                       ),
+                       .max = geom_vec2_new(
+                           pdf_number_as_real(rect.upper_right_x),
+                           pdf_number_as_real(rect.upper_right_y)
+                       )};
 }
 
 PDF_IMPL_FIELD(PdfRectangle, rectangle)

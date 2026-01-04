@@ -1,5 +1,7 @@
 #include "geom/vec2.h"
 
+#include <math.h>
+
 #include "geom/vec3.h"
 
 GeomVec2 geom_vec2_new(double x, double y) {
@@ -8,6 +10,14 @@ GeomVec2 geom_vec2_new(double x, double y) {
 
 GeomVec2 geom_vec2_add(GeomVec2 a, GeomVec2 b) {
     return geom_vec2_new(a.x + b.x, a.y + b.y);
+}
+
+GeomVec2 geom_vec2_min(GeomVec2 a, GeomVec2 b) {
+    return geom_vec2_new(fmin(a.x, b.x), fmin(a.y, b.y));
+}
+
+GeomVec2 geom_vec2_max(GeomVec2 a, GeomVec2 b) {
+    return geom_vec2_new(fmax(a.x, b.x), fmax(a.y, b.y));
 }
 
 GeomVec2 geom_vec2_transform(GeomVec2 lhs, GeomMat3 rhs) {

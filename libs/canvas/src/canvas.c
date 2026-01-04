@@ -42,13 +42,29 @@ Canvas* canvas_new_scalable(
     Arena* arena,
     uint32_t width,
     uint32_t height,
-    uint32_t rgba
+    uint32_t rgba,
+    double raster_res
 ) {
     Canvas* canvas = arena_alloc(arena, sizeof(Canvas));
-    canvas->data.scalable = scalable_canvas_new(arena, width, height, rgba);
+    canvas->data.scalable =
+        scalable_canvas_new(arena, width, height, rgba, raster_res);
     canvas->type = CANVAS_TYPE_SCALABLE;
 
     return canvas;
+}
+
+bool canvas_is_raster(Canvas* canvas) {
+    RELEASE_ASSERT(canvas);
+    return canvas->type == CANVAS_TYPE_RASTER;
+}
+
+double canvas_raster_res(Canvas* canvas) {
+    RELEASE_ASSERT(canvas);
+    if (canvas->type == CANVAS_TYPE_RASTER) {
+        return 1.0;
+    } else {
+        return scalable_canvas_raster_res(canvas->data.scalable);
+    }
 }
 
 void canvas_draw_circle(
@@ -182,6 +198,23 @@ void canvas_draw_path(
         }
         case CANVAS_TYPE_SCALABLE: {
             scalable_canvas_draw_path(canvas->data.scalable, path, brush);
+            break;
+        }
+        default: {
+            LOG_PANIC("Unreachable");
+        }
+    }
+}
+
+void canvas_draw_pixel(Canvas* canvas, GeomVec2 position, uint32_t rgba) {
+    RELEASE_ASSERT(canvas);
+
+    switch (canvas->type) {
+        case CANVAS_TYPE_RASTER: {
+            LOG_TODO();
+        }
+        case CANVAS_TYPE_SCALABLE: {
+            scalable_canvas_draw_pixel(canvas->data.scalable, position, rgba);
             break;
         }
         default: {

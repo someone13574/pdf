@@ -19,6 +19,7 @@ struct ScalableCanvas {
 
     uint32_t width;
     uint32_t height;
+    double raster_res;
 
     SvgPartsVec* parts;
 };
@@ -27,14 +28,17 @@ ScalableCanvas* scalable_canvas_new(
     Arena* arena,
     uint32_t width,
     uint32_t height,
-    uint32_t rgba
+    uint32_t rgba,
+    double raster_res
 ) {
     RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(raster_res > 1e-3);
 
     ScalableCanvas* canvas = arena_alloc(arena, sizeof(ScalableCanvas));
     canvas->arena = arena;
     canvas->width = width;
     canvas->height = height;
+    canvas->raster_res = raster_res;
     canvas->parts = svg_parts_vec_new(arena);
 
     svg_parts_vec_push(
@@ -49,6 +53,11 @@ ScalableCanvas* scalable_canvas_new(
     );
 
     return canvas;
+}
+
+double scalable_canvas_raster_res(ScalableCanvas* canvas) {
+    RELEASE_ASSERT(canvas);
+    return canvas->raster_res;
 }
 
 void scalable_canvas_draw_circle(
@@ -312,6 +321,27 @@ void scalable_canvas_draw_path(
     svg_parts_vec_push(
         canvas->parts,
         arena_string_new_fmt(canvas->arena, "  />")
+    );
+}
+
+void scalable_canvas_draw_pixel(
+    ScalableCanvas* canvas,
+    GeomVec2 position,
+    uint32_t rgba
+) {
+    RELEASE_ASSERT(canvas);
+
+    svg_parts_vec_push(
+        canvas->parts,
+        arena_string_new_fmt(
+            canvas->arena,
+            "<rect x=\"%f\" y=\"%f\" width=\"%f\" height=\"%f\" fill=\"#%08x\" />",
+            position.x,
+            position.y,
+            canvas->raster_res,
+            canvas->raster_res,
+            rgba
+        )
     );
 }
 
