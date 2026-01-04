@@ -8,6 +8,7 @@
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/types.h"
 
 Error* pdf_deserde_fields(
     const PdfObject* object,
@@ -535,589 +536,500 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfIgnored* target_ptr) {
                                  .on_missing = set_ignored_none};
 }
 
-// TODO: Select less-terrible names for the types in these tests
-// #ifdef TEST
-
-// #include "object.h"
-// #include "test/test.h"
-// #include "test_helpers.h"
-
-// #define DESERIALIZER_IMPL_HELPER() \
-//     do { \
-//         TRY(pdf_deserde_fields( \
-//             object, \
-//             fields, \
-//             sizeof(fields) / sizeof(PdfFieldDescriptor), \
-//             false, \
-//             resolver, \
-//             "test-object" \
-//         )); \
-//         return NULL; \
-//     } while (0)
-
-// #define DESERIALIZER_TEST_HELPER() \
-//     PdfResolver* resolver; \
-//     TEST_REQUIRE( \
-//         pdf_resolver_new(arena, (uint8_t*)buffer, strlen(buffer), &resolver)
-//         \
-//     ); \
-//     PdfObject object; \
-//     TEST_REQUIRE(pdf_resolve_ref( \
-//         resolver, \
-//         (PdfIndirectRef) {.object_id = 1, .generation = 0}, \
-//         &object \
-//     ));
-
-// typedef struct {
-//     PdfBoolean boolean;
-//     PdfInteger integer;
-//     PdfReal real;
-//     PdfString string;
-//     PdfName name;
-//     PdfArray array;
-//     PdfDict dict;
-//     PdfStream stream;
-//     PdfIndirectRef indirect_ref;
-// } TestDeserObjectsStruct;
-
-// Error* deserde_test_objects_struct(
-//     PdfObject* object,
-//     TestDeserObjectsStruct* deserialized,
-//     PdfResolver* resolver
-// ) {
-//     PdfFieldDescriptor fields[] = {
-//         PDF_FIELD(
-//             "Boolean",
-//             &deserialized->boolean,
-//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_BOOLEAN)
-//         ),
-//         PDF_FIELD(
-//             "Integer",
-//             &deserialized->integer,
-//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-//         ),
-//         PDF_FIELD(
-//             "Real",
-//             &deserialized->real,
-//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_REAL)
-//         ),
-//         PDF_FIELD(
-//             "String",
-//             &deserialized->string,
-//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
-//         ),
-//         PDF_FIELD(
-//             "Name",
-//             &deserialized->name,
-//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-//         ),
-//         PDF_FIELD(
-//             "Array",
-//             &deserialized->array,
-//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_ARRAY)
-//         ),
-//         PDF_FIELD(
-//             "Dict",
-//             &deserialized->dict,
-//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_DICT)
-//         ),
-//         PDF_FIELD(
-//             "Stream",
-//             &deserialized->stream,
-//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STREAM)
-//         ),
-//         PDF_FIELD(
-//             "IndirectRef",
-//             &deserialized->indirect_ref,
-//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INDIRECT_REF)
-//         )
-//     };
-
-//     DESERIALIZER_IMPL_HELPER();
-// }
-
-// TEST_FUNC(test_deserde_objects) {
-//     Arena* arena = arena_new(1024);
-//     const char* objects[] = {
-//         "<< /Boolean true /Integer 42 /Real 42.5 /String (test) /Name /Hello
-//         /Array [1 2 3] /Dict << /A 1 /B 2 >> /Stream 2 0 R /IndirectRef 1 0 R
-//         >>",
-//         "<< /Length 8 >> stream\n01234567\nendstream\n"
-//     };
-
-//     char* buffer = pdf_construct_deserde_test_doc(
-//         objects,
-//         2,
-//         "<< /Size 3 /Root 404 0 R >>",
-//         arena
-//     );
-
-//     DESERIALIZER_TEST_HELPER();
-
-//     TestDeserObjectsStruct deserialized;
-//     TEST_REQUIRE(deserde_test_objects_struct(&object, &deserialized,
-//     resolver));
-
-//     TEST_ASSERT(deserialized.boolean);
-//     TEST_ASSERT_EQ(42, deserialized.integer);
-//     TEST_ASSERT_EQ(42.5, deserialized.real);
-//     TEST_ASSERT_EQ("test", pdf_string_as_cstr(deserialized.string, arena));
-//     TEST_ASSERT_EQ("Hello", deserialized.name);
-
-//     TEST_ASSERT(deserialized.array.elements);
-//     TEST_ASSERT_EQ((size_t)3,
-//     pdf_object_vec_len(deserialized.array.elements)); for (size_t idx = 0;
-//     idx < 3; idx++) {
-//         PdfObject* element;
-//         TEST_ASSERT(
-//             pdf_object_vec_get(deserialized.array.elements, idx, &element)
-//         );
-//         TEST_ASSERT(element);
-//         TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER,
-//         element->type); TEST_ASSERT_EQ((PdfInteger)idx + 1,
-//         element->data.integer);
-//     }
-
-//     TEST_ASSERT(deserialized.dict.entries);
-//     TEST_ASSERT_EQ(
-//         (size_t)2,
-//         pdf_dict_entry_vec_len(deserialized.dict.entries)
-//     );
-//     for (size_t idx = 0; idx < 2; idx++) {
-//         PdfDictEntry entry;
-//         TEST_ASSERT(
-//             pdf_dict_entry_vec_get(deserialized.dict.entries, idx, &entry)
-//         );
-
-//         TEST_ASSERT(entry.key);
-//         TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_NAME, entry.key->type);
-//         TEST_ASSERT_EQ(idx == 0 ? "A" : "B", entry.key->data.name);
-
-//         TEST_ASSERT(entry.value);
-//         TEST_ASSERT_EQ(
-//             (PdfObjectType)PDF_OBJECT_TYPE_INTEGER,
-//             entry.value->type
-//         );
-//         TEST_ASSERT_EQ((PdfInteger)idx + 1, entry.value->data.integer);
-//     }
-
-//     TEST_ASSERT(deserialized.stream.stream_dict);
-//     TEST_ASSERT(deserialized.stream.stream_bytes);
-//     TEST_ASSERT_EQ((size_t)8, deserialized.stream.decoded_stream_len);
-//     TEST_ASSERT(
-//         memcmp(
-//             "01234567",
-//             deserialized.stream.stream_bytes,
-//             deserialized.stream.decoded_stream_len
-//         )
-//         == 0
-//     );
-
-//     TEST_ASSERT_EQ((size_t)1, deserialized.indirect_ref.object_id);
-//     TEST_ASSERT_EQ((size_t)0, deserialized.indirect_ref.generation);
-
-//     return TEST_RESULT_PASS;
-// }
-
-// typedef struct {
-//     PdfName hello;
-//     PdfInteger world;
-// } TestDeserInnerStruct;
-
-// Error* deserde_test_inner_struct(
-//     const PdfObject* object,
-//     TestDeserInnerStruct* deserialized,
-//     PdfResolver* resolver
-// ) {
-//     PdfFieldDescriptor fields[] = {
-//         PDF_FIELD(
-//             "Hello",
-//             &deserialized->hello,
-//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_NAME)
-//         ),
-//         PDF_FIELD(
-//             "World",
-//             &deserialized->world,
-//             PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-//         )
-//     };
-
-//     DESERIALIZER_IMPL_HELPER();
-// }
-
-// DESERDE_IMPL_TRAMPOLINE(
-//     deserde_test_inner_struct_untyped,
-//     deserde_test_inner_struct
-// )
-
-// DESERDE_DECL_RESOLVABLE(
-//     TestDeserInnerStructRef,
-//     TestDeserInnerStruct,
-//     test_deserde_inner_struct_ref_init,
-//     test_deserde_resolve_inner_struct
-// )
-
-// DESERDE_IMPL_RESOLVABLE(
-//     TestDeserInnerStructRef,
-//     TestDeserInnerStruct,
-//     test_deserde_inner_struct_ref_init,
-//     test_deserde_resolve_inner_struct,
-//     deserde_test_inner_struct
-// )
-
-// typedef struct {
-//     TestDeserInnerStructRef reference;
-// } TestDeserRefStruct;
-
-// Error* deserde_test_ref_struct(
-//     PdfObject* object,
-//     TestDeserRefStruct* deserialized,
-//     PdfResolver* resolver
-// ) {
-//     PdfFieldDescriptor fields[] = {PDF_FIELD(
-//         "Reference",
-//         &deserialized->reference,
-//         PDF_DESERDE_RESOLVABLE(test_deserde_inner_struct_ref_init)
-//     )};
-
-//     DESERIALIZER_IMPL_HELPER();
-// }
-
-// TEST_FUNC(test_deserde_ref) {
-//     Arena* arena = arena_new(1024);
-//     const char* objects[] = {
-//         "<< /Reference 2 0 R >>",
-//         "<< /Hello /There /World 42 >>"
-//     };
-
-//     char* buffer = pdf_construct_deserde_test_doc(
-//         objects,
-//         2,
-//         "<< /Size 3 /Root 404 0 R >>",
-//         arena
-//     );
-
-//     DESERIALIZER_TEST_HELPER();
-
-//     TestDeserRefStruct deserialized;
-//     TEST_REQUIRE(deserde_test_ref_struct(&object, &deserialized, resolver));
-
-//     TestDeserInnerStruct resolved;
-//     TEST_REQUIRE(test_deserde_resolve_inner_struct(
-//         deserialized.reference,
-//         resolver,
-//         &resolved
-//     ));
-
-//     TEST_ASSERT_EQ("There", resolved.hello);
-//     TEST_ASSERT_EQ(42, resolved.world);
-
-//     return TEST_RESULT_PASS;
-// }
-
-// typedef struct {
-//     TestDeserInnerStruct inner;
-// } TestDeserInlineStruct;
-
-// Error* deserde_test_inline_struct(
-//     PdfObject* object,
-//     TestDeserInlineStruct* deserialized,
-//     PdfResolver* resolver
-// ) {
-//     PdfFieldDescriptor fields[] = {PDF_FIELD(
-//         "Inner",
-//         &deserialized->inner,
-//         PDF_DESERDE_CUSTOM(deserde_test_inner_struct_untyped)
-//     )};
-
-//     DESERIALIZER_IMPL_HELPER();
-// }
-
-// TEST_FUNC(test_deserde_inline_struct) {
-//     Arena* arena = arena_new(1024);
-//     const char* objects[] = {
-//         "<< /Inner 2 0 R >>",
-//         "<< /Hello /There /World 42 >>"
-//     };
-
-//     char* buffer = pdf_construct_deserde_test_doc(
-//         objects,
-//         2,
-//         "<< /Size 3 /Root 404 0 R >>",
-//         arena
-//     );
-
-//     PdfResolver* resolver;
-//     TEST_REQUIRE(
-//         pdf_resolver_new(arena, (uint8_t*)buffer, strlen(buffer), &resolver)
-//     );
-
-//     PdfObject object;
-//     TEST_REQUIRE(pdf_resolve_ref(
-//         resolver,
-//         (PdfIndirectRef) {.object_id = 1, .generation = 0},
-//         &object
-//     ));
-
-//     TestDeserInlineStruct deserialized;
-//     TEST_REQUIRE(deserde_test_inline_struct(&object, &deserialized,
-//     resolver));
-
-//     TEST_ASSERT_EQ("There", deserialized.inner.hello);
-//     TEST_ASSERT_EQ(42, deserialized.inner.world);
-
-//     return TEST_RESULT_PASS;
-// }
-
-// DESERDE_DECL_OPTIONAL(
-//     TestDeserInnerOptional,
-//     TestDeserInnerStruct,
-//     test_deserde_inner_struct_op_init
-// )
-
-// DESERDE_IMPL_OPTIONAL(TestDeserInnerOptional,
-// test_deserde_inner_struct_op_init)
-
-// typedef struct {
-//     TestDeserInnerOptional inner;
-// } TestDeserInlineOptional;
-
-// Error* deserde_test_inline_optional(
-//     PdfObject* object,
-//     TestDeserInlineOptional* deserialized,
-//     PdfResolver* resolver
-// ) {
-//     PdfFieldDescriptor fields[] = {PDF_FIELD(
-//         "Inner",
-//         &deserialized->inner,
-//         PDF_DESERDE_OPTIONAL(
-//             test_deserde_inner_struct_op_init,
-//             PDF_DESERDE_CUSTOM(deserde_test_inner_struct_untyped)
-//         )
-//     )};
-
-//     DESERIALIZER_IMPL_HELPER();
-// }
-
-// TEST_FUNC(test_deserde_inline_optional) {
-//     Arena* arena = arena_new(1024);
-//     const char* objects[] = {
-//         "<< /Inner 2 0 R >>",
-//         "<< /Hello /There /World 42 >>"
-//     };
-
-//     char* buffer = pdf_construct_deserde_test_doc(
-//         objects,
-//         2,
-//         "<< /Size 3 /Root 404 0 R >>",
-//         arena
-//     );
-
-//     DESERIALIZER_TEST_HELPER();
-
-//     TestDeserInlineOptional deserialized;
-//     TEST_REQUIRE(
-//         deserde_test_inline_optional(&object, &deserialized, resolver)
-//     );
-
-//     TEST_ASSERT(deserialized.inner.has_value);
-//     TEST_ASSERT_EQ("There", deserialized.inner.value.hello);
-//     TEST_ASSERT_EQ(42, deserialized.inner.value.world);
-
-//     return TEST_RESULT_PASS;
-// }
-
-// TEST_FUNC(test_deserde_inline_optional_none) {
-//     Arena* arena = arena_new(1024);
-//     const char* objects[] = {"<< >>"};
-
-//     char* buffer = pdf_construct_deserde_test_doc(
-//         objects,
-//         1,
-//         "<< /Size 2 /Root 404 0 R >>",
-//         arena
-//     );
-
-//     DESERIALIZER_TEST_HELPER();
-
-//     TestDeserInlineOptional deserialized = {.inner.has_value = true};
-//     TEST_REQUIRE(
-//         deserde_test_inline_optional(&object, &deserialized, resolver)
-//     );
-
-//     TEST_ASSERT(!deserialized.inner.has_value);
-
-//     return TEST_RESULT_PASS;
-// }
-
-// #define DVEC_NAME DeserializeTestStringArray
-// #define DVEC_LOWERCASE_NAME deserde_test_string_array
-// #define DVEC_TYPE PdfString
-// #include "arena/dvec_impl.h"
-
-// #define DVEC_NAME DeserializeTestIntegerArray
-// #define DVEC_LOWERCASE_NAME deserde_test_integer_array
-// #define DVEC_TYPE PdfInteger
-// #include "arena/dvec_impl.h"
-
-// typedef struct {
-//     DeserializeTestStringArray* strings;
-//     DeserializeTestIntegerArray* integers;
-// } TestDeserPrimitiveArrays;
-
-// Error* deserde_test_primitive_arrays(
-//     PdfObject* object,
-//     PdfResolver* resolver,
-//     TestDeserPrimitiveArrays* deserialized
-// ) {
-//     PdfFieldDescriptor fields[] = {
-//         PDF_FIELD(
-//             "Strings",
-//             &deserialized->strings,
-//             PDF_DESERDE_ARRAY(
-//                 deserde_test_string_array_push_uninit,
-//                 PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_STRING)
-//             )
-//         ),
-//         PDF_FIELD(
-//             "Integers",
-//             &deserialized->integers,
-//             PDF_DESERDE_ARRAY(
-//                 deserde_test_integer_array_push_uninit,
-//                 PDF_DESERDE_OBJECT(PDF_OBJECT_TYPE_INTEGER)
-//             )
-//         )
-//     };
-
-//     DESERIALIZER_IMPL_HELPER();
-// }
-
-// TEST_FUNC(test_deserde_primitive_arrays) {
-//     Arena* arena = arena_new(1024);
-//     const char* objects[] = {
-//         "<< /Strings [(Hello) (World)] /Integers [4 5 6] >>"
-//     };
-
-//     char* buffer = pdf_construct_deserde_test_doc(
-//         objects,
-//         1,
-//         "<< /Size 2 /Root 404 0 R >>",
-//         arena
-//     );
-
-//     DESERIALIZER_TEST_HELPER();
-
-//     TestDeserPrimitiveArrays deserialized;
-//     TEST_REQUIRE(
-//         deserde_test_primitive_arrays(&object, resolver, &deserialized)
-//     );
-
-//     TEST_ASSERT(deserialized.strings);
-//     TEST_ASSERT_EQ(
-//         (size_t)2,
-//         deserde_test_string_array_len(deserialized.strings)
-//     );
-
-//     PdfString out_str;
-//     TEST_ASSERT(
-//         deserde_test_string_array_get(deserialized.strings, 0, &out_str)
-//     );
-//     TEST_ASSERT_EQ("Hello", pdf_string_as_cstr(out_str, arena));
-//     TEST_ASSERT(
-//         deserde_test_string_array_get(deserialized.strings, 1, &out_str)
-//     );
-//     TEST_ASSERT_EQ("World", pdf_string_as_cstr(out_str, arena));
-
-//     TEST_ASSERT(deserialized.integers);
-//     TEST_ASSERT_EQ(
-//         (size_t)3,
-//         deserde_test_integer_array_len(deserialized.integers)
-//     );
-
-//     PdfInteger out_int;
-//     TEST_ASSERT(
-//         deserde_test_integer_array_get(deserialized.integers, 0, &out_int)
-//     );
-//     TEST_ASSERT_EQ((PdfInteger)4, out_int);
-//     TEST_ASSERT(
-//         deserde_test_integer_array_get(deserialized.integers, 1, &out_int)
-//     );
-//     TEST_ASSERT_EQ((PdfInteger)5, out_int);
-//     TEST_ASSERT(
-//         deserde_test_integer_array_get(deserialized.integers, 2, &out_int)
-//     );
-//     TEST_ASSERT_EQ((PdfInteger)6, out_int);
-
-//     return TEST_RESULT_PASS;
-// }
-
-// #define DVEC_NAME DeserializeTestStructArray
-// #define DVEC_LOWERCASE_NAME deserde_test_struct_array
-// #define DVEC_TYPE TestDeserInnerStruct
-// #include "arena/dvec_impl.h"
-
-// typedef struct {
-//     DeserializeTestStructArray* inners;
-// } TestDeserTestComplexArray;
-
-// Error* deserde_test_complex_array(
-//     PdfObject* object,
-//     TestDeserTestComplexArray* deserialized,
-//     PdfResolver* resolver
-// ) {
-//     PdfFieldDescriptor fields[] = {PDF_FIELD(
-//         "Inners",
-//         &deserialized->inners,
-//         PDF_DESERDE_ARRAY(
-//             deserde_test_struct_array_push_uninit,
-//             PDF_DESERDE_CUSTOM(deserde_test_inner_struct_untyped)
-//         )
-//     )};
-
-//     DESERIALIZER_IMPL_HELPER();
-// }
-
-// TEST_FUNC(test_deserde_custom_array) {
-//     Arena* arena = arena_new(1024);
-//     const char* objects[] = {
-//         "<< /Inners [<< /Hello /There /World 42 >> << /Hello /Example /World
-//         5 >>] >>"
-//     };
-
-//     char* buffer = pdf_construct_deserde_test_doc(
-//         objects,
-//         1,
-//         "<< /Size 2 /Root 404 0 R >>",
-//         arena
-//     );
-
-//     DESERIALIZER_TEST_HELPER();
-
-//     TestDeserTestComplexArray deserialized;
-//     TEST_REQUIRE(deserde_test_complex_array(&object, &deserialized,
-//     resolver));
-
-//     TEST_ASSERT(deserialized.inners);
-//     TEST_ASSERT_EQ(
-//         (size_t)2,
-//         deserde_test_struct_array_len(deserialized.inners)
-//     );
-
-//     TestDeserInnerStruct element0;
-//     TEST_ASSERT(
-//         deserde_test_struct_array_get(deserialized.inners, 0, &element0)
-//     );
-//     TEST_ASSERT_EQ("There", element0.hello);
-//     TEST_ASSERT_EQ(42, element0.world);
-
-//     TestDeserInnerStruct element1;
-//     TEST_ASSERT(
-//         deserde_test_struct_array_get(deserialized.inners, 1, &element1)
-//     );
-//     TEST_ASSERT_EQ("Example", element1.hello);
-//     TEST_ASSERT_EQ(5, element1.world);
-
-//     return TEST_RESULT_PASS;
-// }
-
-// #endif // TEST
+#ifdef TEST
+
+#include "object.h"
+#include "test/test.h"
+#include "test_helpers.h"
+
+#define DESERIALIZER_IMPL_HELPER()                                             \
+    do {                                                                       \
+        TRY(pdf_deserde_fields(                                                \
+            object,                                                            \
+            fields,                                                            \
+            sizeof(fields) / sizeof(PdfFieldDescriptor),                       \
+            false,                                                             \
+            resolver,                                                          \
+            "test-object"                                                      \
+        ));                                                                    \
+        return NULL;                                                           \
+    } while (0)
+
+#define DESERIALIZER_TEST_HELPER()                                             \
+    PdfResolver* resolver;                                                     \
+    TEST_REQUIRE(                                                              \
+        pdf_resolver_new(arena, (uint8_t*)buffer, strlen(buffer), &resolver)   \
+    );                                                                         \
+    PdfObject object;                                                          \
+    TEST_REQUIRE(pdf_resolve_ref(                                              \
+        resolver,                                                              \
+        (PdfIndirectRef) {.object_id = 1, .generation = 0},                    \
+        &object                                                                \
+    ));
+
+typedef struct {
+    PdfBoolean boolean;
+    PdfInteger integer;
+    PdfReal real;
+    PdfString string;
+    PdfName name;
+    PdfArray array;
+    PdfDict dict;
+    PdfStream stream;
+    PdfIndirectRef indirect_ref;
+} TestDeserObjectsStruct;
+
+Error* deserde_test_objects_struct(
+    PdfObject* object,
+    TestDeserObjectsStruct* target_ptr,
+    PdfResolver* resolver
+) {
+    PdfFieldDescriptor fields[] = {
+        pdf_boolean_field("Boolean", &target_ptr->boolean),
+        pdf_integer_field("Integer", &target_ptr->integer),
+        pdf_real_field("Real", &target_ptr->real),
+        pdf_string_field("String", &target_ptr->string),
+        pdf_name_field("Name", &target_ptr->name),
+        pdf_array_field("Array", &target_ptr->array),
+        pdf_dict_field("Dict", &target_ptr->dict),
+        pdf_stream_field("Stream", &target_ptr->stream),
+        pdf_indirect_ref_field("IndirectRef", &target_ptr->indirect_ref)
+    };
+
+    DESERIALIZER_IMPL_HELPER();
+}
+
+TEST_FUNC(test_deserde_objects) {
+    Arena* arena = arena_new(1024);
+    const char* objects[] = {
+        "<< /Boolean true /Integer 42 /Real 42.5 /String (test) /Name /Hello /Array [1 2 3] /Dict << /A 1 /B 2 >> /Stream 2 0 R /IndirectRef 1 0 R>> ",
+        "<< /Length 8 >> stream\n01234567\nendstream\n"
+    };
+
+    char* buffer = pdf_construct_deserde_test_doc(
+        objects,
+        2,
+        "<< /Size 3 /Root 404 0 R >>",
+        arena
+    );
+
+    DESERIALIZER_TEST_HELPER();
+
+    TestDeserObjectsStruct deserialized;
+    TEST_REQUIRE(deserde_test_objects_struct(&object, &deserialized, resolver));
+
+    TEST_ASSERT(deserialized.boolean);
+    TEST_ASSERT_EQ(42, deserialized.integer);
+    TEST_ASSERT_EQ(42.5, deserialized.real);
+    TEST_ASSERT_EQ("test", pdf_string_as_cstr(deserialized.string, arena));
+    TEST_ASSERT_EQ("Hello", deserialized.name);
+
+    TEST_ASSERT(deserialized.array.elements);
+    TEST_ASSERT_EQ((size_t)3, pdf_object_vec_len(deserialized.array.elements));
+    for (size_t idx = 0; idx < 3; idx++) {
+        PdfObject element;
+        TEST_ASSERT(
+            pdf_object_vec_get(deserialized.array.elements, idx, &element)
+        );
+        TEST_ASSERT_EQ((PdfObjectType)PDF_OBJECT_TYPE_INTEGER, element.type);
+        TEST_ASSERT_EQ((PdfInteger)idx + 1, element.data.integer);
+    }
+
+    TEST_ASSERT(deserialized.dict.entries);
+    TEST_ASSERT_EQ(
+        (size_t)2,
+        pdf_dict_entry_vec_len(deserialized.dict.entries)
+    );
+    for (size_t idx = 0; idx < 2; idx++) {
+        PdfDictEntry entry;
+        TEST_ASSERT(
+            pdf_dict_entry_vec_get(deserialized.dict.entries, idx, &entry)
+        );
+
+        TEST_ASSERT(entry.key);
+        TEST_ASSERT_EQ(idx == 0 ? "A" : "B", entry.key);
+
+        TEST_ASSERT_EQ(
+            (PdfObjectType)PDF_OBJECT_TYPE_INTEGER,
+            entry.value.type
+        );
+        TEST_ASSERT_EQ((PdfInteger)idx + 1, entry.value.data.integer);
+    }
+
+    TEST_ASSERT(deserialized.stream.stream_dict);
+    TEST_ASSERT(deserialized.stream.stream_bytes);
+    TEST_ASSERT_EQ((size_t)8, deserialized.stream.decoded_stream_len);
+    TEST_ASSERT(
+        memcmp(
+            "01234567",
+            deserialized.stream.stream_bytes,
+            deserialized.stream.decoded_stream_len
+        )
+        == 0
+    );
+
+    TEST_ASSERT_EQ((size_t)1, deserialized.indirect_ref.object_id);
+    TEST_ASSERT_EQ((size_t)0, deserialized.indirect_ref.generation);
+
+    return TEST_RESULT_PASS;
+}
+
+typedef struct {
+    PdfName hello;
+    PdfInteger world;
+} TestInnerStruct;
+
+static Error* pdf_deserde_test_inner_struct(
+    const PdfObject* object,
+    TestInnerStruct* target_ptr,
+    PdfResolver* resolver
+) {
+    PdfFieldDescriptor fields[] = {
+        pdf_name_field("Hello", &target_ptr->hello),
+        pdf_integer_field("World", &target_ptr->world)
+    };
+
+    DESERIALIZER_IMPL_HELPER();
+}
+
+PDF_DECL_FIELD(TestInnerStruct, test_inner_struct)
+PDF_IMPL_FIELD(TestInnerStruct, test_inner_struct)
+
+PDF_DECL_RESOLVABLE_FIELD(
+    TestInnerStruct,
+    TestInnerStructRef,
+    test_inner_struct
+)
+PDF_IMPL_RESOLVABLE_FIELD(
+    TestInnerStruct,
+    TestInnerStructRef,
+    test_inner_struct
+)
+
+typedef struct {
+    TestInnerStructRef reference;
+} TestRefStruct;
+
+Error* deserde_test_ref_struct(
+    PdfObject* object,
+    TestRefStruct* target_ptr,
+    PdfResolver* resolver
+) {
+    PdfFieldDescriptor fields[] = {
+        pdf_test_inner_struct_ref_field("Reference", &target_ptr->reference)
+    };
+
+    DESERIALIZER_IMPL_HELPER();
+}
+
+TEST_FUNC(test_deserde_ref) {
+    Arena* arena = arena_new(1024);
+    const char* objects[] = {
+        "<< /Reference 2 0 R >>",
+        "<< /Hello /There /World 42 >>"
+    };
+
+    char* buffer = pdf_construct_deserde_test_doc(
+        objects,
+        2,
+        "<< /Size 3 /Root 404 0 R >>",
+        arena
+    );
+
+    DESERIALIZER_TEST_HELPER();
+
+    TestRefStruct deserialized;
+    TEST_REQUIRE(deserde_test_ref_struct(&object, &deserialized, resolver));
+
+    TEST_REQUIRE(
+        pdf_resolve_test_inner_struct(&deserialized.reference, resolver)
+    );
+
+    TEST_ASSERT_EQ("There", deserialized.reference.resolved->hello);
+    TEST_ASSERT_EQ(42, deserialized.reference.resolved->world);
+
+    return TEST_RESULT_PASS;
+}
+
+typedef struct {
+    TestInnerStruct inner;
+} TestDeserInlineStruct;
+
+Error* deserde_test_inline_struct(
+    PdfObject* object,
+    TestDeserInlineStruct* target_ptr,
+    PdfResolver* resolver
+) {
+    PdfFieldDescriptor fields[] = {
+        pdf_test_inner_struct_field("Inner", &target_ptr->inner)
+    };
+
+    DESERIALIZER_IMPL_HELPER();
+}
+
+TEST_FUNC(test_deserde_inline_struct) {
+    Arena* arena = arena_new(1024);
+    const char* objects[] = {
+        "<< /Inner 2 0 R >>",
+        "<< /Hello /There /World 42 >>"
+    };
+
+    char* buffer = pdf_construct_deserde_test_doc(
+        objects,
+        2,
+        "<< /Size 3 /Root 404 0 R >>",
+        arena
+    );
+
+    PdfResolver* resolver;
+    TEST_REQUIRE(
+        pdf_resolver_new(arena, (uint8_t*)buffer, strlen(buffer), &resolver)
+    );
+
+    PdfObject object;
+    TEST_REQUIRE(pdf_resolve_ref(
+        resolver,
+        (PdfIndirectRef) {.object_id = 1, .generation = 0},
+        &object
+    ));
+
+    TestDeserInlineStruct deserialized;
+    TEST_REQUIRE(deserde_test_inline_struct(&object, &deserialized, resolver));
+
+    TEST_ASSERT_EQ("There", deserialized.inner.hello);
+    TEST_ASSERT_EQ(42, deserialized.inner.world);
+
+    return TEST_RESULT_PASS;
+}
+
+PDF_DECL_OPTIONAL_FIELD(TestInnerStruct, TestInnerOptional, test_inner_struct)
+PDF_IMPL_OPTIONAL_FIELD(TestInnerStruct, TestInnerOptional, test_inner_struct)
+
+typedef struct {
+    TestInnerOptional inner;
+} TestInlineOptional;
+
+Error* deserde_test_inline_optional(
+    PdfObject* object,
+    TestInlineOptional* target_ptr,
+    PdfResolver* resolver
+) {
+    PdfFieldDescriptor fields[] = {
+        pdf_test_inner_struct_optional_field("Inner", &target_ptr->inner)
+    };
+
+    DESERIALIZER_IMPL_HELPER();
+}
+
+TEST_FUNC(test_deserde_inline_optional) {
+    Arena* arena = arena_new(1024);
+    const char* objects[] = {
+        "<< /Inner 2 0 R >>",
+        "<< /Hello /There /World 42 >>"
+    };
+
+    char* buffer = pdf_construct_deserde_test_doc(
+        objects,
+        2,
+        "<< /Size 3 /Root 404 0 R >>",
+        arena
+    );
+
+    DESERIALIZER_TEST_HELPER();
+
+    TestInlineOptional deserialized;
+    TEST_REQUIRE(
+        deserde_test_inline_optional(&object, &deserialized, resolver)
+    );
+
+    TEST_ASSERT(deserialized.inner.is_some);
+    TEST_ASSERT_EQ("There", deserialized.inner.value.hello);
+    TEST_ASSERT_EQ(42, deserialized.inner.value.world);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_deserde_inline_optional_none) {
+    Arena* arena = arena_new(1024);
+    const char* objects[] = {"<< >>"};
+
+    char* buffer = pdf_construct_deserde_test_doc(
+        objects,
+        1,
+        "<< /Size 2 /Root 404 0 R >>",
+        arena
+    );
+
+    DESERIALIZER_TEST_HELPER();
+
+    TestInlineOptional deserialized = {.inner.is_some = true};
+    TEST_REQUIRE(
+        deserde_test_inline_optional(&object, &deserialized, resolver)
+    );
+
+    TEST_ASSERT(!deserialized.inner.is_some);
+
+    return TEST_RESULT_PASS;
+}
+
+#define DVEC_NAME DeserializeTestStringArray
+#define DVEC_LOWERCASE_NAME pdf_deserde_test_string_array
+#define DVEC_TYPE PdfString
+#include "arena/dvec_impl.h"
+
+PDF_IMPL_ARRAY_FIELD(
+    DeserializeTestStringArray,
+    deserde_test_string_array,
+    string
+)
+
+#define DVEC_NAME DeserializeTestIntegerArray
+#define DVEC_LOWERCASE_NAME pdf_deserde_test_integer_array
+#define DVEC_TYPE PdfInteger
+#include "arena/dvec_impl.h"
+
+PDF_IMPL_ARRAY_FIELD(
+    DeserializeTestIntegerArray,
+    deserde_test_integer_array,
+    integer
+)
+
+typedef struct {
+    DeserializeTestStringArray* strings;
+    DeserializeTestIntegerArray* integers;
+} TestDeserPrimitiveArrays;
+
+Error* deserde_test_primitive_arrays(
+    PdfObject* object,
+    PdfResolver* resolver,
+    TestDeserPrimitiveArrays* target_ptr
+) {
+    PdfFieldDescriptor fields[] = {
+        pdf_deserde_test_string_array_field("Strings", &target_ptr->strings),
+        pdf_deserde_test_integer_array_field("Integers", &target_ptr->integers)
+    };
+
+    DESERIALIZER_IMPL_HELPER();
+}
+
+TEST_FUNC(test_deserde_primitive_arrays) {
+    Arena* arena = arena_new(1024);
+    const char* objects[] = {
+        "<< /Strings [(Hello) (World)] /Integers [4 5 6] >>"
+    };
+
+    char* buffer = pdf_construct_deserde_test_doc(
+        objects,
+        1,
+        "<< /Size 2 /Root 404 0 R >>",
+        arena
+    );
+
+    DESERIALIZER_TEST_HELPER();
+
+    TestDeserPrimitiveArrays deserialized;
+    TEST_REQUIRE(
+        deserde_test_primitive_arrays(&object, resolver, &deserialized)
+    );
+
+    TEST_ASSERT(deserialized.strings);
+    TEST_ASSERT_EQ(
+        (size_t)2,
+        pdf_deserde_test_string_array_len(deserialized.strings)
+    );
+
+    PdfString out_str;
+    TEST_ASSERT(
+        pdf_deserde_test_string_array_get(deserialized.strings, 0, &out_str)
+    );
+    TEST_ASSERT_EQ("Hello", pdf_string_as_cstr(out_str, arena));
+    TEST_ASSERT(
+        pdf_deserde_test_string_array_get(deserialized.strings, 1, &out_str)
+    );
+    TEST_ASSERT_EQ("World", pdf_string_as_cstr(out_str, arena));
+
+    TEST_ASSERT(deserialized.integers);
+    TEST_ASSERT_EQ(
+        (size_t)3,
+        pdf_deserde_test_integer_array_len(deserialized.integers)
+    );
+
+    PdfInteger out_int;
+    TEST_ASSERT(
+        pdf_deserde_test_integer_array_get(deserialized.integers, 0, &out_int)
+    );
+    TEST_ASSERT_EQ((PdfInteger)4, out_int);
+    TEST_ASSERT(
+        pdf_deserde_test_integer_array_get(deserialized.integers, 1, &out_int)
+    );
+    TEST_ASSERT_EQ((PdfInteger)5, out_int);
+    TEST_ASSERT(
+        pdf_deserde_test_integer_array_get(deserialized.integers, 2, &out_int)
+    );
+    TEST_ASSERT_EQ((PdfInteger)6, out_int);
+
+    return TEST_RESULT_PASS;
+}
+
+#define DVEC_NAME DeserializeTestStructArray
+#define DVEC_LOWERCASE_NAME pdf_test_struct_array
+#define DVEC_TYPE TestInnerStruct
+#include "arena/dvec_impl.h"
+
+PDF_IMPL_ARRAY_FIELD(
+    DeserializeTestStructArray,
+    test_struct_array,
+    test_inner_struct
+)
+
+typedef struct {
+    DeserializeTestStructArray* inners;
+} TestDeserTestComplexArray;
+
+Error* deserde_test_complex_array(
+    PdfObject* object,
+    TestDeserTestComplexArray* target_ptr,
+    PdfResolver* resolver
+) {
+    PdfFieldDescriptor fields[] = {
+        pdf_test_struct_array_field("Inners", &target_ptr->inners)
+    };
+
+    DESERIALIZER_IMPL_HELPER();
+}
+
+TEST_FUNC(test_deserde_custom_array) {
+    Arena* arena = arena_new(1024);
+    const char* objects[] = {
+        "<< /Inners [<< /Hello /There /World 42 >> << /Hello /Example /World 5 >>] >>"
+    };
+
+    char* buffer = pdf_construct_deserde_test_doc(
+        objects,
+        1,
+        "<< /Size 2 /Root 404 0 R >>",
+        arena
+    );
+
+    DESERIALIZER_TEST_HELPER();
+
+    TestDeserTestComplexArray deserialized;
+    TEST_REQUIRE(deserde_test_complex_array(&object, &deserialized, resolver));
+
+    TEST_ASSERT(deserialized.inners);
+    TEST_ASSERT_EQ((size_t)2, pdf_test_struct_array_len(deserialized.inners));
+
+    TestInnerStruct element0;
+    TEST_ASSERT(pdf_test_struct_array_get(deserialized.inners, 0, &element0));
+    TEST_ASSERT_EQ("There", element0.hello);
+    TEST_ASSERT_EQ(42, element0.world);
+
+    TestInnerStruct element1;
+    TEST_ASSERT(pdf_test_struct_array_get(deserialized.inners, 1, &element1));
+    TEST_ASSERT_EQ("Example", element1.hello);
+    TEST_ASSERT_EQ(5, element1.world);
+
+    return TEST_RESULT_PASS;
+}
+
+#endif // TEST
