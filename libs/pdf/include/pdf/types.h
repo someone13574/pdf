@@ -1,6 +1,7 @@
 #pragma once
 
 #include "geom/mat3.h"
+#include "geom/vec2.h"
 #include "geom/vec3.h"
 #include "pdf/deserde.h"
 #include "pdf/object.h"
@@ -38,6 +39,7 @@ PDF_DECL_OPTIONAL_FIELD(PdfIndirectRef, PdfIndirectRefOptional, indirect_ref)
 #include "arena/dvec_decl.h"
 
 PDF_DECL_ARRAY_FIELD(PdfBooleanVec, boolean_vec)
+PDF_DECL_FIXED_ARRAY_FIELD(PdfBoolean, boolean)
 PDF_DECL_OPTIONAL_FIELD(PdfBooleanVec*, PdfBooleanVecOptional, boolean_vec)
 
 #define DVEC_NAME PdfNameVec
@@ -82,6 +84,7 @@ PDF_DECL_OPTIONAL_FIELD(PdfReal, PdfNumAsRealOptional, num_as_real)
 #include "arena/dvec_decl.h"
 
 PDF_DECL_ARRAY_FIELD(PdfNumberVec, number_vec)
+PDF_DECL_FIXED_ARRAY_FIELD(PdfNumber, number)
 PDF_DECL_OPTIONAL_FIELD(PdfNumberVec*, PdfNumberVecOptional, number_vec)
 
 PdfReal pdf_number_as_real(PdfNumber number);
@@ -103,6 +106,15 @@ Error* pdf_deserde_rectangle(
 
 PDF_DECL_FIELD(PdfRectangle, rectangle)
 PDF_DECL_OPTIONAL_FIELD(PdfRectangle, PdfRectangleOptional, rectangle)
+
+Error* pdf_deserde_geom_vec2(
+    const PdfObject* object,
+    GeomVec2* target_ptr,
+    PdfResolver* resolver
+);
+
+PDF_DECL_FIELD(GeomVec2, geom_vec2)
+PDF_DECL_OPTIONAL_FIELD(GeomVec2, PdfGeomVec2Optional, geom_vec2)
 
 Error* pdf_deserde_geom_vec3(
     const PdfObject* object,

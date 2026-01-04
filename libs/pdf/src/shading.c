@@ -10,6 +10,13 @@
 #include "pdf/resolver.h"
 #include "pdf/types.h"
 
+static const PdfNumber* default_domain = (PdfNumber[]) {
+    {.type = PDF_NUMBER_TYPE_REAL, .value.real = 0.0},
+    {.type = PDF_NUMBER_TYPE_REAL, .value.real = 1.0}
+};
+
+static const PdfBoolean* default_extend = (PdfBoolean[]) {false, false};
+
 Error* pdf_deserde_shading_dict(
     const PdfObject* object,
     PdfShadingDict* target_ptr,
@@ -44,18 +51,27 @@ Error* pdf_deserde_shading_dict(
                 pdf_ignored_field("Background", NULL),
                 pdf_ignored_field("BBox", NULL),
                 pdf_ignored_field("AntiAlias", NULL),
-                pdf_number_vec_field("Coords", &target_ptr->data.type2.coords),
-                pdf_number_vec_optional_field(
+                pdf_number_fixed_array_field(
+                    "Coords",
+                    target_ptr->data.type2.coords,
+                    4,
+                    NULL
+                ),
+                pdf_number_fixed_array_field(
                     "Domain",
-                    &target_ptr->data.type2.domain
+                    target_ptr->data.type2.domain,
+                    2,
+                    default_domain
                 ),
                 pdf_as_function_vec_field(
                     "Function",
                     &target_ptr->data.type2.function
                 ),
-                pdf_boolean_vec_optional_field(
+                pdf_boolean_fixed_array_field(
                     "Extend",
-                    &target_ptr->data.type2.extend
+                    target_ptr->data.type2.extend,
+                    2,
+                    default_extend
                 )
             };
 
@@ -68,22 +84,6 @@ Error* pdf_deserde_shading_dict(
                 "Type2 shading dict"
             ));
 
-            if (pdf_number_vec_len(target_ptr->data.type2.coords) != 4) {
-                return ERROR(PDF_ERR_INCORRECT_TYPE);
-            }
-
-            if (target_ptr->data.type2.domain.is_some
-                && pdf_number_vec_len(target_ptr->data.type2.domain.value)
-                       != 2) {
-                return ERROR(PDF_ERR_INCORRECT_TYPE);
-            }
-
-            if (target_ptr->data.type2.extend.is_some
-                && pdf_boolean_vec_len(target_ptr->data.type2.extend.value)
-                       != 2) {
-                return ERROR(PDF_ERR_INCORRECT_TYPE);
-            }
-
             break;
         }
         case 3: {
@@ -93,18 +93,27 @@ Error* pdf_deserde_shading_dict(
                 pdf_ignored_field("Background", NULL),
                 pdf_ignored_field("BBox", NULL),
                 pdf_ignored_field("AntiAlias", NULL),
-                pdf_number_vec_field("Coords", &target_ptr->data.type3.coords),
-                pdf_number_vec_optional_field(
+                pdf_number_fixed_array_field(
+                    "Coords",
+                    target_ptr->data.type3.coords,
+                    6,
+                    NULL
+                ),
+                pdf_number_fixed_array_field(
                     "Domain",
-                    &target_ptr->data.type3.domain
+                    target_ptr->data.type3.domain,
+                    2,
+                    default_domain
                 ),
                 pdf_as_function_vec_field(
                     "Function",
                     &target_ptr->data.type3.function
                 ),
-                pdf_boolean_vec_optional_field(
+                pdf_boolean_fixed_array_field(
                     "Extend",
-                    &target_ptr->data.type3.extend
+                    target_ptr->data.type3.extend,
+                    2,
+                    default_extend
                 )
             };
 
@@ -117,22 +126,10 @@ Error* pdf_deserde_shading_dict(
                 "Type3 shading dict"
             ));
 
-            if (pdf_number_vec_len(target_ptr->data.type3.coords) != 6) {
-                return ERROR(PDF_ERR_INCORRECT_TYPE);
-            }
-
-            if (target_ptr->data.type3.domain.is_some
-                && pdf_number_vec_len(target_ptr->data.type3.domain.value)
-                       != 2) {
-                return ERROR(PDF_ERR_INCORRECT_TYPE);
-            }
-
-            if (target_ptr->data.type3.extend.is_some
-                && pdf_boolean_vec_len(target_ptr->data.type3.extend.value)
-                       != 2) {
-                return ERROR(PDF_ERR_INCORRECT_TYPE);
-            }
-
+            break;
+        }
+        case 7: {
+            LOG_WARN(PDF, "Unimplemented shading type 7");
             break;
         }
         default: {

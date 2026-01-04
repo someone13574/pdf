@@ -22,6 +22,7 @@ Error* pdf_deserde_resources(
         pdf_dict_optional_field("ExtGState", &target_ptr->ext_gstate),
         pdf_dict_optional_field("ColorSpace", &target_ptr->color_space),
         pdf_dict_optional_field("Pattern", &target_ptr->pattern),
+        pdf_dict_optional_field("Shading", &target_ptr->shading),
         pdf_dict_optional_field("XObject", &target_ptr->xobject),
         pdf_dict_optional_field("Font", &target_ptr->font),
         pdf_name_vec_optional_field("ProcSet", &target_ptr->proc_set),

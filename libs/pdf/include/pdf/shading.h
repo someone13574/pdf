@@ -2,6 +2,7 @@
 
 #include "err/error.h"
 #include "pdf/color_space.h"
+#include "pdf/deserde.h"
 #include "pdf/function.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
@@ -12,14 +13,14 @@ typedef struct {
     /// (Required) An array of four numbers [ x0 y0 x1 y1 ] specifying the
     /// starting and ending coordinates of the axis, expressed in the shading’s
     /// target coordinate space.
-    PdfNumberVec* coords;
+    PdfNumber coords[4];
 
     /// (Optional) An array of two numbers [ t0 t1 ] specifying the limiting
     /// values of a parametric variable t. The variable is considered to vary
     /// linearly between these two values as the colour gradient varies between
     /// the starting and ending points of the axis. The variable t becomes the
     /// input argument to the colour function(s). Default value: [ 0.0 1.0 ].
-    PdfNumberVecOptional domain;
+    PdfNumber domain[2];
 
     /// (Required) A 1-in, n-out function or an array of n 1-in, 1-out functions
     /// (where n is the number of colour components in the shading dictionary’s
@@ -33,7 +34,7 @@ typedef struct {
     /// (Optional) An array of two boolean values specifying whether to extend
     /// the shading beyond the starting and ending points of the axis,
     /// respectively. Default value: [ false false ].
-    PdfBooleanVecOptional extend;
+    PdfBoolean extend[2];
 } PdfShadingDictType2;
 
 /// Radial shadings
@@ -43,14 +44,14 @@ typedef struct {
     /// shading’s target coordinate space. The radii r0 and r1 shall both be
     /// greater than or equal to 0. If one radius is 0, the corresponding circle
     /// shall be treated as a point; if both are 0, nothing shall be painted.
-    PdfNumberVec* coords;
+    PdfNumber coords[6];
 
     /// (Optional) An array of two numbers [ t0 t1 ] specifying the limiting
     /// values of a parametric variable t. The variable is considered to vary
     /// linearly between these two values as the colour gradient varies between
     /// the starting and ending circles. The variable t becomes the input
     /// argument to the colour function(s). Default value: [ 0.0 1.0 ].
-    PdfNumberVecOptional domain;
+    PdfNumber domain[2];
 
     /// (Required) A 1-in, n-out function or an array of n 1-in, 1-out functions
     /// (where n is the number of colour components in the shading dictionary’s
@@ -65,7 +66,7 @@ typedef struct {
     /// (Optional) An array of two boolean values specifying whether to extend
     /// the shading beyond the starting and ending circles, respectively.
     /// Default value: [ false false ].
-    PdfBooleanVecOptional extend;
+    PdfBoolean extend[2];
 } PdfShadingDictType3;
 
 typedef union {

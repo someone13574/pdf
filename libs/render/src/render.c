@@ -24,6 +24,7 @@
 #include "pdf/shading.h"
 #include "pdf/types.h"
 #include "pdf/xobject.h"
+#include "shading.h"
 #include "text_state.h"
 
 static CanvasLineCap pdf_line_cap_to_canvas(PdfLineCapStyle line_cap) {
@@ -690,7 +691,11 @@ static Error* process_content_stream(
                     pdf_deserde_shading_dict(&resolved, &shading_dict, resolver)
                 );
 
-                // LOG_PANIC("here");
+                render_shading(
+                    &shading_dict,
+                    current_graphics_state(state)->ctm,
+                    canvas
+                );
 
                 break;
             }

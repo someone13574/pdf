@@ -27,7 +27,10 @@ Error* pdf_deserde_cid_font(
         pdf_name_field("Type", &target_ptr->type),
         pdf_name_field("Subtype", &target_ptr->subtype),
         pdf_name_field("BaseFont", &target_ptr->base_font),
-        pdf_cid_system_info_field("CIDSystemIfo", &target_ptr->cid_system_info),
+        pdf_cid_system_info_field(
+            "CIDSystemInfo",
+            &target_ptr->cid_system_info
+        ),
         pdf_font_descriptor_ref_field(
             "FontDescriptor",
             &target_ptr->font_descriptor
@@ -95,7 +98,7 @@ Error* pdf_deserde_type0_font(
             "DescendantFonts",
             &target_ptr->descendant_fonts
         ),
-        pdf_stream_optional_field("Tounicode", &target_ptr->to_unicode)
+        pdf_stream_optional_field("ToUnicode", &target_ptr->to_unicode)
     };
 
     TRY(pdf_deserde_fields(

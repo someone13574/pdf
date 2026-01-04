@@ -41,6 +41,7 @@ PDF_IMPL_OPTIONAL_FIELD(PdfIndirectRef, PdfIndirectRefOptional, indirect_ref)
 #include "arena/dvec_impl.h"
 
 PDF_IMPL_ARRAY_FIELD(PdfBooleanVec, boolean_vec, boolean)
+PDF_IMPL_FIXED_ARRAY_FIELD(PdfBoolean, boolean)
 PDF_IMPL_OPTIONAL_FIELD(PdfBooleanVec*, PdfBooleanVecOptional, boolean_vec)
 
 #define DVEC_NAME PdfNameVec
@@ -111,6 +112,7 @@ PDF_IMPL_OPTIONAL_FIELD(PdfReal, PdfNumAsRealOptional, num_as_real)
 #include "arena/dvec_impl.h"
 
 PDF_IMPL_ARRAY_FIELD(PdfNumberVec, number_vec, number)
+PDF_IMPL_FIXED_ARRAY_FIELD(PdfNumber, number)
 PDF_IMPL_OPTIONAL_FIELD(PdfNumberVec*, PdfNumberVecOptional, number_vec)
 
 PdfReal pdf_number_as_real(PdfNumber number) {
@@ -217,6 +219,53 @@ Error* pdf_deserde_rectangle(
 
 PDF_IMPL_FIELD(PdfRectangle, rectangle)
 PDF_IMPL_OPTIONAL_FIELD(PdfRectangle, PdfRectangleOptional, rectangle)
+
+Error* pdf_deserde_geom_vec2(
+    const PdfObject* object,
+    GeomVec2* target_ptr,
+    PdfResolver* resolver
+) {
+    RELEASE_ASSERT(object);
+    RELEASE_ASSERT(target_ptr);
+    RELEASE_ASSERT(resolver);
+
+    switch (object->type) {
+        case PDF_OBJECT_TYPE_ARRAY: {
+            if (pdf_object_vec_len(object->data.array.elements) != 2) {
+                return ERROR(
+                    PDF_ERR_INCORRECT_TYPE,
+                    "Incorrect number of elements in vec array (expected 2)"
+                );
+            }
+
+            PdfReal array[2] = {0};
+            for (size_t idx = 0; idx < 2; idx++) {
+                PdfObject element;
+                RELEASE_ASSERT(pdf_object_vec_get(
+                    object->data.array.elements,
+                    idx,
+                    &element
+                ));
+
+                PdfNumber number;
+                TRY(pdf_deserde_number(&element, &number, resolver));
+
+                array[idx] = pdf_number_as_real(number);
+            }
+
+            *target_ptr = geom_vec2_new(array[0], array[1]);
+            break;
+        }
+        default: {
+            return ERROR(PDF_ERR_INCORRECT_TYPE, "Vec must be an array");
+        }
+    }
+
+    return NULL;
+}
+
+PDF_IMPL_FIELD(GeomVec2, geom_vec2)
+PDF_IMPL_OPTIONAL_FIELD(GeomVec2, PdfGeomVec2Optional, geom_vec2)
 
 Error* pdf_deserde_geom_vec3(
     const PdfObject* object,

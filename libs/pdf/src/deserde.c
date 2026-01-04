@@ -1,6 +1,7 @@
 #include "pdf/deserde.h"
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -8,6 +9,7 @@
 #include "logger/log.h"
 #include "pdf/object.h"
 #include "pdf/resolver.h"
+#include "pdf/stream_dict.h"
 #include "pdf/types.h"
 
 Error* pdf_deserde_fields(
@@ -25,6 +27,10 @@ Error* pdf_deserde_fields(
     // Resolve object
     PdfObject resolved_object;
     TRY(pdf_resolve_object(resolver, object, &resolved_object, true));
+
+    if (resolved_object.type == PDF_OBJECT_TYPE_STREAM) {
+        resolved_object = *resolved_object.data.stream.stream_dict->raw_dict;
+    }
 
     // Check object type
     if (resolved_object.type != PDF_OBJECT_TYPE_DICT) {
@@ -102,9 +108,25 @@ Error* pdf_deserde_fields(
                 continue;
             }
 
-            TRY(field->deserializer(&entry.value, field->target_ptr, resolver),
-                "Error while deserializing field `%s`",
-                field->key);
+            if (field->fixed_array_len < 0) {
+                RELEASE_ASSERT(field->deserializer);
+                TRY(field->deserializer(
+                        &entry.value,
+                        field->target_ptr,
+                        resolver
+                    ),
+                    "Error while deserializing field `%s`",
+                    field->key);
+            } else {
+                RELEASE_ASSERT(field->fixed_array_deserializer);
+                TRY(field->fixed_array_deserializer(
+                        &entry.value,
+                        *field,
+                        resolver
+                    ),
+                    "Error while deserializing fixed array field `%s`",
+                    field->key);
+            }
 
             found = true;
             break;
@@ -112,7 +134,7 @@ Error* pdf_deserde_fields(
 
         if (!found) {
             if (field->on_missing) {
-                TRY(field->on_missing(field->target_ptr));
+                TRY(field->on_missing(*field));
             } else {
                 return ERROR(
                     PDF_ERR_MISSING_DICT_KEY,
@@ -489,8 +511,8 @@ static Error* deserialize_unimplemented(
     return ERROR(PDF_ERR_UNIMPLEMENTED_KEY, "Unimplemented");
 }
 
-static Error* on_missing_none(void* target_ptr) {
-    (void)target_ptr;
+static Error* on_missing_none(PdfFieldDescriptor descriptor) {
+    (void)descriptor;
     return NULL;
 }
 
@@ -499,7 +521,10 @@ PdfFieldDescriptor pdf_unimplemented_field(const char* key) {
     return (PdfFieldDescriptor) {.key = key,
                                  .target_ptr = NULL,
                                  .deserializer = deserialize_unimplemented,
-                                 .on_missing = on_missing_none};
+                                 .on_missing = on_missing_none,
+                                 .fixed_array_len = -1,
+                                 .fixed_array_default = NULL,
+                                 .fixed_array_deserializer = NULL};
 }
 
 static Error* deserialize_ignored(
@@ -519,9 +544,9 @@ static Error* deserialize_ignored(
     return NULL;
 }
 
-static Error* set_ignored_none(void* target_ptr) {
-    if (target_ptr) {
-        PdfIgnored* target = target_ptr;
+static Error* set_ignored_none(PdfFieldDescriptor descriptor) {
+    if (descriptor.target_ptr) {
+        PdfIgnored* target = descriptor.target_ptr;
         target->is_some = false;
     }
 
@@ -533,7 +558,10 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfIgnored* target_ptr) {
     return (PdfFieldDescriptor) {.key = key,
                                  .target_ptr = target_ptr,
                                  .deserializer = deserialize_ignored,
-                                 .on_missing = set_ignored_none};
+                                 .on_missing = set_ignored_none,
+                                 .fixed_array_len = -1,
+                                 .fixed_array_default = NULL,
+                                 .fixed_array_deserializer = NULL};
 }
 
 #ifdef TEST

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "arena/arena.h"
 #include "err/error.h"
@@ -14,14 +15,26 @@ typedef Error* (*PdfDeserdeFn)(
     PdfResolver* resolver
 );
 
-typedef Error* (*PdfOnFieldMissing)(void* target_ptr);
+typedef struct PdfFieldDescriptor PdfFieldDescriptor;
+typedef Error* (*PdfOnFieldMissing)(PdfFieldDescriptor descriptor);
+typedef Error* (*PdfDeserdeFixedArrayFn)(
+    const PdfObject* object,
+    PdfFieldDescriptor descriptor,
+    PdfResolver* resolver
+);
 
-typedef struct {
+struct PdfFieldDescriptor {
     const char* key;
     void* target_ptr;
     PdfDeserdeFn deserializer;
     PdfOnFieldMissing on_missing;
-} PdfFieldDescriptor;
+    int32_t fixed_array_len; /// If this field is positive, then the
+                             /// deserializer will attempt to deserialize an
+                             /// array made up of elements of which
+                             /// `deserializer` and deserialize.
+    const void* fixed_array_default;
+    PdfDeserdeFixedArrayFn fixed_array_deserializer;
+};
 
 typedef struct {
     void* target_ptr;
@@ -158,7 +171,10 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfIgnored* target_ptr);
                                      .target_ptr = (void*)target_ptr,          \
                                      .deserializer =                           \
                                          pdf_deserde_##lowercase##_trampoline, \
-                                     .on_missing = NULL};                      \
+                                     .on_missing = NULL,                       \
+                                     .fixed_array_len = -1,                    \
+                                     .fixed_array_default = NULL,              \
+                                     .fixed_array_deserializer = NULL};        \
     }                                                                          \
     PdfOperandDescriptor pdf_##lowercase##_operand(field_type* target_ptr) {   \
         return (PdfOperandDescriptor) {                                        \
@@ -183,6 +199,7 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfIgnored* target_ptr);
         void* target_ptr,                                                      \
         PdfResolver* resolver                                                  \
     ) {                                                                        \
+        RELEASE_ASSERT(target_ptr);                                            \
         optional_type* target = target_ptr;                                    \
         target->is_some = true;                                                \
         return pdf_deserde_##lowercase_base(                                   \
@@ -191,8 +208,9 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfIgnored* target_ptr);
             resolver                                                           \
         );                                                                     \
     }                                                                          \
-    Error* pdf_##lowercase_base##_init_none(void* target_ptr) {                \
-        optional_type* target = target_ptr;                                    \
+    Error* pdf_##lowercase_base##_init_none(PdfFieldDescriptor descriptor) {   \
+        RELEASE_ASSERT(descriptor.target_ptr);                                 \
+        optional_type* target = descriptor.target_ptr;                         \
         target->is_some = false;                                               \
         return NULL;                                                           \
     }                                                                          \
@@ -207,7 +225,10 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfIgnored* target_ptr);
         ) {.key = key,                                                         \
            .target_ptr = (void*)target_ptr,                                    \
            .deserializer = pdf_deserde_##lowercase_base##_optional_trampoline, \
-           .on_missing = pdf_##lowercase_base##_init_none};                    \
+           .on_missing = pdf_##lowercase_base##_init_none,                     \
+           .fixed_array_len = -1,                                              \
+           .fixed_array_default = NULL,                                        \
+           .fixed_array_deserializer = NULL};                                  \
     }
 
 #define PDF_DECL_ARRAY_FIELD(vec_type, lowercase_vec_type)                     \
@@ -267,6 +288,79 @@ PdfFieldDescriptor pdf_ignored_field(const char* key, PdfIgnored* target_ptr);
         return NULL;                                                           \
     }                                                                          \
     PDF_IMPL_FIELD(vec_type*, as_##lowercase_vec_type)
+
+#define PDF_DECL_FIXED_ARRAY_FIELD(element_type, lowercase_base)               \
+    PdfFieldDescriptor pdf_##lowercase_base##_fixed_array_field(               \
+        const char* key,                                                       \
+        element_type* target_ptr,                                              \
+        uint16_t length,                                                       \
+        const element_type* default_array                                      \
+    );
+
+#define PDF_IMPL_FIXED_ARRAY_FIELD(element_type, lowercase_base)               \
+    Error* pdf_deserde_##lowercase_base##_fix_array(                           \
+        const PdfObject* object,                                               \
+        PdfFieldDescriptor descriptor,                                         \
+        PdfResolver* resolver                                                  \
+    ) {                                                                        \
+        RELEASE_ASSERT(object);                                                \
+        RELEASE_ASSERT(descriptor.target_ptr);                                 \
+        RELEASE_ASSERT(resolver);                                              \
+        PdfArray array;                                                        \
+        TRY(pdf_deserde_array(object, &array, resolver));                      \
+        size_t actual_len = pdf_object_vec_len(array.elements);                \
+        if ((size_t)descriptor.fixed_array_len != actual_len) {                \
+            return ERROR(                                                      \
+                PDF_ERR_INCORRECT_TYPE,                                        \
+                "Incorrect array length. Expected %zu, found %zu",             \
+                (size_t)descriptor.fixed_array_len,                            \
+                actual_len                                                     \
+            );                                                                 \
+        }                                                                      \
+        element_type* target_array = (element_type*)descriptor.target_ptr;     \
+        for (size_t idx = 0; idx < actual_len; idx++) {                        \
+            PdfObject element;                                                 \
+            RELEASE_ASSERT(pdf_object_vec_get(array.elements, idx, &element)); \
+            element_type deserialized;                                         \
+            TRY(descriptor.deserializer(&element, &deserialized, resolver));   \
+            target_array[idx] = deserialized;                                  \
+        }                                                                      \
+        return NULL;                                                           \
+    }                                                                          \
+    Error* pdf_##lowercase_base##_fixed_array_set_default(                     \
+        PdfFieldDescriptor descriptor                                          \
+    ) {                                                                        \
+        RELEASE_ASSERT(descriptor.target_ptr);                                 \
+        RELEASE_ASSERT(descriptor.fixed_array_len >= 0);                       \
+        RELEASE_ASSERT(descriptor.fixed_array_default);                        \
+        const element_type* src = descriptor.fixed_array_default;              \
+        element_type* dst = descriptor.target_ptr;                             \
+        for (int32_t idx = 0; idx < descriptor.fixed_array_len; idx++) {       \
+            dst[idx] = src[idx];                                               \
+        }                                                                      \
+        return NULL;                                                           \
+    }                                                                          \
+    PdfFieldDescriptor pdf_##lowercase_base##_fixed_array_field(               \
+        const char* key,                                                       \
+        element_type* target_ptr,                                              \
+        uint16_t length,                                                       \
+        const element_type* default_array                                      \
+    ) {                                                                        \
+        RELEASE_ASSERT(key);                                                   \
+        RELEASE_ASSERT(target_ptr);                                            \
+        return (PdfFieldDescriptor) {                                          \
+            .key = key,                                                        \
+            .target_ptr = (void*)target_ptr,                                   \
+            .deserializer = pdf_deserde_##lowercase_base##_trampoline,         \
+            .on_missing = default_array                                        \
+                            ? pdf_##lowercase_base##_fixed_array_set_default   \
+                            : NULL,                                            \
+            .fixed_array_len = (int32_t)length,                                \
+            .fixed_array_default = (void*)default_array,                       \
+            .fixed_array_deserializer =                                        \
+                pdf_deserde_##lowercase_base##_fix_array                       \
+        };                                                                     \
+    }
 
 #define PDF_DECL_RESOLVABLE_FIELD(base_type, ref_type, lowercase_base)         \
     typedef struct {                                                           \
