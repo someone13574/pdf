@@ -1,4 +1,33 @@
-# References/Resources
+# PDF
+
+This is a parser/renderer for PDF files, written from scratch using only the C standard library. It can render simple files, and makes heavy use of panics for anything unimplemented. It should compile on gcc and clang, and maybe msvc (though msvc is rarely tested, so no guarantees).
+
+So far the following have been implemented:
+
+- An arena allocator and arena-backed type-safe vectors, arrays, strings, and linked-lists
+- A logging library, error library, and testing library
+  - The testing library supports in-source tests by (ab)using a custom linker section as a test registry. The testing library only works on clang/gcc.
+- A parser for all core pdf object types
+- A deserialization framework for converting pdf objects into C structures
+  - This supports optional fields, lazy and eagar indirect references, dynamic arrays, fixed arrays, and custom deserialization functions. It makes heavy use of macros.
+- A zlib/deflate decompressor for filtered streams
+- A sfnt (ttf) file parser/renderer
+- A CFF font parser/renderer
+- Support for CID fonts
+- A minimal postscript interpreter for parsing cmap files and running pdf functions
+  - This only implements the operators needed for these tasks
+- A simple (incomplete) renderer
+- A SVG canvas
+
+Future expansions:
+
+- Type1 font parser
+- Support for patterns and shadings
+- Image support
+- ICC parser
+- Raster canvas backend
+
+# Resources
 
 - [PDF Specification](https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf)
   - [Let's write a PDF file](https://speakerdeck.com/ange/lets-write-a-pdf-file)
