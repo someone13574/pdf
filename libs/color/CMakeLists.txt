@@ -1,9 +1,11 @@
 add_library(color
     src/cie_xyz.c
     src/conversion.c
+    src/icc.c
+    src/icc_tags.c
     src/rgb.c)
 target_include_directories(color PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(color PUBLIC geom)
+target_link_libraries(color PUBLIC geom parse-ctx)
 target_link_libraries(color PRIVATE pdf-test)
 target_compile_features(color PUBLIC c_std_11)
 if (NOT MSVC)

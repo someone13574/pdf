@@ -24,6 +24,18 @@
     "env": { "ASAN_OPTIONS": "detect_leaks=0" },
   },
   {
+    "label": "Debug icc-example",
+    "build": {
+      "command": "scripts/dev-build.sh",
+      "args": [],
+      "cwd": "$ZED_WORKTREE_ROOT",
+    },
+    "program": "$ZED_WORKTREE_ROOT/build/examples/icc-example",
+    "request": "launch",
+    "adapter": "CodeLLDB",
+    "env": { "ASAN_OPTIONS": "detect_leaks=0" },
+  },
+  {
     "label": "Debug tessellation-example",
     "build": {
       "command": "scripts/dev-build.sh",

@@ -10,7 +10,24 @@ ParseCtx parse_ctx_new(const uint8_t* buffer, size_t buffer_len) {
     return (ParseCtx) {.buffer = buffer, .buffer_len = buffer_len, .offset = 0};
 }
 
-inline Error* parse_ctx_seek(ParseCtx* ctx, size_t offset) {
+Error* parse_ctx_new_subctx(
+    ParseCtx parent,
+    size_t offset,
+    size_t len,
+    ParseCtx* out
+) {
+    RELEASE_ASSERT(parent.buffer);
+    TRY(parse_ctx_seek(&parent, offset));
+    TRY(parse_ctx_bound_check(&parent, len));
+
+    out->buffer = parent.buffer + parent.offset;
+    out->buffer_len = len;
+    out->offset = 0;
+
+    return NULL;
+}
+
+Error* parse_ctx_seek(ParseCtx* ctx, size_t offset) {
     RELEASE_ASSERT(ctx);
 
     if (offset > ctx->buffer_len) {
@@ -21,7 +38,7 @@ inline Error* parse_ctx_seek(ParseCtx* ctx, size_t offset) {
     return NULL;
 }
 
-inline Error* parse_ctx_bound_check(ParseCtx* ctx, size_t len) {
+Error* parse_ctx_bound_check(ParseCtx* ctx, size_t len) {
     RELEASE_ASSERT(ctx);
 
     if (len > ctx->buffer_len || ctx->offset > ctx->buffer_len - len) {
@@ -31,7 +48,7 @@ inline Error* parse_ctx_bound_check(ParseCtx* ctx, size_t len) {
     return NULL;
 }
 
-inline Error* parse_ctx_read_i8(ParseCtx* ctx, int8_t* out) {
+Error* parse_ctx_read_i8(ParseCtx* ctx, int8_t* out) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(out);
     TRY(parse_ctx_bound_check(ctx, 1));
@@ -42,7 +59,7 @@ inline Error* parse_ctx_read_i8(ParseCtx* ctx, int8_t* out) {
     return NULL;
 }
 
-inline Error* parse_ctx_read_u8(ParseCtx* ctx, uint8_t* out) {
+Error* parse_ctx_read_u8(ParseCtx* ctx, uint8_t* out) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(out);
     TRY(parse_ctx_bound_check(ctx, 1));
@@ -51,7 +68,7 @@ inline Error* parse_ctx_read_u8(ParseCtx* ctx, uint8_t* out) {
     return NULL;
 }
 
-inline Error* parse_ctx_read_i16_le(ParseCtx* ctx, int16_t* out) {
+Error* parse_ctx_read_i16_le(ParseCtx* ctx, int16_t* out) {
     RELEASE_ASSERT(out);
 
     uint16_t u16;
@@ -60,7 +77,7 @@ inline Error* parse_ctx_read_i16_le(ParseCtx* ctx, int16_t* out) {
     return NULL;
 }
 
-inline Error* parse_ctx_read_u16_le(ParseCtx* ctx, uint16_t* out) {
+Error* parse_ctx_read_u16_le(ParseCtx* ctx, uint16_t* out) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(out);
     TRY(parse_ctx_bound_check(ctx, 2));
@@ -73,7 +90,7 @@ inline Error* parse_ctx_read_u16_le(ParseCtx* ctx, uint16_t* out) {
     return NULL;
 }
 
-inline Error* parse_ctx_read_i32_le(ParseCtx* ctx, int32_t* out) {
+Error* parse_ctx_read_i32_le(ParseCtx* ctx, int32_t* out) {
     RELEASE_ASSERT(out);
 
     uint32_t u32;
@@ -82,7 +99,7 @@ inline Error* parse_ctx_read_i32_le(ParseCtx* ctx, int32_t* out) {
     return NULL;
 }
 
-inline Error* parse_ctx_read_u32_le(ParseCtx* ctx, uint32_t* out) {
+Error* parse_ctx_read_u32_le(ParseCtx* ctx, uint32_t* out) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(out);
     TRY(parse_ctx_bound_check(ctx, 4));
@@ -96,7 +113,7 @@ inline Error* parse_ctx_read_u32_le(ParseCtx* ctx, uint32_t* out) {
     return NULL;
 }
 
-inline Error* parse_ctx_read_i64_le(ParseCtx* ctx, int64_t* out) {
+Error* parse_ctx_read_i64_le(ParseCtx* ctx, int64_t* out) {
     RELEASE_ASSERT(out);
 
     uint64_t u64;
@@ -105,7 +122,7 @@ inline Error* parse_ctx_read_i64_le(ParseCtx* ctx, int64_t* out) {
     return NULL;
 }
 
-inline Error* parse_ctx_read_u64_le(ParseCtx* ctx, uint64_t* out) {
+Error* parse_ctx_read_u64_le(ParseCtx* ctx, uint64_t* out) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(out);
     TRY(parse_ctx_bound_check(ctx, 8));
@@ -123,7 +140,7 @@ inline Error* parse_ctx_read_u64_le(ParseCtx* ctx, uint64_t* out) {
     return NULL;
 }
 
-inline Error* parse_ctx_read_i16_be(ParseCtx* ctx, int16_t* out) {
+Error* parse_ctx_read_i16_be(ParseCtx* ctx, int16_t* out) {
     RELEASE_ASSERT(out);
 
     uint16_t u16;
@@ -132,7 +149,7 @@ inline Error* parse_ctx_read_i16_be(ParseCtx* ctx, int16_t* out) {
     return NULL;
 }
 
-inline Error* parse_ctx_read_u16_be(ParseCtx* ctx, uint16_t* out) {
+Error* parse_ctx_read_u16_be(ParseCtx* ctx, uint16_t* out) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(out);
     TRY(parse_ctx_bound_check(ctx, 2));
@@ -145,7 +162,7 @@ inline Error* parse_ctx_read_u16_be(ParseCtx* ctx, uint16_t* out) {
     return NULL;
 }
 
-inline Error* parse_ctx_read_i32_be(ParseCtx* ctx, int32_t* out) {
+Error* parse_ctx_read_i32_be(ParseCtx* ctx, int32_t* out) {
     RELEASE_ASSERT(out);
 
     uint32_t u32;
@@ -154,7 +171,7 @@ inline Error* parse_ctx_read_i32_be(ParseCtx* ctx, int32_t* out) {
     return NULL;
 }
 
-inline Error* parse_ctx_read_u32_be(ParseCtx* ctx, uint32_t* out) {
+Error* parse_ctx_read_u32_be(ParseCtx* ctx, uint32_t* out) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(out);
     TRY(parse_ctx_bound_check(ctx, 4));
@@ -168,7 +185,7 @@ inline Error* parse_ctx_read_u32_be(ParseCtx* ctx, uint32_t* out) {
     return NULL;
 }
 
-inline Error* parse_ctx_read_i64_be(ParseCtx* ctx, int64_t* out) {
+Error* parse_ctx_read_i64_be(ParseCtx* ctx, int64_t* out) {
     RELEASE_ASSERT(out);
 
     uint64_t u64;
@@ -177,7 +194,7 @@ inline Error* parse_ctx_read_i64_be(ParseCtx* ctx, int64_t* out) {
     return NULL;
 }
 
-inline Error* parse_ctx_read_u64_be(ParseCtx* ctx, uint64_t* out) {
+Error* parse_ctx_read_u64_be(ParseCtx* ctx, uint64_t* out) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(out);
     TRY(parse_ctx_bound_check(ctx, 8));
@@ -195,7 +212,7 @@ inline Error* parse_ctx_read_u64_be(ParseCtx* ctx, uint64_t* out) {
     return NULL;
 }
 
-extern inline Error* parse_ctx_read_f32_le(ParseCtx* ctx, float* out) {
+extern Error* parse_ctx_read_f32_le(ParseCtx* ctx, float* out) {
     RELEASE_ASSERT(out);
 
     uint32_t u32;
@@ -204,7 +221,7 @@ extern inline Error* parse_ctx_read_f32_le(ParseCtx* ctx, float* out) {
     return NULL;
 }
 
-extern inline Error* parse_ctx_read_f64_le(ParseCtx* ctx, double* out) {
+extern Error* parse_ctx_read_f64_le(ParseCtx* ctx, double* out) {
     RELEASE_ASSERT(out);
 
     uint64_t u64;
@@ -213,7 +230,7 @@ extern inline Error* parse_ctx_read_f64_le(ParseCtx* ctx, double* out) {
     return NULL;
 }
 
-extern inline Error* parse_ctx_read_f32_be(ParseCtx* ctx, float* out) {
+extern Error* parse_ctx_read_f32_be(ParseCtx* ctx, float* out) {
     RELEASE_ASSERT(out);
 
     uint32_t u32;
@@ -222,7 +239,7 @@ extern inline Error* parse_ctx_read_f32_be(ParseCtx* ctx, float* out) {
     return NULL;
 }
 
-extern inline Error* parse_ctx_read_f64_be(ParseCtx* ctx, double* out) {
+extern Error* parse_ctx_read_f64_be(ParseCtx* ctx, double* out) {
     RELEASE_ASSERT(out);
 
     uint64_t u64;
