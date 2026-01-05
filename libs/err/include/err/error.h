@@ -93,7 +93,8 @@ typedef enum {
     SFNT_ERR_INVALID_VERSION,
     SFNT_ERR_MISSING_TABLE,
     SFNT_ERR_RESERVED,
-    SFNT_ERR_TABLE_CHECKSUM
+    SFNT_ERR_TABLE_CHECKSUM,
+    CTX_EOF
 } ErrorCode;
 
 typedef struct Error Error;

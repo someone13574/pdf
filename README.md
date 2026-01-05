@@ -40,3 +40,4 @@ Future expansions:
 - [Partitioning a Polygon into _y_-monotone Pieces](https://www.youtube.com/watch?v=IkA-2Y9lBvM)
 - [DEFLATE Compressed Data Format Specification](https://datatracker.ietf.org/doc/html/rfc1951)
   - [ZLIB Compressed Data Format Specification](https://datatracker.ietf.org/doc/html/rfc1950)
+- [ICC Specification](https://www.color.org/specification/ICC.1-2022-05.pdf)
