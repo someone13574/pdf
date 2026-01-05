@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "err/error.h"
+#include "geom/vec3.h"
 #include "logger/log.h"
 #include "parse_ctx/ctx.h"
 
@@ -20,6 +21,10 @@ Error* icc_parse_date_time(ParseCtx* ctx, ICCDateTime* out) {
     return NULL;
 }
 
+double icc_s15_fixed16_to_double(ICCS15Fixed16Number num) {
+    return (double)num / 65535.0;
+}
+
 Error* icc_parse_xyz_number(ParseCtx* ctx, ICCXYZNumber* out) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(out);
@@ -29,6 +34,14 @@ Error* icc_parse_xyz_number(ParseCtx* ctx, ICCXYZNumber* out) {
     TRY(parse_ctx_read_u32_be(ctx, &out->z));
 
     return NULL;
+}
+
+GeomVec3 icc_xyz_number_to_geom(ICCXYZNumber xyz) {
+    return geom_vec3_new(
+        icc_s15_fixed16_to_double(xyz.x),
+        icc_s15_fixed16_to_double(xyz.y),
+        icc_s15_fixed16_to_double(xyz.z)
+    );
 }
 
 Error* icc_parse_header(ParseCtx* ctx, ICCProfileHeader* out) {
@@ -70,7 +83,7 @@ Error* icc_tag_table_new(ParseCtx* file_ctx, ICCTagTable* out) {
     TRY(parse_ctx_seek(file_ctx, 128));
     TRY(parse_ctx_read_u32_be(file_ctx, &out->tag_count));
     TRY(parse_ctx_new_subctx(
-        *file_ctx,
+        file_ctx,
         128,
         4 + 12 * out->tag_count,
         &out->table_ctx
@@ -93,7 +106,7 @@ icc_tag_table_lookup(ICCTagTable table, uint32_t tag_signature, ParseCtx* out) {
             TRY(parse_ctx_read_u32_be(&table.table_ctx, &offset));
             TRY(parse_ctx_read_u32_be(&table.table_ctx, &size));
             TRY(parse_ctx_new_subctx(
-                table.file_ctx,
+                &table.file_ctx,
                 (size_t)offset,
                 (size_t)size,
                 out

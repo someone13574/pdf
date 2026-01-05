@@ -7,22 +7,27 @@
 
 ParseCtx parse_ctx_new(const uint8_t* buffer, size_t buffer_len) {
     RELEASE_ASSERT(buffer);
-    return (ParseCtx) {.buffer = buffer, .buffer_len = buffer_len, .offset = 0};
+    return (ParseCtx) {.buffer = buffer,
+                       .buffer_len = buffer_len,
+                       .offset = 0,
+                       .global_offset = 0};
 }
 
 Error* parse_ctx_new_subctx(
-    ParseCtx parent,
+    ParseCtx* parent,
     size_t offset,
     size_t len,
     ParseCtx* out
 ) {
-    RELEASE_ASSERT(parent.buffer);
-    TRY(parse_ctx_seek(&parent, offset));
-    TRY(parse_ctx_bound_check(&parent, len));
+    RELEASE_ASSERT(parent);
+    TRY(parse_ctx_seek(parent, offset));
+    TRY(parse_ctx_bound_check(parent, len));
 
-    out->buffer = parent.buffer + parent.offset;
+    out->buffer = parent->buffer + parent->offset;
     out->buffer_len = len;
     out->offset = 0;
+    out->global_offset = parent->offset + parent->global_offset;
+    parent->offset = parent->offset + len;
 
     return NULL;
 }

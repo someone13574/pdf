@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "err/error.h"
+#include "geom/vec3.h"
 #include "parse_ctx/ctx.h"
 
 typedef struct {
@@ -18,6 +19,8 @@ Error* icc_parse_date_time(ParseCtx* ctx, ICCDateTime* out);
 
 typedef uint32_t ICCS15Fixed16Number;
 
+double icc_s15_fixed16_to_double(ICCS15Fixed16Number num);
+
 typedef struct {
     ICCS15Fixed16Number x;
     ICCS15Fixed16Number y;
@@ -25,6 +28,7 @@ typedef struct {
 } ICCXYZNumber;
 
 Error* icc_parse_xyz_number(ParseCtx* ctx, ICCXYZNumber* out);
+GeomVec3 icc_xyz_number_to_geom(ICCXYZNumber xyz);
 
 typedef struct {
     uint32_t size;

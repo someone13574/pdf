@@ -9,11 +9,19 @@ typedef struct {
     const uint8_t* buffer;
     size_t buffer_len;
     size_t offset;
+    size_t global_offset;
 } ParseCtx;
 
 ParseCtx parse_ctx_new(const uint8_t* buffer, size_t buffer_len);
-Error*
-parse_ctx_new_subctx(ParseCtx parent, size_t offset, size_t len, ParseCtx* out);
+
+/// Create a new context with an offset and size from the start of its parent.
+/// The parent's offset will move to the end of this table.
+Error* parse_ctx_new_subctx(
+    ParseCtx* parent,
+    size_t offset,
+    size_t len,
+    ParseCtx* out
+);
 
 Error* parse_ctx_seek(ParseCtx* ctx, size_t offset);
 Error* parse_ctx_bound_check(ParseCtx* ctx, size_t len);

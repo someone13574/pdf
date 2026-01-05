@@ -9,6 +9,10 @@
     "program": "$ZED_WORKTREE_ROOT/build/examples/pdf-example",
     "request": "launch",
     "adapter": "CodeLLDB",
+    "preRunCommands": [
+      "type format add -f decimal uint8_t",
+      "type format add -f decimal 'unsigned char'",
+    ],
     "env": { "ASAN_OPTIONS": "detect_leaks=0" },
   },
   {
@@ -21,6 +25,10 @@
     "program": "$ZED_WORKTREE_ROOT/build/examples/font-example",
     "request": "launch",
     "adapter": "CodeLLDB",
+    "preRunCommands": [
+      "type format add -f decimal uint8_t",
+      "type format add -f decimal 'unsigned char'",
+    ],
     "env": { "ASAN_OPTIONS": "detect_leaks=0" },
   },
   {
@@ -33,6 +41,10 @@
     "program": "$ZED_WORKTREE_ROOT/build/examples/icc-example",
     "request": "launch",
     "adapter": "CodeLLDB",
+    "preRunCommands": [
+      "type format add -f decimal uint8_t",
+      "type format add -f decimal 'unsigned char'",
+    ],
     "env": { "ASAN_OPTIONS": "detect_leaks=0" },
   },
   {
@@ -45,6 +57,10 @@
     "program": "$ZED_WORKTREE_ROOT/build/examples/tessellation-example",
     "request": "launch",
     "adapter": "CodeLLDB",
+    "preRunCommands": [
+      "type format add -f decimal uint8_t",
+      "type format add -f decimal 'unsigned char'",
+    ],
     "env": { "ASAN_OPTIONS": "detect_leaks=0" },
   },
   {
@@ -57,6 +73,10 @@
     "program": "$ZED_WORKTREE_ROOT/build/examples/cmap-example",
     "request": "launch",
     "adapter": "CodeLLDB",
+    "preRunCommands": [
+      "type format add -f decimal uint8_t",
+      "type format add -f decimal 'unsigned char'",
+    ],
     "env": { "ASAN_OPTIONS": "detect_leaks=0" },
   },
   {
@@ -72,6 +92,10 @@
     "program": "$ZED_WORKTREE_ROOT/build/libs/test/pdf-test-main",
     "request": "launch",
     "adapter": "CodeLLDB",
+    "preRunCommands": [
+      "type format add -f decimal uint8_t",
+      "type format add -f decimal 'unsigned char'",
+    ],
     "env": { "ASAN_OPTIONS": "detect_leaks=0" },
   },
 ]
