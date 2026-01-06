@@ -2,13 +2,16 @@
 
 #include <stdint.h>
 
+#include "color/icc_color.h"
 #include "err/error.h"
 #include "geom/vec3.h"
 #include "parse_ctx/ctx.h"
 
 typedef enum {
-    ICC_RENDERING_INTENT_MEDIA_RELATIVE,
-    ICC_RENDERING_INTENT_ICC_ABSOLUTE
+    ICC_INTENT_MEDIA_RELATIVE,
+    ICC_INTENT_ABSOLUTE,
+    ICC_INTENT_PERCEPTUAL,
+    ICC_INTENT_SATURATION
 } ICCRenderingIntent;
 
 typedef struct {
@@ -74,11 +77,27 @@ typedef struct {
 } ICCProfile;
 
 Error* icc_parse_profile(ParseCtx ctx, ICCProfile* profile);
-Error* icc_connect_pcs(
+bool icc_profile_is_pcsxyz(ICCProfile profile);
+
+Error* icc_device_to_pcs(
+    ICCProfile profile,
+    ICCRenderingIntent rendering_intent,
+    ICCColor color,
+    ICCPcsColor* output
+);
+
+Error* icc_pcs_to_device(
+    ICCProfile profile,
+    ICCRenderingIntent rendering_intent,
+    ICCPcsColor color,
+    ICCColor* output
+);
+
+Error* icc_pcs_to_pcs(
     ICCProfile src_profile,
     ICCProfile dst_profile,
     bool src_is_absolute,
     ICCRenderingIntent intent,
-    GeomVec3 src,
-    GeomVec3* dst
+    ICCPcsColor src,
+    ICCPcsColor* dst
 );

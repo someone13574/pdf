@@ -4,6 +4,7 @@
 
 #include "color/cie.h"
 #include "color/icc_color.h"
+#include "color/icc_lut.h"
 #include "color/icc_tags.h"
 #include "err/error.h"
 #include "geom/vec3.h"
@@ -142,6 +143,10 @@ Error* icc_parse_profile(ParseCtx ctx, ICCProfile* profile) {
     return NULL;
 }
 
+bool icc_profile_is_pcsxyz(ICCProfile profile) {
+    return profile.header.pcs == icc_color_space_signature(ICC_COLOR_SPACE_XYZ);
+}
+
 static Error* icc_media_whitepoint(ICCProfile profile, ICCXYZNumber* out) {
     RELEASE_ASSERT(out);
 
@@ -156,74 +161,222 @@ static Error* icc_media_whitepoint(ICCProfile profile, ICCXYZNumber* out) {
     return NULL;
 }
 
-Error* icc_connect_pcs(
+Error* icc_device_to_pcs(
+    ICCProfile profile,
+    ICCRenderingIntent rendering_intent,
+    ICCColor color,
+    ICCPcsColor* output
+) {
+    RELEASE_ASSERT(output);
+
+    if (color.color_space
+        != icc_color_space_from_signature(profile.header.color_space)) {
+        return ERROR(
+            ICC_ERR_INCORRECT_SPACE,
+            "Input color space %d doesn't match profile's color space %d",
+            (int)color.color_space,
+            (int)icc_color_space_from_signature(profile.header.color_space)
+        );
+    }
+
+    ICCTag a_to_b_tag;
+    switch (rendering_intent) {
+        case ICC_INTENT_MEDIA_RELATIVE:
+        case ICC_INTENT_ABSOLUTE: {
+            a_to_b_tag = ICC_TAG_A_TO_B1;
+            break;
+        }
+        case ICC_INTENT_PERCEPTUAL: {
+            a_to_b_tag = ICC_TAG_A_TO_B0;
+            break;
+        }
+        case ICC_INTENT_SATURATION: {
+            a_to_b_tag = ICC_TAG_A_TO_B2;
+            break;
+        }
+    }
+
+    ParseCtx lut_ctx;
+    TRY(icc_tag_table_lookup(
+        profile.tag_table,
+        icc_tag_signature(a_to_b_tag),
+        &lut_ctx
+    ));
+
+    uint32_t lut_signature;
+    TRY(parse_ctx_read_u32_be(&lut_ctx, &lut_signature));
+
+    switch (lut_signature) {
+        case 0x6D667431: {
+            ICCLut8 lut;
+            TRY(icc_parse_lut8(lut_ctx, &lut));
+
+            double lut_output[15];
+            TRY(icc_lut8_map(lut, color, lut_output));
+            *output = (ICCPcsColor) {
+                .vec =
+                    geom_vec3_new(lut_output[0], lut_output[1], lut_output[2]),
+                .is_xyz = profile.header.pcs
+                       == icc_color_space_signature(ICC_COLOR_SPACE_XYZ)
+            };
+            break;
+        }
+        case 0x6D667432: {
+            ICCLut16 lut;
+            TRY(icc_parse_lut16(lut_ctx, &lut));
+
+            double lut_output[15];
+            TRY(icc_lut16_map(lut, color, lut_output));
+            *output = (ICCPcsColor) {
+                .vec =
+                    geom_vec3_new(lut_output[0], lut_output[1], lut_output[2]),
+                .is_xyz = profile.header.pcs
+                       == icc_color_space_signature(ICC_COLOR_SPACE_XYZ)
+            };
+            break;
+        }
+        default: {
+            return ERROR(ICC_ERR_INVALID_LUT, "Unknown lut signature");
+        }
+    }
+
+    return NULL;
+}
+
+Error* icc_pcs_to_device(
+    ICCProfile profile,
+    ICCRenderingIntent rendering_intent,
+    ICCPcsColor color,
+    ICCColor* output
+) {
+    RELEASE_ASSERT(output);
+
+    if (color.is_xyz
+        && ICC_COLOR_SPACE_XYZ
+               != icc_color_space_from_signature(profile.header.pcs)) {
+        return ERROR(
+            ICC_ERR_INCORRECT_SPACE,
+            "Input pcs (is_xyz=%d) doesn't match pcs %d",
+            (int)color.is_xyz,
+            (int)icc_color_space_from_signature(profile.header.pcs)
+        );
+    }
+
+    ICCTag b_to_a_tag;
+    switch (rendering_intent) {
+        case ICC_INTENT_MEDIA_RELATIVE:
+        case ICC_INTENT_ABSOLUTE: {
+            b_to_a_tag = ICC_TAG_B_TO_A1;
+            break;
+        }
+        case ICC_INTENT_PERCEPTUAL: {
+            b_to_a_tag = ICC_TAG_B_TO_A0;
+            break;
+        }
+        case ICC_INTENT_SATURATION: {
+            b_to_a_tag = ICC_TAG_B_TO_A2;
+            break;
+        }
+    }
+
+    ParseCtx lut_ctx;
+    TRY(icc_tag_table_lookup(
+        profile.tag_table,
+        icc_tag_signature(b_to_a_tag),
+        &lut_ctx
+    ));
+
+    uint32_t lut_signature;
+    TRY(parse_ctx_read_u32_be(&lut_ctx, &lut_signature));
+
+    switch (lut_signature) {
+        case 0x6D667431: {
+            ICCLut8 lut;
+            TRY(icc_parse_lut8(lut_ctx, &lut));
+            TRY(icc_lut8_map(lut, icc_pcs_to_color(color), output->channels));
+            output->color_space =
+                icc_color_space_from_signature(profile.header.color_space);
+            break;
+        }
+        case 0x6D667432: {
+            ICCLut16 lut;
+            TRY(icc_parse_lut16(lut_ctx, &lut));
+            TRY(icc_lut16_map(lut, icc_pcs_to_color(color), output->channels));
+            output->color_space =
+                icc_color_space_from_signature(profile.header.color_space);
+            break;
+        }
+        default: {
+            return ERROR(
+                ICC_ERR_INVALID_LUT,
+                "Unknown lut signature 0x%lx",
+                (unsigned long)lut_signature
+            );
+        }
+    }
+
+    return NULL;
+}
+
+Error* icc_pcs_to_pcs(
     ICCProfile src_profile,
     ICCProfile dst_profile,
     bool src_is_absolute,
     ICCRenderingIntent intent,
-    GeomVec3 src,
-    GeomVec3* dst
+    ICCPcsColor src,
+    ICCPcsColor* dst
 ) {
     RELEASE_ASSERT(dst);
+    RELEASE_ASSERT(src.is_xyz == icc_profile_is_pcsxyz(src_profile));
 
-    bool src_is_xyz = src_profile.header.pcs
-                   == icc_color_space_signature(ICC_COLOR_SPACE_XYZ);
-    bool intermediate_is_xyz = src_is_xyz
-                            || intent == ICC_RENDERING_INTENT_ICC_ABSOLUTE
-                            || src_is_absolute;
+    bool intermediate_is_xyz =
+        src.is_xyz || intent == ICC_INTENT_ABSOLUTE || src_is_absolute;
     bool dst_is_xyz = dst_profile.header.pcs
                    == icc_color_space_signature(ICC_COLOR_SPACE_XYZ);
 
-    GeomVec3 intermediate;
+    ICCPcsColor intermediate;
     const CieXYZ D50 = {.x = 0.9642, .y = 1.0, .z = 0.8249};
 
-    if (intermediate_is_xyz && !src_is_xyz) {
-        intermediate =
-            cie_xyz_to_geom(cie_lab_to_cie_xyz(cie_lab_from_geom(src), D50));
+    if (intermediate_is_xyz) {
+        intermediate = icc_pcs_color_to_xyz(src);
     } else {
         intermediate = src;
     }
 
-    if (src_is_absolute && intent == ICC_RENDERING_INTENT_ICC_ABSOLUTE) {
+    if (src_is_absolute && intent == ICC_INTENT_ABSOLUTE) {
         // Absolute -> absolute
         ICCXYZNumber src_mw, dst_mw;
         TRY(icc_media_whitepoint(src_profile, &src_mw));
         TRY(icc_media_whitepoint(dst_profile, &dst_mw));
-        intermediate = geom_vec3_mul(
-            intermediate,
+        intermediate.vec = geom_vec3_mul(
+            intermediate.vec,
             geom_vec3_div(
                 icc_xyz_number_to_geom(dst_mw),
                 icc_xyz_number_to_geom(src_mw)
             )
         );
-    } else if (intent == ICC_RENDERING_INTENT_ICC_ABSOLUTE) {
+    } else if (intent == ICC_INTENT_ABSOLUTE) {
         // Relative -> absolute
         ICCXYZNumber dst_mw;
         TRY(icc_media_whitepoint(dst_profile, &dst_mw));
-        intermediate = geom_vec3_mul(
-            intermediate,
+        intermediate.vec = geom_vec3_mul(
+            intermediate.vec,
             geom_vec3_div(icc_xyz_number_to_geom(dst_mw), cie_xyz_to_geom(D50))
         );
     } else if (src_is_absolute) {
         // Absolute -> relative
         ICCXYZNumber src_mw;
         TRY(icc_media_whitepoint(src_profile, &src_mw));
-        intermediate = geom_vec3_mul(
-            intermediate,
+        intermediate.vec = geom_vec3_mul(
+            intermediate.vec,
             geom_vec3_div(cie_xyz_to_geom(D50), icc_xyz_number_to_geom(src_mw))
         );
     }
 
-    if (intermediate_is_xyz && !dst_is_xyz) {
-        *dst = cie_lab_to_geom(
-            cie_xyz_to_cie_lab(cie_xyz_from_geom(intermediate), D50)
-        );
-    } else if (!intermediate_is_xyz && dst_is_xyz) {
-        *dst = cie_xyz_to_geom(
-            cie_lab_to_cie_xyz(cie_lab_from_geom(intermediate), D50)
-        );
+    if (dst_is_xyz) {
+        *dst = icc_pcs_color_to_xyz(intermediate);
     } else {
-        *dst = intermediate;
+        *dst = icc_pcs_color_to_lab(intermediate);
     }
 
     return NULL;

@@ -1,51 +1,75 @@
 #include "color/icc.h"
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "arena/arena.h"
 #include "arena/common.h"
 #include "color/icc_color.h"
-#include "color/icc_lut.h"
-#include "color/icc_tags.h"
 #include "err/error.h"
+#include "logger/log.h"
 #include "parse_ctx/ctx.h"
 
 int main(void) {
     Arena* arena = arena_new(128);
 
-    size_t buffer_len;
-    const uint8_t* buffer = load_file_to_buffer(
+    size_t swop_buffer_len;
+    const uint8_t* swop_buffer = load_file_to_buffer(
         arena,
         "test-files/USWebCoatedSWOP.icc",
-        &buffer_len
+        &swop_buffer_len
     );
 
-    ParseCtx ctx = parse_ctx_new(buffer, buffer_len);
-    ICCProfileHeader header;
-    REQUIRE(icc_parse_header(&ctx, &header));
+    size_t srgb_buffer_len;
+    const uint8_t* srgb_buffer = load_file_to_buffer(
+        arena,
+        "assets/icc-profiles/sRGB_v4_ICC_preference.icc",
+        &srgb_buffer_len
+    );
 
-    ICCTagTable table;
-    REQUIRE(icc_tag_table_new(&ctx, &table));
+    ParseCtx swop_ctx = parse_ctx_new(swop_buffer, swop_buffer_len);
+    ICCProfile swop_profile;
+    REQUIRE(icc_parse_profile(swop_ctx, &swop_profile));
 
-    ParseCtx lut_ctx;
-    REQUIRE(icc_tag_table_lookup(
-        table,
-        icc_tag_signature(ICC_TAG_B_TO_A0),
-        &lut_ctx
+    ParseCtx srgb_ctx = parse_ctx_new(srgb_buffer, srgb_buffer_len);
+    ICCProfile srgb_profile;
+    REQUIRE(icc_parse_profile(srgb_ctx, &srgb_profile));
+
+    ICCColor input = {
+        .channels = {1.0, 0.0, 0.0, 1.0},
+        .color_space = ICC_COLOR_SPACE_CMYK
+    };
+
+    ICCRenderingIntent intent = ICC_INTENT_MEDIA_RELATIVE;
+
+    ICCPcsColor src_pcs, dst_pcs;
+    REQUIRE(icc_device_to_pcs(
+        swop_profile,
+        ICC_INTENT_MEDIA_RELATIVE,
+        input,
+        &src_pcs
+    ));
+    REQUIRE(icc_pcs_to_pcs(
+        swop_profile,
+        srgb_profile,
+        false,
+        intent,
+        src_pcs,
+        &dst_pcs
     ));
 
-    ICCLut8 lut;
-    REQUIRE(icc_parse_lut8(lut_ctx, &lut));
+    ICCColor mapped_color;
+    REQUIRE(icc_pcs_to_device(srgb_profile, intent, dst_pcs, &mapped_color));
+    RELEASE_ASSERT(mapped_color.color_space == ICC_COLOR_SPACE_RGB);
 
-    double out[15] = {0};
-    REQUIRE(icc_lut8_map(
-        lut,
-        (ICCColor) {
-            .channels = {0.3, 0.5, 0.7},
-            .color_space = ICC_COLOR_SPACE_XYZ
-    },
-        out
-    ));
+    LOG_DIAG(
+        INFO,
+        EXAMPLE,
+        "Output sRGB: r=%f, g=%f, b=%f",
+        mapped_color.channels[0],
+        mapped_color.channels[1],
+        mapped_color.channels[2]
+    );
 
     arena_free(arena);
     return 0;

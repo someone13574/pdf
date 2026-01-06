@@ -53,3 +53,4 @@ typedef struct {
 } ICCLut16;
 
 Error* icc_parse_lut16(ParseCtx ctx, ICCLut16* out);
+Error* icc_lut16_map(ICCLut16 lut, ICCColor input, double out[15]);

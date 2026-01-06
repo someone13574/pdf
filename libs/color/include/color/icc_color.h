@@ -1,9 +1,11 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include "geom/mat3.h"
+#include "geom/vec3.h"
 
 typedef enum {
     ICC_COLOR_SPACE_XYZ = 0,
@@ -46,3 +48,12 @@ typedef struct {
 
 void icc_color_clamp(ICCColor* color);
 void icc_color_norm_pcs(ICCColor* color, GeomMat3 matrix);
+
+typedef struct {
+    GeomVec3 vec;
+    bool is_xyz;
+} ICCPcsColor;
+
+ICCPcsColor icc_pcs_color_to_lab(ICCPcsColor color);
+ICCPcsColor icc_pcs_color_to_xyz(ICCPcsColor color);
+ICCColor icc_pcs_to_color(ICCPcsColor color);

@@ -1,5 +1,6 @@
 #include "color/icc_color.h"
 
+#include "color/cie.h"
 #include "geom/mat3.h"
 #include "geom/vec3.h"
 #include "logger/log.h"
@@ -264,4 +265,39 @@ void icc_color_norm_pcs(ICCColor* color, GeomMat3 matrix) {
     }
 
     icc_color_clamp(color);
+}
+
+static CieXYZ D50 = {.x = 0.9642, .y = 1.0, .z = 0.8249};
+
+ICCPcsColor icc_pcs_color_to_lab(ICCPcsColor color) {
+    if (color.is_xyz) {
+        return (ICCPcsColor) {
+            .vec = cie_lab_to_geom(
+                cie_xyz_to_cie_lab(cie_xyz_from_geom(color.vec), D50)
+            ),
+            .is_xyz = false
+        };
+    } else {
+        return color;
+    }
+}
+
+ICCPcsColor icc_pcs_color_to_xyz(ICCPcsColor color) {
+    if (!color.is_xyz) {
+        return (ICCPcsColor) {
+            .vec = cie_xyz_to_geom(
+                cie_lab_to_cie_xyz(cie_lab_from_geom(color.vec), D50)
+            ),
+            .is_xyz = false
+        };
+    } else {
+        return color;
+    }
+}
+
+ICCColor icc_pcs_to_color(ICCPcsColor color) {
+    return (ICCColor) {
+        .channels = {color.vec.x, color.vec.y, color.vec.z},
+        .color_space = color.is_xyz ? ICC_COLOR_SPACE_XYZ : ICC_COLOR_SPACE_LAB
+    };
 }
