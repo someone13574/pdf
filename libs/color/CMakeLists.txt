@@ -1,5 +1,5 @@
 add_library(color
-    src/cie_xyz.c
+    src/cie.c
     src/conversion.c
     src/icc.c
     src/icc_color.c

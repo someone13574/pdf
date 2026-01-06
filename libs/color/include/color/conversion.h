@@ -1,6 +1,6 @@
 #pragma once
 
-#include "color/cie_xyz.h"
+#include "color/cie.h"
 #include "color/rgb.h"
 
 Rgb cie_xyz_to_linear_srgb(CieXYZ cie_xyz);

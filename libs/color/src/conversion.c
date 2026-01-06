@@ -1,6 +1,6 @@
 #include "color/conversion.h"
 
-#include "color/cie_xyz.h"
+#include "color/cie.h"
 #include "color/rgb.h"
 #include "geom/mat3.h"
 #include "geom/vec3.h"
