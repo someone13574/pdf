@@ -6,6 +6,11 @@
 #include "geom/vec3.h"
 #include "parse_ctx/ctx.h"
 
+typedef enum {
+    ICC_RENDERING_INTENT_MEDIA_RELATIVE,
+    ICC_RENDERING_INTENT_ICC_ABSOLUTE
+} ICCRenderingIntent;
+
 typedef struct {
     uint16_t year;
     uint16_t month;
@@ -62,3 +67,18 @@ typedef struct {
 Error* icc_tag_table_new(ParseCtx* file_ctx, ICCTagTable* out);
 Error*
 icc_tag_table_lookup(ICCTagTable table, uint32_t tag_signature, ParseCtx* out);
+
+typedef struct {
+    ICCProfileHeader header;
+    ICCTagTable tag_table;
+} ICCProfile;
+
+Error* icc_parse_profile(ParseCtx ctx, ICCProfile* profile);
+Error* icc_connect_pcs(
+    ICCProfile src_profile,
+    ICCProfile dst_profile,
+    bool src_is_absolute,
+    ICCRenderingIntent intent,
+    GeomVec3 src,
+    GeomVec3* dst
+);

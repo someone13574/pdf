@@ -2,6 +2,9 @@
 
 #include <stdint.h>
 
+#include "color/cie.h"
+#include "color/icc_color.h"
+#include "color/icc_tags.h"
 #include "err/error.h"
 #include "geom/vec3.h"
 #include "logger/log.h"
@@ -72,6 +75,18 @@ Error* icc_parse_header(ParseCtx* ctx, ICCProfileHeader* out) {
     RELEASE_ASSERT(ctx->offset == 100);
     TRY(parse_ctx_seek(ctx, 128));
 
+    if (out->class == 0x6C696E6B) {
+        LOG_PANIC("DeviceLink profiles aren't supported");
+    }
+
+    ICCColorSpace pcs = icc_color_space_from_signature(out->pcs);
+    if (pcs != ICC_COLOR_SPACE_XYZ && pcs != ICC_COLOR_SPACE_LAB) {
+        return ERROR(
+            ICC_ERR_INVALID_HEADER,
+            "Profile connection space must be xyz or lab"
+        );
+    }
+
     return NULL;
 }
 
@@ -113,6 +128,102 @@ icc_tag_table_lookup(ICCTagTable table, uint32_t tag_signature, ParseCtx* out) {
             ));
             break;
         }
+    }
+
+    return NULL;
+}
+
+Error* icc_parse_profile(ParseCtx ctx, ICCProfile* profile) {
+    RELEASE_ASSERT(profile);
+
+    TRY(icc_parse_header(&ctx, &profile->header));
+    TRY(icc_tag_table_new(&ctx, &profile->tag_table));
+
+    return NULL;
+}
+
+static Error* icc_media_whitepoint(ICCProfile profile, ICCXYZNumber* out) {
+    RELEASE_ASSERT(out);
+
+    ParseCtx ctx;
+    TRY(icc_tag_table_lookup(
+        profile.tag_table,
+        icc_tag_signature(ICC_TAG_MEDIA_WHITEPOINT),
+        &ctx
+    ));
+    TRY(icc_parse_xyz_number(&ctx, out));
+
+    return NULL;
+}
+
+Error* icc_connect_pcs(
+    ICCProfile src_profile,
+    ICCProfile dst_profile,
+    bool src_is_absolute,
+    ICCRenderingIntent intent,
+    GeomVec3 src,
+    GeomVec3* dst
+) {
+    RELEASE_ASSERT(dst);
+
+    bool src_is_xyz = src_profile.header.pcs
+                   == icc_color_space_signature(ICC_COLOR_SPACE_XYZ);
+    bool intermediate_is_xyz = src_is_xyz
+                            || intent == ICC_RENDERING_INTENT_ICC_ABSOLUTE
+                            || src_is_absolute;
+    bool dst_is_xyz = dst_profile.header.pcs
+                   == icc_color_space_signature(ICC_COLOR_SPACE_XYZ);
+
+    GeomVec3 intermediate;
+    const CieXYZ D50 = {.x = 0.9642, .y = 1.0, .z = 0.8249};
+
+    if (intermediate_is_xyz && !src_is_xyz) {
+        intermediate =
+            cie_xyz_to_geom(cie_lab_to_cie_xyz(cie_lab_from_geom(src), D50));
+    } else {
+        intermediate = src;
+    }
+
+    if (src_is_absolute && intent == ICC_RENDERING_INTENT_ICC_ABSOLUTE) {
+        // Absolute -> absolute
+        ICCXYZNumber src_mw, dst_mw;
+        TRY(icc_media_whitepoint(src_profile, &src_mw));
+        TRY(icc_media_whitepoint(dst_profile, &dst_mw));
+        intermediate = geom_vec3_mul(
+            intermediate,
+            geom_vec3_div(
+                icc_xyz_number_to_geom(dst_mw),
+                icc_xyz_number_to_geom(src_mw)
+            )
+        );
+    } else if (intent == ICC_RENDERING_INTENT_ICC_ABSOLUTE) {
+        // Relative -> absolute
+        ICCXYZNumber dst_mw;
+        TRY(icc_media_whitepoint(dst_profile, &dst_mw));
+        intermediate = geom_vec3_mul(
+            intermediate,
+            geom_vec3_div(icc_xyz_number_to_geom(dst_mw), cie_xyz_to_geom(D50))
+        );
+    } else if (src_is_absolute) {
+        // Absolute -> relative
+        ICCXYZNumber src_mw;
+        TRY(icc_media_whitepoint(src_profile, &src_mw));
+        intermediate = geom_vec3_mul(
+            intermediate,
+            geom_vec3_div(cie_xyz_to_geom(D50), icc_xyz_number_to_geom(src_mw))
+        );
+    }
+
+    if (intermediate_is_xyz && !dst_is_xyz) {
+        *dst = cie_lab_to_geom(
+            cie_xyz_to_cie_lab(cie_xyz_from_geom(intermediate), D50)
+        );
+    } else if (!intermediate_is_xyz && dst_is_xyz) {
+        *dst = cie_xyz_to_geom(
+            cie_lab_to_cie_xyz(cie_lab_from_geom(intermediate), D50)
+        );
+    } else {
+        *dst = intermediate;
     }
 
     return NULL;

@@ -24,6 +24,9 @@ GeomVec3 geom_vec3_sub(GeomVec3 lhs, GeomVec3 rhs);
 /// Computes the product of vectors a and b.
 GeomVec3 geom_vec3_mul(GeomVec3 lhs, GeomVec3 rhs);
 
+/// Computes the quotient of vectors a and b.
+GeomVec3 geom_vec3_div(GeomVec3 lhs, GeomVec3 rhs);
+
 /// Computes the component-wise lhs^rhs
 GeomVec3 geom_vec3_pow(GeomVec3 lhs, GeomVec3 rhs);
 

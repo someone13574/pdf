@@ -22,6 +22,10 @@ GeomVec3 geom_vec3_mul(GeomVec3 lhs, GeomVec3 rhs) {
     return geom_vec3_new(lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z);
 }
 
+GeomVec3 geom_vec3_div(GeomVec3 lhs, GeomVec3 rhs) {
+    return geom_vec3_new(lhs.x / rhs.x, lhs.y / rhs.y, lhs.z / rhs.z);
+}
+
 GeomVec3 geom_vec3_pow(GeomVec3 lhs, GeomVec3 rhs) {
     return geom_vec3_new(
         pow(lhs.x, rhs.x),
