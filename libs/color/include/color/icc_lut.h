@@ -31,17 +31,25 @@ typedef struct {
 typedef struct {
     ParseCtx ctx;
     ICCLutCommon common;
-    ParseCtx input_tables;
-    ParseCtx clut_values;
-    ParseCtx output_tables;
 
-    GeomMat3 matrix;
+    ParseCtx input_table;
+    ParseCtx clut;
+    ParseCtx output_table;
 } ICCLut8;
 
 Error* icc_parse_lut8(ParseCtx ctx, ICCLut8* out);
-Error* icc_lut8_map(
-    ICCLut8* lut,
-    ICCColor input,
-    double out[15],
-    size_t* output_channels
-);
+Error* icc_lut8_map(ICCLut8 lut, ICCColor input, double out[15]);
+
+typedef struct {
+    ParseCtx ctx;
+    ICCLutCommon common;
+
+    uint16_t input_entries;
+    uint16_t output_entries;
+
+    ParseCtx input_table;
+    ParseCtx clut;
+    ParseCtx output_table;
+} ICCLut16;
+
+Error* icc_parse_lut16(ParseCtx ctx, ICCLut16* out);

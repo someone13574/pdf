@@ -84,6 +84,9 @@ uint32_t icc_color_space_signature(ICCColorSpace color_space) {
         case ICC_COLOR_SPACE_UNKNOWN: {
             return 0xffffffff;
         }
+        default: {
+            LOG_PANIC("Unreachable");
+        }
     }
 }
 
@@ -228,8 +231,8 @@ size_t icc_color_space_channels(ICCColorSpace space) {
         case ICC_COLOR_SPACE_15CLR: {
             return 15;
         }
-        case ICC_COLOR_SPACE_UNKNOWN: {
-            return 16;
+        default: {
+            LOG_PANIC("Unreachable");
         }
     }
 }

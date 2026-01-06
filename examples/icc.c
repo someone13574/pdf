@@ -26,8 +26,6 @@ int main(void) {
 
     ICCTagTable table;
     REQUIRE(icc_tag_table_new(&ctx, &table));
-    ICCColorSpace pcs = icc_color_space_from_signature(header.pcs);
-    ICCColorSpace space = icc_color_space_from_signature(header.color_space);
 
     ParseCtx lut_ctx;
     REQUIRE(icc_tag_table_lookup(
@@ -38,6 +36,16 @@ int main(void) {
 
     ICCLut8 lut;
     REQUIRE(icc_parse_lut8(lut_ctx, &lut));
+
+    double out[15] = {0};
+    REQUIRE(icc_lut8_map(
+        lut,
+        (ICCColor) {
+            .channels = {0.3, 0.5, 0.7},
+            .color_space = ICC_COLOR_SPACE_XYZ
+    },
+        out
+    ));
 
     arena_free(arena);
     return 0;

@@ -81,7 +81,7 @@ Error* icc_parse_lut8(ParseCtx ctx, ICCLut8* out) {
         &ctx,
         ctx.offset,
         256 * (size_t)out->common.input_channels,
-        &out->input_tables
+        &out->input_table
     ));
 
     TRY(parse_ctx_new_subctx(
@@ -89,14 +89,14 @@ Error* icc_parse_lut8(ParseCtx ctx, ICCLut8* out) {
         ctx.offset,
         integer_pow(out->common.grid_points, out->common.input_channels)
             * (size_t)out->common.output_channels,
-        &out->clut_values
+        &out->clut
     ));
 
     TRY(parse_ctx_new_subctx(
         &ctx,
         ctx.offset,
         256 * (size_t)out->common.output_channels,
-        &out->output_tables
+        &out->output_table
     ));
 
     return NULL;
@@ -129,26 +129,26 @@ icc_lut8_map_1d(ParseCtx table, double val, size_t channel, double* out) {
     return NULL;
 }
 
-static Error* icc_lut8_clut(ICCLut8* lut, double coords[15], double out[15]) {
-    double max_coord = (double)lut->common.grid_points - 1.0;
-    for (size_t idx = 0; idx < lut->common.input_channels; idx++) {
+static Error* icc_lut8_clut(ICCLut8 lut, double coords[15], double out[15]) {
+    double max_coord = (double)lut.common.grid_points - 1.0;
+    for (size_t idx = 0; idx < lut.common.input_channels; idx++) {
         coords[idx] = coords[idx] < 0.0 ? 0.0 : coords[idx];
         coords[idx] = coords[idx] > 1.0 ? 1.0 : coords[idx];
         coords[idx] *= max_coord;
     }
 
     size_t strides[15];
-    strides[lut->common.input_channels - 1] = 1;
-    for (int i = (int)lut->common.input_channels - 2; i >= 0; i--) {
-        strides[i] = strides[i + 1] * lut->common.grid_points;
+    strides[lut.common.input_channels - 1] = 1;
+    for (int i = (int)lut.common.input_channels - 2; i >= 0; i--) {
+        strides[i] = strides[i + 1] * lut.common.grid_points;
     }
 
     double acc[15] = {0}; // TODO: Kahan summation
-    uint16_t max_state = (uint16_t)(1 << lut->common.input_channels) - 1;
+    uint16_t max_state = (uint16_t)(1 << lut.common.input_channels) - 1;
     for (uint16_t state = 0; state <= max_state; state++) {
         size_t offset = 0;
         double weight = 1.0;
-        for (size_t in_channel = 0; in_channel < lut->common.input_channels;
+        for (size_t in_channel = 0; in_channel < lut.common.input_channels;
              in_channel++) {
             bool high = ((state >> in_channel) & 1) == 1;
             double frac = coords[in_channel] - floor(coords[in_channel]);
@@ -159,51 +159,42 @@ static Error* icc_lut8_clut(ICCLut8* lut, double coords[15], double out[15]) {
             offset += (size_t)coord * strides[in_channel];
         }
 
-        offset *= (size_t)lut->common.output_channels;
-        TRY(parse_ctx_seek(&lut->clut_values, offset));
+        offset *= (size_t)lut.common.output_channels;
+        TRY(parse_ctx_seek(&lut.clut, offset));
 
-        for (size_t out_channel = 0; out_channel < lut->common.output_channels;
+        for (size_t out_channel = 0; out_channel < lut.common.output_channels;
              out_channel++) {
             uint8_t sample;
-            TRY(parse_ctx_read_u8(&lut->clut_values, &sample));
-            acc[out_channel] += (double)sample / 255.0 * weight;
+            TRY(parse_ctx_read_u8(&lut.clut, &sample));
+            acc[out_channel] += (double)sample * weight;
         }
     }
 
-    for (size_t output = 0; output < lut->common.output_channels; output++) {
-        out[output] = acc[output];
+    for (size_t output = 0; output < lut.common.output_channels; output++) {
+        out[output] = acc[output] / 255.0;
     }
 
     return NULL;
 }
 
-Error* icc_lut8_map(
-    ICCLut8* lut,
-    ICCColor input,
-    double out[15],
-    size_t* output_channels
-) {
-    RELEASE_ASSERT(lut);
-    RELEASE_ASSERT(output_channels);
-    *output_channels = lut->common.output_channels;
-
-    if (input.color_space != lut->common.input_channels) {
+Error* icc_lut8_map(ICCLut8 lut, ICCColor input, double out[15]) {
+    if (icc_color_space_channels(input.color_space)
+        != lut.common.input_channels) {
         return ERROR(
             ICC_ERR_INCORRECT_CHANNELS,
             "Input space %d has %d channels, but the lut has %d",
             (int)input.color_space,
             (int)icc_color_space_channels(input.color_space),
-            (int)lut->common.input_channels
+            (int)lut.common.input_channels
         );
     }
 
-    // Applies matrix if the color space is pcsxyz. Clamps all channels to 0-1
-    icc_color_norm_pcs(&input, lut->matrix);
+    icc_color_norm_pcs(&input, lut.common.matrix);
 
     double temp[15] = {0};
-    for (size_t channel = 0; channel < lut->common.input_channels; channel++) {
+    for (size_t channel = 0; channel < lut.common.input_channels; channel++) {
         TRY(icc_lut8_map_1d(
-            lut->input_tables,
+            lut.input_table,
             input.channels[channel],
             channel,
             &temp[channel]
@@ -212,11 +203,169 @@ Error* icc_lut8_map(
 
     TRY(icc_lut8_clut(lut, temp, out));
 
-    for (size_t channel = 0; channel < lut->common.output_channels; channel++) {
+    for (size_t channel = 0; channel < lut.common.output_channels; channel++) {
         TRY(icc_lut8_map_1d(
-            lut->output_tables,
+            lut.output_table,
             out[channel],
             channel,
+            &out[channel]
+        ));
+    }
+
+    return NULL;
+}
+
+Error* icc_parse_lut16(ParseCtx ctx, ICCLut16* out) {
+    RELEASE_ASSERT(ctx.buffer);
+    RELEASE_ASSERT(out);
+
+    TRY(icc_parse_lut_common(&ctx, &out->common));
+    if (out->common.signature != 0x6D667432) {
+        return ERROR(ICC_ERR_INVALID_SIGNATURE);
+    }
+
+    TRY(parse_ctx_read_u16_be(&ctx, &out->input_entries));
+    TRY(parse_ctx_read_u16_be(&ctx, &out->output_entries));
+
+    TRY(parse_ctx_new_subctx(
+        &ctx,
+        ctx.offset,
+        2 * (size_t)out->input_entries * (size_t)out->common.input_channels,
+        &out->input_table
+    ));
+
+    TRY(parse_ctx_new_subctx(
+        &ctx,
+        ctx.offset,
+        2 * integer_pow(out->common.grid_points, out->common.input_channels)
+            * (size_t)out->common.output_channels,
+        &out->clut
+    ));
+
+    TRY(parse_ctx_new_subctx(
+        &ctx,
+        ctx.offset,
+        2 * (size_t)out->output_entries * (size_t)out->common.output_channels,
+        &out->output_table
+    ));
+
+    return NULL;
+}
+
+static Error* icc_lut16_map_1d(
+    ParseCtx table,
+    double val,
+    size_t channel,
+    size_t entries,
+    double* out
+) {
+    val = val < 0.0 ? 0.0 : val;
+    val = val > 1.0 ? 1.0 : val;
+
+    double x = val * (double)(entries - 1) + (double)channel * (double)entries;
+    double frac = x - floor(x);
+    bool interpolate =
+        (size_t)floor(x) < entries + (size_t)channel * entries - 1;
+
+    uint16_t sample_a;
+    TRY(parse_ctx_seek(&table, 2 * (size_t)floor(x)));
+    TRY(parse_ctx_read_u16_be(&table, &sample_a));
+
+    if (interpolate) {
+        uint16_t sample_b;
+        TRY(parse_ctx_read_u16_be(&table, &sample_b));
+
+        double a = (double)sample_a / 65535.0;
+        double b = (double)sample_b / 65535.0;
+        *out = a + frac * (b - a);
+    } else {
+        *out = (double)sample_a / 65535.0;
+    }
+
+    return NULL;
+}
+
+static Error* icc_lut16_clut(ICCLut16 lut, double coords[15], double out[15]) {
+    double max_coord = (double)lut.common.grid_points - 1.0;
+    for (size_t idx = 0; idx < lut.common.input_channels; idx++) {
+        coords[idx] = coords[idx] < 0.0 ? 0.0 : coords[idx];
+        coords[idx] = coords[idx] > 1.0 ? 1.0 : coords[idx];
+        coords[idx] *= max_coord;
+    }
+
+    size_t strides[15];
+    strides[lut.common.input_channels - 1] = 1;
+    for (int i = (int)lut.common.input_channels - 2; i >= 0; i--) {
+        strides[i] = strides[i + 1] * lut.common.grid_points;
+    }
+
+    double acc[15] = {0}; // TODO: Kahan summation
+    uint16_t max_state = (uint16_t)(1 << lut.common.input_channels) - 1;
+    for (uint16_t state = 0; state <= max_state; state++) {
+        size_t offset = 0;
+        double weight = 1.0;
+        for (size_t in_channel = 0; in_channel < lut.common.input_channels;
+             in_channel++) {
+            bool high = ((state >> in_channel) & 1) == 1;
+            double frac = coords[in_channel] - floor(coords[in_channel]);
+            weight *= high ? frac : (1.0 - frac);
+
+            double coord = coords[in_channel] + (high ? 1.0 : 0.0);
+            coord = coord > max_coord ? max_coord : coord;
+            offset += (size_t)coord * strides[in_channel];
+        }
+
+        offset *= (size_t)lut.common.output_channels * 2;
+        TRY(parse_ctx_seek(&lut.clut, offset));
+
+        for (size_t out_channel = 0; out_channel < lut.common.output_channels;
+             out_channel++) {
+            uint16_t sample;
+            TRY(parse_ctx_read_u16_be(&lut.clut, &sample));
+            acc[out_channel] += (double)sample * weight;
+        }
+    }
+
+    for (size_t output = 0; output < lut.common.output_channels; output++) {
+        out[output] = acc[output] / 65535.0;
+    }
+
+    return NULL;
+}
+
+Error* icc_lut16_map(ICCLut16 lut, ICCColor input, double out[15]) {
+    if (icc_color_space_channels(input.color_space)
+        != lut.common.input_channels) {
+        return ERROR(
+            ICC_ERR_INCORRECT_CHANNELS,
+            "Input space %d has %d channels, but the lut has %d",
+            (int)input.color_space,
+            (int)icc_color_space_channels(input.color_space),
+            (int)lut.common.input_channels
+        );
+    }
+
+    icc_color_norm_pcs(&input, lut.common.matrix);
+
+    double temp[15] = {0};
+    for (size_t channel = 0; channel < lut.common.input_channels; channel++) {
+        TRY(icc_lut16_map_1d(
+            lut.input_table,
+            input.channels[channel],
+            channel,
+            lut.input_entries,
+            &temp[channel]
+        ));
+    }
+
+    TRY(icc_lut16_clut(lut, temp, out));
+
+    for (size_t channel = 0; channel < lut.common.output_channels; channel++) {
+        TRY(icc_lut16_map_1d(
+            lut.output_table,
+            out[channel],
+            channel,
+            lut.output_entries,
             &out[channel]
         ));
     }
