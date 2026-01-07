@@ -54,6 +54,6 @@ typedef enum {
     ICC_TAG_TECHNOLOGY,
     ICC_TAG_VIEWING_COND_DESC,
     ICC_TAG_VIEWING_CONDS
-} ICCTag;
+} IccTag;
 
-uint32_t icc_tag_signature(ICCTag tag);
+uint32_t icc_tag_signature(IccTag tag);

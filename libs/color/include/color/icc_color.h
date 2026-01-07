@@ -34,26 +34,26 @@ typedef enum {
     ICC_COLOR_SPACE_14CLR = 23,
     ICC_COLOR_SPACE_15CLR = 24,
     ICC_COLOR_SPACE_UNKNOWN = 25
-} ICCColorSpace;
+} IccColorSpace;
 
-uint32_t icc_color_space_signature(ICCColorSpace color_space);
-ICCColorSpace icc_color_space_from_signature(uint32_t signature);
+uint32_t icc_color_space_signature(IccColorSpace color_space);
+IccColorSpace icc_color_space_from_signature(uint32_t signature);
 
-size_t icc_color_space_channels(ICCColorSpace space);
+size_t icc_color_space_channels(IccColorSpace space);
 
 typedef struct {
-    ICCColorSpace color_space;
+    IccColorSpace color_space;
     double channels[15];
-} ICCColor;
+} IccColor;
 
-void icc_color_clamp(ICCColor* color);
-void icc_color_norm_pcs(ICCColor* color, GeomMat3 matrix);
+void icc_color_clamp(IccColor* color);
+void icc_color_norm_pcs(IccColor* color, GeomMat3 matrix);
 
 typedef struct {
     GeomVec3 vec;
     bool is_xyz;
-} ICCPcsColor;
+} IccPcsColor;
 
-ICCPcsColor icc_pcs_color_to_lab(ICCPcsColor color);
-ICCPcsColor icc_pcs_color_to_xyz(ICCPcsColor color);
-ICCColor icc_pcs_to_color(ICCPcsColor color);
+IccPcsColor icc_pcs_color_to_lab(IccPcsColor color);
+IccPcsColor icc_pcs_color_to_xyz(IccPcsColor color);
+IccColor icc_pcs_to_color(IccPcsColor color);

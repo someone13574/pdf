@@ -11,7 +11,7 @@
 #include "logger/log.h"
 #include "parse_ctx/ctx.h"
 
-Error* icc_parse_date_time(ParseCtx* ctx, ICCDateTime* out) {
+Error* icc_parse_date_time(ParseCtx* ctx, IccDateTime* out) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(out);
 
@@ -25,22 +25,26 @@ Error* icc_parse_date_time(ParseCtx* ctx, ICCDateTime* out) {
     return NULL;
 }
 
-double icc_s15_fixed16_to_double(ICCS15Fixed16Number num) {
-    return (double)num / 65535.0;
+double icc_u8_fixed8_to_double(IccU8Fixed8Number num) {
+    return (double)num / 256.0;
 }
 
-Error* icc_parse_xyz_number(ParseCtx* ctx, ICCXYZNumber* out) {
+double icc_s15_fixed16_to_double(IccS15Fixed16Number num) {
+    return (double)num / 65536.0;
+}
+
+Error* icc_parse_xyz_number(ParseCtx* ctx, IccXYZNumber* out) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(out);
 
-    TRY(parse_ctx_read_u32_be(ctx, &out->x));
-    TRY(parse_ctx_read_u32_be(ctx, &out->y));
-    TRY(parse_ctx_read_u32_be(ctx, &out->z));
+    TRY(parse_ctx_read_i32_be(ctx, &out->x));
+    TRY(parse_ctx_read_i32_be(ctx, &out->y));
+    TRY(parse_ctx_read_i32_be(ctx, &out->z));
 
     return NULL;
 }
 
-GeomVec3 icc_xyz_number_to_geom(ICCXYZNumber xyz) {
+GeomVec3 icc_xyz_number_to_geom(IccXYZNumber xyz) {
     return geom_vec3_new(
         icc_s15_fixed16_to_double(xyz.x),
         icc_s15_fixed16_to_double(xyz.y),
@@ -48,7 +52,7 @@ GeomVec3 icc_xyz_number_to_geom(ICCXYZNumber xyz) {
     );
 }
 
-Error* icc_parse_header(ParseCtx* ctx, ICCProfileHeader* out) {
+Error* icc_parse_header(ParseCtx* ctx, IccProfileHeader* out) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(out);
     RELEASE_ASSERT(ctx->offset == 0);
@@ -80,7 +84,7 @@ Error* icc_parse_header(ParseCtx* ctx, ICCProfileHeader* out) {
         LOG_PANIC("DeviceLink profiles aren't supported");
     }
 
-    ICCColorSpace pcs = icc_color_space_from_signature(out->pcs);
+    IccColorSpace pcs = icc_color_space_from_signature(out->pcs);
     if (pcs != ICC_COLOR_SPACE_XYZ && pcs != ICC_COLOR_SPACE_LAB) {
         return ERROR(
             ICC_ERR_INVALID_HEADER,
@@ -91,7 +95,7 @@ Error* icc_parse_header(ParseCtx* ctx, ICCProfileHeader* out) {
     return NULL;
 }
 
-Error* icc_tag_table_new(ParseCtx* file_ctx, ICCTagTable* out) {
+Error* icc_tag_table_new(ParseCtx* file_ctx, IccTagTable* out) {
     RELEASE_ASSERT(file_ctx);
     RELEASE_ASSERT(out);
 
@@ -109,7 +113,7 @@ Error* icc_tag_table_new(ParseCtx* file_ctx, ICCTagTable* out) {
 }
 
 Error*
-icc_tag_table_lookup(ICCTagTable table, uint32_t tag_signature, ParseCtx* out) {
+icc_tag_table_lookup(IccTagTable table, uint32_t tag_signature, ParseCtx* out) {
     RELEASE_ASSERT(out);
 
     for (uint32_t idx = 0; idx < table.tag_count; idx++) {
@@ -134,7 +138,7 @@ icc_tag_table_lookup(ICCTagTable table, uint32_t tag_signature, ParseCtx* out) {
     return NULL;
 }
 
-Error* icc_parse_profile(ParseCtx ctx, ICCProfile* profile) {
+Error* icc_parse_profile(ParseCtx ctx, IccProfile* profile) {
     RELEASE_ASSERT(profile);
 
     TRY(icc_parse_header(&ctx, &profile->header));
@@ -143,11 +147,11 @@ Error* icc_parse_profile(ParseCtx ctx, ICCProfile* profile) {
     return NULL;
 }
 
-bool icc_profile_is_pcsxyz(ICCProfile profile) {
+bool icc_profile_is_pcsxyz(IccProfile profile) {
     return profile.header.pcs == icc_color_space_signature(ICC_COLOR_SPACE_XYZ);
 }
 
-static Error* icc_media_whitepoint(ICCProfile profile, ICCXYZNumber* out) {
+static Error* icc_media_whitepoint(IccProfile profile, IccXYZNumber* out) {
     RELEASE_ASSERT(out);
 
     ParseCtx ctx;
@@ -162,12 +166,14 @@ static Error* icc_media_whitepoint(ICCProfile profile, ICCXYZNumber* out) {
 }
 
 Error* icc_device_to_pcs(
-    ICCProfile profile,
-    ICCRenderingIntent rendering_intent,
-    ICCColor color,
-    ICCPcsColor* output
+    IccProfile profile,
+    IccRenderingIntent rendering_intent,
+    IccColor color,
+    IccPcsColor* output
 ) {
     RELEASE_ASSERT(output);
+
+    LOG_DIAG(INFO, ICC, "Mapping device -> pcs");
 
     if (color.color_space
         != icc_color_space_from_signature(profile.header.color_space)) {
@@ -179,7 +185,7 @@ Error* icc_device_to_pcs(
         );
     }
 
-    ICCTag a_to_b_tag;
+    IccTag a_to_b_tag;
     switch (rendering_intent) {
         case ICC_INTENT_MEDIA_RELATIVE:
         case ICC_INTENT_ABSOLUTE: {
@@ -208,12 +214,12 @@ Error* icc_device_to_pcs(
 
     switch (lut_signature) {
         case 0x6D667431: {
-            ICCLut8 lut;
+            IccLut8 lut;
             TRY(icc_parse_lut8(lut_ctx, &lut));
 
             double lut_output[15];
             TRY(icc_lut8_map(lut, color, lut_output));
-            *output = (ICCPcsColor) {
+            *output = (IccPcsColor) {
                 .vec =
                     geom_vec3_new(lut_output[0], lut_output[1], lut_output[2]),
                 .is_xyz = profile.header.pcs
@@ -222,12 +228,12 @@ Error* icc_device_to_pcs(
             break;
         }
         case 0x6D667432: {
-            ICCLut16 lut;
+            IccLut16 lut;
             TRY(icc_parse_lut16(lut_ctx, &lut));
 
             double lut_output[15];
             TRY(icc_lut16_map(lut, color, lut_output));
-            *output = (ICCPcsColor) {
+            *output = (IccPcsColor) {
                 .vec =
                     geom_vec3_new(lut_output[0], lut_output[1], lut_output[2]),
                 .is_xyz = profile.header.pcs
@@ -244,12 +250,16 @@ Error* icc_device_to_pcs(
 }
 
 Error* icc_pcs_to_device(
-    ICCProfile profile,
-    ICCRenderingIntent rendering_intent,
-    ICCPcsColor color,
-    ICCColor* output
+    Arena* arena,
+    IccProfile profile,
+    IccRenderingIntent rendering_intent,
+    IccPcsColor color,
+    IccColor* output
 ) {
+    RELEASE_ASSERT(arena);
     RELEASE_ASSERT(output);
+
+    LOG_DIAG(INFO, ICC, "Mapping pcs -> device");
 
     if (color.is_xyz
         && ICC_COLOR_SPACE_XYZ
@@ -262,7 +272,7 @@ Error* icc_pcs_to_device(
         );
     }
 
-    ICCTag b_to_a_tag;
+    IccTag b_to_a_tag;
     switch (rendering_intent) {
         case ICC_INTENT_MEDIA_RELATIVE:
         case ICC_INTENT_ABSOLUTE: {
@@ -291,7 +301,7 @@ Error* icc_pcs_to_device(
 
     switch (lut_signature) {
         case 0x6D667431: {
-            ICCLut8 lut;
+            IccLut8 lut;
             TRY(icc_parse_lut8(lut_ctx, &lut));
             TRY(icc_lut8_map(lut, icc_pcs_to_color(color), output->channels));
             output->color_space =
@@ -299,11 +309,25 @@ Error* icc_pcs_to_device(
             break;
         }
         case 0x6D667432: {
-            ICCLut16 lut;
+            IccLut16 lut;
             TRY(icc_parse_lut16(lut_ctx, &lut));
             TRY(icc_lut16_map(lut, icc_pcs_to_color(color), output->channels));
             output->color_space =
                 icc_color_space_from_signature(profile.header.color_space);
+            break;
+        }
+        case 0x6D424120: {
+            IccLutBToA lut;
+            TRY(icc_parse_lut_b_to_a(arena, lut_ctx, &lut));
+            TRY(icc_lut_b_to_a_map(&lut, color, output->channels));
+            output->color_space =
+                icc_color_space_from_signature(profile.header.color_space);
+
+            if (!lut.has_clut) {
+                RELEASE_ASSERT(
+                    3 == icc_color_space_channels(output->color_space)
+                );
+            }
             break;
         }
         default: {
@@ -319,22 +343,24 @@ Error* icc_pcs_to_device(
 }
 
 Error* icc_pcs_to_pcs(
-    ICCProfile src_profile,
-    ICCProfile dst_profile,
+    IccProfile src_profile,
+    IccProfile dst_profile,
     bool src_is_absolute,
-    ICCRenderingIntent intent,
-    ICCPcsColor src,
-    ICCPcsColor* dst
+    IccRenderingIntent intent,
+    IccPcsColor src,
+    IccPcsColor* dst
 ) {
     RELEASE_ASSERT(dst);
     RELEASE_ASSERT(src.is_xyz == icc_profile_is_pcsxyz(src_profile));
+
+    LOG_DIAG(INFO, ICC, "Mapping pcs -> pcs");
 
     bool intermediate_is_xyz =
         src.is_xyz || intent == ICC_INTENT_ABSOLUTE || src_is_absolute;
     bool dst_is_xyz = dst_profile.header.pcs
                    == icc_color_space_signature(ICC_COLOR_SPACE_XYZ);
 
-    ICCPcsColor intermediate;
+    IccPcsColor intermediate;
     const CieXYZ D50 = {.x = 0.9642, .y = 1.0, .z = 0.8249};
 
     if (intermediate_is_xyz) {
@@ -345,7 +371,7 @@ Error* icc_pcs_to_pcs(
 
     if (src_is_absolute && intent == ICC_INTENT_ABSOLUTE) {
         // Absolute -> absolute
-        ICCXYZNumber src_mw, dst_mw;
+        IccXYZNumber src_mw, dst_mw;
         TRY(icc_media_whitepoint(src_profile, &src_mw));
         TRY(icc_media_whitepoint(dst_profile, &dst_mw));
         intermediate.vec = geom_vec3_mul(
@@ -357,7 +383,7 @@ Error* icc_pcs_to_pcs(
         );
     } else if (intent == ICC_INTENT_ABSOLUTE) {
         // Relative -> absolute
-        ICCXYZNumber dst_mw;
+        IccXYZNumber dst_mw;
         TRY(icc_media_whitepoint(dst_profile, &dst_mw));
         intermediate.vec = geom_vec3_mul(
             intermediate.vec,
@@ -365,7 +391,7 @@ Error* icc_pcs_to_pcs(
         );
     } else if (src_is_absolute) {
         // Absolute -> relative
-        ICCXYZNumber src_mw;
+        IccXYZNumber src_mw;
         TRY(icc_media_whitepoint(src_profile, &src_mw));
         intermediate.vec = geom_vec3_mul(
             intermediate.vec,

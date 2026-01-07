@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "err/error.h"
 
@@ -23,7 +24,14 @@ Error* parse_ctx_new_subctx(
     ParseCtx* out
 );
 
+/// Seeks a position within the subctx
 Error* parse_ctx_seek(ParseCtx* ctx, size_t offset);
+
+/// Aligns the current offset to the next multiple of `align` within the *global
+/// offset*. If `require_zeros` is true, all skipped bytes must be zero.
+Error* parse_ctx_align(ParseCtx* ctx, size_t align, bool require_zeros);
+
+/// Produces an error a `len` byte read would go out of bounds.
 Error* parse_ctx_bound_check(ParseCtx* ctx, size_t len);
 
 Error* parse_ctx_read_i8(ParseCtx* ctx, int8_t* out);

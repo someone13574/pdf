@@ -2,7 +2,7 @@
 
 #include "logger/log.h"
 
-uint32_t icc_tag_signature(ICCTag tag) {
+uint32_t icc_tag_signature(IccTag tag) {
     switch (tag) {
         case ICC_TAG_A_TO_B0: {
             return 0x41324230;

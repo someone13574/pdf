@@ -5,7 +5,7 @@
 #include "geom/vec3.h"
 #include "logger/log.h"
 
-uint32_t icc_color_space_signature(ICCColorSpace color_space) {
+uint32_t icc_color_space_signature(IccColorSpace color_space) {
     switch (color_space) {
         case ICC_COLOR_SPACE_XYZ: {
             return 0x58595A20;
@@ -91,7 +91,7 @@ uint32_t icc_color_space_signature(ICCColorSpace color_space) {
     }
 }
 
-ICCColorSpace icc_color_space_from_signature(uint32_t signature) {
+IccColorSpace icc_color_space_from_signature(uint32_t signature) {
     switch (signature) {
         case 0x58595A20: {
             return ICC_COLOR_SPACE_XYZ;
@@ -174,7 +174,7 @@ ICCColorSpace icc_color_space_from_signature(uint32_t signature) {
     }
 }
 
-size_t icc_color_space_channels(ICCColorSpace space) {
+size_t icc_color_space_channels(IccColorSpace space) {
     switch (space) {
         case ICC_COLOR_SPACE_GRAY: {
             return 1;
@@ -238,7 +238,7 @@ size_t icc_color_space_channels(ICCColorSpace space) {
     }
 }
 
-void icc_color_clamp(ICCColor* color) {
+void icc_color_clamp(IccColor* color) {
     RELEASE_ASSERT(color);
 
     for (size_t idx = 0; idx < icc_color_space_channels(color->color_space);
@@ -249,7 +249,7 @@ void icc_color_clamp(ICCColor* color) {
     }
 }
 
-void icc_color_norm_pcs(ICCColor* color, GeomMat3 matrix) {
+void icc_color_norm_pcs(IccColor* color, GeomMat3 matrix) {
     if (color->color_space == icc_color_space_signature(ICC_COLOR_SPACE_XYZ)) {
         GeomVec3 xyz = geom_vec3_transform(
             geom_vec3_new(
@@ -269,9 +269,10 @@ void icc_color_norm_pcs(ICCColor* color, GeomMat3 matrix) {
 
 static CieXYZ D50 = {.x = 0.9642, .y = 1.0, .z = 0.8249};
 
-ICCPcsColor icc_pcs_color_to_lab(ICCPcsColor color) {
+IccPcsColor icc_pcs_color_to_lab(IccPcsColor color) {
     if (color.is_xyz) {
-        return (ICCPcsColor) {
+        LOG_DIAG(DEBUG, ICC, "Mapping PCS XYZ -> Lab");
+        return (IccPcsColor) {
             .vec = cie_lab_to_geom(
                 cie_xyz_to_cie_lab(cie_xyz_from_geom(color.vec), D50)
             ),
@@ -282,9 +283,10 @@ ICCPcsColor icc_pcs_color_to_lab(ICCPcsColor color) {
     }
 }
 
-ICCPcsColor icc_pcs_color_to_xyz(ICCPcsColor color) {
+IccPcsColor icc_pcs_color_to_xyz(IccPcsColor color) {
     if (!color.is_xyz) {
-        return (ICCPcsColor) {
+        LOG_DIAG(DEBUG, ICC, "Mapping PCS Lab -> XYZ");
+        return (IccPcsColor) {
             .vec = cie_xyz_to_geom(
                 cie_lab_to_cie_xyz(cie_lab_from_geom(color.vec), D50)
             ),
@@ -295,8 +297,8 @@ ICCPcsColor icc_pcs_color_to_xyz(ICCPcsColor color) {
     }
 }
 
-ICCColor icc_pcs_to_color(ICCPcsColor color) {
-    return (ICCColor) {
+IccColor icc_pcs_to_color(IccPcsColor color) {
+    return (IccColor) {
         .channels = {color.vec.x, color.vec.y, color.vec.z},
         .color_space = color.is_xyz ? ICC_COLOR_SPACE_XYZ : ICC_COLOR_SPACE_LAB
     };

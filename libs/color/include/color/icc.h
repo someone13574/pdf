@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 
+#include "arena/arena.h"
 #include "color/icc_color.h"
 #include "err/error.h"
 #include "geom/vec3.h"
@@ -12,7 +13,7 @@ typedef enum {
     ICC_INTENT_ABSOLUTE,
     ICC_INTENT_PERCEPTUAL,
     ICC_INTENT_SATURATION
-} ICCRenderingIntent;
+} IccRenderingIntent;
 
 typedef struct {
     uint16_t year;
@@ -21,22 +22,24 @@ typedef struct {
     uint16_t hour;
     uint16_t minute;
     uint16_t second;
-} ICCDateTime;
+} IccDateTime;
 
-Error* icc_parse_date_time(ParseCtx* ctx, ICCDateTime* out);
+Error* icc_parse_date_time(ParseCtx* ctx, IccDateTime* out);
 
-typedef uint32_t ICCS15Fixed16Number;
+typedef uint16_t IccU8Fixed8Number;
+double icc_u8_fixed8_to_double(IccU8Fixed8Number num);
 
-double icc_s15_fixed16_to_double(ICCS15Fixed16Number num);
+typedef int32_t IccS15Fixed16Number;
+double icc_s15_fixed16_to_double(IccS15Fixed16Number num);
 
 typedef struct {
-    ICCS15Fixed16Number x;
-    ICCS15Fixed16Number y;
-    ICCS15Fixed16Number z;
-} ICCXYZNumber;
+    IccS15Fixed16Number x;
+    IccS15Fixed16Number y;
+    IccS15Fixed16Number z;
+} IccXYZNumber;
 
-Error* icc_parse_xyz_number(ParseCtx* ctx, ICCXYZNumber* out);
-GeomVec3 icc_xyz_number_to_geom(ICCXYZNumber xyz);
+Error* icc_parse_xyz_number(ParseCtx* ctx, IccXYZNumber* out);
+GeomVec3 icc_xyz_number_to_geom(IccXYZNumber xyz);
 
 typedef struct {
     uint32_t size;
@@ -45,7 +48,7 @@ typedef struct {
     uint32_t class;
     uint32_t color_space;
     uint32_t pcs;
-    ICCDateTime date;
+    IccDateTime date;
     uint32_t signature;
     uint32_t platform_signature;
     uint32_t flags;
@@ -53,51 +56,52 @@ typedef struct {
     uint32_t device_model;
     uint64_t device_attributes;
     uint32_t rendering_intent;
-    ICCXYZNumber illuminant;
+    IccXYZNumber illuminant;
     uint32_t creator_signature;
     uint64_t id_low;
     uint64_t id_high;
-} ICCProfileHeader;
+} IccProfileHeader;
 
-Error* icc_parse_header(ParseCtx* ctx, ICCProfileHeader* out);
+Error* icc_parse_header(ParseCtx* ctx, IccProfileHeader* out);
 
 typedef struct {
     ParseCtx file_ctx;
     ParseCtx table_ctx;
     uint32_t tag_count;
-} ICCTagTable;
+} IccTagTable;
 
-Error* icc_tag_table_new(ParseCtx* file_ctx, ICCTagTable* out);
+Error* icc_tag_table_new(ParseCtx* file_ctx, IccTagTable* out);
 Error*
-icc_tag_table_lookup(ICCTagTable table, uint32_t tag_signature, ParseCtx* out);
+icc_tag_table_lookup(IccTagTable table, uint32_t tag_signature, ParseCtx* out);
 
 typedef struct {
-    ICCProfileHeader header;
-    ICCTagTable tag_table;
-} ICCProfile;
+    IccProfileHeader header;
+    IccTagTable tag_table;
+} IccProfile;
 
-Error* icc_parse_profile(ParseCtx ctx, ICCProfile* profile);
-bool icc_profile_is_pcsxyz(ICCProfile profile);
+Error* icc_parse_profile(ParseCtx ctx, IccProfile* profile);
+bool icc_profile_is_pcsxyz(IccProfile profile);
 
 Error* icc_device_to_pcs(
-    ICCProfile profile,
-    ICCRenderingIntent rendering_intent,
-    ICCColor color,
-    ICCPcsColor* output
+    IccProfile profile,
+    IccRenderingIntent rendering_intent,
+    IccColor color,
+    IccPcsColor* output
 );
 
 Error* icc_pcs_to_device(
-    ICCProfile profile,
-    ICCRenderingIntent rendering_intent,
-    ICCPcsColor color,
-    ICCColor* output
+    Arena* arena,
+    IccProfile profile,
+    IccRenderingIntent rendering_intent,
+    IccPcsColor color,
+    IccColor* output
 );
 
 Error* icc_pcs_to_pcs(
-    ICCProfile src_profile,
-    ICCProfile dst_profile,
+    IccProfile src_profile,
+    IccProfile dst_profile,
     bool src_is_absolute,
-    ICCRenderingIntent intent,
-    ICCPcsColor src,
-    ICCPcsColor* dst
+    IccRenderingIntent intent,
+    IccPcsColor src,
+    IccPcsColor* dst
 );

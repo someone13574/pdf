@@ -3,6 +3,7 @@ add_library(color
     src/conversion.c
     src/icc.c
     src/icc_color.c
+    src/icc_curve.c
     src/icc_lut.c
     src/icc_tags.c
     src/rgb.c)

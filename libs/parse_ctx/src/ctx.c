@@ -43,11 +43,41 @@ Error* parse_ctx_seek(ParseCtx* ctx, size_t offset) {
     return NULL;
 }
 
+Error* parse_ctx_align(ParseCtx* ctx, size_t align, bool require_zeros) {
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(align > 0);
+
+    size_t next_global_offset =
+        (ctx->offset + ctx->global_offset + align - 1) / align * align;
+    size_t next_local_offset = next_global_offset - ctx->global_offset;
+
+    if (require_zeros) {
+        DEBUG_ASSERT(next_local_offset >= ctx->offset);
+        TRY(parse_ctx_bound_check(ctx, next_local_offset - ctx->offset));
+
+        for (; ctx->offset < next_local_offset; ctx->offset++) {
+            if (ctx->buffer[ctx->offset] != 0) {
+                return ERROR(CTX_NO_PAD);
+            }
+        }
+    } else {
+        TRY(parse_ctx_seek(ctx, next_local_offset));
+    }
+
+    return NULL;
+}
+
 Error* parse_ctx_bound_check(ParseCtx* ctx, size_t len) {
     RELEASE_ASSERT(ctx);
 
     if (len > ctx->buffer_len || ctx->offset > ctx->buffer_len - len) {
-        return ERROR(CTX_EOF);
+        return ERROR(
+            CTX_EOF,
+            "Attempted to read %zu bytes starting at offset %zu in buffer size %zu",
+            len,
+            ctx->offset,
+            ctx->buffer_len
+        );
     }
 
     return NULL;

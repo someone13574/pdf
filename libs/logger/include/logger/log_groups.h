@@ -11,6 +11,7 @@
     X(LINKED_LIST, INHERIT, ARENA)                                             \
     X(CODEC, OFF, GLOBAL)                                                      \
     X(CANVAS, INHERIT, GLOBAL)                                                 \
+    X(ICC, TRACE, GLOBAL)                                                      \
     X(DCEL, INHERIT, CANVAS)                                                   \
     X(PDF, INHERIT, GLOBAL)                                                    \
     X(DOC, INHERIT, PDF)                                                       \

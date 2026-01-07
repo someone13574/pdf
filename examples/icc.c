@@ -28,21 +28,21 @@ int main(void) {
     );
 
     ParseCtx swop_ctx = parse_ctx_new(swop_buffer, swop_buffer_len);
-    ICCProfile swop_profile;
+    IccProfile swop_profile;
     REQUIRE(icc_parse_profile(swop_ctx, &swop_profile));
 
     ParseCtx srgb_ctx = parse_ctx_new(srgb_buffer, srgb_buffer_len);
-    ICCProfile srgb_profile;
+    IccProfile srgb_profile;
     REQUIRE(icc_parse_profile(srgb_ctx, &srgb_profile));
 
-    ICCColor input = {
-        .channels = {1.0, 0.0, 0.0, 1.0},
+    IccColor input = {
+        .channels = {1.0, 0.0, 0.0, 0.0},
         .color_space = ICC_COLOR_SPACE_CMYK
     };
 
-    ICCRenderingIntent intent = ICC_INTENT_MEDIA_RELATIVE;
+    IccRenderingIntent intent = ICC_INTENT_MEDIA_RELATIVE;
 
-    ICCPcsColor src_pcs, dst_pcs;
+    IccPcsColor src_pcs, dst_pcs;
     REQUIRE(icc_device_to_pcs(
         swop_profile,
         ICC_INTENT_MEDIA_RELATIVE,
@@ -58,8 +58,10 @@ int main(void) {
         &dst_pcs
     ));
 
-    ICCColor mapped_color;
-    REQUIRE(icc_pcs_to_device(srgb_profile, intent, dst_pcs, &mapped_color));
+    IccColor mapped_color;
+    REQUIRE(
+        icc_pcs_to_device(arena, srgb_profile, intent, dst_pcs, &mapped_color)
+    );
     RELEASE_ASSERT(mapped_color.color_space == ICC_COLOR_SPACE_RGB);
 
     LOG_DIAG(
