@@ -242,18 +242,13 @@ GeomVec3 pdf_map_color(
                                : geom_vec3_new(0.0, 0.0, 0.0);
             GeomMat3 matrix = params.matrix.is_some ? params.matrix.value
                                                     : geom_mat3_identity();
-
-            GeomVec3 xyz = geom_vec3_new(
-                matrix.mat[0][0] * pow(components[0], gamma.x)
-                    + matrix.mat[1][0] * pow(components[1], gamma.y)
-                    + matrix.mat[2][0] * pow(components[2], gamma.z),
-                matrix.mat[0][1] * pow(components[0], gamma.x)
-                    + matrix.mat[1][1] * pow(components[1], gamma.y)
-                    + matrix.mat[2][1] * pow(components[2], gamma.z),
-                matrix.mat[0][2] * pow(components[0], gamma.x)
-                    + matrix.mat[1][2] * pow(components[1], gamma.y)
-                    + matrix.mat[2][2] * pow(components[2], gamma.z)
+            GeomVec3 pow_rgb = geom_vec3_new(
+                pow(components[0], gamma.x),
+                pow(components[1], gamma.y),
+                pow(components[2], gamma.z)
             );
+
+            GeomVec3 xyz = geom_vec3_transform(pow_rgb, matrix);
 
             return cie_xyz_to_srgb(xyz, params.whitepoint, blackpoint);
         }

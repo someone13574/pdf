@@ -267,7 +267,7 @@ void icc_color_norm_pcs(IccColor* color, GeomMat3 matrix) {
     icc_color_clamp(color);
 }
 
-static CieXYZ D50 = {.x = 0.9642, .y = 1.0, .z = 0.8249};
+static const CieXYZ D50 = {.x = 0.9642, .y = 1.0, .z = 0.8249};
 
 IccPcsColor icc_pcs_color_to_lab(IccPcsColor color) {
     if (color.is_xyz) {

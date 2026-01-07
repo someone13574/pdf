@@ -68,3 +68,23 @@ CieXYZ cie_lab_to_cie_xyz(CieLab cie_lab, CieXYZ reference_illuminant) {
             )
     );
 }
+
+#ifdef TEST
+
+#include "test/test.h"
+
+TEST_FUNC(test_cie_xyz_lab_roundtrip) {
+    static const CieXYZ D50 = {.x = 0.9642, .y = 1.0, .z = 0.8249};
+
+    CieXYZ xyz = cie_xyz_new(0.4, 0.2, 0.7);
+    CieLab lab = cie_xyz_to_cie_lab(xyz, D50);
+    CieXYZ roundtrip_xyz = cie_lab_to_cie_xyz(lab, D50);
+
+    TEST_ASSERT_EQ(xyz.x, roundtrip_xyz.x);
+    TEST_ASSERT_EQ(xyz.y, roundtrip_xyz.y);
+    TEST_ASSERT_EQ(xyz.z, roundtrip_xyz.z);
+
+    return TEST_RESULT_PASS;
+}
+
+#endif // TEST

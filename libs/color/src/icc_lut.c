@@ -268,6 +268,8 @@ static Error* icc_lut16_map_1d(
     size_t entries,
     double* out
 ) {
+    LOG_DIAG(TRACE, ICC, "Mapping 1d 16bit: %f or %f", val, val * 65535.0);
+
     val = val < 0.0 ? 0.0 : val;
     val = val > 1.0 ? 1.0 : val;
 
@@ -291,6 +293,8 @@ static Error* icc_lut16_map_1d(
         *out = (double)sample_a / 65535.0;
     }
 
+    LOG_DIAG(TRACE, ICC, "Out: %f or %f", *out, *out * 65535.0);
+
     return NULL;
 }
 
@@ -301,6 +305,14 @@ icc_lut16_clut_map(IccLut16 lut, double coords[15], double out[15]) {
         coords[idx] = coords[idx] < 0.0 ? 0.0 : coords[idx];
         coords[idx] = coords[idx] > 1.0 ? 1.0 : coords[idx];
         coords[idx] *= max_coord;
+        LOG_DIAG(
+            DEBUG,
+            ICC,
+            "CLut scaled input coord %zu: %f/%f",
+            idx,
+            coords[idx],
+            max_coord
+        );
     }
 
     size_t strides[15];
@@ -338,6 +350,7 @@ icc_lut16_clut_map(IccLut16 lut, double coords[15], double out[15]) {
 
     for (size_t output = 0; output < lut.common.output_channels; output++) {
         out[output] = acc[output] / 65535.0;
+        LOG_DIAG(DEBUG, ICC, "CLut output coord %zu: %f", output, acc[output]);
     }
 
     return NULL;
@@ -435,6 +448,14 @@ static Error* icc_variable_clut_map(
         coords[idx] = coords[idx] < 0.0 ? 0.0 : coords[idx];
         coords[idx] = coords[idx] > 1.0 ? 1.0 : coords[idx];
         coords[idx] *= (double)lut.grid_points[idx] - 1.0;
+        LOG_DIAG(
+            DEBUG,
+            ICC,
+            "CLut scaled input coord %zu: %f/%f",
+            idx,
+            coords[idx],
+            (double)lut.grid_points[idx] - 1.0
+        );
     }
 
     size_t strides[15];
@@ -445,6 +466,7 @@ static Error* icc_variable_clut_map(
 
     double acc[15] = {0}; // TODO: Kahan summation
     uint16_t max_state = (uint16_t)(1 << input_channels) - 1;
+
     for (uint16_t state = 0; state <= max_state; state++) {
         size_t offset = 0;
         double weight = 1.0;
@@ -479,6 +501,7 @@ static Error* icc_variable_clut_map(
 
     for (size_t output = 0; output < output_channels; output++) {
         out[output] = acc[output] / (lut.precision == 1 ? 255.0 : 65535.0);
+        LOG_DIAG(DEBUG, ICC, "CLut output coord %zu: %f", output, acc[output]);
     }
 
     return NULL;
@@ -633,6 +656,7 @@ icc_lut_b_to_a_map(const IccLutBToA* lut, IccPcsColor input, double out[15]) {
     ));
 
     if (lut->has_matrix) {
+        LOG_DIAG(TRACE, ICC, "Applied matrix and offset");
         intermediate.vec = geom_vec3_add(
             geom_vec3_transform(intermediate.vec, lut->matrix),
             lut->matrix_vec

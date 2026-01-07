@@ -207,11 +207,14 @@ Error*
 icc_any_curve_map(IccAnyCurve curve, bool is_pcsxyz, double x, double* out) {
     RELEASE_ASSERT(out);
 
+    LOG_DIAG(TRACE, ICC, "Mapping 1d any: %f", x);
     if (curve.parametric) {
         *out = icc_parametric_curve_map(curve.curve.parametric, x);
     } else {
         TRY(icc_curve_map(curve.curve.curve, x, is_pcsxyz, out));
     }
+
+    LOG_DIAG(TRACE, ICC, "Out: %f", *out);
 
     return NULL;
 }

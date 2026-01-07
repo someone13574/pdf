@@ -36,19 +36,23 @@ int main(void) {
     REQUIRE(icc_parse_profile(srgb_ctx, &srgb_profile));
 
     IccColor input = {
-        .channels = {1.0, 0.0, 0.0, 0.0},
+        .channels = {0.4, 0.5, 0.6, 0.2},
         .color_space = ICC_COLOR_SPACE_CMYK
     };
 
-    IccRenderingIntent intent = ICC_INTENT_MEDIA_RELATIVE;
+    LOG_DIAG(
+        INFO,
+        EXAMPLE,
+        "Naive conversion: %f, %f, %f",
+        (1.0 - input.channels[0]) * (1.0 - input.channels[3]),
+        (1.0 - input.channels[1]) * (1.0 - input.channels[3]),
+        (1.0 - input.channels[2]) * (1.0 - input.channels[3])
+    );
+
+    IccRenderingIntent intent = ICC_INTENT_PERCEPTUAL;
 
     IccPcsColor src_pcs, dst_pcs;
-    REQUIRE(icc_device_to_pcs(
-        swop_profile,
-        ICC_INTENT_MEDIA_RELATIVE,
-        input,
-        &src_pcs
-    ));
+    REQUIRE(icc_device_to_pcs(swop_profile, intent, input, &src_pcs));
     REQUIRE(icc_pcs_to_pcs(
         swop_profile,
         srgb_profile,
