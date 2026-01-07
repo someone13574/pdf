@@ -17,6 +17,7 @@ So far the following have been implemented:
 - A minimal postscript interpreter for parsing cmap files and running pdf functions
   - This only implements the operators needed for these tasks
 - A simple (incomplete) renderer
+- A minimal ICC parser
 - A SVG canvas
 
 Future expansions:
@@ -24,7 +25,6 @@ Future expansions:
 - Type1 font parser
 - Support for patterns and shadings
 - Image support
-- ICC parser
 - Raster canvas backend
 
 # Resources
@@ -40,3 +40,4 @@ Future expansions:
 - [Partitioning a Polygon into _y_-monotone Pieces](https://www.youtube.com/watch?v=IkA-2Y9lBvM)
 - [DEFLATE Compressed Data Format Specification](https://datatracker.ietf.org/doc/html/rfc1951)
   - [ZLIB Compressed Data Format Specification](https://datatracker.ietf.org/doc/html/rfc1950)
+- [ICC Specification](https://www.color.org/specification/ICC.1-2022-05.pdf)

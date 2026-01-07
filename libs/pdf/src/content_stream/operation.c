@@ -467,8 +467,8 @@ static Error* deserde_set_cmyk(
 
     PdfOperandDescriptor descriptors[] = {
         pdf_num_as_real_operand(&queue_op->data.set_cmyk.c),
-        pdf_num_as_real_operand(&queue_op->data.set_cmyk.y),
         pdf_num_as_real_operand(&queue_op->data.set_cmyk.m),
+        pdf_num_as_real_operand(&queue_op->data.set_cmyk.y),
         pdf_num_as_real_operand(&queue_op->data.set_cmyk.k),
     };
 
