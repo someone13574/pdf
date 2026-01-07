@@ -162,7 +162,7 @@ double icc_parametric_curve_map(IccParametricCurve curve, double x) {
         }
         case 4: {
             if (x >= curve.d) {
-                x = pow(curve.a * x + curve.b, curve.g) + curve.c;
+                x = pow(curve.a * x + curve.b, curve.g) + curve.e;
             } else {
                 x = curve.c * x + curve.f;
             }
