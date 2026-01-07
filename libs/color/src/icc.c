@@ -1,5 +1,6 @@
 #include "color/icc.h"
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "color/cie.h"
@@ -10,47 +11,6 @@
 #include "geom/vec3.h"
 #include "logger/log.h"
 #include "parse_ctx/ctx.h"
-
-Error* icc_parse_date_time(ParseCtx* ctx, IccDateTime* out) {
-    RELEASE_ASSERT(ctx);
-    RELEASE_ASSERT(out);
-
-    TRY(parse_ctx_read_u16_be(ctx, &out->year));
-    TRY(parse_ctx_read_u16_be(ctx, &out->month));
-    TRY(parse_ctx_read_u16_be(ctx, &out->day_of_month));
-    TRY(parse_ctx_read_u16_be(ctx, &out->hour));
-    TRY(parse_ctx_read_u16_be(ctx, &out->minute));
-    TRY(parse_ctx_read_u16_be(ctx, &out->second));
-
-    return NULL;
-}
-
-double icc_u8_fixed8_to_double(IccU8Fixed8Number num) {
-    return (double)num / 256.0;
-}
-
-double icc_s15_fixed16_to_double(IccS15Fixed16Number num) {
-    return (double)num / 65536.0;
-}
-
-Error* icc_parse_xyz_number(ParseCtx* ctx, IccXYZNumber* out) {
-    RELEASE_ASSERT(ctx);
-    RELEASE_ASSERT(out);
-
-    TRY(parse_ctx_read_i32_be(ctx, &out->x));
-    TRY(parse_ctx_read_i32_be(ctx, &out->y));
-    TRY(parse_ctx_read_i32_be(ctx, &out->z));
-
-    return NULL;
-}
-
-GeomVec3 icc_xyz_number_to_geom(IccXYZNumber xyz) {
-    return geom_vec3_new(
-        icc_s15_fixed16_to_double(xyz.x),
-        icc_s15_fixed16_to_double(xyz.y),
-        icc_s15_fixed16_to_double(xyz.z)
-    );
-}
 
 Error* icc_parse_header(ParseCtx* ctx, IccProfileHeader* out) {
     RELEASE_ASSERT(ctx);
@@ -138,11 +98,13 @@ icc_tag_table_lookup(IccTagTable table, uint32_t tag_signature, ParseCtx* out) {
     return NULL;
 }
 
-Error* icc_parse_profile(ParseCtx ctx, IccProfile* profile) {
-    RELEASE_ASSERT(profile);
+Error* icc_parse_profile(ParseCtx ctx, Arena* arena, IccProfile* out) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(out);
 
-    TRY(icc_parse_header(&ctx, &profile->header));
-    TRY(icc_tag_table_new(&ctx, &profile->tag_table));
+    out->arena = arena;
+    TRY(icc_parse_header(&ctx, &out->header));
+    TRY(icc_tag_table_new(&ctx, &out->tag_table));
 
     return NULL;
 }
@@ -250,25 +212,23 @@ Error* icc_device_to_pcs(
 }
 
 Error* icc_pcs_to_device(
-    Arena* arena,
-    IccProfile profile,
+    IccProfile* profile,
     IccRenderingIntent rendering_intent,
     IccPcsColor color,
     IccColor* output
 ) {
-    RELEASE_ASSERT(arena);
     RELEASE_ASSERT(output);
 
     LOG_DIAG(INFO, ICC, "Mapping pcs -> device");
 
     if (color.is_xyz
         && ICC_COLOR_SPACE_XYZ
-               != icc_color_space_from_signature(profile.header.pcs)) {
+               != icc_color_space_from_signature(profile->header.pcs)) {
         return ERROR(
             ICC_ERR_INCORRECT_SPACE,
             "Input pcs (is_xyz=%d) doesn't match pcs %d",
             (int)color.is_xyz,
-            (int)icc_color_space_from_signature(profile.header.pcs)
+            (int)icc_color_space_from_signature(profile->header.pcs)
         );
     }
 
@@ -291,7 +251,7 @@ Error* icc_pcs_to_device(
 
     ParseCtx lut_ctx;
     TRY(icc_tag_table_lookup(
-        profile.tag_table,
+        profile->tag_table,
         icc_tag_signature(b_to_a_tag),
         &lut_ctx
     ));
@@ -305,7 +265,7 @@ Error* icc_pcs_to_device(
             TRY(icc_parse_lut8(lut_ctx, &lut));
             TRY(icc_lut8_map(lut, icc_pcs_to_color(color), output->channels));
             output->color_space =
-                icc_color_space_from_signature(profile.header.color_space);
+                icc_color_space_from_signature(profile->header.color_space);
             break;
         }
         case 0x6D667432: {
@@ -313,21 +273,52 @@ Error* icc_pcs_to_device(
             TRY(icc_parse_lut16(lut_ctx, &lut));
             TRY(icc_lut16_map(lut, icc_pcs_to_color(color), output->channels));
             output->color_space =
-                icc_color_space_from_signature(profile.header.color_space);
+                icc_color_space_from_signature(profile->header.color_space);
             break;
         }
         case 0x6D424120: {
             IccLutBToA lut;
-            TRY(icc_parse_lut_b_to_a(arena, lut_ctx, &lut));
+            if (b_to_a_tag == ICC_TAG_B_TO_A0 && profile->cached_b2a0) {
+                lut = profile->b2a0;
+            } else if (b_to_a_tag == ICC_TAG_B_TO_A0 && profile->cached_b2a1) {
+                lut = profile->b2a1;
+            } else if (b_to_a_tag == ICC_TAG_B_TO_A0 && profile->cached_b2a2) {
+                lut = profile->b2a2;
+            } else {
+                TRY(icc_parse_lut_b_to_a(profile->arena, lut_ctx, &lut));
+            }
+
             TRY(icc_lut_b_to_a_map(&lut, color, output->channels));
             output->color_space =
-                icc_color_space_from_signature(profile.header.color_space);
+                icc_color_space_from_signature(profile->header.color_space);
 
             if (!lut.has_clut) {
                 RELEASE_ASSERT(
                     3 == icc_color_space_channels(output->color_space)
                 );
             }
+
+            switch (b_to_a_tag) {
+                case ICC_TAG_B_TO_A0: {
+                    profile->cached_b2a0 = true;
+                    profile->b2a0 = lut;
+                    break;
+                }
+                case ICC_TAG_B_TO_A1: {
+                    profile->cached_b2a1 = true;
+                    profile->b2a1 = lut;
+                    break;
+                }
+                case ICC_TAG_B_TO_A2: {
+                    profile->cached_b2a2 = true;
+                    profile->b2a2 = lut;
+                    break;
+                }
+                default: {
+                    LOG_PANIC("Unreachable");
+                }
+            }
+
             break;
         }
         default: {
@@ -404,6 +395,30 @@ Error* icc_pcs_to_pcs(
     } else {
         *dst = icc_pcs_color_to_lab(intermediate);
     }
+
+    return NULL;
+}
+
+Error* icc_device_to_device(
+    IccProfile* src_profile,
+    IccProfile* dst_profile,
+    IccRenderingIntent intent,
+    IccColor src,
+    IccColor* dst
+) {
+    RELEASE_ASSERT(dst);
+
+    IccPcsColor src_pcs, dst_pcs;
+    TRY(icc_device_to_pcs(*src_profile, intent, src, &src_pcs));
+    TRY(icc_pcs_to_pcs(
+        *src_profile,
+        *dst_profile,
+        false,
+        intent,
+        src_pcs,
+        &dst_pcs
+    ));
+    TRY(icc_pcs_to_device(dst_profile, intent, dst_pcs, dst));
 
     return NULL;
 }

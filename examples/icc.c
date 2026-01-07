@@ -16,7 +16,7 @@ int main(void) {
     size_t swop_buffer_len;
     const uint8_t* swop_buffer = load_file_to_buffer(
         arena,
-        "test-files/USWebCoatedSWOP.icc",
+        "assets/icc-profiles/CGATS001Compat-v2-micro.icc",
         &swop_buffer_len
     );
 
@@ -29,11 +29,11 @@ int main(void) {
 
     ParseCtx swop_ctx = parse_ctx_new(swop_buffer, swop_buffer_len);
     IccProfile swop_profile;
-    REQUIRE(icc_parse_profile(swop_ctx, &swop_profile));
+    REQUIRE(icc_parse_profile(swop_ctx, arena, &swop_profile));
 
     ParseCtx srgb_ctx = parse_ctx_new(srgb_buffer, srgb_buffer_len);
     IccProfile srgb_profile;
-    REQUIRE(icc_parse_profile(srgb_ctx, &srgb_profile));
+    REQUIRE(icc_parse_profile(srgb_ctx, arena, &srgb_profile));
 
     IccColor input = {
         .channels = {0.4, 0.5, 0.6, 0.2},
@@ -63,9 +63,7 @@ int main(void) {
     ));
 
     IccColor mapped_color;
-    REQUIRE(
-        icc_pcs_to_device(arena, srgb_profile, intent, dst_pcs, &mapped_color)
-    );
+    REQUIRE(icc_pcs_to_device(&srgb_profile, intent, dst_pcs, &mapped_color));
     RELEASE_ASSERT(mapped_color.color_space == ICC_COLOR_SPACE_RGB);
 
     LOG_DIAG(

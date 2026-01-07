@@ -2,6 +2,8 @@ add_library(color
     src/cie.c
     src/conversion.c
     src/icc.c
+    src/icc_types.c
+    src/icc_cache.c
     src/icc_color.c
     src/icc_curve.c
     src/icc_lut.c

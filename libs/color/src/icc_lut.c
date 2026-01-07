@@ -6,7 +6,6 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
-#include "color/icc.h"
 #include "color/icc_color.h"
 #include "color/icc_curve.h"
 #include "err/error.h"
@@ -135,6 +134,10 @@ icc_lut8_map_1d(ParseCtx table, double val, size_t channel, double* out) {
 
 static Error*
 icc_lut8_clut_map(IccLut8 lut, double coords[15], double out[15]) {
+    RELEASE_ASSERT(coords);
+    RELEASE_ASSERT(out);
+    RELEASE_ASSERT(lut.common.input_channels >= 1);
+
     double max_coord = (double)lut.common.grid_points - 1.0;
     for (size_t idx = 0; idx < lut.common.input_channels; idx++) {
         coords[idx] = coords[idx] < 0.0 ? 0.0 : coords[idx];
@@ -300,6 +303,10 @@ static Error* icc_lut16_map_1d(
 
 static Error*
 icc_lut16_clut_map(IccLut16 lut, double coords[15], double out[15]) {
+    RELEASE_ASSERT(coords);
+    RELEASE_ASSERT(out);
+    RELEASE_ASSERT(lut.common.input_channels >= 1);
+
     double max_coord = (double)lut.common.grid_points - 1.0;
     for (size_t idx = 0; idx < lut.common.input_channels; idx++) {
         coords[idx] = coords[idx] < 0.0 ? 0.0 : coords[idx];
@@ -443,6 +450,7 @@ static Error* icc_variable_clut_map(
 ) {
     RELEASE_ASSERT(coords);
     RELEASE_ASSERT(out);
+    RELEASE_ASSERT(input_channels >= 1);
 
     for (size_t idx = 0; idx < input_channels; idx++) {
         coords[idx] = coords[idx] < 0.0 ? 0.0 : coords[idx];

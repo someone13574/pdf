@@ -1,7 +1,9 @@
 #include "parse_ctx/ctx.h"
 
+#include <stdint.h>
 #include <string.h>
 
+#include "arena/common.h"
 #include "err/error.h"
 #include "logger/log.h"
 
@@ -11,6 +13,17 @@ ParseCtx parse_ctx_new(const uint8_t* buffer, size_t buffer_len) {
                        .buffer_len = buffer_len,
                        .offset = 0,
                        .global_offset = 0};
+}
+
+ParseCtx parse_ctx_from_file(Arena* arena, const char* path) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(path);
+
+    size_t len;
+    const uint8_t* buffer = load_file_to_buffer(arena, path, &len);
+    RELEASE_ASSERT(buffer, "Invalid path");
+
+    return parse_ctx_new(buffer, len);
 }
 
 Error* parse_ctx_new_subctx(

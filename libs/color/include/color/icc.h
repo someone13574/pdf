@@ -4,8 +4,9 @@
 
 #include "arena/arena.h"
 #include "color/icc_color.h"
+#include "color/icc_lut.h"
+#include "color/icc_types.h"
 #include "err/error.h"
-#include "geom/vec3.h"
 #include "parse_ctx/ctx.h"
 
 typedef enum {
@@ -14,32 +15,6 @@ typedef enum {
     ICC_INTENT_PERCEPTUAL,
     ICC_INTENT_SATURATION
 } IccRenderingIntent;
-
-typedef struct {
-    uint16_t year;
-    uint16_t month;
-    uint16_t day_of_month;
-    uint16_t hour;
-    uint16_t minute;
-    uint16_t second;
-} IccDateTime;
-
-Error* icc_parse_date_time(ParseCtx* ctx, IccDateTime* out);
-
-typedef uint16_t IccU8Fixed8Number;
-double icc_u8_fixed8_to_double(IccU8Fixed8Number num);
-
-typedef int32_t IccS15Fixed16Number;
-double icc_s15_fixed16_to_double(IccS15Fixed16Number num);
-
-typedef struct {
-    IccS15Fixed16Number x;
-    IccS15Fixed16Number y;
-    IccS15Fixed16Number z;
-} IccXYZNumber;
-
-Error* icc_parse_xyz_number(ParseCtx* ctx, IccXYZNumber* out);
-GeomVec3 icc_xyz_number_to_geom(IccXYZNumber xyz);
 
 typedef struct {
     uint32_t size;
@@ -75,11 +50,19 @@ Error*
 icc_tag_table_lookup(IccTagTable table, uint32_t tag_signature, ParseCtx* out);
 
 typedef struct {
+    Arena* arena;
     IccProfileHeader header;
     IccTagTable tag_table;
+
+    bool cached_b2a0;
+    bool cached_b2a1;
+    bool cached_b2a2;
+    IccLutBToA b2a0;
+    IccLutBToA b2a1;
+    IccLutBToA b2a2;
 } IccProfile;
 
-Error* icc_parse_profile(ParseCtx ctx, IccProfile* profile);
+Error* icc_parse_profile(ParseCtx ctx, Arena* arena, IccProfile* out);
 bool icc_profile_is_pcsxyz(IccProfile profile);
 
 Error* icc_device_to_pcs(
@@ -90,8 +73,7 @@ Error* icc_device_to_pcs(
 );
 
 Error* icc_pcs_to_device(
-    Arena* arena,
-    IccProfile profile,
+    IccProfile* profile,
     IccRenderingIntent rendering_intent,
     IccPcsColor color,
     IccColor* output
@@ -104,4 +86,12 @@ Error* icc_pcs_to_pcs(
     IccRenderingIntent intent,
     IccPcsColor src,
     IccPcsColor* dst
+);
+
+Error* icc_device_to_device(
+    IccProfile* src_profile,
+    IccProfile* dst_profile,
+    IccRenderingIntent intent,
+    IccColor src,
+    IccColor* dst
 );

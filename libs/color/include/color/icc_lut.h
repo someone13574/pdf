@@ -3,9 +3,9 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
-#include "color/icc.h"
 #include "color/icc_color.h"
 #include "color/icc_curve.h"
+#include "color/icc_types.h"
 #include "err/error.h"
 #include "geom/mat3.h"
 #include "parse_ctx/ctx.h"

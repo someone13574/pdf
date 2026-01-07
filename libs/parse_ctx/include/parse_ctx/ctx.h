@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "arena/arena.h"
 #include "err/error.h"
 
 typedef struct {
@@ -14,6 +15,7 @@ typedef struct {
 } ParseCtx;
 
 ParseCtx parse_ctx_new(const uint8_t* buffer, size_t buffer_len);
+ParseCtx parse_ctx_from_file(Arena* arena, const char* path);
 
 /// Create a new context with an offset and size from the start of its parent.
 /// The parent's offset will move to the end of this table.

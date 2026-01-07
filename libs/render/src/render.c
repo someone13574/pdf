@@ -7,6 +7,7 @@
 #include "cache.h"
 #include "canvas/canvas.h"
 #include "canvas/path_builder.h"
+#include "color/icc_cache.h"
 #include "err/error.h"
 #include "geom/mat3.h"
 #include "geom/rect.h"
@@ -502,11 +503,13 @@ static Error* process_content_stream(
                 }
 
                 if (num_components != 0) {
-                    graphics_state->nonstroking_rgb = pdf_map_color(
+                    TRY(pdf_map_color(
                         components,
                         num_components,
-                        graphics_state->nonstroking_color_space
-                    );
+                        graphics_state->nonstroking_color_space,
+                        &state->cache.icc_cache,
+                        &graphics_state->nonstroking_rgb
+                    ));
                 }
 
                 break;
@@ -541,11 +544,13 @@ static Error* process_content_stream(
                             ));
                         }
 
-                        graphics_state->nonstroking_rgb = pdf_map_color(
+                        TRY(pdf_map_color(
                             components,
                             3,
-                            graphics_state->nonstroking_color_space
-                        );
+                            graphics_state->nonstroking_color_space,
+                            &state->cache.icc_cache,
+                            &graphics_state->nonstroking_rgb
+                        ));
 
                         break;
                     }
@@ -576,11 +581,13 @@ static Error* process_content_stream(
                     PDF_COLOR_SPACE_DEVICE_GRAY;
 
                 PdfReal components[1] = {op.data.set_gray};
-                graphics_state->stroking_rgb = pdf_map_color(
+                TRY(pdf_map_color(
                     components,
                     1,
-                    graphics_state->stroking_color_space
-                );
+                    graphics_state->stroking_color_space,
+                    &state->cache.icc_cache,
+                    &graphics_state->stroking_rgb
+                ));
                 break;
             }
             case PDF_OPERATOR_g: {
@@ -590,11 +597,13 @@ static Error* process_content_stream(
                     PDF_COLOR_SPACE_DEVICE_GRAY;
 
                 PdfReal components[1] = {op.data.set_gray};
-                graphics_state->nonstroking_rgb = pdf_map_color(
+                TRY(pdf_map_color(
                     components,
                     1,
-                    graphics_state->nonstroking_color_space
-                );
+                    graphics_state->nonstroking_color_space,
+                    &state->cache.icc_cache,
+                    &graphics_state->nonstroking_rgb
+                ));
                 break;
             }
             case PDF_OPERATOR_RG: {
@@ -605,11 +614,13 @@ static Error* process_content_stream(
 
                 PdfReal components[3] =
                     {op.data.set_rgb.r, op.data.set_rgb.g, op.data.set_rgb.b};
-                graphics_state->stroking_rgb = pdf_map_color(
+                TRY(pdf_map_color(
                     components,
                     3,
-                    graphics_state->stroking_color_space
-                );
+                    graphics_state->stroking_color_space,
+                    &state->cache.icc_cache,
+                    &graphics_state->stroking_rgb
+                ));
                 break;
             }
             case PDF_OPERATOR_rg: {
@@ -620,11 +631,13 @@ static Error* process_content_stream(
 
                 PdfReal components[3] =
                     {op.data.set_rgb.r, op.data.set_rgb.g, op.data.set_rgb.b};
-                graphics_state->nonstroking_rgb = pdf_map_color(
+                TRY(pdf_map_color(
                     components,
                     3,
-                    graphics_state->nonstroking_color_space
-                );
+                    graphics_state->nonstroking_color_space,
+                    &state->cache.icc_cache,
+                    &graphics_state->nonstroking_rgb
+                ));
                 break;
             }
             case PDF_OPERATOR_K: {
@@ -639,11 +652,13 @@ static Error* process_content_stream(
                     op.data.set_cmyk.y,
                     op.data.set_cmyk.k
                 };
-                graphics_state->stroking_rgb = pdf_map_color(
+                TRY(pdf_map_color(
                     components,
                     4,
-                    graphics_state->stroking_color_space
-                );
+                    graphics_state->stroking_color_space,
+                    &state->cache.icc_cache,
+                    &graphics_state->stroking_rgb
+                ));
 
                 break;
             }
@@ -659,11 +674,13 @@ static Error* process_content_stream(
                     op.data.set_cmyk.y,
                     op.data.set_cmyk.k
                 };
-                graphics_state->nonstroking_rgb = pdf_map_color(
+                TRY(pdf_map_color(
                     components,
                     4,
-                    graphics_state->nonstroking_color_space
-                );
+                    graphics_state->nonstroking_color_space,
+                    &state->cache.icc_cache,
+                    &graphics_state->nonstroking_rgb
+                ));
 
                 break;
             }
@@ -788,6 +805,7 @@ Error* render_page(
         .text_object_state = text_object_state_default(),
         .cache.cmap_cache = pdf_cmap_cache_new(arena),
         .cache.glyph_list = NULL,
+        .cache.icc_cache = icc_profile_cache_new(arena),
         .path = path_builder_new(arena)
     };
 

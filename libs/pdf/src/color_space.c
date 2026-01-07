@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "color/icc.h"
+#include "color/icc_cache.h"
+#include "color/icc_color.h"
 #include "err/error.h"
 #include "geom/mat3.h"
 #include "geom/vec3.h"
@@ -194,21 +197,29 @@ cie_xyz_to_srgb(GeomVec3 xyz, GeomVec3 whitepoint, GeomVec3 blackpoint) {
     return linear_srgb_to_nonlinear(linear, whitepoint, blackpoint);
 }
 
-GeomVec3 pdf_map_color(
-    PdfReal* components,
+Error* pdf_map_color(
+    double* components,
     size_t n_components,
-    PdfColorSpace color_space
+    PdfColorSpace color_space,
+    IccProfileCache* icc_cache,
+    GeomVec3* srgb_out
 ) {
     RELEASE_ASSERT(components);
+    RELEASE_ASSERT(icc_cache);
+    RELEASE_ASSERT(srgb_out);
 
     switch (color_space.family) {
         case PDF_COLOR_SPACE_DEVICE_GRAY: {
             RELEASE_ASSERT(n_components == 1);
-            return geom_vec3_new(components[0], components[0], components[0]);
+            *srgb_out =
+                geom_vec3_new(components[0], components[0], components[0]);
+            return NULL;
         }
         case PDF_COLOR_SPACE_DEVICE_RGB: {
             RELEASE_ASSERT(n_components == 3);
-            return geom_vec3_new(components[0], components[1], components[2]);
+            *srgb_out =
+                geom_vec3_new(components[0], components[1], components[2]);
+            return NULL;
         }
         case PDF_COLOR_SPACE_DEVICE_CMYK: {
             RELEASE_ASSERT(n_components == 4);
@@ -217,18 +228,37 @@ GeomVec3 pdf_map_color(
             double y = components[2];
             double k = components[3];
 
-            // TODO: ICC profiles?
-            GeomVec3 linear = geom_vec3_new(
-                (1.0 - c) * (1.0 - k),
-                (1.0 - m) * (1.0 - k),
-                (1.0 - y) * (1.0 - k)
-            );
+            IccProfile *swop_profile, *srgb_profile;
+            TRY(icc_profile_cache_get(
+                icc_cache,
+                "assets/icc-profiles/CGATS001Compat-v2-micro.icc",
+                &swop_profile
+            ));
+            TRY(icc_profile_cache_get(
+                icc_cache,
+                "assets/icc-profiles/sRGB_v4_ICC_preference.icc",
+                &srgb_profile
+            ));
 
-            return linear_srgb_to_nonlinear(
-                linear,
-                geom_vec3_new(1.0, 1.0, 1.0),
-                geom_vec3_new(0.0, 0.0, 0.0)
+            IccColor dst;
+            TRY(icc_device_to_device(
+                swop_profile,
+                srgb_profile,
+                ICC_INTENT_PERCEPTUAL,
+                (IccColor) {
+                    .color_space = ICC_COLOR_SPACE_CMYK,
+                    .channels = {c, m, y, k}
+            },
+                &dst
+            ));
+
+            RELEASE_ASSERT(dst.color_space == ICC_COLOR_SPACE_RGB);
+            *srgb_out = geom_vec3_new(
+                dst.channels[0],
+                dst.channels[1],
+                dst.channels[2]
             );
+            return NULL;
         }
         case PDF_COLOR_SPACE_CAL_RGB: {
             RELEASE_ASSERT(n_components == 3);
@@ -250,12 +280,11 @@ GeomVec3 pdf_map_color(
 
             GeomVec3 xyz = geom_vec3_transform(pow_rgb, matrix);
 
-            return cie_xyz_to_srgb(xyz, params.whitepoint, blackpoint);
+            *srgb_out = cie_xyz_to_srgb(xyz, params.whitepoint, blackpoint);
+            return NULL;
         }
         default: {
             LOG_TODO("Unimplemented color space %d", color_space.family);
         }
     }
-
-    return geom_vec3_new(0.0, 0.0, 0.0);
 }

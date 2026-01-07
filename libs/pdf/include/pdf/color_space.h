@@ -1,5 +1,6 @@
 #pragma once
 
+#include "color/icc_cache.h"
 #include "err/error.h"
 #include "geom/vec3.h"
 #include "pdf/deserde.h"
@@ -71,8 +72,10 @@ Error* pdf_deserde_color_space(
 
 PDF_DECL_FIELD(PdfColorSpace, color_space)
 
-GeomVec3 pdf_map_color(
+Error* pdf_map_color(
     double* components,
     size_t n_components,
-    PdfColorSpace color_space
+    PdfColorSpace color_space,
+    IccProfileCache* icc_cache,
+    GeomVec3* srgb_out
 );
