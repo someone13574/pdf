@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #include "err/error.h"
-#include "parser.h"
+#include "parse_ctx/ctx.h"
 #include "sfnt/types.h"
 
 typedef struct {
@@ -24,4 +24,4 @@ typedef struct {
     uint16_t max_component_depth;
 } SfntMaxp;
 
-Error* sfnt_parse_maxp(SfntParser* parser, SfntMaxp* maxp);
+Error* sfnt_parse_maxp(ParseCtx ctx, SfntMaxp* maxp);

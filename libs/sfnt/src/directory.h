@@ -2,12 +2,12 @@
 
 #include "arena/arena.h"
 #include "err/error.h"
-#include "parser.h"
+#include "parse_ctx/ctx.h"
 #include "sfnt/sfnt.h"
 
 Error* sfnt_parse_directory(
     Arena* arena,
-    SfntParser* parser,
+    ParseCtx ctx,
     SfntFontDirectory* font_directory
 );
 

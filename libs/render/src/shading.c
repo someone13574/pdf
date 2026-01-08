@@ -75,7 +75,7 @@ void render_shading(
                     canvas_draw_pixel(
                         canvas,
                         geom_vec2_new(canvas_x, canvas_y),
-                        0xff0000ff
+                        0xff00ffff
                     );
                 }
             }

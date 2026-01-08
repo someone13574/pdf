@@ -12,6 +12,7 @@
 #include "geom/mat3.h"
 #include "geom/vec3.h"
 #include "logger/log.h"
+#include "parse_ctx/binary.h"
 #include "parse_ctx/ctx.h"
 
 static uint64_t integer_pow(uint64_t base, uint64_t exponent) {
@@ -82,14 +83,12 @@ Error* icc_parse_lut8(ParseCtx ctx, IccLut8* out) {
 
     TRY(parse_ctx_new_subctx(
         &ctx,
-        ctx.offset,
         256 * (size_t)out->common.input_channels,
         &out->input_table
     ));
 
     TRY(parse_ctx_new_subctx(
         &ctx,
-        ctx.offset,
         integer_pow(out->common.grid_points, out->common.input_channels)
             * (size_t)out->common.output_channels,
         &out->clut
@@ -97,7 +96,6 @@ Error* icc_parse_lut8(ParseCtx ctx, IccLut8* out) {
 
     TRY(parse_ctx_new_subctx(
         &ctx,
-        ctx.offset,
         256 * (size_t)out->common.output_channels,
         &out->output_table
     ));
@@ -241,14 +239,12 @@ Error* icc_parse_lut16(ParseCtx ctx, IccLut16* out) {
 
     TRY(parse_ctx_new_subctx(
         &ctx,
-        ctx.offset,
         2 * (size_t)out->input_entries * (size_t)out->common.input_channels,
         &out->input_table
     ));
 
     TRY(parse_ctx_new_subctx(
         &ctx,
-        ctx.offset,
         2 * integer_pow(out->common.grid_points, out->common.input_channels)
             * (size_t)out->common.output_channels,
         &out->clut
@@ -256,7 +252,6 @@ Error* icc_parse_lut16(ParseCtx ctx, IccLut16* out) {
 
     TRY(parse_ctx_new_subctx(
         &ctx,
-        ctx.offset,
         2 * (size_t)out->output_entries * (size_t)out->common.output_channels,
         &out->output_table
     ));
@@ -437,7 +432,7 @@ static Error* icc_parse_variable_clut(
     }
     len *= out->precision;
 
-    TRY(parse_ctx_new_subctx(ctx, ctx->offset, len, &out->data));
+    TRY(parse_ctx_new_subctx(ctx, len, &out->data));
     return NULL;
 }
 

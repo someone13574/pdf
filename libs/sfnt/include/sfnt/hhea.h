@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #include "err/error.h"
-#include "parser.h"
+#include "parse_ctx/ctx.h"
 #include "sfnt/types.h"
 
 /// Horizontal layout information
@@ -23,4 +23,4 @@ typedef struct {
     uint16_t num_of_long_for_metrics;
 } SfntHhea;
 
-Error* sfnt_parse_hhea(SfntParser* parser, SfntHhea* hhea);
+Error* sfnt_parse_hhea(ParseCtx ctx, SfntHhea* hhea);

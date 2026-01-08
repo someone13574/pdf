@@ -1,19 +1,18 @@
-#include "loca.h"
+#include "sfnt/loca.h"
 
 #include "err/error.h"
 #include "logger/log.h"
-#include "maxp.h"
-#include "parser.h"
+#include "parse_ctx/binary.h"
+#include "parse_ctx/ctx.h"
 
 Error* sfnt_parse_loca(
     Arena* arena,
-    SfntParser* parser,
+    ParseCtx ctx,
     const SfntHead* head,
     const SfntMaxp* maxp,
     SfntLoca* loca
 ) {
     RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(parser);
     RELEASE_ASSERT(head);
     RELEASE_ASSERT(maxp);
     RELEASE_ASSERT(loca);
@@ -32,14 +31,14 @@ Error* sfnt_parse_loca(
         // Short format
         for (size_t idx = 0; idx < maxp->num_glyphs; idx++) {
             uint16_t word_offset;
-            TRY(sfnt_parser_read_uint16(parser, &word_offset));
+            TRY(parse_ctx_read_u16_be(&ctx, &word_offset));
             uint32_array_set(loca->offsets, idx, (uint32_t)word_offset * 2);
         }
     } else {
         // Long format
         for (size_t idx = 0; idx < maxp->num_glyphs; idx++) {
             uint32_t byte_offset;
-            TRY(sfnt_parser_read_uint32(parser, &byte_offset));
+            TRY(parse_ctx_read_u32_be(&ctx, &byte_offset));
             uint32_array_set(loca->offsets, idx, byte_offset);
         }
     }

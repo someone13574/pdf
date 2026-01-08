@@ -3,7 +3,8 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
-#include "parser.h"
+#include "err/error.h"
+#include "parse_ctx/ctx.h"
 
 typedef struct {
     uint16_t platform_id;
@@ -19,7 +20,7 @@ typedef struct {
 typedef struct {
     uint16_t length;
     uint16_t language;
-    Uint8Array* glyph_index_array;
+    ParseCtx glyph_index_array;
 } SfntCmapFormat0;
 
 typedef struct {
@@ -29,11 +30,11 @@ typedef struct {
     uint16_t search_range;
     uint16_t entry_selector;
     uint16_t range_shift;
-    Uint16Array* end_code;
-    Uint16Array* start_code;
-    Uint16Array* id_delta;
-    Uint16Array* id_range_offset;
-    Uint16Array* glyph_index_array;
+    ParseCtx end_code;
+    ParseCtx start_code;
+    ParseCtx id_delta;
+    ParseCtx id_range_offset;
+    ParseCtx glyph_index_array;
 } SfntCmapFormat4;
 
 typedef struct {
@@ -41,7 +42,7 @@ typedef struct {
     uint16_t language;
     uint16_t first_code;
     uint16_t entry_count;
-    Uint16Array* glyph_index_array;
+    ParseCtx glyph_index_array;
 } SfntCmapFormat6;
 
 typedef struct {
@@ -61,5 +62,5 @@ typedef struct {
     SfntCmapSubtable mapping_table;
 } SfntCmap;
 
-Error* sfnt_parse_cmap(Arena* arena, SfntParser* parser, SfntCmap* cmap);
+Error* sfnt_parse_cmap(Arena* arena, ParseCtx ctx, SfntCmap* cmap);
 uint32_t sfnt_cmap_map_cid(const SfntCmapSubtable* subtable, uint32_t cid);
