@@ -12,6 +12,7 @@
 #include "geom/mat3.h"
 #include "geom/vec3.h"
 #include "logger/log.h"
+#include "parse_ctx/binary.h"
 #include "parse_ctx/ctx.h"
 
 static uint64_t integer_pow(uint64_t base, uint64_t exponent) {

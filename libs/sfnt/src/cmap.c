@@ -6,6 +6,7 @@
 #include "arena/arena.h"
 #include "err/error.h"
 #include "logger/log.h"
+#include "parse_ctx/binary.h"
 #include "parse_ctx/ctx.h"
 
 #define DVEC_NAME SfntCmapHeaderVec

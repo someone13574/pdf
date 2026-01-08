@@ -10,6 +10,7 @@
 #include "err/error.h"
 #include "geom/vec3.h"
 #include "logger/log.h"
+#include "parse_ctx/binary.h"
 #include "parse_ctx/ctx.h"
 
 Error* icc_parse_header(ParseCtx* ctx, IccProfileHeader* out) {

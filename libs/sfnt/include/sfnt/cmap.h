@@ -3,7 +3,6 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
-#include "arena/common.h"
 #include "err/error.h"
 #include "parse_ctx/ctx.h"
 

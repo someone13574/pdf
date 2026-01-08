@@ -9,6 +9,7 @@
 #include "err/error.h"
 #include "geom/vec2.h"
 #include "logger/log.h"
+#include "parse_ctx/binary.h"
 #include "parse_ctx/ctx.h"
 #include "sfnt/glyph.h"
 #include "sfnt/types.h"

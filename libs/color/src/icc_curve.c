@@ -6,6 +6,7 @@
 #include "color/icc_types.h"
 #include "err/error.h"
 #include "logger/log.h"
+#include "parse_ctx/binary.h"
 #include "parse_ctx/ctx.h"
 
 Error* icc_parse_curve(ParseCtx* ctx, IccCurve* out) {

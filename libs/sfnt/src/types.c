@@ -1,5 +1,6 @@
 #include "sfnt/types.h"
 
+#include "parse_ctx/binary.h"
 #include "parse_ctx/ctx.h"
 
 #define DARRAY_NAME SfntFWordArray

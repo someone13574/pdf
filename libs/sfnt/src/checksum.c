@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "err/error.h"
+#include "parse_ctx/binary.h"
 #include "parse_ctx/ctx.h"
 
 Error*
