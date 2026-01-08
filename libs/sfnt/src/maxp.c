@@ -1,15 +1,15 @@
-#include "maxp.h"
+#include "sfnt/maxp.h"
 
 #include "err/error.h"
 #include "logger/log.h"
-#include "parser.h"
+#include "parse_ctx/ctx.h"
+#include "sfnt/types.h"
 
-Error* sfnt_parse_maxp(SfntParser* parser, SfntMaxp* maxp) {
-    RELEASE_ASSERT(parser);
+Error* sfnt_parse_maxp(ParseCtx ctx, SfntMaxp* maxp) {
     RELEASE_ASSERT(maxp);
 
-    TRY(sfnt_parser_read_fixed(parser, &maxp->version));
-    TRY(sfnt_parser_read_uint16(parser, &maxp->num_glyphs));
+    TRY(sfnt_read_fixed(&ctx, &maxp->version));
+    TRY(parse_ctx_read_u16_be(&ctx, &maxp->num_glyphs));
 
     if (maxp->version == 0x5000) {
         return NULL;
@@ -21,19 +21,19 @@ Error* sfnt_parse_maxp(SfntParser* parser, SfntMaxp* maxp) {
         );
     }
 
-    TRY(sfnt_parser_read_uint16(parser, &maxp->max_points));
-    TRY(sfnt_parser_read_uint16(parser, &maxp->max_contours));
-    TRY(sfnt_parser_read_uint16(parser, &maxp->max_component_points));
-    TRY(sfnt_parser_read_uint16(parser, &maxp->max_component_contours));
-    TRY(sfnt_parser_read_uint16(parser, &maxp->max_zones));
-    TRY(sfnt_parser_read_uint16(parser, &maxp->max_twilight_points));
-    TRY(sfnt_parser_read_uint16(parser, &maxp->max_storage));
-    TRY(sfnt_parser_read_uint16(parser, &maxp->max_function_defs));
-    TRY(sfnt_parser_read_uint16(parser, &maxp->max_instruction_defs));
-    TRY(sfnt_parser_read_uint16(parser, &maxp->max_stack_elements));
-    TRY(sfnt_parser_read_uint16(parser, &maxp->max_size_of_instructions));
-    TRY(sfnt_parser_read_uint16(parser, &maxp->max_component_elements));
-    TRY(sfnt_parser_read_uint16(parser, &maxp->max_component_depth));
+    TRY(parse_ctx_read_u16_be(&ctx, &maxp->max_points));
+    TRY(parse_ctx_read_u16_be(&ctx, &maxp->max_contours));
+    TRY(parse_ctx_read_u16_be(&ctx, &maxp->max_component_points));
+    TRY(parse_ctx_read_u16_be(&ctx, &maxp->max_component_contours));
+    TRY(parse_ctx_read_u16_be(&ctx, &maxp->max_zones));
+    TRY(parse_ctx_read_u16_be(&ctx, &maxp->max_twilight_points));
+    TRY(parse_ctx_read_u16_be(&ctx, &maxp->max_storage));
+    TRY(parse_ctx_read_u16_be(&ctx, &maxp->max_function_defs));
+    TRY(parse_ctx_read_u16_be(&ctx, &maxp->max_instruction_defs));
+    TRY(parse_ctx_read_u16_be(&ctx, &maxp->max_stack_elements));
+    TRY(parse_ctx_read_u16_be(&ctx, &maxp->max_size_of_instructions));
+    TRY(parse_ctx_read_u16_be(&ctx, &maxp->max_component_elements));
+    TRY(parse_ctx_read_u16_be(&ctx, &maxp->max_component_depth));
 
     return NULL;
 }

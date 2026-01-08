@@ -5,7 +5,7 @@
 #include "arena/arena.h"
 #include "err/error.h"
 #include "logger/log.h"
-#include "parser.h"
+#include "parse_ctx/ctx.h"
 #include "sfnt/sfnt.h"
 
 #define DARRAY_NAME SfntDirectoryEntryVec
@@ -13,40 +13,45 @@
 #define DARRAY_TYPE SfntDirectoryEntry
 #include "arena/darray_impl.h"
 
-Error*
-sfnt_parse_directory_entry(SfntParser* parser, SfntDirectoryEntry* entry) {
-    RELEASE_ASSERT(parser);
+static Error*
+sfnt_parse_directory_entry(ParseCtx* ctx, SfntDirectoryEntry* entry) {
     RELEASE_ASSERT(entry);
 
-    TRY(sfnt_parser_read_uint32(parser, &entry->tag));
-    TRY(sfnt_parser_read_uint32(parser, &entry->checksum));
-    TRY(sfnt_parser_read_uint32(parser, &entry->offset));
-    TRY(sfnt_parser_read_uint32(parser, &entry->length));
+    TRY(parse_ctx_read_u32_be(ctx, &entry->tag));
+    TRY(parse_ctx_read_u32_be(ctx, &entry->checksum));
+    TRY(parse_ctx_read_u32_be(ctx, &entry->offset));
+    TRY(parse_ctx_read_u32_be(ctx, &entry->length));
+
+    LOG_DIAG(
+        DEBUG,
+        SFNT,
+        "Directory entry: `%c%c%c%c`",
+        (entry->tag >> 24) & 0xff,
+        (entry->tag >> 16) & 0xff,
+        (entry->tag >> 8) & 0xff,
+        entry->tag & 0xff
+    );
 
     return NULL;
 }
 
-Error* sfnt_parse_directory(
-    Arena* arena,
-    SfntParser* parser,
-    SfntFontDirectory* directory
-) {
+Error*
+sfnt_parse_directory(Arena* arena, ParseCtx ctx, SfntFontDirectory* directory) {
     RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(parser);
     RELEASE_ASSERT(directory);
 
-    parser->offset = 0;
-    TRY(sfnt_parser_read_uint32(parser, &directory->scalar_type));
-    TRY(sfnt_parser_read_uint16(parser, &directory->num_tables));
-    TRY(sfnt_parser_read_uint16(parser, &directory->search_range));
-    TRY(sfnt_parser_read_uint16(parser, &directory->entry_selector));
-    TRY(sfnt_parser_read_uint16(parser, &directory->range_shift));
+    TRY(parse_ctx_seek(&ctx, 0));
+    TRY(parse_ctx_read_u32_be(&ctx, &directory->scalar_type));
+    TRY(parse_ctx_read_u16_be(&ctx, &directory->num_tables));
+    TRY(parse_ctx_read_u16_be(&ctx, &directory->search_range));
+    TRY(parse_ctx_read_u16_be(&ctx, &directory->entry_selector));
+    TRY(parse_ctx_read_u16_be(&ctx, &directory->range_shift));
 
     directory->entries =
         sfnt_directory_entry_array_new(arena, directory->num_tables);
     for (size_t idx = 0; idx < directory->num_tables; idx++) {
         SfntDirectoryEntry entry;
-        TRY(sfnt_parse_directory_entry(parser, &entry));
+        TRY(sfnt_parse_directory_entry(&ctx, &entry));
         sfnt_directory_entry_array_set(directory->entries, idx, entry);
     }
 

@@ -1,8 +1,8 @@
-#include "hmtx.h"
+#include "sfnt/hmtx.h"
 
 #include "err/error.h"
 #include "logger/log.h"
-#include "parser.h"
+#include "parse_ctx/ctx.h"
 #include "sfnt/types.h"
 
 #define DARRAY_NAME SfntHMetricsArray
@@ -12,13 +12,12 @@
 
 Error* sfnt_parse_hmtx(
     Arena* arena,
-    SfntParser* parser,
+    ParseCtx ctx,
     const SfntMaxp* maxp,
     const SfntHhea* hhea,
     SfntHmtx* hmtx
 ) {
     RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(parser);
     RELEASE_ASSERT(maxp);
     RELEASE_ASSERT(hhea);
     RELEASE_ASSERT(hmtx);
@@ -27,8 +26,8 @@ Error* sfnt_parse_hmtx(
         sfnt_hmetrics_array_new(arena, hhea->num_of_long_for_metrics);
     for (size_t idx = 0; idx < hhea->num_of_long_for_metrics; idx++) {
         SfntLongHorMetric long_hor_metric;
-        TRY(sfnt_parser_read_uint16(parser, &long_hor_metric.advance_width));
-        TRY(sfnt_parser_read_int16(parser, &long_hor_metric.left_side_bearing));
+        TRY(parse_ctx_read_u16_be(&ctx, &long_hor_metric.advance_width));
+        TRY(parse_ctx_read_i16_be(&ctx, &long_hor_metric.left_side_bearing));
 
         sfnt_hmetrics_array_set(hmtx->h_metrics, idx, long_hor_metric);
     }
@@ -45,7 +44,7 @@ Error* sfnt_parse_hmtx(
             idx,
             &left_side_bearing
         ));
-        TRY(sfnt_parser_read_fword(parser, left_side_bearing));
+        TRY(sfnt_read_fword(&ctx, left_side_bearing));
     }
 
     return NULL;

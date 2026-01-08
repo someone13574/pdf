@@ -3,7 +3,7 @@
 #include <math.h>
 #include <stdint.h>
 
-#include "color/icc.h"
+#include "color/icc_types.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "parse_ctx/ctx.h"
@@ -24,12 +24,7 @@ Error* icc_parse_curve(ParseCtx* ctx, IccCurve* out) {
         LOG_WARN(ICC, "Reserved field not 0");
     }
 
-    TRY(parse_ctx_new_subctx(
-        ctx,
-        ctx->offset,
-        2 * (size_t)out->entries,
-        &out->data
-    ));
+    TRY(parse_ctx_new_subctx(ctx, 2 * (size_t)out->entries, &out->data));
 
     return NULL;
 }

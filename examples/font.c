@@ -1,13 +1,11 @@
 #include <stdint.h>
-#include <stdio.h>
-#include <string.h>
 
 #include "arena/arena.h"
-#include "arena/common.h"
 #include "canvas/canvas.h"
 #include "err/error.h"
 #include "geom/mat3.h"
 #include "logger/log.h"
+#include "parse_ctx/ctx.h"
 #include "sfnt/glyph.h"
 #include "sfnt/sfnt.h"
 
@@ -17,18 +15,16 @@ int main(int argc, char** argv) {
 
     Arena* arena = arena_new(4096);
 
-    size_t buffer_len;
-    uint8_t* buffer = load_file_to_buffer(
+    ParseCtx ctx = parse_ctx_from_file(
         arena,
-        "assets/fonts-urw-base35/fonts/NimbusSans-Regular.ttf",
-        &buffer_len
+        "assets/fonts-urw-base35/fonts/NimbusSans-Regular.ttf"
     );
 
-    SfntFont* font;
-    REQUIRE(sfnt_font_new(arena, buffer, buffer_len, &font));
+    SfntFont font;
+    REQUIRE(sfnt_font_new(arena, ctx, &font));
 
     SfntGlyph glyph;
-    REQUIRE(sfnt_get_glyph_for_cid(font, '%', &glyph));
+    REQUIRE(sfnt_get_glyph_for_cid(&font, '%', &glyph));
 
     Canvas* canvas = canvas_new_scalable(arena, 2000, 2000, 0xffffffff, 1.0);
     GeomMat3 transform =

@@ -1,5 +1,6 @@
 #include "parse_ctx/ctx.h"
 
+#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -26,14 +27,8 @@ ParseCtx parse_ctx_from_file(Arena* arena, const char* path) {
     return parse_ctx_new(buffer, len);
 }
 
-Error* parse_ctx_new_subctx(
-    ParseCtx* parent,
-    size_t offset,
-    size_t len,
-    ParseCtx* out
-) {
+Error* parse_ctx_new_subctx(ParseCtx* parent, size_t len, ParseCtx* out) {
     RELEASE_ASSERT(parent);
-    TRY(parse_ctx_seek(parent, offset));
     TRY(parse_ctx_bound_check(parent, len));
 
     out->buffer = parent->buffer + parent->offset;
@@ -293,5 +288,23 @@ extern Error* parse_ctx_read_f64_be(ParseCtx* ctx, double* out) {
     uint64_t u64;
     TRY(parse_ctx_read_u64_be(ctx, &u64));
     memcpy(out, &u64, 8);
+    return NULL;
+}
+
+Error* parse_ctx_get_u8(ParseCtx ctx, size_t idx, uint8_t* out) {
+    RELEASE_ASSERT(out);
+
+    ctx.offset = idx;
+    TRY(parse_ctx_read_u8(&ctx, out));
+
+    return NULL;
+}
+
+Error* parse_ctx_get_u16_be(ParseCtx ctx, size_t idx, uint16_t* out) {
+    RELEASE_ASSERT(out);
+
+    ctx.offset = idx * 2;
+    TRY(parse_ctx_read_u16_be(&ctx, out));
+
     return NULL;
 }

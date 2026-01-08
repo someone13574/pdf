@@ -62,12 +62,10 @@ Error* icc_tag_table_new(ParseCtx* file_ctx, IccTagTable* out) {
     out->file_ctx = *file_ctx;
     TRY(parse_ctx_seek(file_ctx, 128));
     TRY(parse_ctx_read_u32_be(file_ctx, &out->tag_count));
-    TRY(parse_ctx_new_subctx(
-        file_ctx,
-        128,
-        4 + 12 * out->tag_count,
-        &out->table_ctx
-    ));
+    TRY(parse_ctx_seek(file_ctx, 128));
+    TRY(
+        parse_ctx_new_subctx(file_ctx, 4 + 12 * out->tag_count, &out->table_ctx)
+    );
 
     return NULL;
 }
@@ -85,12 +83,8 @@ icc_tag_table_lookup(IccTagTable table, uint32_t tag_signature, ParseCtx* out) {
             uint32_t offset, size;
             TRY(parse_ctx_read_u32_be(&table.table_ctx, &offset));
             TRY(parse_ctx_read_u32_be(&table.table_ctx, &size));
-            TRY(parse_ctx_new_subctx(
-                &table.file_ctx,
-                (size_t)offset,
-                (size_t)size,
-                out
-            ));
+            TRY(parse_ctx_seek(&table.file_ctx, offset));
+            TRY(parse_ctx_new_subctx(&table.file_ctx, (size_t)size, out));
             break;
         }
     }
