@@ -5,7 +5,7 @@
 #include "err/error.h"
 #include "geom/mat3.h"
 #include "geom/rect.h"
-#include "parser.h"
+#include "parse_ctx/ctx.h"
 #include "types.h"
 
 typedef struct {
@@ -38,6 +38,6 @@ typedef struct {
 } CffTopDict;
 
 Error*
-cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out);
+cff_parse_top_dict(ParseCtx* ctx, size_t length, CffTopDict* top_dict_out);
 
 CffTopDict cff_top_dict_default(void);

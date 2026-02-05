@@ -323,12 +323,11 @@ Error* render_glyph(
                 } else if (strcmp(subtype, "CIDFontType0C") == 0) {
                     Arena* local_arena = arena_new(1024);
                     CffFontSet* cff_font_set;
-                    TRY(cff_parse_fontset(
-                        arena,
+                    ParseCtx cff_ctx = parse_ctx_new(
                         font_descriptor->font_file3.value.stream_bytes,
-                        font_descriptor->font_file3.value.decoded_stream_len,
-                        &cff_font_set
-                    ));
+                        font_descriptor->font_file3.value.decoded_stream_len
+                    );
+                    TRY(cff_parse_fontset(arena, cff_ctx, &cff_font_set));
 
                     TRY(cff_render_glyph(
                         cff_font_set,
@@ -595,12 +594,11 @@ Error* get_font_matrix(
                 } else if (strcmp(subtype, "CIDFontType0C") == 0) {
                     Arena* local_arena = arena_new(1024);
                     CffFontSet* cff_font_set;
-                    TRY(cff_parse_fontset(
-                        arena,
+                    ParseCtx cff_ctx = parse_ctx_new(
                         font_descriptor->font_file3.value.stream_bytes,
-                        font_descriptor->font_file3.value.decoded_stream_len,
-                        &cff_font_set
-                    ));
+                        font_descriptor->font_file3.value.decoded_stream_len
+                    );
+                    TRY(cff_parse_fontset(arena, cff_ctx, &cff_font_set));
 
                     *font_matrix_out = cff_font_matrix(cff_font_set);
                     arena_free(local_arena);

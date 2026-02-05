@@ -2,11 +2,11 @@
 
 #include <string.h>
 
-#include "arena/string.h"
 #include "err/error.h"
 #include "logger/log.h"
 #include "postscript/interpreter.h"
 #include "postscript/tokenizer.h"
+#include "str/alloc_str.h"
 
 #define DLINKED_NAME PSObjectList
 #define DLINKED_LOWERCASE_NAME ps_object_list
@@ -94,25 +94,23 @@ const char* ps_object_fmt(Arena* arena, const PSObject* object) {
 
     switch (object->type) {
         case PS_OBJECT_INTEGER: {
-            return arena_string_buffer(
-                arena_string_new_fmt(arena, "%d", (int)object->data.integer)
+            return str_get_cstr(
+                str_new_fmt(arena, "%d", (int)object->data.integer)
             );
         }
         case PS_OBJECT_NAME: {
             char* prefix = object->literal ? "/" : "";
-            return arena_string_buffer(
-                arena_string_new_fmt(arena, "%s%s", prefix, object->data.name)
+            return str_get_cstr(
+                str_new_fmt(arena, "%s%s", prefix, object->data.name)
             );
         }
         case PS_OBJECT_REAL: {
-            return arena_string_buffer(
-                arena_string_new_fmt(arena, "%f", object->data.real)
-            );
+            return str_get_cstr(str_new_fmt(arena, "%f", object->data.real));
         }
         case PS_OBJECT_ARRAY: {
             char* delims = object->literal ? "[]" : "{}";
 
-            ArenaString* str = arena_string_new_fmt(arena, "%c ", delims[0]);
+            Str* str = str_new_fmt(arena, "%c ", delims[0]);
             for (size_t idx = 0; idx < ps_object_list_len(object->data.array);
                  idx++) {
                 PSObject* array_object = NULL;
@@ -122,23 +120,20 @@ const char* ps_object_fmt(Arena* arena, const PSObject* object) {
                     &array_object
                 ));
 
-                str = arena_string_new_fmt(
+                str = str_new_fmt(
                     arena,
                     "%s%s ",
-                    arena_string_buffer(str),
+                    str_get_cstr(str),
                     ps_object_fmt(arena, array_object)
                 );
             }
 
-            return arena_string_buffer(arena_string_new_fmt(
-                arena,
-                "%s%c",
-                arena_string_buffer(str),
-                delims[1]
-            ));
+            return str_get_cstr(
+                str_new_fmt(arena, "%s%c", str_get_cstr(str), delims[1])
+            );
         }
         case PS_OBJECT_PROC: {
-            ArenaString* str = arena_string_new_fmt(arena, "{ ");
+            Str* str = str_new_fmt(arena, "{ ");
             for (size_t idx = 0; idx < ps_object_list_len(object->data.proc);
                  idx++) {
                 PSObject* proc_object = NULL;
@@ -146,23 +141,21 @@ const char* ps_object_fmt(Arena* arena, const PSObject* object) {
                     ps_object_list_get_ptr(object->data.proc, idx, &proc_object)
                 );
 
-                str = arena_string_new_fmt(
+                str = str_new_fmt(
                     arena,
                     "%s%s ",
-                    arena_string_buffer(str),
+                    str_get_cstr(str),
                     ps_object_fmt(arena, proc_object)
                 );
             }
 
-            return arena_string_buffer(
-                arena_string_new_fmt(arena, "%s}", arena_string_buffer(str))
-            );
+            return str_get_cstr(str_new_fmt(arena, "%s}", str_get_cstr(str)));
         }
         case PS_OBJECT_OPERATOR: {
             return "<|builtin|>";
         }
         case PS_OBJECT_DICT: {
-            ArenaString* str = arena_string_new_fmt(arena, "<< ");
+            Str* str = str_new_fmt(arena, "<< ");
             for (size_t idx = 0; idx < ps_object_list_len(object->data.dict);
                  idx++) {
                 PSObject* dict_object = NULL;
@@ -170,20 +163,18 @@ const char* ps_object_fmt(Arena* arena, const PSObject* object) {
                     ps_object_list_get_ptr(object->data.dict, idx, &dict_object)
                 );
 
-                str = arena_string_new_fmt(
+                str = str_new_fmt(
                     arena,
                     "%s%s ",
-                    arena_string_buffer(str),
+                    str_get_cstr(str),
                     ps_object_fmt(arena, dict_object)
                 );
             }
 
-            return arena_string_buffer(
-                arena_string_new_fmt(arena, "%s>>", arena_string_buffer(str))
-            );
+            return str_get_cstr(str_new_fmt(arena, "%s>>", str_get_cstr(str)));
         }
         case PS_OBJECT_STRING: {
-            return arena_string_buffer(arena_string_new_fmt(
+            return str_get_cstr(str_new_fmt(
                 arena,
                 "(%s)",
                 ps_string_as_cstr(object->data.string, arena)

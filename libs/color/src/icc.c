@@ -71,9 +71,16 @@ Error* icc_tag_table_new(ParseCtx* file_ctx, IccTagTable* out) {
     return NULL;
 }
 
-Error*
-icc_tag_table_lookup(IccTagTable table, uint32_t tag_signature, ParseCtx* out) {
+Error* icc_tag_table_lookup(
+    IccTagTable table,
+    uint32_t tag_signature,
+    ParseCtx* out,
+    bool* found
+) {
     RELEASE_ASSERT(out);
+    RELEASE_ASSERT(found);
+
+    *found = false;
 
     for (uint32_t idx = 0; idx < table.tag_count; idx++) {
         uint32_t entry_signature;
@@ -86,7 +93,8 @@ icc_tag_table_lookup(IccTagTable table, uint32_t tag_signature, ParseCtx* out) {
             TRY(parse_ctx_read_u32_be(&table.table_ctx, &size));
             TRY(parse_ctx_seek(&table.file_ctx, offset));
             TRY(parse_ctx_new_subctx(&table.file_ctx, (size_t)size, out));
-            break;
+            *found = true;
+            return NULL;
         }
     }
 
@@ -112,11 +120,19 @@ static Error* icc_media_whitepoint(IccProfile profile, IccXYZNumber* out) {
     RELEASE_ASSERT(out);
 
     ParseCtx ctx;
+    bool found;
     TRY(icc_tag_table_lookup(
         profile.tag_table,
         icc_tag_signature(ICC_TAG_MEDIA_WHITEPOINT),
-        &ctx
+        &ctx,
+        &found
     ));
+    if (!found) {
+        return ERROR(
+            ICC_ERR_MISSING_TAG,
+            "Required mediaWhitePointTag not found"
+        );
+    }
     TRY(icc_parse_xyz_number(&ctx, out));
 
     return NULL;
@@ -160,11 +176,24 @@ Error* icc_device_to_pcs(
     }
 
     ParseCtx lut_ctx;
+    bool found;
     TRY(icc_tag_table_lookup(
         profile.tag_table,
         icc_tag_signature(a_to_b_tag),
-        &lut_ctx
+        &lut_ctx,
+        &found
     ));
+    if (!found && a_to_b_tag != ICC_TAG_A_TO_B0) {
+        TRY(icc_tag_table_lookup(
+            profile.tag_table,
+            icc_tag_signature(ICC_TAG_A_TO_B0),
+            &lut_ctx,
+            &found
+        ));
+    }
+    if (!found) {
+        return ERROR(ICC_ERR_MISSING_TAG, "Required AToB0 tag not found");
+    }
 
     uint32_t lut_signature;
     TRY(parse_ctx_read_u32_be(&lut_ctx, &lut_signature));
@@ -245,11 +274,24 @@ Error* icc_pcs_to_device(
     }
 
     ParseCtx lut_ctx;
+    bool found;
     TRY(icc_tag_table_lookup(
         profile->tag_table,
         icc_tag_signature(b_to_a_tag),
-        &lut_ctx
+        &lut_ctx,
+        &found
     ));
+    if (!found && b_to_a_tag != ICC_TAG_B_TO_A0) {
+        TRY(icc_tag_table_lookup(
+            profile->tag_table,
+            icc_tag_signature(ICC_TAG_B_TO_A0),
+            &lut_ctx,
+            &found
+        ));
+    }
+    if (!found) {
+        return ERROR(ICC_ERR_MISSING_TAG, "Required BToA0 tag not found");
+    }
 
     uint32_t lut_signature;
     TRY(parse_ctx_read_u32_be(&lut_ctx, &lut_signature));

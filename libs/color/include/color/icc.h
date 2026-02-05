@@ -46,8 +46,12 @@ typedef struct {
 } IccTagTable;
 
 Error* icc_tag_table_new(ParseCtx* file_ctx, IccTagTable* out);
-Error*
-icc_tag_table_lookup(IccTagTable table, uint32_t tag_signature, ParseCtx* out);
+Error* icc_tag_table_lookup(
+    IccTagTable table,
+    uint32_t tag_signature,
+    ParseCtx* out,
+    bool* found
+);
 
 typedef struct {
     Arena* arena;

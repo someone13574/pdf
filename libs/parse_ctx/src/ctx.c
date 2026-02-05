@@ -4,9 +4,12 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "arena/arena.h"
 #include "arena/common.h"
 #include "err/error.h"
 #include "logger/log.h"
+#include "str/alloc_str.h"
+#include "str/ref.h"
 
 ParseCtx parse_ctx_new(const uint8_t* buffer, size_t buffer_len) {
     RELEASE_ASSERT(buffer);
@@ -60,6 +63,25 @@ Error* parse_ctx_align(ParseCtx* ctx, size_t align, bool require_zeros) {
     } else {
         TRY(parse_ctx_seek(ctx, next_local_offset));
     }
+
+    return NULL;
+}
+
+Error*
+parse_ctx_read_string(ParseCtx* ctx, Arena* arena, size_t len, Str** out) {
+    RELEASE_ASSERT(ctx);
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(out);
+
+    TRY(parse_ctx_bound_check(ctx, len));
+
+    StrRef ref = {
+        .data = (const char*)(ctx->buffer + ctx->offset),
+        .len = len,
+        .terminated = false
+    };
+    *out = str_copy_ref(ref, arena);
+    ctx->offset += len;
 
     return NULL;
 }

@@ -4,12 +4,12 @@
 #include "err/error.h"
 #include "geom/mat3.h"
 #include "index.h"
-#include "parser.h"
+#include "parse_ctx/ctx.h"
 
 Error* cff_charstr2_render(
-    CffParser* parser,
+    ParseCtx* ctx,
     CffIndex global_subr_index,
-    CffIndex subr_index,
+    CffIndex local_subr_index,
     size_t length,
     Canvas* canvas,
     GeomMat3 transform,

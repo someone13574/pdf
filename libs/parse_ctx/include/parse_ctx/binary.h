@@ -24,7 +24,7 @@ static inline Error* parse_ctx_read_u8(ParseCtx* ctx, uint8_t* out) {
     return NULL;
 }
 
-// Little-endien read functions (increments current offset)
+// Little-endian read functions (increments current offset)
 static inline Error* parse_ctx_read_u16_le(ParseCtx* ctx, uint16_t* out) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(out);
@@ -97,7 +97,7 @@ static inline Error* parse_ctx_read_i64_le(ParseCtx* ctx, int64_t* out) {
     return NULL;
 }
 
-// Big-endien read functions (increments current offset)
+// Big-endian read functions (increments current offset)
 static inline Error* parse_ctx_read_u16_be(ParseCtx* ctx, uint16_t* out) {
     RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(out);

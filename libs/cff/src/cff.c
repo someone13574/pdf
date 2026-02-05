@@ -10,7 +10,7 @@
 #include "header.h"
 #include "index.h"
 #include "logger/log.h"
-#include "parser.h"
+#include "parse_ctx/ctx.h"
 #include "private_dict.h"
 #include "top_dict.h"
 #include "types.h"
@@ -30,7 +30,7 @@ typedef struct {
 #include "arena/darray_impl.h"
 
 struct CffFontSet {
-    CffParser parser;
+    ParseCtx ctx;
 
     CffHeader header;
     CffIndex name_index;
@@ -41,25 +41,19 @@ struct CffFontSet {
     CffFontArray* fonts;
 };
 
-Error* cff_parse_fontset(
-    Arena* arena,
-    const uint8_t* data,
-    size_t data_len,
-    CffFontSet** cff_font_out
-) {
+Error* cff_parse_fontset(Arena* arena, ParseCtx ctx, CffFontSet** out) {
     RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(data);
-    RELEASE_ASSERT(cff_font_out);
+    RELEASE_ASSERT(out);
 
     CffFontSet fontset;
-    fontset.parser = cff_parser_new(data, data_len);
+    fontset.ctx = ctx;
 
-    TRY(cff_read_header(&fontset.parser, &fontset.header));
-    TRY(cff_parser_seek(&fontset.parser, fontset.header.header_size));
-    TRY(cff_parse_index(&fontset.parser, &fontset.name_index));
-    TRY(cff_parse_index(&fontset.parser, &fontset.top_dict_index));
-    TRY(cff_parse_index(&fontset.parser, &fontset.string_index));
-    TRY(cff_parse_index(&fontset.parser, &fontset.global_subr_index));
+    TRY(cff_read_header(&fontset.ctx, &fontset.header));
+    TRY(parse_ctx_seek(&fontset.ctx, fontset.header.header_size));
+    TRY(cff_parse_index(&fontset.ctx, &fontset.name_index));
+    TRY(cff_parse_index(&fontset.ctx, &fontset.top_dict_index));
+    TRY(cff_parse_index(&fontset.ctx, &fontset.string_index));
+    TRY(cff_parse_index(&fontset.ctx, &fontset.global_subr_index));
 
     fontset.fonts = cff_font_array_new_init(
         arena,
@@ -67,7 +61,7 @@ Error* cff_parse_fontset(
         (CffFont) {.top_dict = cff_top_dict_default(),
                    .private_dict = cff_private_dict_default()}
     );
-    for (CffCard16 font_idx = 0; font_idx < fontset.name_index.count;
+    for (uint16_t font_idx = 0; font_idx < fontset.name_index.count;
          font_idx++) {
         CffFont* font = NULL;
         RELEASE_ASSERT(cff_font_array_get_ptr(fontset.fonts, font_idx, &font));
@@ -76,66 +70,62 @@ Error* cff_parse_fontset(
         size_t name_len;
         TRY(cff_index_seek_object(
             &fontset.name_index,
-            &fontset.parser,
+            &fontset.ctx,
             font_idx,
             &name_len
         ));
-        TRY(cff_parser_get_str(arena, &fontset.parser, name_len, &font->name));
+        TRY(cff_get_str(arena, &fontset.ctx, name_len, &font->name));
         LOG_DIAG(INFO, CFF, "Font name: %s", font->name);
 
         // Top dict
         size_t top_dict_len;
         TRY(cff_index_seek_object(
             &fontset.top_dict_index,
-            &fontset.parser,
+            &fontset.ctx,
             font_idx,
             &top_dict_len
         ));
-        TRY(cff_parse_top_dict(&fontset.parser, top_dict_len, &font->top_dict));
+        TRY(cff_parse_top_dict(&fontset.ctx, top_dict_len, &font->top_dict));
 
         // Private dict
         CffPrivateDict private_dict = cff_private_dict_default();
-        TRY(cff_parser_seek(
-            &fontset.parser,
-            (size_t)font->top_dict.private_offset
-        ));
+        TRY(
+            parse_ctx_seek(&fontset.ctx, (size_t)font->top_dict.private_offset)
+        );
         TRY(cff_parse_private_dict(
             arena,
-            &fontset.parser,
+            &fontset.ctx,
             (size_t)font->top_dict.private_dict_size,
             &private_dict
         ));
 
         // Local sub-routines
-        TRY(cff_parser_seek(
-            &fontset.parser,
+        TRY(parse_ctx_seek(
+            &fontset.ctx,
             (size_t)font->top_dict.private_offset + (size_t)private_dict.subrs
         ));
-        TRY(cff_parse_index(&fontset.parser, &font->subrs_index));
+        TRY(cff_parse_index(&fontset.ctx, &font->subrs_index));
 
         // Char string index
-        TRY(cff_parser_seek(
-            &fontset.parser,
-            (size_t)font->top_dict.char_strings
-        ));
-        TRY(cff_parse_index(&fontset.parser, &font->charstr_index));
+        TRY(parse_ctx_seek(&fontset.ctx, (size_t)font->top_dict.char_strings));
+        TRY(cff_parse_index(&fontset.ctx, &font->charstr_index));
 
         // Charset
         if (font->top_dict.charset <= 2) {
             LOG_TODO("Support predefined charset IDs");
         }
 
-        TRY(cff_parser_seek(&fontset.parser, (size_t)font->top_dict.charset));
+        TRY(parse_ctx_seek(&fontset.ctx, (size_t)font->top_dict.charset));
         TRY(cff_parse_charset(
-            &fontset.parser,
+            &fontset.ctx,
             arena,
             font->charstr_index.count,
             &font->charset
         ));
     }
 
-    *cff_font_out = arena_alloc(arena, sizeof(CffFontSet));
-    **cff_font_out = fontset;
+    *out = arena_alloc(arena, sizeof(CffFontSet));
+    **out = fontset;
 
     return NULL;
 }
@@ -160,13 +150,13 @@ Error* cff_render_glyph(
     size_t charstr_len;
     TRY(cff_index_seek_object(
         &font.charstr_index,
-        &fontset->parser,
-        (CffCard16)gid,
+        &fontset->ctx,
+        (uint16_t)gid,
         &charstr_len
     ));
 
     TRY(cff_charstr2_render(
-        &fontset->parser,
+        &fontset->ctx,
         fontset->global_subr_index,
         font.subrs_index,
         charstr_len,

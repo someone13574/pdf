@@ -4,14 +4,14 @@
 #include <string.h>
 
 #include "arena/arena.h"
-#include "arena/string.h"
 #include "canvas/canvas.h"
 #include "logger/log.h"
 #include "path_builder.h"
+#include "str/alloc_str.h"
 
 #define DVEC_NAME SvgPartsVec
 #define DVEC_LOWERCASE_NAME svg_parts_vec
-#define DVEC_TYPE ArenaString*
+#define DVEC_TYPE Str*
 #include "arena/dvec_impl.h"
 
 struct ScalableCanvas {
@@ -43,7 +43,7 @@ ScalableCanvas* scalable_canvas_new(
 
     svg_parts_vec_push(
         canvas->parts,
-        arena_string_new_fmt(
+        str_new_fmt(
             arena,
             "<rect width=\"%u\" height=\"%u\" fill=\"#%08x\" />",
             width,
@@ -71,7 +71,7 @@ void scalable_canvas_draw_circle(
 
     svg_parts_vec_push(
         canvas->parts,
-        arena_string_new_fmt(
+        str_new_fmt(
             canvas->arena,
             "<circle cx=\"%f\" cy=\"%f\" r=\"%f\" fill=\"#%08x\" />",
             x,
@@ -95,7 +95,7 @@ void scalable_canvas_draw_line(
 
     svg_parts_vec_push(
         canvas->parts,
-        arena_string_new_fmt(
+        str_new_fmt(
             canvas->arena,
             "<line x1=\"%f\" y1=\"%f\" x2=\"%f\" y2=\"%f\" stroke=\"#%08x\" stroke-width=\"%f\" fill=\"transparent\" />",
             x1,
@@ -123,7 +123,7 @@ void scalable_canvas_draw_bezier(
 
     svg_parts_vec_push(
         canvas->parts,
-        arena_string_new_fmt(
+        str_new_fmt(
             canvas->arena,
             "<path d=\"M %f %f Q %f %f %f %f\" stroke=\"#%08x\" stroke-width=\"%f\" fill=\"transparent\" />",
             x1,
@@ -146,10 +146,7 @@ void scalable_canvas_draw_path(
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(path);
 
-    svg_parts_vec_push(
-        canvas->parts,
-        arena_string_new_fmt(canvas->arena, "<path d=\"")
-    );
+    svg_parts_vec_push(canvas->parts, str_new_fmt(canvas->arena, "<path d=\""));
 
     for (size_t contour_idx = 0;
          contour_idx < path_contour_vec_len(path->contours);
@@ -160,10 +157,7 @@ void scalable_canvas_draw_path(
         );
 
         if (contour_idx != 0) {
-            svg_parts_vec_push(
-                canvas->parts,
-                arena_string_new_fmt(canvas->arena, "Z ")
-            );
+            svg_parts_vec_push(canvas->parts, str_new_fmt(canvas->arena, "Z "));
         }
 
         for (size_t segment_idx = 0; segment_idx < path_contour_len(contour);
@@ -175,7 +169,7 @@ void scalable_canvas_draw_path(
                 case PATH_CONTOUR_SEGMENT_TYPE_START: {
                     svg_parts_vec_push(
                         canvas->parts,
-                        arena_string_new_fmt(
+                        str_new_fmt(
                             canvas->arena,
                             "M %f %f ",
                             segment.value.start.x,
@@ -187,7 +181,7 @@ void scalable_canvas_draw_path(
                 case PATH_CONTOUR_SEGMENT_TYPE_LINE: {
                     svg_parts_vec_push(
                         canvas->parts,
-                        arena_string_new_fmt(
+                        str_new_fmt(
                             canvas->arena,
                             "L %f %f ",
                             segment.value.line.x,
@@ -199,7 +193,7 @@ void scalable_canvas_draw_path(
                 case PATH_CONTOUR_SEGMENT_TYPE_QUAD_BEZIER: {
                     svg_parts_vec_push(
                         canvas->parts,
-                        arena_string_new_fmt(
+                        str_new_fmt(
                             canvas->arena,
                             "Q %f %f %f %f ",
                             segment.value.quad_bezier.control.x,
@@ -213,7 +207,7 @@ void scalable_canvas_draw_path(
                 case PATH_CONTOUR_SEGMENT_TYPE_CUBIC_BEZIER: {
                     svg_parts_vec_push(
                         canvas->parts,
-                        arena_string_new_fmt(
+                        str_new_fmt(
                             canvas->arena,
                             "C %f %f, %f %f, %f %f ",
                             segment.value.cubic_bezier.control_a.x,
@@ -234,23 +228,19 @@ void scalable_canvas_draw_path(
     if (brush.enable_fill) {
         svg_parts_vec_push(
             canvas->parts,
-            arena_string_new_fmt(
-                canvas->arena,
-                "\" fill=\"#%08x\"",
-                brush.fill_rgba
-            )
+            str_new_fmt(canvas->arena, "\" fill=\"#%08x\"", brush.fill_rgba)
         );
     } else {
         svg_parts_vec_push(
             canvas->parts,
-            arena_string_new_fmt(canvas->arena, "\" fill=\"none\"")
+            str_new_fmt(canvas->arena, "\" fill=\"none\"")
         );
     }
 
     if (brush.enable_stroke) {
         svg_parts_vec_push(
             canvas->parts,
-            arena_string_new_fmt(
+            str_new_fmt(
                 canvas->arena,
                 " stroke=\"#%08x\" stroke-width=\"%f\"",
                 brush.stroke_rgba,
@@ -275,11 +265,7 @@ void scalable_canvas_draw_path(
         }
         svg_parts_vec_push(
             canvas->parts,
-            arena_string_new_fmt(
-                canvas->arena,
-                " stroke-linecap=\"%s\"",
-                line_cap
-            )
+            str_new_fmt(canvas->arena, " stroke-linecap=\"%s\"", line_cap)
         );
 
         const char* line_join = NULL;
@@ -299,17 +285,13 @@ void scalable_canvas_draw_path(
         }
         svg_parts_vec_push(
             canvas->parts,
-            arena_string_new_fmt(
-                canvas->arena,
-                " stroke-linejoin=\"%s\"",
-                line_join
-            )
+            str_new_fmt(canvas->arena, " stroke-linejoin=\"%s\"", line_join)
         );
 
         if (brush.line_join == CANVAS_LINEJOIN_MITER) {
             svg_parts_vec_push(
                 canvas->parts,
-                arena_string_new_fmt(
+                str_new_fmt(
                     canvas->arena,
                     " stroke-miterlimit=\"%f\"",
                     brush.miter_limit
@@ -318,10 +300,7 @@ void scalable_canvas_draw_path(
         }
     }
 
-    svg_parts_vec_push(
-        canvas->parts,
-        arena_string_new_fmt(canvas->arena, "  />")
-    );
+    svg_parts_vec_push(canvas->parts, str_new_fmt(canvas->arena, "  />"));
 }
 
 void scalable_canvas_draw_pixel(
@@ -333,7 +312,7 @@ void scalable_canvas_draw_pixel(
 
     svg_parts_vec_push(
         canvas->parts,
-        arena_string_new_fmt(
+        str_new_fmt(
             canvas->arena,
             "<rect x=\"%f\" y=\"%f\" width=\"%f\" height=\"%f\" fill=\"#%08x\" />",
             position.x,
@@ -363,10 +342,10 @@ bool scalable_canvas_write_file(ScalableCanvas* canvas, const char* path) {
     }
 
     for (size_t idx = 0; idx < svg_parts_vec_len(canvas->parts); ++idx) {
-        ArenaString* operation;
+        Str* operation;
         RELEASE_ASSERT(svg_parts_vec_get(canvas->parts, idx, &operation));
 
-        const char* opbuf = arena_string_buffer(operation);
+        const char* opbuf = str_get_cstr(operation);
         size_t oplen = strlen(opbuf);
 
         if (oplen > 0) {

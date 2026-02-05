@@ -395,7 +395,7 @@ TEST_FUNC(test_cmap_format4_mapping) {
         cmap_format4_table,
         sizeof(cmap_format4_table) / sizeof(uint8_t)
     );
-    ctx.offset = 4;
+    ctx.offset = 2;
 
     SfntCmapFormat4 table;
     REQUIRE(parse_cmap_format4(&ctx, &table));

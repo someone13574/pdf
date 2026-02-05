@@ -8,6 +8,7 @@
 #include "arena/arena.h"
 #include "err/error.h"
 #include "logger/log.h"
+#include "str/alloc_str.h"
 
 typedef struct {
     const uint8_t* buffer;
@@ -55,3 +56,6 @@ static inline Error* parse_ctx_bound_check(ParseCtx* ctx, size_t len) {
 
     return NULL;
 }
+
+Error*
+parse_ctx_read_string(ParseCtx* ctx, Arena* arena, size_t len, Str** out);
