@@ -1,7 +1,7 @@
 #pragma once
 
 #include "err/error.h"
-#include "parser.h"
+#include "parse_ctx/ctx.h"
 #include "types.h"
 
 /// An INDEX is an array of variable-sized objects. It comprises a header, an
@@ -13,7 +13,7 @@
 /// length of the last object may be determined.
 typedef struct {
     /// Number of objects stored in INDEX.
-    CffCard16 count;
+    uint16_t count;
 
     /// Offset array element size.
     CffOffsetSize offset_size;
@@ -23,15 +23,15 @@ typedef struct {
 } CffIndex;
 
 /// Read a `CffIndex` from the current parser offset.
-Error* cff_parse_index(CffParser* parser, CffIndex* index_out);
+Error* cff_parse_index(ParseCtx* ctx, CffIndex* index_out);
 
 /// Seeks to the end of a CFF index.
-Error* cff_index_skip(CffIndex* index, CffParser* parser);
+Error* cff_index_skip(CffIndex* index, ParseCtx* ctx);
 
 /// Seeks to object `object_idx` and returns its size.
 Error* cff_index_seek_object(
     CffIndex* index,
-    CffParser* parser,
-    CffCard16 object_idx,
+    ParseCtx* ctx,
+    uint16_t object_idx,
     size_t* object_size_out
 );

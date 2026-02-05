@@ -10,8 +10,7 @@
 #include "geom/vec2.h"
 #include "index.h"
 #include "logger/log.h"
-#include "parser.h"
-#include "types.h"
+#include "parse_ctx/binary.h"
 
 enum { CHARSTR_MAX_OPERANDS = 48 };
 
@@ -116,7 +115,7 @@ typedef struct {
 } CharstrState;
 
 static Error* cff_charstr2_subr(
-    CffParser* parser,
+    ParseCtx* ctx,
     CffIndex global_subr_index,
     CffIndex local_subr_index,
     size_t length,
@@ -326,7 +325,7 @@ static Error* check_stack_consumed(CharstrState* state) {
     return NULL;
 }
 
-static CffCard16 subr_bias(CffCard16 num_subrs) {
+static uint16_t subr_bias(uint16_t num_subrs) {
     if (num_subrs < 1240) {
         return 107;
     } else if (num_subrs < 33900) {
@@ -339,7 +338,7 @@ static CffCard16 subr_bias(CffCard16 num_subrs) {
 static Error* charstring_interpret_operator(
     CharstrOperator operator,
     CharstrState* state,
-    CffParser* parser,
+    ParseCtx* ctx,
     CffIndex global_subr_index,
     CffIndex local_subr_index,
     bool* endchar_out,
@@ -438,7 +437,7 @@ static Error* charstring_interpret_operator(
                 );
             }
 
-            CffCard16 bias = subr_bias(local_subr_index.count);
+            uint16_t bias = subr_bias(local_subr_index.count);
             int64_t subr_idx = unbiased_subr_num.value.integer + bias;
             if (subr_idx < 0 || subr_idx >= local_subr_index.count) {
                 return ERROR(
@@ -448,23 +447,23 @@ static Error* charstring_interpret_operator(
                 );
             }
 
-            size_t return_offset = parser->offset;
+            size_t return_offset = ctx->offset;
             size_t subr_size;
             TRY(cff_index_seek_object(
                 &local_subr_index,
-                parser,
-                (CffCard16)subr_idx,
+                ctx,
+                (uint16_t)subr_idx,
                 &subr_size
             ));
             TRY(cff_charstr2_subr(
-                parser,
+                ctx,
                 global_subr_index,
                 local_subr_index,
                 subr_size,
                 state,
                 endchar_out
             ));
-            TRY(cff_parser_seek(parser, return_offset));
+            TRY(parse_ctx_seek(ctx, return_offset));
             break;
         }
         case CHARSTR_OPERATOR_RETURN: {
@@ -603,7 +602,7 @@ static Error* charstring_interpret_operator(
                 );
             }
 
-            CffCard16 bias = subr_bias(global_subr_index.count);
+            uint16_t bias = subr_bias(global_subr_index.count);
             int64_t subr_idx = unbiased_subr_num.value.integer + bias;
             if (subr_idx < 0 || subr_idx >= global_subr_index.count) {
                 return ERROR(
@@ -613,23 +612,23 @@ static Error* charstring_interpret_operator(
                 );
             }
 
-            size_t return_offset = parser->offset;
+            size_t return_offset = ctx->offset;
             size_t subr_size;
             TRY(cff_index_seek_object(
                 &global_subr_index,
-                parser,
-                (CffCard16)subr_idx,
+                ctx,
+                (uint16_t)subr_idx,
                 &subr_size
             ));
             TRY(cff_charstr2_subr(
-                parser,
+                ctx,
                 global_subr_index,
                 local_subr_index,
                 subr_size,
                 state,
                 endchar_out
             ));
-            TRY(cff_parser_seek(parser, return_offset));
+            TRY(parse_ctx_seek(ctx, return_offset));
 
             break;
         }
@@ -724,21 +723,21 @@ static Error* charstring_interpret_operator(
 }
 
 static Error* cff_charstr2_subr(
-    CffParser* parser,
+    ParseCtx* ctx,
     CffIndex global_subr_index,
     CffIndex local_subr_index,
     size_t length,
     CharstrState* state,
     bool* endchar_out
 ) {
-    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(state);
     RELEASE_ASSERT(endchar_out);
 
-    size_t end_offset = parser->offset + length;
-    while (parser->offset < end_offset) {
-        CffCard8 byte;
-        TRY(cff_parser_read_card8(parser, &byte));
+    size_t end_offset = ctx->offset + length;
+    while (ctx->offset < end_offset) {
+        uint8_t byte;
+        TRY(parse_ctx_read_u8(ctx, &byte));
 
         bool endchar = false;
         bool return_subr = false;
@@ -747,15 +746,15 @@ static Error* cff_charstr2_subr(
             TRY(charstring_interpret_operator(
                 byte,
                 state,
-                parser,
+                ctx,
                 global_subr_index,
                 local_subr_index,
                 &endchar,
                 &return_subr
             ));
         } else if (byte == 12) {
-            CffCard8 next_byte;
-            TRY(cff_parser_read_card8(parser, &next_byte));
+            uint8_t next_byte;
+            TRY(parse_ctx_read_u8(ctx, &next_byte));
 
             LOG_DIAG(
                 INFO,
@@ -768,7 +767,7 @@ static Error* cff_charstr2_subr(
             TRY(charstring_interpret_operator(
                 byte,
                 state,
-                parser,
+                ctx,
                 global_subr_index,
                 local_subr_index,
                 &endchar,
@@ -780,7 +779,7 @@ static Error* cff_charstr2_subr(
             TRY(charstring_interpret_operator(
                 byte,
                 state,
-                parser,
+                ctx,
                 global_subr_index,
                 local_subr_index,
                 &endchar,
@@ -792,7 +791,7 @@ static Error* cff_charstr2_subr(
             TRY(charstring_interpret_operator(
                 byte,
                 state,
-                parser,
+                ctx,
                 global_subr_index,
                 local_subr_index,
                 &endchar,
@@ -801,15 +800,15 @@ static Error* cff_charstr2_subr(
         } else if (byte <= 246) {
             TRY(push_integer_operand((int32_t)byte - 139, state));
         } else if (byte <= 250) {
-            CffCard8 next_byte;
-            TRY(cff_parser_read_card8(parser, &next_byte));
+            uint8_t next_byte;
+            TRY(parse_ctx_read_u8(ctx, &next_byte));
             TRY(push_integer_operand(
                 ((int32_t)byte - 247) * 256 + (int32_t)next_byte + 108,
                 state
             ));
         } else if (byte <= 254) {
-            CffCard8 next_byte;
-            TRY(cff_parser_read_card8(parser, &next_byte));
+            uint8_t next_byte;
+            TRY(parse_ctx_read_u8(ctx, &next_byte));
             TRY(push_integer_operand(
                 -(((int32_t)byte - 251) * 256) - (int32_t)next_byte - 108,
                 state
@@ -830,7 +829,7 @@ static Error* cff_charstr2_subr(
 }
 
 Error* cff_charstr2_render(
-    CffParser* parser,
+    ParseCtx* ctx,
     CffIndex global_subr_index,
     CffIndex local_subr_index,
     size_t length,
@@ -838,7 +837,7 @@ Error* cff_charstr2_render(
     GeomMat3 transform,
     CanvasBrush brush
 ) {
-    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(canvas);
 
     Arena* temp_arena = arena_new(4096);
@@ -853,7 +852,7 @@ Error* cff_charstr2_render(
     bool endchar; // We don't actually need this since we aren't actually
                   // calling a subroutine.
     TRY(cff_charstr2_subr(
-        parser,
+        ctx,
         global_subr_index,
         local_subr_index,
         length,

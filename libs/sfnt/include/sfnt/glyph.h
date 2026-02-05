@@ -2,9 +2,9 @@
 
 #include <stdint.h>
 
-#include "arena/common.h"
 #include "canvas/canvas.h"
 #include "geom/mat3.h"
+#include "parse_ctx/ctx.h"
 #include "types.h"
 
 typedef enum {
@@ -38,9 +38,9 @@ typedef struct {
 #include "arena/darray_decl.h"
 
 typedef struct {
-    Uint16Array* end_pts_of_contours;
+    ParseCtx end_pts_of_contours;
     uint16_t instruction_len;
-    Uint8Array* instructions;
+    ParseCtx instructions;
     SfntSimpleGlyphFlagsVec* flags;
     SfntGlyphPointArray* points;
 } SfntSimpleGlyph;

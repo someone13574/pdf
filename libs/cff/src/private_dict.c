@@ -5,7 +5,7 @@
 #include "arena/arena.h"
 #include "err/error.h"
 #include "logger/log.h"
-#include "parser.h"
+#include "parse_ctx/binary.h"
 #include "types.h"
 
 enum { CFF_MAX_OPERANDS = 48 };
@@ -40,11 +40,11 @@ static const char* cff_private_dict_key_names[] = {CFF_PRIVATE_DICT_KEYS};
 #undef CFF_PRIVATE_DICT_KEYS
 
 static Error* cff_private_dict_interpret_key(
-    CffParser* parser,
+    ParseCtx* ctx,
     uint8_t operator0,
     CffPrivateDictKey* key_out
 ) {
-    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(operator0 <= 21);
     RELEASE_ASSERT(key_out);
 
@@ -62,8 +62,8 @@ static Error* cff_private_dict_interpret_key(
         return ERROR(CFF_ERR_INVALID_OPERATOR);
     }
 
-    CffCard8 operator1;
-    TRY(cff_parser_read_card8(parser, &operator1));
+    uint8_t operator1;
+    TRY(parse_ctx_read_u8(ctx, &operator1));
 
     if (operator1 >= 9 && operator1 <= 11) {
         *key_out =
@@ -169,27 +169,27 @@ static Error* pop_number(
 
 Error* cff_parse_private_dict(
     Arena* arena,
-    CffParser* parser,
+    ParseCtx* ctx,
     size_t length,
     CffPrivateDict* private_dict_out
 ) {
     RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(private_dict_out);
 
     size_t operand_count = 0;
     CffToken operand_stack[CFF_MAX_OPERANDS] = {0};
-    size_t end_offset = parser->offset + length;
+    size_t end_offset = ctx->offset + length;
 
-    while (parser->offset < end_offset) {
+    while (ctx->offset < end_offset) {
         CffToken token;
-        TRY(cff_parser_read_token(parser, &token));
+        TRY(cff_read_token(ctx, &token));
 
         switch (token.type) {
             case CFF_TOKEN_OPERATOR: {
                 CffPrivateDictKey key;
                 TRY(cff_private_dict_interpret_key(
-                    parser,
+                    ctx,
                     token.value.operator,
                     &key
                 ));

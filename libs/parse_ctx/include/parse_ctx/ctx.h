@@ -3,9 +3,12 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "arena/arena.h"
 #include "err/error.h"
+#include "logger/log.h"
+#include "str/alloc_str.h"
 
 typedef struct {
     const uint8_t* buffer;
@@ -19,41 +22,40 @@ ParseCtx parse_ctx_from_file(Arena* arena, const char* path);
 
 /// Create a new context with an offset and size from the start of its parent.
 /// The parent's offset will move to the end of this table.
-Error* parse_ctx_new_subctx(
-    ParseCtx* parent,
-    size_t offset,
-    size_t len,
-    ParseCtx* out
-);
+Error* parse_ctx_new_subctx(ParseCtx* parent, size_t len, ParseCtx* out);
 
 /// Seeks a position within the subctx
-Error* parse_ctx_seek(ParseCtx* ctx, size_t offset);
+static inline Error* parse_ctx_seek(ParseCtx* ctx, size_t offset) {
+    RELEASE_ASSERT(ctx);
+
+    if (offset > ctx->buffer_len) {
+        return ERROR(CTX_EOF, "Attempted to seek past EOF");
+    }
+
+    ctx->offset = offset;
+    return NULL;
+}
 
 /// Aligns the current offset to the next multiple of `align` within the *global
 /// offset*. If `require_zeros` is true, all skipped bytes must be zero.
 Error* parse_ctx_align(ParseCtx* ctx, size_t align, bool require_zeros);
 
 /// Produces an error a `len` byte read would go out of bounds.
-Error* parse_ctx_bound_check(ParseCtx* ctx, size_t len);
+static inline Error* parse_ctx_bound_check(ParseCtx* ctx, size_t len) {
+    RELEASE_ASSERT(ctx);
 
-Error* parse_ctx_read_i8(ParseCtx* ctx, int8_t* out);
-Error* parse_ctx_read_u8(ParseCtx* ctx, uint8_t* out);
+    if (len > ctx->buffer_len || ctx->offset > ctx->buffer_len - len) {
+        return ERROR(
+            CTX_EOF,
+            "Attempted to read %zu bytes starting at offset %zu in buffer size %zu",
+            len,
+            ctx->offset,
+            ctx->buffer_len
+        );
+    }
 
-Error* parse_ctx_read_i16_le(ParseCtx* ctx, int16_t* out);
-Error* parse_ctx_read_u16_le(ParseCtx* ctx, uint16_t* out);
-Error* parse_ctx_read_i32_le(ParseCtx* ctx, int32_t* out);
-Error* parse_ctx_read_u32_le(ParseCtx* ctx, uint32_t* out);
-Error* parse_ctx_read_i64_le(ParseCtx* ctx, int64_t* out);
-Error* parse_ctx_read_u64_le(ParseCtx* ctx, uint64_t* out);
+    return NULL;
+}
 
-Error* parse_ctx_read_i16_be(ParseCtx* ctx, int16_t* out);
-Error* parse_ctx_read_u16_be(ParseCtx* ctx, uint16_t* out);
-Error* parse_ctx_read_i32_be(ParseCtx* ctx, int32_t* out);
-Error* parse_ctx_read_u32_be(ParseCtx* ctx, uint32_t* out);
-Error* parse_ctx_read_i64_be(ParseCtx* ctx, int64_t* out);
-Error* parse_ctx_read_u64_be(ParseCtx* ctx, uint64_t* out);
-
-Error* parse_ctx_read_f32_le(ParseCtx* ctx, float* out);
-Error* parse_ctx_read_f64_le(ParseCtx* ctx, double* out);
-Error* parse_ctx_read_f32_be(ParseCtx* ctx, float* out);
-Error* parse_ctx_read_f64_be(ParseCtx* ctx, double* out);
+Error*
+parse_ctx_read_string(ParseCtx* ctx, Arena* arena, size_t len, Str** out);

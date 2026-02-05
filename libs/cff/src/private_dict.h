@@ -5,7 +5,7 @@
 #include "arena/arena.h"
 #include "arena/common.h"
 #include "err/error.h"
-#include "parser.h"
+#include "parse_ctx/ctx.h"
 #include "types.h"
 
 typedef struct {
@@ -31,9 +31,9 @@ typedef struct {
 
 Error* cff_parse_private_dict(
     Arena* arena,
-    CffParser* parser,
+    ParseCtx* ctx,
     size_t length,
-    CffPrivateDict* private_dict_out
+    CffPrivateDict* out
 );
 
 CffPrivateDict cff_private_dict_default(void);

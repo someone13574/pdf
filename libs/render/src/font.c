@@ -12,6 +12,7 @@
 #include "err/error.h"
 #include "geom/mat3.h"
 #include "logger/log.h"
+#include "parse_ctx/ctx.h"
 #include "pdf/fonts/agl.h"
 #include "pdf/fonts/cid_to_gid_map.h"
 #include "pdf/fonts/cmap.h"
@@ -322,12 +323,11 @@ Error* render_glyph(
                 } else if (strcmp(subtype, "CIDFontType0C") == 0) {
                     Arena* local_arena = arena_new(1024);
                     CffFontSet* cff_font_set;
-                    TRY(cff_parse_fontset(
-                        arena,
+                    ParseCtx cff_ctx = parse_ctx_new(
                         font_descriptor->font_file3.value.stream_bytes,
-                        font_descriptor->font_file3.value.decoded_stream_len,
-                        &cff_font_set
-                    ));
+                        font_descriptor->font_file3.value.decoded_stream_len
+                    );
+                    TRY(cff_parse_fontset(arena, cff_ctx, &cff_font_set));
 
                     TRY(cff_render_glyph(
                         cff_font_set,
@@ -355,31 +355,30 @@ Error* render_glyph(
             PdfFontDescriptor* font_descriptor =
                 font->data.cid.font_descriptor.resolved;
 
-            SfntFont* sfnt_font = NULL;
+            SfntFont sfnt_font;
             if (font_descriptor->font_file2.is_some) {
                 TRY(sfnt_font_new(
                     arena,
-                    font_descriptor->font_file2.value.stream_bytes,
-                    font_descriptor->font_file2.value.decoded_stream_len,
+                    parse_ctx_new(
+                        font_descriptor->font_file2.value.stream_bytes,
+                        font_descriptor->font_file2.value.decoded_stream_len
+                    ),
                     &sfnt_font
                 ));
             } else {
                 // TODO: proper resolution, caching
-                size_t font_file_size = 0;
-                uint8_t* font_file = load_file_to_buffer(
+                TRY(sfnt_font_new(
                     arena,
-                    "assets/fonts-urw-base35/fonts/NimbusSans-Regular.ttf",
-                    &font_file_size
-                );
-                RELEASE_ASSERT(font_file);
-
-                TRY(
-                    sfnt_font_new(arena, font_file, font_file_size, &sfnt_font)
-                );
+                    parse_ctx_from_file(
+                        arena,
+                        "assets/fonts-urw-base35/fonts/NimbusSans-Regular.ttf"
+                    ),
+                    &sfnt_font
+                ));
             }
 
             SfntGlyph glyph;
-            TRY(sfnt_get_glyph_for_gid(sfnt_font, gid, &glyph));
+            TRY(sfnt_get_glyph_for_gid(&sfnt_font, gid, &glyph));
             sfnt_glyph_render(canvas, &glyph, transform, brush);
 
             return NULL;
@@ -394,31 +393,30 @@ Error* render_glyph(
             PdfFontDescriptor* font_descriptor =
                 font->data.true_type.font_descriptor.value.resolved;
 
-            SfntFont* sfnt_font = NULL;
+            SfntFont sfnt_font;
             if (font_descriptor->font_file2.is_some) {
                 TRY(sfnt_font_new(
                     arena,
-                    font_descriptor->font_file2.value.stream_bytes,
-                    font_descriptor->font_file2.value.decoded_stream_len,
+                    parse_ctx_new(
+                        font_descriptor->font_file2.value.stream_bytes,
+                        font_descriptor->font_file2.value.decoded_stream_len
+                    ),
                     &sfnt_font
                 ));
             } else {
                 // TODO: proper resolution, caching
-                size_t font_file_size = 0;
-                uint8_t* font_file = load_file_to_buffer(
+                TRY(sfnt_font_new(
                     arena,
-                    "assets/fonts-urw-base35/fonts/NimbusSans-Regular.ttf",
-                    &font_file_size
-                );
-                RELEASE_ASSERT(font_file);
-
-                TRY(
-                    sfnt_font_new(arena, font_file, font_file_size, &sfnt_font)
-                );
+                    parse_ctx_from_file(
+                        arena,
+                        "assets/fonts-urw-base35/fonts/NimbusSans-Regular.ttf"
+                    ),
+                    &sfnt_font
+                ));
             }
 
             SfntGlyph glyph;
-            TRY(sfnt_get_glyph_for_cid(sfnt_font, gid, &glyph));
+            TRY(sfnt_get_glyph_for_cid(&sfnt_font, gid, &glyph));
             sfnt_glyph_render(canvas, &glyph, transform, brush);
             break;
         }
@@ -596,12 +594,11 @@ Error* get_font_matrix(
                 } else if (strcmp(subtype, "CIDFontType0C") == 0) {
                     Arena* local_arena = arena_new(1024);
                     CffFontSet* cff_font_set;
-                    TRY(cff_parse_fontset(
-                        arena,
+                    ParseCtx cff_ctx = parse_ctx_new(
                         font_descriptor->font_file3.value.stream_bytes,
-                        font_descriptor->font_file3.value.decoded_stream_len,
-                        &cff_font_set
-                    ));
+                        font_descriptor->font_file3.value.decoded_stream_len
+                    );
+                    TRY(cff_parse_fontset(arena, cff_ctx, &cff_font_set));
 
                     *font_matrix_out = cff_font_matrix(cff_font_set);
                     arena_free(local_arena);
@@ -623,30 +620,29 @@ Error* get_font_matrix(
             PdfFontDescriptor* font_descriptor =
                 font->data.cid.font_descriptor.resolved;
 
-            SfntFont* sfnt_font = NULL;
+            SfntFont sfnt_font;
             if (font_descriptor->font_file2.is_some) {
                 TRY(sfnt_font_new(
                     arena,
-                    font_descriptor->font_file2.value.stream_bytes,
-                    font_descriptor->font_file2.value.decoded_stream_len,
+                    parse_ctx_new(
+                        font_descriptor->font_file2.value.stream_bytes,
+                        font_descriptor->font_file2.value.decoded_stream_len
+                    ),
                     &sfnt_font
                 ));
             } else {
                 // TODO: proper resolution, caching
-                size_t font_file_size = 0;
-                uint8_t* font_file = load_file_to_buffer(
+                TRY(sfnt_font_new(
                     arena,
-                    "assets/fonts-urw-base35/fonts/NimbusMonoPS-Regular.ttf",
-                    &font_file_size
-                );
-                RELEASE_ASSERT(font_file);
-
-                TRY(
-                    sfnt_font_new(arena, font_file, font_file_size, &sfnt_font)
-                );
+                    parse_ctx_from_file(
+                        arena,
+                        "assets/fonts-urw-base35/fonts/NimbusMonoPS-Regular.ttf"
+                    ),
+                    &sfnt_font
+                ));
             }
 
-            units_per_em = (double)sfnt_font_head(sfnt_font).units_per_em;
+            units_per_em = (double)sfnt_font_head(&sfnt_font).units_per_em;
             break;
         }
         case PDF_FONT_TRUETYPE: {
@@ -660,30 +656,29 @@ Error* get_font_matrix(
             PdfFontDescriptor* font_descriptor =
                 font->data.true_type.font_descriptor.value.resolved;
 
-            SfntFont* sfnt_font = NULL;
+            SfntFont sfnt_font;
             if (font_descriptor->font_file2.is_some) {
                 TRY(sfnt_font_new(
                     arena,
-                    font_descriptor->font_file2.value.stream_bytes,
-                    font_descriptor->font_file2.value.decoded_stream_len,
+                    parse_ctx_new(
+                        font_descriptor->font_file2.value.stream_bytes,
+                        font_descriptor->font_file2.value.decoded_stream_len
+                    ),
                     &sfnt_font
                 ));
             } else {
                 // TODO: proper resolution, caching
-                size_t font_file_size = 0;
-                uint8_t* font_file = load_file_to_buffer(
+                TRY(sfnt_font_new(
                     arena,
-                    "assets/fonts-urw-base35/fonts/NimbusMonoPS-Regular.ttf",
-                    &font_file_size
-                );
-                RELEASE_ASSERT(font_file);
-
-                TRY(
-                    sfnt_font_new(arena, font_file, font_file_size, &sfnt_font)
-                );
+                    parse_ctx_from_file(
+                        arena,
+                        "assets/fonts-urw-base35/fonts/NimbusMonoPS-Regular.ttf"
+                    ),
+                    &sfnt_font
+                ));
             }
 
-            units_per_em = (double)sfnt_font_head(sfnt_font).units_per_em;
+            units_per_em = (double)sfnt_font_head(&sfnt_font).units_per_em;
 
             break;
         }

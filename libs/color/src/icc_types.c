@@ -1,6 +1,7 @@
 #include "color/icc_types.h"
 
 #include "logger/log.h"
+#include "parse_ctx/binary.h"
 
 Error* icc_parse_date_time(ParseCtx* ctx, IccDateTime* out) {
     RELEASE_ASSERT(ctx);

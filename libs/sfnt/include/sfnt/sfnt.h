@@ -4,8 +4,13 @@
 
 #include "arena/arena.h"
 #include "err/error.h"
+#include "parse_ctx/ctx.h"
+#include "sfnt/cmap.h"
 #include "sfnt/glyph.h"
-#include "sfnt/types.h"
+#include "sfnt/head.h"
+#include "sfnt/hmtx.h"
+#include "sfnt/loca.h"
+#include "sfnt/maxp.h"
 
 typedef struct {
     uint32_t tag;
@@ -29,32 +34,21 @@ typedef struct {
 } SfntFontDirectory;
 
 typedef struct {
-    SfntFixed version;
-    SfntFixed font_revision;
-    uint32_t check_sum_adjustment;
-    uint16_t flags;
-    uint16_t units_per_em;
-    SfntLongDateTime created;
-    SfntLongDateTime modified;
-    SfntFWord x_min;
-    SfntFWord y_min;
-    SfntFWord x_max;
-    SfntFWord y_max;
-    uint16_t mac_style;
-    uint16_t lowest_rec_ppem;
-    int16_t front_direction_hint;
-    int16_t idx_to_loc_format;
-    int16_t glyph_data_format;
-} SfntHead;
+    Arena* arena;
+    ParseCtx ctx;
+    ParseCtx glyf_parser;
 
-typedef struct SfntFont SfntFont;
+    SfntFontDirectory directory;
+    SfntHead head;
+    SfntMaxp maxp;
+    SfntLoca loca;
+    SfntCmap cmap;
+    SfntHmtx hmtx;
 
-Error* sfnt_font_new(
-    Arena* arena,
-    const uint8_t* buffer,
-    size_t buffer_len,
-    SfntFont** font
-);
+    bool has_cmap;
+} SfntFont;
+
+Error* sfnt_font_new(Arena* arena, ParseCtx ctx, SfntFont* out);
 
 SfntHead sfnt_font_head(SfntFont* font);
 

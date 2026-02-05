@@ -4,36 +4,37 @@
 
 #include "err/error.h"
 #include "logger/log.h"
-#include "parser.h"
+#include "parse_ctx/binary.h"
+#include "parse_ctx/ctx.h"
 #include "test/test.h"
 #include "types.h"
 
-Error* cff_parse_index(CffParser* parser, CffIndex* index_out) {
-    RELEASE_ASSERT(parser);
+Error* cff_parse_index(ParseCtx* ctx, CffIndex* index_out) {
+    RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(index_out);
 
-    index_out->parser_start_offset = parser->offset;
+    index_out->parser_start_offset = ctx->offset;
 
-    TRY(cff_parser_read_card16(parser, &index_out->count));
+    TRY(parse_ctx_read_u16_be(ctx, &index_out->count));
     if (index_out->count == 0) {
         index_out->offset_size = 0;
         return NULL;
     }
 
-    TRY(cff_parser_read_offset_size(parser, &index_out->offset_size));
-    TRY(cff_index_skip(index_out, parser));
+    TRY(cff_read_offset_size(ctx, &index_out->offset_size));
+    TRY(cff_index_skip(index_out, ctx));
 
     return NULL;
 }
 
 static Error* cff_index_get_object_offset(
     CffIndex* index,
-    CffParser* parser,
-    CffCard16 object_idx,
+    ParseCtx* ctx,
+    uint16_t object_idx,
     size_t* offset_out
 ) {
     RELEASE_ASSERT(index);
-    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(offset_out);
 
     RELEASE_ASSERT(index->count != 0);
@@ -44,10 +45,10 @@ static Error* cff_index_get_object_offset(
     // Read object offset
     size_t offset_offset = index->parser_start_offset + 3
                          + (size_t)object_idx * index->offset_size;
-    TRY(cff_parser_seek(parser, offset_offset));
+    TRY(parse_ctx_seek(ctx, offset_offset));
 
     CffOffset object_rel_offset;
-    TRY(cff_parser_read_offset(parser, index->offset_size, &object_rel_offset));
+    TRY(cff_read_offset(ctx, index->offset_size, &object_rel_offset));
 
     // Get object absolute offset
     *offset_out = index->parser_start_offset + 2
@@ -57,30 +58,30 @@ static Error* cff_index_get_object_offset(
     return NULL;
 }
 
-Error* cff_index_skip(CffIndex* index, CffParser* parser) {
+Error* cff_index_skip(CffIndex* index, ParseCtx* ctx) {
     RELEASE_ASSERT(index);
-    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(ctx);
 
     if (index->count == 0) {
-        TRY(cff_parser_seek(parser, index->parser_start_offset + 2));
+        TRY(parse_ctx_seek(ctx, index->parser_start_offset + 2));
         return NULL;
     }
 
     size_t end_offset;
-    TRY(cff_index_get_object_offset(index, parser, index->count, &end_offset));
-    TRY(cff_parser_seek(parser, end_offset));
+    TRY(cff_index_get_object_offset(index, ctx, index->count, &end_offset));
+    TRY(parse_ctx_seek(ctx, end_offset));
 
     return NULL;
 }
 
 Error* cff_index_seek_object(
     CffIndex* index,
-    CffParser* parser,
-    CffCard16 object_idx,
+    ParseCtx* ctx,
+    uint16_t object_idx,
     size_t* object_size_out
 ) {
     RELEASE_ASSERT(index);
-    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(object_size_out);
 
     if (object_idx >= index->count) {
@@ -94,16 +95,14 @@ Error* cff_index_seek_object(
 
     size_t start_offset;
     size_t end_offset;
-    TRY(cff_index_get_object_offset(index, parser, object_idx, &start_offset));
-    TRY(
-        cff_index_get_object_offset(index, parser, object_idx + 1, &end_offset)
-    );
+    TRY(cff_index_get_object_offset(index, ctx, object_idx, &start_offset));
+    TRY(cff_index_get_object_offset(index, ctx, object_idx + 1, &end_offset));
 
     if (end_offset < start_offset) {
         return ERROR(CFF_ERR_INVALID_INDEX, "Objects in INDEX not in order");
     }
 
-    TRY(cff_parser_seek(parser, start_offset));
+    TRY(parse_ctx_seek(ctx, start_offset));
 
     *object_size_out = end_offset - start_offset;
 
@@ -114,27 +113,27 @@ Error* cff_index_seek_object(
 
 TEST_FUNC(test_cff_index_empty_skip) {
     uint8_t buffer[] = {0x00, 0x00};
-    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+    ParseCtx ctx = parse_ctx_new(buffer, sizeof(buffer) / sizeof(uint8_t));
 
     CffIndex index;
-    TEST_REQUIRE(cff_parse_index(&parser, &index));
+    TEST_REQUIRE(cff_parse_index(&ctx, &index));
 
-    TEST_REQUIRE(cff_index_skip(&index, &parser));
-    TEST_ASSERT_EQ((size_t)2, parser.offset);
+    TEST_REQUIRE(cff_index_skip(&index, &ctx));
+    TEST_ASSERT_EQ((size_t)2, ctx.offset);
 
     return TEST_RESULT_PASS;
 }
 
 TEST_FUNC(test_cff_index_empty_seek_object) {
     uint8_t buffer[] = {0x00, 0x00};
-    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+    ParseCtx ctx = parse_ctx_new(buffer, sizeof(buffer) / sizeof(uint8_t));
 
     CffIndex index;
-    TEST_REQUIRE(cff_parse_index(&parser, &index));
+    TEST_REQUIRE(cff_parse_index(&ctx, &index));
 
     size_t object_size;
     TEST_REQUIRE_ERR(
-        cff_index_seek_object(&index, &parser, 0, &object_size),
+        cff_index_seek_object(&index, &ctx, 0, &object_size),
         CFF_ERR_INVALID_OBJECT_IDX
     );
 
@@ -161,26 +160,26 @@ TEST_FUNC(test_cff_index_seek_offset_size_1) {
         2,
         '@'
     };
-    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+    ParseCtx ctx = parse_ctx_new(buffer, sizeof(buffer) / sizeof(uint8_t));
 
     CffIndex index;
-    TEST_REQUIRE(cff_parse_index(&parser, &index));
+    TEST_REQUIRE(cff_parse_index(&ctx, &index));
 
     size_t object_size;
-    TEST_REQUIRE(cff_index_seek_object(&index, &parser, 0, &object_size));
-    TEST_ASSERT_EQ((size_t)7, parser.offset);
+    TEST_REQUIRE(cff_index_seek_object(&index, &ctx, 0, &object_size));
+    TEST_ASSERT_EQ((size_t)7, ctx.offset);
     TEST_ASSERT_EQ((size_t)3, object_size);
 
-    TEST_REQUIRE(cff_index_seek_object(&index, &parser, 1, &object_size));
-    TEST_ASSERT_EQ((size_t)10, parser.offset);
+    TEST_REQUIRE(cff_index_seek_object(&index, &ctx, 1, &object_size));
+    TEST_ASSERT_EQ((size_t)10, ctx.offset);
     TEST_ASSERT_EQ((size_t)2, object_size);
 
-    TEST_REQUIRE(cff_index_seek_object(&index, &parser, 2, &object_size));
-    TEST_ASSERT_EQ((size_t)12, parser.offset);
+    TEST_REQUIRE(cff_index_seek_object(&index, &ctx, 2, &object_size));
+    TEST_ASSERT_EQ((size_t)12, ctx.offset);
     TEST_ASSERT_EQ((size_t)1, object_size);
 
     TEST_REQUIRE_ERR(
-        cff_index_seek_object(&index, &parser, 4, &object_size),
+        cff_index_seek_object(&index, &ctx, 4, &object_size),
         CFF_ERR_INVALID_OBJECT_IDX
     );
 
@@ -211,26 +210,26 @@ TEST_FUNC(test_cff_index_seek_offset_size_2) {
         2,
         '@'
     };
-    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+    ParseCtx ctx = parse_ctx_new(buffer, sizeof(buffer) / sizeof(uint8_t));
 
     CffIndex index;
-    TEST_REQUIRE(cff_parse_index(&parser, &index));
+    TEST_REQUIRE(cff_parse_index(&ctx, &index));
 
     size_t object_size;
-    TEST_REQUIRE(cff_index_seek_object(&index, &parser, 0, &object_size));
-    TEST_ASSERT_EQ((size_t)11, parser.offset);
+    TEST_REQUIRE(cff_index_seek_object(&index, &ctx, 0, &object_size));
+    TEST_ASSERT_EQ((size_t)11, ctx.offset);
     TEST_ASSERT_EQ((size_t)3, object_size);
 
-    TEST_REQUIRE(cff_index_seek_object(&index, &parser, 1, &object_size));
-    TEST_ASSERT_EQ((size_t)14, parser.offset);
+    TEST_REQUIRE(cff_index_seek_object(&index, &ctx, 1, &object_size));
+    TEST_ASSERT_EQ((size_t)14, ctx.offset);
     TEST_ASSERT_EQ((size_t)2, object_size);
 
-    TEST_REQUIRE(cff_index_seek_object(&index, &parser, 2, &object_size));
-    TEST_ASSERT_EQ((size_t)16, parser.offset);
+    TEST_REQUIRE(cff_index_seek_object(&index, &ctx, 2, &object_size));
+    TEST_ASSERT_EQ((size_t)16, ctx.offset);
     TEST_ASSERT_EQ((size_t)1, object_size);
 
     TEST_REQUIRE_ERR(
-        cff_index_seek_object(&index, &parser, 4, &object_size),
+        cff_index_seek_object(&index, &ctx, 4, &object_size),
         CFF_ERR_INVALID_OBJECT_IDX
     );
 
@@ -257,13 +256,13 @@ TEST_FUNC(test_cff_index_skip_size_1) {
         2,
         '@'
     };
-    CffParser parser = cff_parser_new(buffer, sizeof(buffer) / sizeof(uint8_t));
+    ParseCtx ctx = parse_ctx_new(buffer, sizeof(buffer) / sizeof(uint8_t));
 
     CffIndex index;
-    TEST_REQUIRE(cff_parse_index(&parser, &index));
+    TEST_REQUIRE(cff_parse_index(&ctx, &index));
 
-    TEST_REQUIRE(cff_index_skip(&index, &parser));
-    TEST_ASSERT_EQ((size_t)13, parser.offset);
+    TEST_REQUIRE(cff_index_skip(&index, &ctx));
+    TEST_ASSERT_EQ((size_t)13, ctx.offset);
 
     return TEST_RESULT_PASS;
 }

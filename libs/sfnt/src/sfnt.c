@@ -1,36 +1,16 @@
 #include "sfnt/sfnt.h"
 
 #include "arena/arena.h"
-#include "cmap.h"
+#include "checksum.h"
 #include "directory.h"
 #include "err/error.h"
 #include "glyph.h"
-#include "head.h"
-#include "hhea.h"
-#include "hmtx.h"
-#include "loca.h"
 #include "logger/log.h"
-#include "maxp.h"
-#include "parser.h"
+#include "parse_ctx/ctx.h"
 
-struct SfntFont {
-    Arena* arena;
-    SfntParser parser;
-    SfntParser glyf_parser;
-
-    SfntFontDirectory directory;
-    SfntHead head;
-    SfntMaxp maxp;
-    SfntLoca loca;
-    SfntCmap cmap;
-    SfntHmtx hmtx;
-
-    bool has_cmap;
-};
-
-Error* new_table_parser(SfntFont* font, uint32_t tag, SfntParser* parser) {
+Error* new_table_parser(SfntFont* font, uint32_t tag, ParseCtx* out) {
     RELEASE_ASSERT(font);
-    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(out);
 
     LOG_DIAG(
         INFO,
@@ -44,14 +24,9 @@ Error* new_table_parser(SfntFont* font, uint32_t tag, SfntParser* parser) {
 
     SfntDirectoryEntry* entry;
     TRY(sfnt_directory_get_entry(&font->directory, tag, &entry));
-    TRY(sfnt_subparser_new(
-        &font->parser,
-        entry->offset,
-        entry->length,
-        entry->checksum,
-        tag == 0x68656164,
-        parser
-    ));
+    TRY(parse_ctx_seek(&font->ctx, entry->offset));
+    TRY(parse_ctx_new_subctx(&font->ctx, entry->length, out));
+    TRY(sfnt_validate_checksum(*out, entry->checksum, tag == 0x68656164));
 
     LOG_DIAG(
         TRACE,
@@ -64,57 +39,40 @@ Error* new_table_parser(SfntFont* font, uint32_t tag, SfntParser* parser) {
     return NULL;
 }
 
-Error* sfnt_font_new(
-    Arena* arena,
-    const uint8_t* buffer,
-    size_t buffer_len,
-    SfntFont** font
-) {
+Error* sfnt_font_new(Arena* arena, ParseCtx ctx, SfntFont* out) {
     RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(buffer);
-    RELEASE_ASSERT(font);
+    RELEASE_ASSERT(out);
 
-    *font = arena_alloc(arena, sizeof(SfntFont));
-    (*font)->arena = arena;
-    (*font)->has_cmap = false;
-    sfnt_parser_new(buffer, buffer_len, &(*font)->parser);
+    out->arena = arena;
+    out->has_cmap = false;
+    out->ctx = ctx;
 
-    TRY(sfnt_parse_directory(arena, &(*font)->parser, &(*font)->directory));
+    TRY(sfnt_parse_directory(arena, ctx, &out->directory));
 
-    SfntParser head_parser;
-    TRY(new_table_parser(*font, 0x68656164, &head_parser));
-    TRY(sfnt_parse_head(&head_parser, &(*font)->head));
+    ParseCtx head_ctx;
+    TRY(new_table_parser(out, 0x68656164, &head_ctx));
+    TRY(sfnt_parse_head(head_ctx, &out->head));
 
-    SfntParser maxp_parser;
-    TRY(new_table_parser(*font, 0x6d617870, &maxp_parser));
-    TRY(sfnt_parse_maxp(&maxp_parser, &(*font)->maxp));
+    ParseCtx maxp_ctx;
+    TRY(new_table_parser(out, 0x6d617870, &maxp_ctx));
+    TRY(sfnt_parse_maxp(maxp_ctx, &out->maxp));
 
-    SfntParser loca_parser;
-    TRY(new_table_parser(*font, 0x6c6f6361, &loca_parser));
-    TRY(sfnt_parse_loca(
-        arena,
-        &loca_parser,
-        &(*font)->head,
-        &(*font)->maxp,
-        &(*font)->loca
-    ));
+    ParseCtx loca_parser;
+    TRY(new_table_parser(out, 0x6c6f6361, &loca_parser));
+    TRY(
+        sfnt_parse_loca(arena, loca_parser, &out->head, &out->maxp, &out->loca)
+    );
 
-    SfntParser hhea_parser;
+    ParseCtx hhea_parser;
     SfntHhea hhea;
-    TRY(new_table_parser(*font, 0x68686561, &hhea_parser));
-    TRY(sfnt_parse_hhea(&hhea_parser, &hhea));
+    TRY(new_table_parser(out, 0x68686561, &hhea_parser));
+    TRY(sfnt_parse_hhea(hhea_parser, &hhea));
 
-    SfntParser hmtx_parser;
-    TRY(new_table_parser(*font, 0x686d7478, &hmtx_parser));
-    TRY(sfnt_parse_hmtx(
-        arena,
-        &hmtx_parser,
-        &(*font)->maxp,
-        &hhea,
-        &(*font)->hmtx
-    ));
+    ParseCtx hmtx_parser;
+    TRY(new_table_parser(out, 0x686d7478, &hmtx_parser));
+    TRY(sfnt_parse_hmtx(arena, hmtx_parser, &out->maxp, &hhea, &out->hmtx));
 
-    TRY(new_table_parser(*font, 0x676c7966, &(*font)->glyf_parser));
+    TRY(new_table_parser(out, 0x676c7966, &out->glyf_parser));
 
     return NULL;
 }
@@ -130,9 +88,9 @@ sfnt_get_glyph_for_cid(SfntFont* font, uint32_t cid, SfntGlyph* glyph_out) {
     RELEASE_ASSERT(glyph_out);
 
     if (!font->has_cmap) {
-        SfntParser cmap_parser;
+        ParseCtx cmap_parser;
         TRY(new_table_parser(font, 0x636d6170, &cmap_parser));
-        TRY(sfnt_parse_cmap(font->arena, &cmap_parser, &font->cmap));
+        TRY(sfnt_parse_cmap(font->arena, cmap_parser, &font->cmap));
     }
 
     uint32_t gid = sfnt_cmap_map_cid(&font->cmap.mapping_table, cid);
@@ -162,8 +120,8 @@ sfnt_get_glyph_for_gid(SfntFont* font, uint32_t gid, SfntGlyph* glyph_out) {
     );
 
     if (!next_ok || next_offset - offset != 0) {
-        TRY(sfnt_parser_seek(&font->glyf_parser, (size_t)offset));
-        TRY(sfnt_parse_glyph(font->arena, &font->glyf_parser, glyph_out));
+        TRY(parse_ctx_seek(&font->glyf_parser, (size_t)offset));
+        TRY(sfnt_parse_glyph(font->arena, font->glyf_parser, glyph_out));
     } else {
         LOG_DIAG(DEBUG, SFNT, "Glyph is empty");
         glyph_out->num_contours = 0;

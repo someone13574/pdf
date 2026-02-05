@@ -1,5 +1,6 @@
 #include "glyph.h"
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "arena/arena.h"
@@ -8,8 +9,10 @@
 #include "err/error.h"
 #include "geom/vec2.h"
 #include "logger/log.h"
-#include "parser.h"
+#include "parse_ctx/binary.h"
+#include "parse_ctx/ctx.h"
 #include "sfnt/glyph.h"
+#include "sfnt/types.h"
 
 #define DVEC_NAME SfntSimpleGlyphFlagsVec
 #define DVEC_LOWERCASE_NAME sfnt_simple_glyph_flags_vec
@@ -21,27 +24,26 @@
 #define DARRAY_TYPE SfntGlyphPoint
 #include "arena/darray_impl.h"
 
-Error*
-sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
+Error* sfnt_parse_simple_glyph(Arena* arena, ParseCtx ctx, SfntGlyph* glyph) {
     RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(parser);
     RELEASE_ASSERT(glyph);
     RELEASE_ASSERT(glyph->num_contours > 0);
 
     SfntSimpleGlyph* data = &glyph->data.simple;
 
-    data->end_pts_of_contours =
-        uint16_array_new(arena, (size_t)glyph->num_contours);
-    TRY(sfnt_parser_read_uint16_array(parser, data->end_pts_of_contours));
+    TRY(parse_ctx_new_subctx(
+        &ctx,
+        (size_t)glyph->num_contours * 2,
+        &data->end_pts_of_contours
+    ));
 
-    TRY(sfnt_parser_read_uint16(parser, &data->instruction_len));
-    data->instructions = uint8_array_new(arena, data->instruction_len);
-    TRY(sfnt_parser_read_uint8_array(parser, data->instructions));
+    TRY(parse_ctx_read_u16_be(&ctx, &data->instruction_len));
+    TRY(parse_ctx_new_subctx(&ctx, data->instruction_len, &data->instructions));
 
     uint16_t last_point_idx;
-    RELEASE_ASSERT(uint16_array_get(
+    REQUIRE(parse_ctx_get_u16_be(
         data->end_pts_of_contours,
-        uint16_array_len(data->end_pts_of_contours) - 1,
+        (size_t)glyph->num_contours - 1,
         &last_point_idx
     ));
 
@@ -51,10 +53,10 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
 
     while (point_idx <= last_point_idx) {
         SfntSimpleGlyphFlags flags = {.flags = 0, .repetitions = 0};
-        TRY(sfnt_parser_read_uint8(parser, &flags.flags));
+        TRY(parse_ctx_read_u8(&ctx, &flags.flags));
 
         if ((flags.flags & SFNT_SIMPLE_GLYPH_REPEAT) != 0) {
-            TRY(sfnt_parser_read_uint8(parser, &flags.repetitions));
+            TRY(parse_ctx_read_u8(&ctx, &flags.repetitions));
         }
 
         point_idx += (uint16_t)(flags.repetitions + 1);
@@ -98,7 +100,7 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
                 bool positive =
                     (flags.flags & SFNT_SIMPLE_GLYPH_X_MODIFIER) != 0;
                 uint8_t delta_mag;
-                TRY(sfnt_parser_read_uint8(parser, &delta_mag));
+                TRY(parse_ctx_read_u8(&ctx, &delta_mag));
 
                 int16_t delta_x =
                     (int16_t)(positive ? delta_mag : -(int16_t)delta_mag);
@@ -110,7 +112,7 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
                 );
             } else {
                 int16_t delta_x;
-                TRY(sfnt_parser_read_int16(parser, &delta_x));
+                TRY(parse_ctx_read_i16_be(&ctx, &delta_x));
 
                 LOG_DIAG(TRACE, SFNT, "Delta-x: %d", delta_x);
                 sfnt_glyph_point_array_set(
@@ -159,7 +161,7 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
                 bool positive =
                     (flags.flags & SFNT_SIMPLE_GLYPH_Y_MODIFIER) != 0;
                 uint8_t delta_mag;
-                TRY(sfnt_parser_read_uint8(parser, &delta_mag));
+                TRY(parse_ctx_read_u8(&ctx, &delta_mag));
 
                 int16_t delta_y =
                     (int16_t)(positive ? delta_mag : -(int16_t)delta_mag);
@@ -173,7 +175,7 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
                 point->delta_y = delta_y;
             } else {
                 int16_t delta_y;
-                TRY(sfnt_parser_read_int16(parser, &delta_y));
+                TRY(parse_ctx_read_i16_be(&ctx, &delta_y));
 
                 LOG_DIAG(TRACE, SFNT, "Delta-y: %d", delta_y);
                 SfntGlyphPoint* point;
@@ -190,16 +192,15 @@ sfnt_parse_simple_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
     return NULL;
 }
 
-Error* sfnt_parse_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
+Error* sfnt_parse_glyph(Arena* arena, ParseCtx ctx, SfntGlyph* glyph) {
     RELEASE_ASSERT(arena);
-    RELEASE_ASSERT(parser);
     RELEASE_ASSERT(glyph);
 
-    TRY(sfnt_parser_read_int16(parser, &glyph->num_contours));
-    TRY(sfnt_parser_read_fword(parser, &glyph->x_min));
-    TRY(sfnt_parser_read_fword(parser, &glyph->y_min));
-    TRY(sfnt_parser_read_fword(parser, &glyph->x_max));
-    TRY(sfnt_parser_read_fword(parser, &glyph->y_max));
+    TRY(parse_ctx_read_i16_be(&ctx, &glyph->num_contours));
+    TRY(sfnt_read_fword(&ctx, &glyph->x_min));
+    TRY(sfnt_read_fword(&ctx, &glyph->y_min));
+    TRY(sfnt_read_fword(&ctx, &glyph->x_max));
+    TRY(sfnt_read_fword(&ctx, &glyph->y_max));
 
     if (glyph->num_contours == 0) {
         glyph->glyph_type = SFNT_GLYPH_TYPE_NONE;
@@ -208,7 +209,7 @@ Error* sfnt_parse_glyph(Arena* arena, SfntParser* parser, SfntGlyph* glyph) {
 
     if (glyph->num_contours > 0) {
         glyph->glyph_type = SFNT_GLYPH_TYPE_SIMPLE;
-        return sfnt_parse_simple_glyph(arena, parser, glyph);
+        return sfnt_parse_simple_glyph(arena, ctx, glyph);
     }
 
     LOG_TODO("Compound glyphs");
@@ -240,21 +241,20 @@ void sfnt_glyph_render(
     int32_t x_coord = 0;
     int32_t y_coord = 0;
 
-    for (size_t contour_idx = 0;
-         contour_idx < uint16_array_len(data.end_pts_of_contours);
+    for (int16_t contour_idx = 0; contour_idx < glyph->num_contours;
          contour_idx++) {
         uint16_t contour_end;
-        RELEASE_ASSERT(uint16_array_get(
+        REQUIRE(parse_ctx_get_u16_be(
             data.end_pts_of_contours,
-            contour_idx,
+            (size_t)contour_idx,
             &contour_end
         ));
 
         uint16_t contour_start = 0;
         if (contour_idx != 0) {
-            RELEASE_ASSERT(uint16_array_get(
+            REQUIRE(parse_ctx_get_u16_be(
                 data.end_pts_of_contours,
-                contour_idx - 1,
+                (size_t)contour_idx - 1,
                 &contour_start
             ));
             contour_start++;

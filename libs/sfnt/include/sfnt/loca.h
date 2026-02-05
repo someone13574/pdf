@@ -1,10 +1,11 @@
 #pragma once
 
 #include "arena/arena.h"
+#include "arena/common.h"
 #include "err/error.h"
-#include "maxp.h"
-#include "parser.h"
-#include "sfnt/sfnt.h"
+#include "parse_ctx/ctx.h"
+#include "sfnt/head.h"
+#include "sfnt/maxp.h"
 
 typedef struct {
     Uint32Array* offsets;
@@ -12,7 +13,7 @@ typedef struct {
 
 Error* sfnt_parse_loca(
     Arena* arena,
-    SfntParser* parser,
+    ParseCtx ctx,
     const SfntHead* head,
     const SfntMaxp* maxp,
     SfntLoca* loca

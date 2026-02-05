@@ -9,7 +9,7 @@
 #include "geom/rect.h"
 #include "geom/vec2.h"
 #include "logger/log.h"
-#include "parser.h"
+#include "parse_ctx/binary.h"
 #include "types.h"
 
 enum { CFF_MAX_OPERANDS = 48 };
@@ -51,11 +51,11 @@ static const char* cff_top_dict_key_names[] = {CFF_TOP_DICT_KEYS};
 #undef CFF_TOP_DICT_KEYS
 
 static Error* cff_top_dict_interpret_key(
-    CffParser* parser,
+    ParseCtx* ctx,
     uint8_t operator0,
     CffTopDictKey* key_out
 ) {
-    RELEASE_ASSERT(parser);
+    RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(operator0 <= 21);
     RELEASE_ASSERT(key_out);
 
@@ -113,10 +113,10 @@ static Error* cff_top_dict_interpret_key(
         }
     }
 
-    CffCard8 operator1; // Use a Card8 instead of a token since BaseFontName and
-                        // BaseFontBlend allow bytes 22 and 23, when the limit
-                        // for operators is 21.
-    TRY(cff_parser_read_card8(parser, &operator1));
+    uint8_t operator1; // Use a Card8 instead of a token since BaseFontName and
+                       // BaseFontBlend allow bytes 22 and 23, when the limit
+                       // for operators is 21.
+    TRY(parse_ctx_read_u8(ctx, &operator1));
 
     RELEASE_ASSERT(operator0 == 12);
     CffTopDictKey two_byte_keys[] = {
@@ -233,26 +233,24 @@ static Error* pop_number(
 }
 
 Error*
-cff_parse_top_dict(CffParser* parser, size_t length, CffTopDict* top_dict_out) {
-    RELEASE_ASSERT(parser);
+cff_parse_top_dict(ParseCtx* ctx, size_t length, CffTopDict* top_dict_out) {
+    RELEASE_ASSERT(ctx);
     RELEASE_ASSERT(top_dict_out);
 
     size_t operand_count = 0;
     CffToken operand_stack[CFF_MAX_OPERANDS] = {0};
 
-    size_t end_offset = parser->offset + length;
-    while (parser->offset < end_offset) {
+    size_t end_offset = ctx->offset + length;
+    while (ctx->offset < end_offset) {
         CffToken token;
-        TRY(cff_parser_read_token(parser, &token));
+        TRY(cff_read_token(ctx, &token));
 
         switch (token.type) {
             case CFF_TOKEN_OPERATOR: {
                 CffTopDictKey key;
-                TRY(cff_top_dict_interpret_key(
-                    parser,
-                    token.value.operator,
-                    &key
-                ));
+                TRY(
+                    cff_top_dict_interpret_key(ctx, token.value.operator, &key)
+                );
 
                 LOG_DIAG(DEBUG, CFF, "Key: %s", cff_top_dict_key_names[key]);
                 switch (key) {

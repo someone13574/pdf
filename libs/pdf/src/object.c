@@ -7,7 +7,6 @@
 #include <string.h>
 
 #include "arena/arena.h"
-#include "arena/string.h"
 #include "ctx.h"
 #include "err/error.h"
 #include "logger/log.h"
@@ -15,6 +14,7 @@
 #include "pdf/resolver.h"
 #include "pdf/stream_dict.h"
 #include "resolver.h"
+#include "str/alloc_str.h"
 #include "stream/filters.h"
 
 #define DVEC_NAME PdfObjectVec
@@ -944,7 +944,7 @@ pdf_object_dict_get(const PdfDict* dict, const char* key, PdfObject* object) {
     return ERROR(PDF_ERR_MISSING_DICT_KEY, "Dict key `%s` not found", key);
 }
 
-ArenaString* pdf_fmt_object_indented(
+Str* pdf_fmt_object_indented(
     Arena* arena,
     const PdfObject* object,
     int indent,
@@ -956,37 +956,37 @@ ArenaString* pdf_fmt_object_indented(
     switch (object->type) {
         case PDF_OBJECT_TYPE_BOOLEAN: {
             if (object->data.boolean) {
-                return arena_string_new_fmt(arena, "true");
+                return str_new_fmt(arena, "true");
             } else {
-                return arena_string_new_fmt(arena, "false");
+                return str_new_fmt(arena, "false");
             }
         }
         case PDF_OBJECT_TYPE_INTEGER: {
-            return arena_string_new_fmt(arena, "%d", object->data.integer);
+            return str_new_fmt(arena, "%d", object->data.integer);
         }
         case PDF_OBJECT_TYPE_REAL: {
-            return arena_string_new_fmt(arena, "%g", object->data.real);
+            return str_new_fmt(arena, "%g", object->data.real);
         }
         case PDF_OBJECT_TYPE_STRING: {
-            return arena_string_new_fmt(
+            return str_new_fmt(
                 arena,
                 "(%s)",
                 pdf_string_as_cstr(object->data.string, arena)
             );
         }
         case PDF_OBJECT_TYPE_NAME: {
-            return arena_string_new_fmt(arena, "/%s", object->data.name);
+            return str_new_fmt(arena, "/%s", object->data.name);
         }
         case PDF_OBJECT_TYPE_ARRAY: {
             PdfObjectVec* items = object->data.array.elements;
             size_t num_items = pdf_object_vec_len(items);
             if (num_items == 0) {
-                return arena_string_new_fmt(arena, "[]");
+                return str_new_fmt(arena, "[]");
             }
 
             int length = indent;
-            ArenaString** item_strs = (ArenaString**)
-                arena_alloc(arena, sizeof(ArenaString*) * num_items);
+            Str** item_strs =
+                (Str**)arena_alloc(arena, sizeof(Str*) * num_items);
             bool array_contains_indirect = false;
             for (size_t idx = 0; idx < num_items; idx++) {
                 PdfObject element;
@@ -998,19 +998,19 @@ ArenaString* pdf_fmt_object_indented(
                     indent + 2,
                     &array_contains_indirect
                 );
-                length += (int)arena_string_len(item_strs[idx]);
+                length += (int)str_len(item_strs[idx]);
             }
 
             if (length > 80 || array_contains_indirect) {
-                ArenaString* buffer = arena_string_new_fmt(arena, "[");
+                Str* buffer = str_new_fmt(arena, "[");
                 for (size_t idx = 0; idx < num_items; idx++) {
-                    ArenaString* new_buffer = arena_string_new_fmt(
+                    Str* new_buffer = str_new_fmt(
                         arena,
                         "%s\n  %*s%s",
-                        arena_string_buffer(buffer),
+                        str_get_cstr(buffer),
                         indent,
                         "",
-                        arena_string_buffer(item_strs[idx])
+                        str_get_cstr(item_strs[idx])
                     );
                     if (new_buffer) {
                         buffer = new_buffer;
@@ -1020,38 +1020,34 @@ ArenaString* pdf_fmt_object_indented(
                     }
                 }
 
-                return arena_string_new_fmt(
+                return str_new_fmt(
                     arena,
                     "%s\n%*s]",
-                    arena_string_buffer(buffer),
+                    str_get_cstr(buffer),
                     indent,
                     ""
                 );
             } else {
-                ArenaString* buffer = arena_string_new_fmt(arena, "[");
+                Str* buffer = str_new_fmt(arena, "[");
                 for (size_t idx = 0; idx < num_items; idx++) {
-                    buffer = arena_string_new_fmt(
+                    buffer = str_new_fmt(
                         arena,
                         "%s %s",
-                        arena_string_buffer(buffer),
-                        arena_string_buffer(item_strs[idx])
+                        str_get_cstr(buffer),
+                        str_get_cstr(item_strs[idx])
                     );
                 }
 
-                return arena_string_new_fmt(
-                    arena,
-                    "%s ]",
-                    arena_string_buffer(buffer)
-                );
+                return str_new_fmt(arena, "%s ]", str_get_cstr(buffer));
             }
         }
         case PDF_OBJECT_TYPE_DICT: {
             PdfDictEntryVec* entries = object->data.dict.entries;
 
             if (pdf_dict_entry_vec_len(entries) == 0) {
-                return arena_string_new_fmt(arena, "<< >>");
+                return str_new_fmt(arena, "<< >>");
             } else {
-                ArenaString* buffer = arena_string_new_fmt(arena, "<<");
+                Str* buffer = str_new_fmt(arena, "<<");
                 for (size_t idx = 0; idx < pdf_dict_entry_vec_len(entries);
                      idx++) {
                     PdfDictEntry entry;
@@ -1063,40 +1059,40 @@ ArenaString* pdf_fmt_object_indented(
                         .type = PDF_OBJECT_TYPE_NAME,
                         .data.name = entry.key
                     };
-                    ArenaString* key_text =
+                    Str* key_text =
                         pdf_fmt_object_indented(arena, &key, indent + 2, NULL);
-                    ArenaString* value_text = pdf_fmt_object_indented(
+                    Str* value_text = pdf_fmt_object_indented(
                         arena,
                         &entry.value,
-                        indent + (int)arena_string_len(key_text) + 3,
+                        indent + (int)str_len(key_text) + 3,
                         NULL
                     );
 
-                    buffer = arena_string_new_fmt(
+                    buffer = str_new_fmt(
                         arena,
                         "%s\n  %*s%s %s",
-                        arena_string_buffer(buffer),
+                        str_get_cstr(buffer),
                         indent,
                         "",
-                        arena_string_buffer(key_text),
-                        arena_string_buffer(value_text)
+                        str_get_cstr(key_text),
+                        str_get_cstr(value_text)
                     );
                 }
 
-                return arena_string_new_fmt(
+                return str_new_fmt(
                     arena,
                     "%s\n%*s>>",
-                    arena_string_buffer(buffer),
+                    str_get_cstr(buffer),
                     indent,
                     ""
                 );
             }
         }
         case PDF_OBJECT_TYPE_STREAM: {
-            return arena_string_new_fmt(
+            return str_new_fmt(
                 arena,
                 "%s\n%*sstream\n%*s...\n%*sendstream",
-                arena_string_buffer(pdf_fmt_object_indented(
+                str_get_cstr(pdf_fmt_object_indented(
                     arena,
                     object->data.stream.stream_dict->raw_dict,
                     indent,
@@ -1115,14 +1111,14 @@ ArenaString* pdf_fmt_object_indented(
                 *force_indent_parent = true;
             }
 
-            return arena_string_new_fmt(
+            return str_new_fmt(
                 arena,
                 "%zu %zu obj\n%*s%s\n%*sendobj",
                 object->data.indirect_object.object_id,
                 object->data.indirect_object.generation,
                 indent + 2,
                 "",
-                arena_string_buffer(pdf_fmt_object_indented(
+                str_get_cstr(pdf_fmt_object_indented(
                     arena,
                     object->data.indirect_object.object,
                     indent + 2,
@@ -1136,7 +1132,7 @@ ArenaString* pdf_fmt_object_indented(
             if (force_indent_parent) {
                 *force_indent_parent = true;
             }
-            return arena_string_new_fmt(
+            return str_new_fmt(
                 arena,
                 "%zu %zu R",
                 object->data.indirect_ref.object_id,
@@ -1144,11 +1140,11 @@ ArenaString* pdf_fmt_object_indented(
             );
         }
         case PDF_OBJECT_TYPE_NULL: {
-            return arena_string_new_fmt(arena, "null");
+            return str_new_fmt(arena, "null");
         }
     }
 
-    return arena_string_new_fmt(arena, "unreachable");
+    return str_new_fmt(arena, "unreachable");
 }
 
 char* pdf_fmt_object(Arena* arena, const PdfObject* object) {
@@ -1156,12 +1152,11 @@ char* pdf_fmt_object(Arena* arena, const PdfObject* object) {
     RELEASE_ASSERT(object);
 
     Arena* temp_arena = arena_new(512);
-    ArenaString* formatted =
-        pdf_fmt_object_indented(temp_arena, object, 0, NULL);
+    Str* formatted = pdf_fmt_object_indented(temp_arena, object, 0, NULL);
 
-    size_t len = arena_string_len(formatted) + 1;
+    size_t len = str_len(formatted) + 1;
     char* allocated = arena_alloc(arena, sizeof(char) * len);
-    strncpy(allocated, arena_string_buffer(formatted), len);
+    strncpy(allocated, str_get_cstr(formatted), len);
     arena_free(temp_arena);
 
     return allocated;

@@ -4,9 +4,9 @@
 
 #include "arena/arena.h"
 #include "err/error.h"
-#include "hhea.h"
-#include "maxp.h"
-#include "parser.h"
+#include "parse_ctx/ctx.h"
+#include "sfnt/hhea.h"
+#include "sfnt/maxp.h"
 #include "sfnt/types.h"
 
 typedef struct {
@@ -27,7 +27,7 @@ typedef struct {
 
 Error* sfnt_parse_hmtx(
     Arena* arena,
-    SfntParser* parser,
+    ParseCtx ctx,
     const SfntMaxp* maxp,
     const SfntHhea* hhea,
     SfntHmtx* hmtx
