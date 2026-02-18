@@ -37,7 +37,7 @@ typedef struct {
 typedef struct {
     PdfNameVec* names;
     PdfName alternate_space;
-    PdfObject* tilt_transform;
+    PdfObject tint_transform;
     PdfDictOptional attributes;
 } PdfDeviceNParams;
 
@@ -57,6 +57,7 @@ typedef enum {
 
 typedef union {
     PdfCalRGBParams cal_rgb;
+    PdfDeviceNParams device_n;
 } PdfColorSpaceParams;
 
 typedef struct {

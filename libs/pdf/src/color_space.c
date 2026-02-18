@@ -137,6 +137,150 @@ Error* pdf_deserde_color_space(
             break;
         }
         case PDF_COLOR_SPACE_DEVICE_N: {
+            if (resolved.type != PDF_OBJECT_TYPE_ARRAY) {
+                return ERROR(
+                    PDF_ERR_INCORRECT_TYPE,
+                    "DeviceN color spaces must be arrays"
+                );
+            }
+
+            size_t num_elements =
+                pdf_object_vec_len(resolved.data.array.elements);
+            if (num_elements != 4 && num_elements != 5) {
+                return ERROR(
+                    PDF_ERR_INCORRECT_TYPE,
+                    "DeviceN color spaces must have exactly 4 or 5 elements, "
+                    "found %zu",
+                    num_elements
+                );
+            }
+
+            PdfObject names_object;
+            RELEASE_ASSERT(pdf_object_vec_get(
+                resolved.data.array.elements,
+                1,
+                &names_object
+            ));
+            PdfArray names_array;
+            TRY(pdf_deserde_array(&names_object, &names_array, resolver));
+            if (pdf_object_vec_len(names_array.elements) == 0) {
+                return ERROR(
+                    PDF_ERR_INCORRECT_TYPE,
+                    "DeviceN color space names array must contain at least one "
+                    "colorant name"
+                );
+            }
+
+            target_ptr->params.device_n.names =
+                pdf_name_vec_new(pdf_resolver_arena(resolver));
+            for (size_t idx = 0; idx < pdf_object_vec_len(names_array.elements);
+                 idx++) {
+                PdfObject name_object;
+                RELEASE_ASSERT(
+                    pdf_object_vec_get(names_array.elements, idx, &name_object)
+                );
+
+                PdfName name;
+                TRY(pdf_deserde_name(&name_object, &name, resolver));
+                pdf_name_vec_push(target_ptr->params.device_n.names, name);
+            }
+
+            PdfObject alternate_object;
+            RELEASE_ASSERT(pdf_object_vec_get(
+                resolved.data.array.elements,
+                2,
+                &alternate_object
+            ));
+
+            PdfObject alternate_resolved;
+            TRY(pdf_resolve_object(
+                resolver,
+                &alternate_object,
+                &alternate_resolved,
+                true
+            ));
+
+            if (alternate_resolved.type == PDF_OBJECT_TYPE_NAME) {
+                target_ptr->params.device_n.alternate_space =
+                    alternate_resolved.data.name;
+            } else if (alternate_resolved.type == PDF_OBJECT_TYPE_ARRAY) {
+                PdfObject first;
+                if (!pdf_object_vec_get(
+                        alternate_resolved.data.array.elements,
+                        0,
+                        &first
+                    )) {
+                    return ERROR(
+                        PDF_ERR_INCORRECT_TYPE,
+                        "DeviceN alternate color space array must contain a "
+                        "base color space name"
+                    );
+                }
+
+                PdfObject first_resolved;
+                TRY(
+                    pdf_resolve_object(resolver, &first, &first_resolved, true)
+                );
+
+                if (first_resolved.type != PDF_OBJECT_TYPE_NAME) {
+                    return ERROR(
+                        PDF_ERR_INCORRECT_TYPE,
+                        "DeviceN alternate color space array must start with "
+                        "a color space name"
+                    );
+                }
+
+                target_ptr->params.device_n.alternate_space =
+                    first_resolved.data.name;
+            } else {
+                return ERROR(
+                    PDF_ERR_INCORRECT_TYPE,
+                    "DeviceN alternate color space must be a name or array"
+                );
+            }
+
+            PdfObject tint_transform_object;
+            RELEASE_ASSERT(pdf_object_vec_get(
+                resolved.data.array.elements,
+                3,
+                &tint_transform_object
+            ));
+
+            PdfObject tint_transform_resolved;
+            TRY(pdf_resolve_object(
+                resolver,
+                &tint_transform_object,
+                &tint_transform_resolved,
+                true
+            ));
+            if (tint_transform_resolved.type != PDF_OBJECT_TYPE_DICT
+                && tint_transform_resolved.type != PDF_OBJECT_TYPE_STREAM) {
+                return ERROR(
+                    PDF_ERR_INCORRECT_TYPE,
+                    "DeviceN TintTransform must be a function dictionary or "
+                    "stream"
+                );
+            }
+            target_ptr->params.device_n.tint_transform =
+                tint_transform_resolved;
+
+            if (num_elements == 5) {
+                PdfObject attributes_object;
+                RELEASE_ASSERT(pdf_object_vec_get(
+                    resolved.data.array.elements,
+                    4,
+                    &attributes_object
+                ));
+                TRY(pdf_deserde_dict(
+                    &attributes_object,
+                    &target_ptr->params.device_n.attributes.value,
+                    resolver
+                ));
+                target_ptr->params.device_n.attributes.is_some = true;
+            } else {
+                target_ptr->params.device_n.attributes =
+                    (PdfDictOptional) {.is_some = false};
+            }
             break;
         }
         default: {

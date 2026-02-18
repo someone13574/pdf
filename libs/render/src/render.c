@@ -710,6 +710,7 @@ static Error* process_content_stream(
 
                 render_shading(
                     &shading_dict,
+                    arena,
                     current_graphics_state(state)->ctm,
                     canvas
                 );

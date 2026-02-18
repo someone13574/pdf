@@ -1,5 +1,6 @@
 #include "pdf/function.h"
 
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -224,6 +225,274 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
     RELEASE_ASSERT(io);
 
     switch (function->function_type) {
+        case 2: {
+            if (pdf_number_vec_len(function->domain) != 2) {
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
+            }
+            if (pdf_object_vec_len(io) != 1) {
+                return ERROR(PDF_ERR_EXCESS_OPERAND);
+            }
+
+            PdfObject input_object;
+            RELEASE_ASSERT(pdf_object_vec_get(io, 0, &input_object));
+
+            PdfNumber domain_min;
+            PdfNumber domain_max;
+            RELEASE_ASSERT(
+                pdf_number_vec_get(function->domain, 0, &domain_min)
+            );
+            RELEASE_ASSERT(
+                pdf_number_vec_get(function->domain, 1, &domain_max)
+            );
+
+            PdfObject clipped_input;
+            TRY(clip_num(input_object, domain_min, domain_max, &clipped_input));
+
+            PdfNumber x_num;
+            TRY(pdf_deserde_number(&clipped_input, &x_num, NULL));
+            PdfReal x = pdf_number_as_real(x_num);
+
+            size_t output_size = 1;
+            if (function->data.type2.c0.is_some) {
+                output_size = pdf_number_vec_len(function->data.type2.c0.value);
+            }
+            if (function->data.type2.c1.is_some) {
+                size_t c1_size =
+                    pdf_number_vec_len(function->data.type2.c1.value);
+                if (function->data.type2.c0.is_some && c1_size != output_size) {
+                    return ERROR(PDF_ERR_INCORRECT_TYPE);
+                }
+                output_size = c1_size;
+            }
+
+            if (output_size == 0) {
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
+            }
+
+            if (function->range.is_some
+                && pdf_number_vec_len(function->range.value)
+                       != 2 * output_size) {
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
+            }
+
+            PdfReal n = pdf_number_as_real(function->data.type2.n);
+            PdfReal x_to_n = pow(x, n);
+
+            pdf_object_vec_clear(io);
+            for (size_t idx = 0; idx < output_size; idx++) {
+                PdfReal c0 = 0.0;
+                if (function->data.type2.c0.is_some) {
+                    PdfNumber c0_number;
+                    RELEASE_ASSERT(pdf_number_vec_get(
+                        function->data.type2.c0.value,
+                        idx,
+                        &c0_number
+                    ));
+                    c0 = pdf_number_as_real(c0_number);
+                }
+
+                PdfReal c1 = 1.0;
+                if (function->data.type2.c1.is_some) {
+                    PdfNumber c1_number;
+                    RELEASE_ASSERT(pdf_number_vec_get(
+                        function->data.type2.c1.value,
+                        idx,
+                        &c1_number
+                    ));
+                    c1 = pdf_number_as_real(c1_number);
+                }
+
+                PdfObject output = {
+                    .type = PDF_OBJECT_TYPE_REAL,
+                    .data.real = c0 + x_to_n * (c1 - c0)
+                };
+
+                if (function->range.is_some) {
+                    PdfNumber range_min;
+                    PdfNumber range_max;
+                    RELEASE_ASSERT(pdf_number_vec_get(
+                        function->range.value,
+                        2 * idx,
+                        &range_min
+                    ));
+                    RELEASE_ASSERT(pdf_number_vec_get(
+                        function->range.value,
+                        2 * idx + 1,
+                        &range_max
+                    ));
+
+                    PdfObject clipped_output;
+                    TRY(
+                        clip_num(output, range_min, range_max, &clipped_output)
+                    );
+                    output = clipped_output;
+                }
+
+                pdf_object_vec_push(io, output);
+            }
+
+            break;
+        }
+        case 3: {
+            if (pdf_number_vec_len(function->domain) != 2) {
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
+            }
+            if (pdf_object_vec_len(io) != 1) {
+                return ERROR(PDF_ERR_EXCESS_OPERAND);
+            }
+
+            size_t k = pdf_function_vec_len(function->data.type3.functions);
+            if (k == 0) {
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
+            }
+            if (pdf_number_vec_len(function->data.type3.bounds) != k - 1) {
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
+            }
+            if (pdf_number_vec_len(function->data.type3.encode) != 2 * k) {
+                return ERROR(PDF_ERR_INCORRECT_TYPE);
+            }
+
+            PdfObject input_object;
+            RELEASE_ASSERT(pdf_object_vec_get(io, 0, &input_object));
+
+            PdfNumber domain_min_num;
+            PdfNumber domain_max_num;
+            RELEASE_ASSERT(
+                pdf_number_vec_get(function->domain, 0, &domain_min_num)
+            );
+            RELEASE_ASSERT(
+                pdf_number_vec_get(function->domain, 1, &domain_max_num)
+            );
+
+            PdfObject clipped_input;
+            TRY(clip_num(
+                input_object,
+                domain_min_num,
+                domain_max_num,
+                &clipped_input
+            ));
+
+            PdfNumber x_num;
+            TRY(pdf_deserde_number(&clipped_input, &x_num, NULL));
+            PdfReal x = pdf_number_as_real(x_num);
+
+            PdfReal domain_min = pdf_number_as_real(domain_min_num);
+            PdfReal domain_max = pdf_number_as_real(domain_max_num);
+
+            size_t selected_idx = k - 1;
+            PdfReal selected_low = domain_min;
+            PdfReal selected_high = domain_max;
+            PdfReal low = domain_min;
+            for (size_t idx = 0; idx < k; idx++) {
+                PdfReal high = domain_max;
+                if (idx + 1 < k) {
+                    PdfNumber bound;
+                    RELEASE_ASSERT(pdf_number_vec_get(
+                        function->data.type3.bounds,
+                        idx,
+                        &bound
+                    ));
+                    high = pdf_number_as_real(bound);
+                }
+
+                bool in_interval = false;
+                if (idx + 1 == k) {
+                    in_interval = (x >= low - 1e-9) && (x <= high + 1e-9);
+                } else {
+                    in_interval = (x >= low - 1e-9) && (x < high);
+                }
+                if (in_interval) {
+                    selected_idx = idx;
+                    selected_low = low;
+                    selected_high = high;
+                    break;
+                }
+
+                low = high;
+            }
+
+            PdfNumber encode_min_num;
+            PdfNumber encode_max_num;
+            RELEASE_ASSERT(pdf_number_vec_get(
+                function->data.type3.encode,
+                2 * selected_idx,
+                &encode_min_num
+            ));
+            RELEASE_ASSERT(pdf_number_vec_get(
+                function->data.type3.encode,
+                2 * selected_idx + 1,
+                &encode_max_num
+            ));
+
+            PdfReal encode_min = pdf_number_as_real(encode_min_num);
+            PdfReal encode_max = pdf_number_as_real(encode_max_num);
+
+            PdfReal mapped_x = encode_min;
+            if (fabs(selected_high - selected_low) > 1e-9) {
+                mapped_x = encode_min
+                         + ((x - selected_low) * (encode_max - encode_min))
+                               / (selected_high - selected_low);
+            }
+
+            PdfFunction selected_function;
+            RELEASE_ASSERT(pdf_function_vec_get(
+                function->data.type3.functions,
+                selected_idx,
+                &selected_function
+            ));
+
+            pdf_object_vec_clear(io);
+            pdf_object_vec_push(
+                io,
+                (PdfObject) {.type = PDF_OBJECT_TYPE_REAL,
+                             .data.real = mapped_x}
+            );
+            TRY(pdf_run_function(&selected_function, arena, io));
+
+            if (function->range.is_some) {
+                size_t output_len = pdf_object_vec_len(io);
+                if (output_len == 0) {
+                    return ERROR(PDF_ERR_INCORRECT_TYPE);
+                }
+                if (pdf_number_vec_len(function->range.value)
+                    != 2 * output_len) {
+                    return ERROR(PDF_ERR_INCORRECT_TYPE);
+                }
+
+                PdfObject clipped_outputs[output_len];
+                for (size_t idx = 0; idx < output_len; idx++) {
+                    PdfObject output;
+                    RELEASE_ASSERT(pdf_object_vec_get(io, idx, &output));
+
+                    PdfNumber range_min;
+                    PdfNumber range_max;
+                    RELEASE_ASSERT(pdf_number_vec_get(
+                        function->range.value,
+                        2 * idx,
+                        &range_min
+                    ));
+                    RELEASE_ASSERT(pdf_number_vec_get(
+                        function->range.value,
+                        2 * idx + 1,
+                        &range_max
+                    ));
+
+                    TRY(clip_num(
+                        output,
+                        range_min,
+                        range_max,
+                        &clipped_outputs[idx]
+                    ));
+                }
+
+                pdf_object_vec_clear(io);
+                for (size_t idx = 0; idx < output_len; idx++) {
+                    pdf_object_vec_push(io, clipped_outputs[idx]);
+                }
+            }
+
+            break;
+        }
         case 4: {
             for (size_t idx = 0; idx < pdf_object_vec_len(io); idx++) {
                 PdfObject pdf_operand;
@@ -324,6 +593,99 @@ pdf_run_function(const PdfFunction* function, Arena* arena, PdfObjectVec* io) {
 #ifdef TEST
 
 #include "test/test.h"
+
+TEST_FUNC(test_pdf_function_type2) {
+    Arena* arena = arena_new(256);
+    uint8_t buffer[] = "10 0 obj\n"
+                       "<< /FunctionType 2\n"
+                       "/Domain [0.0 1.0]\n"
+                       "/C0 [0.0 0.0]\n"
+                       "/C1 [1.0 0.5]\n"
+                       "/N 2.0\n"
+                       ">>\n endobj";
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
+    PdfResolver* resolver = pdf_fake_resolver_new(arena, ctx);
+
+    PdfObject object;
+    TEST_REQUIRE(pdf_parse_object(resolver, &object, false));
+
+    PdfFunction func;
+    TEST_REQUIRE(pdf_deserde_function(&object, &func, resolver));
+
+    PdfObjectVec* io = pdf_object_vec_new(arena);
+    pdf_object_vec_push(
+        io,
+        (PdfObject) {.type = PDF_OBJECT_TYPE_REAL, .data.real = 0.5}
+    );
+    TEST_REQUIRE(pdf_run_function(&func, arena, io));
+
+    TEST_ASSERT_EQ(pdf_object_vec_len(io), (size_t)2);
+
+    PdfObject output_0;
+    RELEASE_ASSERT(pdf_object_vec_get(io, 0, &output_0));
+    TEST_ASSERT_EQ((int)output_0.type, (int)PDF_OBJECT_TYPE_REAL);
+    TEST_ASSERT_EQ(output_0.data.real, 0.25);
+
+    PdfObject output_1;
+    RELEASE_ASSERT(pdf_object_vec_get(io, 1, &output_1));
+    TEST_ASSERT_EQ((int)output_1.type, (int)PDF_OBJECT_TYPE_REAL);
+    TEST_ASSERT_EQ(output_1.data.real, 0.125);
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_pdf_function_type3) {
+    Arena* arena = arena_new(1024);
+    uint8_t buffer[] = "10 0 obj\n"
+                       "<< /FunctionType 3\n"
+                       "/Domain [0.0 1.0]\n"
+                       "/Functions [\n"
+                       "<< /FunctionType 2 /Domain [0.0 1.0] /C0 [0.0] /C1 "
+                       "[1.0] /N 1.0 >>\n"
+                       "<< /FunctionType 2 /Domain [0.0 1.0] /C0 [0.0] /C1 "
+                       "[0.0] /N 1.0 >>\n"
+                       "]\n"
+                       "/Bounds [0.5]\n"
+                       "/Encode [0.0 1.0 0.0 1.0]\n"
+                       ">>\n endobj";
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
+    PdfResolver* resolver = pdf_fake_resolver_new(arena, ctx);
+
+    PdfObject object;
+    TEST_REQUIRE(pdf_parse_object(resolver, &object, false));
+
+    PdfFunction func;
+    TEST_REQUIRE(pdf_deserde_function(&object, &func, resolver));
+
+    PdfObjectVec* io = pdf_object_vec_new(arena);
+    pdf_object_vec_push(
+        io,
+        (PdfObject) {.type = PDF_OBJECT_TYPE_REAL, .data.real = 0.25}
+    );
+    TEST_REQUIRE(pdf_run_function(&func, arena, io));
+
+    TEST_ASSERT_EQ(pdf_object_vec_len(io), (size_t)1);
+    PdfObject output;
+    RELEASE_ASSERT(pdf_object_vec_get(io, 0, &output));
+    TEST_ASSERT_EQ((int)output.type, (int)PDF_OBJECT_TYPE_REAL);
+    TEST_ASSERT_EQ(output.data.real, 0.5);
+
+    pdf_object_vec_clear(io);
+    pdf_object_vec_push(
+        io,
+        (PdfObject) {.type = PDF_OBJECT_TYPE_REAL, .data.real = 0.75}
+    );
+    TEST_REQUIRE(pdf_run_function(&func, arena, io));
+
+    TEST_ASSERT_EQ(pdf_object_vec_len(io), (size_t)1);
+    RELEASE_ASSERT(pdf_object_vec_get(io, 0, &output));
+    TEST_ASSERT_EQ((int)output.type, (int)PDF_OBJECT_TYPE_REAL);
+    TEST_ASSERT_EQ(output.data.real, 0.0);
+
+    return TEST_RESULT_PASS;
+}
 
 TEST_FUNC(test_pdf_function) {
     Arena* arena = arena_new(128);
