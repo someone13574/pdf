@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "arena/arena.h"
@@ -55,6 +56,14 @@ void scalable_canvas_draw_path(
     const PathBuilder* path,
     CanvasBrush brush
 );
+
+void scalable_canvas_push_clip_path(
+    ScalableCanvas* canvas,
+    const PathBuilder* path,
+    bool even_odd_rule
+);
+
+void scalable_canvas_pop_clip_paths(ScalableCanvas* canvas, size_t count);
 
 void scalable_canvas_draw_pixel(
     ScalableCanvas* canvas,

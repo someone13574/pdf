@@ -654,8 +654,9 @@ Error* pdf_deserde_content_op(
             new_queue_op(operation_queue, PDF_OPERATOR_n);
             return NULL;
         }
-        case PDF_OPERATOR_W: {
-            LOG_WARN(PDF, "TODO: Clipping paths");
+        case PDF_OPERATOR_W:
+        case PDF_OPERATOR_W_star: {
+            new_queue_op(operation_queue, op);
             return NULL;
         }
         case PDF_OPERATOR_BT: {
@@ -803,3 +804,46 @@ Error* pdf_deserde_content_op(
         }
     }
 }
+
+#ifdef TEST
+
+#include "../ctx.h"
+#include "../test_helpers.h"
+#include "test/test.h"
+
+TEST_FUNC(test_deserde_content_op_clipping_operators) {
+    Arena* arena = arena_new(128);
+    uint8_t buffer[] = "0";
+    PdfCtx* ctx =
+        pdf_ctx_new(arena, buffer, sizeof(buffer) / sizeof(uint8_t) - 1);
+    PdfResolver* resolver = pdf_fake_resolver_new(arena, ctx);
+
+    PdfObjectVec* operands = pdf_object_vec_new(arena);
+    PdfContentOpVec* operation_queue = pdf_content_op_vec_new(arena);
+
+    TEST_REQUIRE(pdf_deserde_content_op(
+        PDF_OPERATOR_W,
+        operands,
+        resolver,
+        operation_queue
+    ));
+    TEST_REQUIRE(pdf_deserde_content_op(
+        PDF_OPERATOR_W_star,
+        operands,
+        resolver,
+        operation_queue
+    ));
+
+    TEST_ASSERT_EQ(pdf_content_op_vec_len(operation_queue), (size_t)2);
+
+    PdfContentOp op;
+    TEST_ASSERT(pdf_content_op_vec_get(operation_queue, 0, &op));
+    TEST_ASSERT_EQ((int)op.kind, (int)PDF_OPERATOR_W);
+
+    TEST_ASSERT(pdf_content_op_vec_get(operation_queue, 1, &op));
+    TEST_ASSERT_EQ((int)op.kind, (int)PDF_OPERATOR_W_star);
+
+    return TEST_RESULT_PASS;
+}
+
+#endif // TEST

@@ -1,7 +1,8 @@
 #pragma once
 
+#include <stddef.h>
+
 #include "pdf/color_space.h"
-#include "pdf/content_stream/operation.h"
 #include "pdf/object.h"
 #include "pdf/resources.h"
 #include "text_state.h"
@@ -17,7 +18,7 @@ typedef enum { OVERPRINT_MODE_DEFAULT, OVERPRINT_MODE_NONZERO } OverprintMode;
 
 typedef struct {
     GeomMat3 ctm;
-    // clipping_path
+    size_t clip_depth;
     PdfColorSpace stroking_color_space;
     PdfColorSpace nonstroking_color_space;
     GeomVec3 stroking_rgb;

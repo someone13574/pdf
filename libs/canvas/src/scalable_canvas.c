@@ -22,6 +22,8 @@ struct ScalableCanvas {
     double raster_res;
 
     SvgPartsVec* parts;
+    size_t next_clip_id;
+    size_t active_clip_depth;
 };
 
 ScalableCanvas* scalable_canvas_new(
@@ -40,6 +42,8 @@ ScalableCanvas* scalable_canvas_new(
     canvas->height = height;
     canvas->raster_res = raster_res;
     canvas->parts = svg_parts_vec_new(arena);
+    canvas->next_clip_id = 0;
+    canvas->active_clip_depth = 0;
 
     svg_parts_vec_push(
         canvas->parts,
@@ -138,15 +142,12 @@ void scalable_canvas_draw_bezier(
     );
 }
 
-void scalable_canvas_draw_path(
+static void scalable_canvas_append_path_data(
     ScalableCanvas* canvas,
-    const PathBuilder* path,
-    CanvasBrush brush
+    const PathBuilder* path
 ) {
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(path);
-
-    svg_parts_vec_push(canvas->parts, str_new_fmt(canvas->arena, "<path d=\""));
 
     for (size_t contour_idx = 0;
          contour_idx < path_contour_vec_len(path->contours);
@@ -223,6 +224,18 @@ void scalable_canvas_draw_path(
             }
         }
     }
+}
+
+void scalable_canvas_draw_path(
+    ScalableCanvas* canvas,
+    const PathBuilder* path,
+    CanvasBrush brush
+) {
+    RELEASE_ASSERT(canvas);
+    RELEASE_ASSERT(path);
+
+    svg_parts_vec_push(canvas->parts, str_new_fmt(canvas->arena, "<path d=\""));
+    scalable_canvas_append_path_data(canvas, path);
 
     // Brush
     if (brush.enable_fill) {
@@ -303,6 +316,49 @@ void scalable_canvas_draw_path(
     svg_parts_vec_push(canvas->parts, str_new_fmt(canvas->arena, "  />"));
 }
 
+void scalable_canvas_push_clip_path(
+    ScalableCanvas* canvas,
+    const PathBuilder* path,
+    bool even_odd_rule
+) {
+    RELEASE_ASSERT(canvas);
+    RELEASE_ASSERT(path);
+
+    size_t clip_id = canvas->next_clip_id++;
+
+    svg_parts_vec_push(
+        canvas->parts,
+        str_new_fmt(canvas->arena, "<clipPath id=\"clip-%zu\">", clip_id)
+    );
+    svg_parts_vec_push(canvas->parts, str_new_fmt(canvas->arena, "<path d=\""));
+    scalable_canvas_append_path_data(canvas, path);
+    svg_parts_vec_push(
+        canvas->parts,
+        str_new_fmt(
+            canvas->arena,
+            "\" clip-rule=\"%s\" /></clipPath>",
+            even_odd_rule ? "evenodd" : "nonzero"
+        )
+    );
+    svg_parts_vec_push(
+        canvas->parts,
+        str_new_fmt(canvas->arena, "<g clip-path=\"url(#clip-%zu)\">", clip_id)
+    );
+
+    canvas->active_clip_depth++;
+}
+
+void scalable_canvas_pop_clip_paths(ScalableCanvas* canvas, size_t count) {
+    RELEASE_ASSERT(canvas);
+    RELEASE_ASSERT(count <= canvas->active_clip_depth);
+
+    for (size_t idx = 0; idx < count; idx++) {
+        svg_parts_vec_push(canvas->parts, str_new_fmt(canvas->arena, "</g>"));
+    }
+
+    canvas->active_clip_depth -= count;
+}
+
 void scalable_canvas_draw_pixel(
     ScalableCanvas* canvas,
     GeomVec2 position,
@@ -354,6 +410,13 @@ bool scalable_canvas_write_file(ScalableCanvas* canvas, const char* path) {
                 fclose(file);
                 return false;
             }
+        }
+    }
+
+    for (size_t idx = 0; idx < canvas->active_clip_depth; idx++) {
+        if (fputs("</g>", file) == EOF) {
+            fclose(file);
+            return false;
         }
     }
 

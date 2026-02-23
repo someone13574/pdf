@@ -206,6 +206,55 @@ void canvas_draw_path(
     }
 }
 
+void canvas_push_clip_path(
+    Canvas* canvas,
+    const PathBuilder* path,
+    bool even_odd_rule
+) {
+    RELEASE_ASSERT(canvas);
+    RELEASE_ASSERT(path);
+
+    switch (canvas->type) {
+        case CANVAS_TYPE_RASTER: {
+            raster_canvas_push_clip_path(
+                canvas->data.raster,
+                path,
+                even_odd_rule
+            );
+            break;
+        }
+        case CANVAS_TYPE_SCALABLE: {
+            scalable_canvas_push_clip_path(
+                canvas->data.scalable,
+                path,
+                even_odd_rule
+            );
+            break;
+        }
+        default: {
+            LOG_PANIC("Unreachable");
+        }
+    }
+}
+
+void canvas_pop_clip_paths(Canvas* canvas, size_t count) {
+    RELEASE_ASSERT(canvas);
+
+    switch (canvas->type) {
+        case CANVAS_TYPE_RASTER: {
+            raster_canvas_pop_clip_paths(canvas->data.raster, count);
+            break;
+        }
+        case CANVAS_TYPE_SCALABLE: {
+            scalable_canvas_pop_clip_paths(canvas->data.scalable, count);
+            break;
+        }
+        default: {
+            LOG_PANIC("Unreachable");
+        }
+    }
+}
+
 void canvas_draw_pixel(Canvas* canvas, GeomVec2 position, uint32_t rgba) {
     RELEASE_ASSERT(canvas);
 

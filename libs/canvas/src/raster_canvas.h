@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "arena/arena.h"
@@ -77,5 +78,13 @@ void raster_canvas_draw_path(
     const PathBuilder* path,
     CanvasBrush brush
 );
+
+void raster_canvas_push_clip_path(
+    RasterCanvas* canvas,
+    const PathBuilder* path,
+    bool even_odd_rule
+);
+
+void raster_canvas_pop_clip_paths(RasterCanvas* canvas, size_t count);
 
 bool raster_canvas_write_file(RasterCanvas* canvas, const char* path);

@@ -64,6 +64,8 @@ typedef struct {
     GraphicsStateStack* graphics_state_stack; // idx 0 == top
     TextObjectState text_object_state;
     PathBuilder* path;
+    bool pending_clip;
+    bool pending_clip_even_odd;
 
     RenderCache cache;
 } RenderState;
@@ -87,14 +89,27 @@ static void save_graphics_state(RenderState* state) {
     );
 }
 
-static Error* restore_graphics_state(RenderState* state) {
+static Error* restore_graphics_state(RenderState* state, Canvas* canvas) {
     RELEASE_ASSERT(state);
+    RELEASE_ASSERT(canvas);
 
-    if (!graphics_state_stack_pop_front(state->graphics_state_stack, NULL)) {
+    if (graphics_state_stack_len(state->graphics_state_stack) <= 1) {
         return ERROR(
             RENDER_ERR_GSTATE_CANNOT_RESTORE,
             "GState stack underflow"
         );
+    }
+
+    GraphicsState popped;
+    RELEASE_ASSERT(
+        graphics_state_stack_pop_front(state->graphics_state_stack, &popped)
+    );
+
+    GraphicsState* restored = current_graphics_state(state);
+    RELEASE_ASSERT(popped.clip_depth >= restored->clip_depth);
+    size_t clips_to_pop = popped.clip_depth - restored->clip_depth;
+    if (clips_to_pop != 0) {
+        canvas_pop_clip_paths(canvas, clips_to_pop);
     }
 
     return NULL;
@@ -103,6 +118,27 @@ static Error* restore_graphics_state(RenderState* state) {
 static uint32_t pack_rgba(GeomVec3 rgb, double a) {
     return ((uint32_t)(rgb.x * 255.0) << 24) | ((uint32_t)(rgb.y * 255.0) << 16)
          | ((uint32_t)(rgb.z * 255.0) << 8) | (uint32_t)(a * 255.0);
+}
+
+static void consume_current_path(Arena* arena, RenderState* state) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(state);
+
+    state->path = path_builder_new(arena); // TODO: recycle
+}
+
+static void apply_pending_clip_path(RenderState* state, Canvas* canvas) {
+    RELEASE_ASSERT(state);
+    RELEASE_ASSERT(canvas);
+
+    if (!state->pending_clip) {
+        return;
+    }
+
+    canvas_push_clip_path(canvas, state->path, state->pending_clip_even_odd);
+    current_graphics_state(state)->clip_depth++;
+    state->pending_clip = false;
+    state->pending_clip_even_odd = false;
 }
 
 static Error* process_content_stream(
@@ -173,7 +209,7 @@ static Error* process_content_stream(
                 break;
             }
             case PDF_OPERATOR_Q: {
-                TRY(restore_graphics_state(state));
+                TRY(restore_graphics_state(state, canvas));
                 break;
             }
             case PDF_OPERATOR_cm: {
@@ -222,6 +258,16 @@ static Error* process_content_stream(
                 path_builder_close_contour(state->path);
                 break;
             }
+            case PDF_OPERATOR_W: {
+                state->pending_clip = true;
+                state->pending_clip_even_odd = false;
+                break;
+            }
+            case PDF_OPERATOR_W_star: {
+                state->pending_clip = true;
+                state->pending_clip_even_odd = true;
+                break;
+            }
             case PDF_OPERATOR_S: {
                 CanvasBrush brush = {
                     .enable_fill = false,
@@ -244,8 +290,9 @@ static Error* process_content_stream(
                     state->path,
                     current_graphics_state(state)->ctm
                 );
+                apply_pending_clip_path(state, canvas);
                 canvas_draw_path(canvas, state->path, brush);
-                state->path = path_builder_new(arena); // TODO: recycle
+                consume_current_path(arena, state);
                 break;
             }
             case PDF_OPERATOR_f: {
@@ -262,8 +309,9 @@ static Error* process_content_stream(
                     state->path,
                     current_graphics_state(state)->ctm
                 );
+                apply_pending_clip_path(state, canvas);
                 canvas_draw_path(canvas, state->path, brush);
-                state->path = path_builder_new(arena); // TODO: recycle
+                consume_current_path(arena, state);
                 break;
             }
             case PDF_OPERATOR_B: {
@@ -292,12 +340,20 @@ static Error* process_content_stream(
                     state->path,
                     current_graphics_state(state)->ctm
                 );
+                apply_pending_clip_path(state, canvas);
                 canvas_draw_path(canvas, state->path, brush);
-                state->path = path_builder_new(arena); // TODO: recycle
+                consume_current_path(arena, state);
                 break;
             }
             case PDF_OPERATOR_n: {
-                state->path = path_builder_new(arena); // TODO: recycle
+                if (state->pending_clip) {
+                    path_builder_apply_transform(
+                        state->path,
+                        current_graphics_state(state)->ctm
+                    );
+                    apply_pending_clip_path(state, canvas);
+                }
+                consume_current_path(arena, state);
                 break;
             }
             case PDF_OPERATOR_BT: {
@@ -745,11 +801,47 @@ static Error* process_content_stream(
                         }
 
                         save_graphics_state(state);
-                        geom_mat3_mul(
-                            current_graphics_state(state)->ctm,
-                            matrix
+                        current_graphics_state(state)->ctm = geom_mat3_mul(
+                            matrix,
+                            current_graphics_state(state)->ctm
                         );
-                        // TODO: clip with bbox
+
+                        PathBuilder* clip_path = path_builder_new(arena);
+                        path_builder_new_contour(
+                            clip_path,
+                            geom_vec2_new(
+                                pdf_number_as_real(form->bbox.lower_left_x),
+                                pdf_number_as_real(form->bbox.lower_left_y)
+                            )
+                        );
+                        path_builder_line_to(
+                            clip_path,
+                            geom_vec2_new(
+                                pdf_number_as_real(form->bbox.upper_right_x),
+                                pdf_number_as_real(form->bbox.lower_left_y)
+                            )
+                        );
+                        path_builder_line_to(
+                            clip_path,
+                            geom_vec2_new(
+                                pdf_number_as_real(form->bbox.upper_right_x),
+                                pdf_number_as_real(form->bbox.upper_right_y)
+                            )
+                        );
+                        path_builder_line_to(
+                            clip_path,
+                            geom_vec2_new(
+                                pdf_number_as_real(form->bbox.lower_left_x),
+                                pdf_number_as_real(form->bbox.upper_right_y)
+                            )
+                        );
+
+                        path_builder_apply_transform(
+                            clip_path,
+                            current_graphics_state(state)->ctm
+                        );
+                        canvas_push_clip_path(canvas, clip_path, false);
+                        current_graphics_state(state)->clip_depth++;
 
                         TRY(process_content_stream(
                             arena,
@@ -760,7 +852,7 @@ static Error* process_content_stream(
                             canvas
                         ));
 
-                        TRY(restore_graphics_state(state));
+                        TRY(restore_graphics_state(state, canvas));
                     }
                 }
 
@@ -804,6 +896,8 @@ Error* render_page(
     RenderState state = {
         .graphics_state_stack = graphics_state_stack_new(arena),
         .text_object_state = text_object_state_default(),
+        .pending_clip = false,
+        .pending_clip_even_odd = false,
         .cache.cmap_cache = pdf_cmap_cache_new(arena),
         .cache.glyph_list = NULL,
         .cache.icc_cache = icc_profile_cache_new(arena),

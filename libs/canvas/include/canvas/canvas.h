@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "arena/arena.h"
@@ -88,6 +89,14 @@ void canvas_draw_path(
     const PathBuilder* path,
     CanvasBrush brush
 );
+
+void canvas_push_clip_path(
+    Canvas* canvas,
+    const PathBuilder* path,
+    bool even_odd_rule
+);
+
+void canvas_pop_clip_paths(Canvas* canvas, size_t count);
 
 void canvas_draw_pixel(Canvas* canvas, GeomVec2 position, uint32_t rgba);
 

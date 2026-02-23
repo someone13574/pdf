@@ -359,6 +359,25 @@ void raster_canvas_draw_path(
     LOG_TODO();
 }
 
+void raster_canvas_push_clip_path(
+    RasterCanvas* canvas,
+    const PathBuilder* path,
+    bool even_odd_rule
+) {
+    (void)canvas;
+    (void)path;
+    (void)even_odd_rule;
+
+    LOG_TODO();
+}
+
+void raster_canvas_pop_clip_paths(RasterCanvas* canvas, size_t count) {
+    (void)canvas;
+    (void)count;
+
+    LOG_TODO();
+}
+
 bool raster_canvas_write_file(RasterCanvas* canvas, const char* path) {
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(path);

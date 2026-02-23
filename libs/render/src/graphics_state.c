@@ -15,6 +15,7 @@
 GraphicsState graphics_state_default(void) {
     return (GraphicsState) {
         .ctm = geom_mat3_identity(),
+        .clip_depth = 0,
         .stroking_color_space =
             (PdfColorSpace) {.family = PDF_COLOR_SPACE_DEVICE_GRAY},
         .nonstroking_color_space =
