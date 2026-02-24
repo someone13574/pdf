@@ -116,6 +116,11 @@ RasterCanvas* raster_canvas_new(
     return canvas;
 }
 
+double raster_canvas_raster_res(const RasterCanvas* canvas) {
+    RELEASE_ASSERT(canvas);
+    return 1.0 / canvas->coordinate_scale;
+}
+
 uint32_t raster_canvas_width(const RasterCanvas* canvas) {
     RELEASE_ASSERT(canvas);
     return canvas->width;
@@ -382,6 +387,18 @@ void raster_canvas_push_clip_path(
 void raster_canvas_pop_clip_paths(RasterCanvas* canvas, size_t count) {
     (void)canvas;
     (void)count;
+
+    LOG_TODO();
+}
+
+void raster_canvas_draw_pixel(
+    RasterCanvas* canvas,
+    GeomVec2 position,
+    Rgba rgba
+) {
+    (void)canvas;
+    (void)position;
+    (void)rgba;
 
     LOG_TODO();
 }

@@ -18,6 +18,7 @@ RasterCanvas* raster_canvas_new(
     double coordinate_scale
 );
 
+double raster_canvas_raster_res(const RasterCanvas* canvas);
 uint32_t raster_canvas_width(const RasterCanvas* canvas);
 uint32_t raster_canvas_height(const RasterCanvas* canvas);
 
@@ -85,5 +86,11 @@ void raster_canvas_push_clip_path(
 );
 
 void raster_canvas_pop_clip_paths(RasterCanvas* canvas, size_t count);
+
+void raster_canvas_draw_pixel(
+    RasterCanvas* canvas,
+    GeomVec2 position,
+    Rgba rgba
+);
 
 bool raster_canvas_write_file(RasterCanvas* canvas, const char* path);

@@ -61,7 +61,7 @@ bool canvas_is_raster(Canvas* canvas) {
 double canvas_raster_res(Canvas* canvas) {
     RELEASE_ASSERT(canvas);
     if (canvas->type == CANVAS_TYPE_RASTER) {
-        return 1.0;
+        return raster_canvas_raster_res(canvas->data.raster);
     } else {
         return scalable_canvas_raster_res(canvas->data.scalable);
     }
@@ -260,7 +260,8 @@ void canvas_draw_pixel(Canvas* canvas, GeomVec2 position, Rgba rgba) {
 
     switch (canvas->type) {
         case CANVAS_TYPE_RASTER: {
-            LOG_TODO();
+            raster_canvas_draw_pixel(canvas->data.raster, position, rgba);
+            break;
         }
         case CANVAS_TYPE_SCALABLE: {
             scalable_canvas_draw_pixel(canvas->data.scalable, position, rgba);
