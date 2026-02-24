@@ -3,9 +3,11 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "arena/arena.h"
 #include "logger/log.h"
+#include "path_builder.h"
 #include "raster_canvas.h"
 
 #define DVEC_NAME DcelVertices
@@ -884,6 +886,339 @@ void dcel_partition(Dcel* dcel) {
     }
 
     arena_free(local_arena);
+}
+
+static bool dcel_sample_on_segment(
+    GeomVec2 a,
+    GeomVec2 b,
+    double sample_x,
+    double sample_y
+) {
+    const double eps = 1e-5;
+
+    GeomVec2 ab = geom_vec2_sub(b, a);
+    GeomVec2 ap = geom_vec2_new(sample_x - a.x, sample_y - a.y);
+    double ab_len_sq = geom_vec2_len_sq(ab);
+    if (ab_len_sq <= 1e-18) {
+        return geom_vec2_len_sq(ap) <= eps * eps;
+    }
+
+    double cross = ap.x * ab.y - ap.y * ab.x;
+    if (cross * cross > eps * eps * ab_len_sq) {
+        return false;
+    }
+
+    double dot = geom_vec2_dot(ap, ab);
+    if (dot < -eps || dot > ab_len_sq + eps) {
+        return false;
+    }
+
+    return true;
+}
+
+static void dcel_update_crossing(
+    GeomVec2 a,
+    GeomVec2 b,
+    double sample_x,
+    double sample_y,
+    int* winding,
+    int* parity,
+    bool* on_boundary
+) {
+    RELEASE_ASSERT(winding);
+    RELEASE_ASSERT(parity);
+    RELEASE_ASSERT(on_boundary);
+
+    if (*on_boundary) {
+        return;
+    }
+    if (dcel_sample_on_segment(a, b, sample_x, sample_y)) {
+        *on_boundary = true;
+        return;
+    }
+
+    bool crosses_up = a.y <= sample_y && b.y > sample_y;
+    bool crosses_down = a.y > sample_y && b.y <= sample_y;
+    if (!crosses_up && !crosses_down) {
+        return;
+    }
+
+    double y_delta = b.y - a.y;
+    if (fabs(y_delta) < 1e-18) {
+        return;
+    }
+
+    double t = (sample_y - a.y) / y_delta;
+    double x_intersection = a.x + t * (b.x - a.x);
+    if (x_intersection <= sample_x) {
+        return;
+    }
+
+    *parity ^= 1;
+    *winding += crosses_up ? 1 : -1;
+}
+
+bool dcel_path_contains_point(
+    const PathBuilder* path,
+    DcelFillRule fill_rule,
+    double x,
+    double y
+) {
+    RELEASE_ASSERT(path);
+
+    int winding = 0;
+    int parity = 0;
+    bool on_boundary = false;
+
+    for (size_t contour_idx = 0;
+         contour_idx < path_contour_vec_len(path->contours);
+         contour_idx++) {
+        PathContour* contour = NULL;
+        RELEASE_ASSERT(
+            path_contour_vec_get(path->contours, contour_idx, &contour)
+        );
+
+        if (path_contour_len(contour) < 2) {
+            continue;
+        }
+
+        PathContourSegment first;
+        RELEASE_ASSERT(path_contour_get(contour, 0, &first));
+        RELEASE_ASSERT(
+            first.type == PATH_CONTOUR_SEGMENT_TYPE_START,
+            "Path contour must start with START segment"
+        );
+
+        GeomVec2 start = first.value.start;
+        GeomVec2 current = start;
+        bool has_line = false;
+
+        for (size_t segment_idx = 1; segment_idx < path_contour_len(contour);
+             segment_idx++) {
+            PathContourSegment segment;
+            RELEASE_ASSERT(path_contour_get(contour, segment_idx, &segment));
+
+            switch (segment.type) {
+                case PATH_CONTOUR_SEGMENT_TYPE_START: {
+                    start = segment.value.start;
+                    current = segment.value.start;
+                    has_line = false;
+                    break;
+                }
+                case PATH_CONTOUR_SEGMENT_TYPE_LINE: {
+                    dcel_update_crossing(
+                        current,
+                        segment.value.line,
+                        x,
+                        y,
+                        &winding,
+                        &parity,
+                        &on_boundary
+                    );
+                    current = segment.value.line;
+                    has_line = true;
+                    break;
+                }
+                case PATH_CONTOUR_SEGMENT_TYPE_QUAD_BEZIER: {
+                    RELEASE_ASSERT(
+                        false,
+                        "DCEL point test requires flattened path segments"
+                    );
+                    break;
+                }
+                case PATH_CONTOUR_SEGMENT_TYPE_CUBIC_BEZIER: {
+                    RELEASE_ASSERT(
+                        false,
+                        "DCEL point test requires flattened path segments"
+                    );
+                    break;
+                }
+            }
+
+            if (on_boundary) {
+                break;
+            }
+        }
+
+        if (!on_boundary && has_line
+            && !geom_vec2_equal_eps(current, start, 1e-9)) {
+            dcel_update_crossing(
+                current,
+                start,
+                x,
+                y,
+                &winding,
+                &parity,
+                &on_boundary
+            );
+        }
+
+        if (on_boundary) {
+            break;
+        }
+    }
+
+    return on_boundary || (fill_rule == DCEL_FILL_RULE_EVEN_ODD ? parity != 0
+                                                                 : winding != 0);
+}
+
+void dcel_rasterize_path_mask(
+    Arena* arena,
+    const PathBuilder* path,
+    DcelFillRule fill_rule,
+    uint32_t width,
+    uint32_t height,
+    double coordinate_scale,
+    uint8_t* out_mask,
+    DcelMaskBounds* out_bounds
+) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(path);
+    RELEASE_ASSERT(out_mask);
+    RELEASE_ASSERT(coordinate_scale > 1e-6);
+
+    if (out_bounds) {
+        *out_bounds = (DcelMaskBounds) {.is_empty = true,
+                                        .min_x = 0,
+                                        .min_y = 0,
+                                        .max_x = 0,
+                                        .max_y = 0};
+    }
+
+    if (width == 0 || height == 0) {
+        return;
+    }
+
+    size_t pixel_count = (size_t)width * (size_t)height;
+    memset(out_mask, 0, pixel_count);
+
+    bool has_points = false;
+    double min_x = 0.0;
+    double min_y = 0.0;
+    double max_x = 0.0;
+    double max_y = 0.0;
+
+    for (size_t contour_idx = 0;
+         contour_idx < path_contour_vec_len(path->contours);
+         contour_idx++) {
+        PathContour* contour = NULL;
+        RELEASE_ASSERT(
+            path_contour_vec_get(path->contours, contour_idx, &contour)
+        );
+
+        for (size_t segment_idx = 0; segment_idx < path_contour_len(contour);
+             segment_idx++) {
+            PathContourSegment segment;
+            RELEASE_ASSERT(path_contour_get(contour, segment_idx, &segment));
+
+            GeomVec2 point;
+            switch (segment.type) {
+                case PATH_CONTOUR_SEGMENT_TYPE_START: {
+                    point = segment.value.start;
+                    break;
+                }
+                case PATH_CONTOUR_SEGMENT_TYPE_LINE: {
+                    point = segment.value.line;
+                    break;
+                }
+                case PATH_CONTOUR_SEGMENT_TYPE_QUAD_BEZIER: {
+                    RELEASE_ASSERT(
+                        false,
+                        "DCEL rasterization requires flattened path segments"
+                    );
+                    continue;
+                }
+                case PATH_CONTOUR_SEGMENT_TYPE_CUBIC_BEZIER: {
+                    RELEASE_ASSERT(
+                        false,
+                        "DCEL rasterization requires flattened path segments"
+                    );
+                    continue;
+                }
+            }
+
+            if (!has_points) {
+                min_x = point.x;
+                min_y = point.y;
+                max_x = point.x;
+                max_y = point.y;
+                has_points = true;
+                continue;
+            }
+
+            if (point.x < min_x) {
+                min_x = point.x;
+            }
+            if (point.y < min_y) {
+                min_y = point.y;
+            }
+            if (point.x > max_x) {
+                max_x = point.x;
+            }
+            if (point.y > max_y) {
+                max_y = point.y;
+            }
+        }
+    }
+
+    if (!has_points) {
+        return;
+    }
+
+    int64_t start_x = (int64_t)floor(min_x * coordinate_scale) - 1;
+    int64_t start_y = (int64_t)floor(min_y * coordinate_scale) - 1;
+    int64_t end_x = (int64_t)ceil(max_x * coordinate_scale);
+    int64_t end_y = (int64_t)ceil(max_y * coordinate_scale);
+
+    if (start_x < 0) {
+        start_x = 0;
+    }
+    if (start_y < 0) {
+        start_y = 0;
+    }
+    if (end_x >= (int64_t)width) {
+        end_x = (int64_t)width - 1;
+    }
+    if (end_y >= (int64_t)height) {
+        end_y = (int64_t)height - 1;
+    }
+
+    if (start_x > end_x || start_y > end_y) {
+        return;
+    }
+
+    uint32_t min_px = (uint32_t)start_x;
+    uint32_t min_py = (uint32_t)start_y;
+    uint32_t max_px = (uint32_t)end_x;
+    uint32_t max_py = (uint32_t)end_y;
+
+    for (uint32_t py = min_py;; py++) {
+        double sample_y = ((double)py + 0.5) / coordinate_scale;
+
+        for (uint32_t px = min_px;; px++) {
+            double sample_x = ((double)px + 0.5) / coordinate_scale;
+            if (dcel_path_contains_point(path, fill_rule, sample_x, sample_y)) {
+                size_t idx = (size_t)py * (size_t)width + (size_t)px;
+                out_mask[idx] = 1;
+            }
+
+            if (px == max_px) {
+                break;
+            }
+        }
+
+        if (py == max_py) {
+            break;
+        }
+    }
+
+    if (out_bounds) {
+        *out_bounds = (DcelMaskBounds) {.is_empty = false,
+                                        .min_x = min_px,
+                                        .min_y = min_py,
+                                        .max_x = max_px,
+                                        .max_y = max_py};
+    }
 }
 
 static uint32_t hash32(uint32_t x) {

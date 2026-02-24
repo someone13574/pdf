@@ -1,7 +1,12 @@
 #pragma once
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #include "arena/arena.h"
-#include "raster_canvas.h"
+
+typedef struct RasterCanvas RasterCanvas;
+typedef struct PathBuilder PathBuilder;
 
 typedef struct DcelVertex DcelVertex;
 typedef struct DcelHalfEdge DcelHalfEdge;
@@ -60,6 +65,16 @@ typedef struct {
     DcelFace* outer_face;
 } Dcel;
 
+typedef enum { DCEL_FILL_RULE_NONZERO, DCEL_FILL_RULE_EVEN_ODD } DcelFillRule;
+
+typedef struct {
+    bool is_empty;
+    uint32_t min_x;
+    uint32_t min_y;
+    uint32_t max_x;
+    uint32_t max_y;
+} DcelMaskBounds;
+
 Dcel* dcel_new(Arena* arena);
 
 DcelVertex* dcel_add_vertex(Dcel* dcel, double x, double y);
@@ -80,3 +95,21 @@ void dcel_assign_faces(Dcel* dcel);
 void dcel_partition(Dcel* dcel);
 
 void dcel_render(const Dcel* dcel, RasterCanvas* canvas);
+
+bool dcel_path_contains_point(
+    const PathBuilder* path,
+    DcelFillRule fill_rule,
+    double x,
+    double y
+);
+
+void dcel_rasterize_path_mask(
+    Arena* arena,
+    const PathBuilder* path,
+    DcelFillRule fill_rule,
+    uint32_t width,
+    uint32_t height,
+    double coordinate_scale,
+    uint8_t* out_mask,
+    DcelMaskBounds* out_bounds
+);

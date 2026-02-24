@@ -8,19 +8,34 @@
 
 #include "arena/arena.h"
 #include "canvas/canvas.h"
+#include "dcel.h"
 #include "logger/log.h"
 #include "path_builder.h"
 
 #define BMP_HEADER_LEN 14
 #define BMP_INFO_HEADER_LEN 40
 
+typedef struct {
+    const PathBuilder* path;
+    DcelFillRule fill_rule;
+} ClipPathEntry;
+
+#define DVEC_NAME ClipPathVec
+#define DVEC_LOWERCASE_NAME clip_path_vec
+#define DVEC_TYPE ClipPathEntry
+#include "arena/dvec_impl.h"
+
 struct RasterCanvas {
+    Arena* arena;
+
     uint32_t width;
     uint32_t height;
     uint32_t file_size;
     uint8_t* data;
 
     double coordinate_scale;
+
+    ClipPathVec* clip_paths;
 };
 
 static void write_u16(uint8_t* target, uint16_t value) {
@@ -92,6 +107,7 @@ RasterCanvas* raster_canvas_new(
     );
 
     RasterCanvas* canvas = arena_alloc(arena, sizeof(RasterCanvas));
+    canvas->arena = arena;
     canvas->width = width;
     canvas->height = height;
     canvas->file_size = file_size;
@@ -99,6 +115,7 @@ RasterCanvas* raster_canvas_new(
     memset(canvas->data, 0, file_size);
 
     canvas->coordinate_scale = coordinate_scale;
+    canvas->clip_paths = clip_path_vec_new(arena);
 
     write_bmp_header(canvas->data, file_size);
     write_bmp_info_header(canvas->data + BMP_HEADER_LEN, width, height);
@@ -132,6 +149,35 @@ uint32_t raster_canvas_height(const RasterCanvas* canvas) {
     return canvas->height;
 }
 
+static bool raster_canvas_pixel_visible(
+    const RasterCanvas* canvas,
+    uint32_t x,
+    uint32_t y
+) {
+    RELEASE_ASSERT(canvas);
+
+    if (clip_path_vec_len(canvas->clip_paths) == 0) {
+        return true;
+    }
+
+    double sample_x = ((double)x + 0.5) / canvas->coordinate_scale;
+    double sample_y = ((double)y + 0.5) / canvas->coordinate_scale;
+    for (size_t idx = 0; idx < clip_path_vec_len(canvas->clip_paths); idx++) {
+        ClipPathEntry clip_path;
+        RELEASE_ASSERT(clip_path_vec_get(canvas->clip_paths, idx, &clip_path));
+        if (!dcel_path_contains_point(
+                clip_path.path,
+                clip_path.fill_rule,
+                sample_x,
+                sample_y
+            )) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 Rgba raster_canvas_get_rgba(
     const RasterCanvas* canvas,
     uint32_t x,
@@ -161,6 +207,9 @@ void raster_canvas_set_rgba(
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(x < canvas->width);
     RELEASE_ASSERT(y < canvas->height);
+    if (!raster_canvas_pixel_visible(canvas, x, y)) {
+        return;
+    }
 
     uint32_t packed_rgba = rgba_pack(rgba);
 
@@ -397,14 +446,44 @@ void raster_canvas_draw_path(
     RELEASE_ASSERT(path);
 
     if (brush.enable_fill) {
-        static bool warned_fill_unimplemented = false;
-        if (!warned_fill_unimplemented) {
-            LOG_WARN(
-                CANVAS,
-                "Raster path fill is not implemented yet; ignoring fill"
-            );
-            warned_fill_unimplemented = true;
+        Arena* local_arena = arena_new(4096);
+        size_t pixel_count = (size_t)canvas->width * (size_t)canvas->height;
+        uint8_t* mask = arena_alloc(local_arena, pixel_count * sizeof(uint8_t));
+        DcelMaskBounds bounds;
+
+        dcel_rasterize_path_mask(
+            local_arena,
+            path,
+            DCEL_FILL_RULE_NONZERO,
+            canvas->width,
+            canvas->height,
+            canvas->coordinate_scale,
+            mask,
+            &bounds
+        );
+
+        if (!bounds.is_empty) {
+            for (uint32_t y = bounds.min_y;; y++) {
+                for (uint32_t x = bounds.min_x;; x++) {
+                    size_t idx = (size_t)y * (size_t)canvas->width + (size_t)x;
+                    if (mask[idx] != 0) {
+                        Rgba dst = raster_canvas_get_rgba(canvas, x, y);
+                        Rgba out = rgba_blend_src_over(dst, brush.fill_rgba);
+                        raster_canvas_set_rgba(canvas, x, y, out);
+                    }
+
+                    if (x == bounds.max_x) {
+                        break;
+                    }
+                }
+
+                if (y == bounds.max_y) {
+                    break;
+                }
+            }
         }
+
+        arena_free(local_arena);
     }
 
     if (!brush.enable_stroke || brush.stroke_width <= 0.0) {
@@ -482,18 +561,27 @@ void raster_canvas_push_clip_path(
     const PathBuilder* path,
     bool even_odd_rule
 ) {
-    (void)canvas;
-    (void)path;
-    (void)even_odd_rule;
+    RELEASE_ASSERT(canvas);
+    RELEASE_ASSERT(path);
 
-    LOG_TODO();
+    clip_path_vec_push(
+        canvas->clip_paths,
+        (ClipPathEntry) {
+            .path = path,
+            .fill_rule =
+                even_odd_rule ? DCEL_FILL_RULE_EVEN_ODD : DCEL_FILL_RULE_NONZERO
+        }
+    );
 }
 
 void raster_canvas_pop_clip_paths(RasterCanvas* canvas, size_t count) {
-    (void)canvas;
-    (void)count;
+    RELEASE_ASSERT(canvas);
+    RELEASE_ASSERT(count <= clip_path_vec_len(canvas->clip_paths));
 
-    LOG_TODO();
+    for (size_t idx = 0; idx < count; idx++) {
+        ClipPathEntry removed_path;
+        RELEASE_ASSERT(clip_path_vec_pop(canvas->clip_paths, &removed_path));
+    }
 }
 
 void raster_canvas_draw_pixel(

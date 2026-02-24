@@ -99,15 +99,41 @@ static void path_builder_append_line(PathBuilder* builder, GeomVec2 point) {
     );
 }
 
+static double path_point_distance_sq_to_segment(
+    GeomVec2 point,
+    GeomVec2 start,
+    GeomVec2 end
+) {
+    GeomVec2 segment = geom_vec2_sub(end, start);
+    double segment_len_sq = geom_vec2_len_sq(segment);
+    if (segment_len_sq <= 1e-18) {
+        return geom_vec2_len_sq(geom_vec2_sub(point, start));
+    }
+
+    double t = geom_vec2_dot(geom_vec2_sub(point, start), segment)
+             / segment_len_sq;
+    if (t < 0.0) {
+        t = 0.0;
+    } else if (t > 1.0) {
+        t = 1.0;
+    }
+
+    GeomVec2 closest = geom_vec2_lerp(start, end, t);
+    return geom_vec2_len_sq(geom_vec2_sub(point, closest));
+}
+
 static bool path_quad_is_flat_enough(
     GeomVec2 start,
     GeomVec2 control,
     GeomVec2 end,
     double flatness
 ) {
-    GeomVec2 mid = geom_vec2_lerp(start, end, 0.5);
-    GeomVec2 delta = geom_vec2_sub(control, mid);
-    return geom_vec2_len_sq(delta) <= flatness * flatness;
+    // For a quadratic Bezier, the control-point weight peaks at 0.5.
+    // If control-to-segment distance <= 2 * tolerance, the entire curve
+    // is guaranteed within tolerance of the chord segment.
+    double control_dist_sq = path_point_distance_sq_to_segment(control, start, end);
+    double max_control_dist = flatness * 2.0;
+    return control_dist_sq <= max_control_dist * max_control_dist;
 }
 
 static void path_builder_append_flattened_quad_recursive(
@@ -119,13 +145,17 @@ static void path_builder_append_flattened_quad_recursive(
 ) {
     RELEASE_ASSERT(builder);
 
-    if (depth >= builder->options.quad_max_depth
-        || path_quad_is_flat_enough(
-            start,
-            control,
-            end,
-            builder->options.quad_flatness
-        )) {
+    bool flat_enough = path_quad_is_flat_enough(
+        start,
+        control,
+        end,
+        builder->options.quad_flatness
+    );
+    if (flat_enough) {
+        path_builder_append_line(builder, end);
+        return;
+    }
+    if (depth >= builder->options.quad_max_depth) {
         path_builder_append_line(builder, end);
         return;
     }
@@ -157,27 +187,22 @@ static bool path_cubic_is_flat_enough(
     GeomVec2 end,
     double flatness
 ) {
-    GeomVec2 line = geom_vec2_sub(end, start);
-    double line_len_sq = geom_vec2_len_sq(line);
-
-    GeomVec2 d1;
-    GeomVec2 d2;
-    if (line_len_sq <= 1e-18) {
-        d1 = geom_vec2_sub(control_a, start);
-        d2 = geom_vec2_sub(control_b, start);
-    } else {
-        double t1 = geom_vec2_dot(geom_vec2_sub(control_a, start), line) / line_len_sq;
-        double t2 = geom_vec2_dot(geom_vec2_sub(control_b, start), line) / line_len_sq;
-
-        GeomVec2 proj1 = geom_vec2_add(start, geom_vec2_scale(line, t1));
-        GeomVec2 proj2 = geom_vec2_add(start, geom_vec2_scale(line, t2));
-
-        d1 = geom_vec2_sub(control_a, proj1);
-        d2 = geom_vec2_sub(control_b, proj2);
-    }
-
-    return fmax(geom_vec2_len_sq(d1), geom_vec2_len_sq(d2))
-        <= flatness * flatness;
+    // Distance-to-segment is convex, and cubic control weights sum to <= 3/4.
+    // So max(control distance) <= (4/3) * tolerance implies curve distance
+    // to the chord segment <= tolerance.
+    double control_a_dist_sq = path_point_distance_sq_to_segment(
+        control_a,
+        start,
+        end
+    );
+    double control_b_dist_sq = path_point_distance_sq_to_segment(
+        control_b,
+        start,
+        end
+    );
+    double max_control_dist_sq = fmax(control_a_dist_sq, control_b_dist_sq);
+    double max_control_dist = flatness * (4.0 / 3.0);
+    return max_control_dist_sq <= max_control_dist * max_control_dist;
 }
 
 static void path_builder_append_flattened_cubic_recursive(
@@ -190,14 +215,18 @@ static void path_builder_append_flattened_cubic_recursive(
 ) {
     RELEASE_ASSERT(builder);
 
-    if (depth >= builder->options.cubic_max_depth
-        || path_cubic_is_flat_enough(
-            start,
-            control_a,
-            control_b,
-            end,
-            builder->options.cubic_flatness
-        )) {
+    bool flat_enough = path_cubic_is_flat_enough(
+        start,
+        control_a,
+        control_b,
+        end,
+        builder->options.cubic_flatness
+    );
+    if (flat_enough) {
+        path_builder_append_line(builder, end);
+        return;
+    }
+    if (depth >= builder->options.cubic_max_depth) {
         path_builder_append_line(builder, end);
         return;
     }
@@ -472,6 +501,65 @@ static PathContour* path_builder_test_first_contour(PathBuilder* builder) {
     return contour;
 }
 
+static GeomVec2 path_builder_test_eval_quad(
+    GeomVec2 start,
+    GeomVec2 control,
+    GeomVec2 end,
+    double t
+) {
+    double u = 1.0 - t;
+    GeomVec2 a = geom_vec2_scale(start, u * u);
+    GeomVec2 b = geom_vec2_scale(control, 2.0 * u * t);
+    GeomVec2 c = geom_vec2_scale(end, t * t);
+    return geom_vec2_add(geom_vec2_add(a, b), c);
+}
+
+static GeomVec2 path_builder_test_eval_cubic(
+    GeomVec2 start,
+    GeomVec2 control_a,
+    GeomVec2 control_b,
+    GeomVec2 end,
+    double t
+) {
+    double u = 1.0 - t;
+    GeomVec2 a = geom_vec2_scale(start, u * u * u);
+    GeomVec2 b = geom_vec2_scale(control_a, 3.0 * u * u * t);
+    GeomVec2 c = geom_vec2_scale(control_b, 3.0 * u * t * t);
+    GeomVec2 d = geom_vec2_scale(end, t * t * t);
+    return geom_vec2_add(geom_vec2_add(a, b), geom_vec2_add(c, d));
+}
+
+static double path_builder_test_min_distance_sq_to_polyline(
+    const PathContour* contour,
+    GeomVec2 point
+) {
+    RELEASE_ASSERT(contour);
+
+    PathContourSegment start_segment;
+    RELEASE_ASSERT(path_contour_get(contour, 0, &start_segment));
+    RELEASE_ASSERT(start_segment.type == PATH_CONTOUR_SEGMENT_TYPE_START);
+    GeomVec2 prev = start_segment.value.start;
+
+    bool has_line = false;
+    double min_distance_sq = HUGE_VAL;
+    for (size_t idx = 1; idx < path_contour_len(contour); idx++) {
+        PathContourSegment segment;
+        RELEASE_ASSERT(path_contour_get(contour, idx, &segment));
+        RELEASE_ASSERT(segment.type == PATH_CONTOUR_SEGMENT_TYPE_LINE);
+
+        double distance_sq =
+            path_point_distance_sq_to_segment(point, prev, segment.value.line);
+        if (distance_sq < min_distance_sq) {
+            min_distance_sq = distance_sq;
+        }
+        prev = segment.value.line;
+        has_line = true;
+    }
+
+    RELEASE_ASSERT(has_line);
+    return min_distance_sq;
+}
+
 TEST_FUNC(test_path_builder_options_flatten_disabled_keeps_quad) {
     Arena* arena = arena_new(1024);
 
@@ -585,6 +673,224 @@ TEST_FUNC(test_path_builder_options_flatten_enabled_flattens_quad) {
     return TEST_RESULT_PASS;
 }
 
+TEST_FUNC(test_path_builder_options_flatten_enabled_quad_within_tolerance) {
+    Arena* arena = arena_new(4096);
+
+    PathBuilderOptions options = path_builder_options_flattened();
+    options.quad_flatness = 0.005;
+    options.quad_max_depth = 24;
+
+    GeomVec2 start = geom_vec2_new(0.0, 0.0);
+    GeomVec2 control = geom_vec2_new(0.2, 1.3);
+    GeomVec2 end = geom_vec2_new(1.0, -0.2);
+
+    PathBuilder* path = path_builder_new_with_options(arena, options);
+    path_builder_new_contour(path, start);
+    path_builder_quad_bezier_to(path, end, control);
+
+    PathContour* contour = path_builder_test_first_contour(path);
+    TEST_ASSERT((unsigned long)path_contour_len(contour) > 2UL);
+
+    const size_t sample_count = 10000; // dt = 1e-4
+    double tolerance = options.quad_flatness + 1e-6;
+    double tolerance_sq = tolerance * tolerance;
+    for (size_t sample_idx = 0; sample_idx <= sample_count; sample_idx++) {
+        double t = (double)sample_idx / (double)sample_count;
+        GeomVec2 sample = path_builder_test_eval_quad(start, control, end, t);
+        double min_distance_sq =
+            path_builder_test_min_distance_sq_to_polyline(contour, sample);
+        TEST_ASSERT(min_distance_sq <= tolerance_sq);
+    }
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_path_builder_options_flatten_enabled_quad_tolerance_boundary) {
+    Arena* arena = arena_new(1024);
+
+    PathBuilderOptions options = path_builder_options_flattened();
+    options.quad_flatness = 0.05;
+    options.quad_max_depth = 16;
+
+    PathBuilder* path = path_builder_new_with_options(arena, options);
+    path_builder_new_contour(path, geom_vec2_new(0.0, 0.0));
+    // Control point is 0.1 above the chord; quadratic max deviation is half.
+    path_builder_quad_bezier_to(
+        path,
+        geom_vec2_new(1.0, 0.0),
+        geom_vec2_new(0.5, 0.1)
+    );
+
+    PathContour* contour = path_builder_test_first_contour(path);
+    TEST_ASSERT_EQ((unsigned long)path_contour_len(contour), 2UL);
+
+    PathContourSegment segment;
+    RELEASE_ASSERT(path_contour_get(contour, 1, &segment));
+    TEST_ASSERT_EQ((int)segment.type, (int)PATH_CONTOUR_SEGMENT_TYPE_LINE);
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_path_builder_options_flatten_enabled_cubic_within_tolerance) {
+    Arena* arena = arena_new(4096);
+
+    PathBuilderOptions options = path_builder_options_flattened();
+    options.cubic_flatness = 0.005;
+    options.cubic_max_depth = 24;
+
+    GeomVec2 start = geom_vec2_new(0.0, 0.0);
+    GeomVec2 control_a = geom_vec2_new(0.25, 1.6);
+    GeomVec2 control_b = geom_vec2_new(0.75, -1.2);
+    GeomVec2 end = geom_vec2_new(1.0, 0.2);
+
+    PathBuilder* path = path_builder_new_with_options(arena, options);
+    path_builder_new_contour(path, start);
+    path_builder_cubic_bezier_to(path, end, control_a, control_b);
+
+    PathContour* contour = path_builder_test_first_contour(path);
+    TEST_ASSERT((unsigned long)path_contour_len(contour) > 2UL);
+
+    const size_t sample_count = 10000; // dt = 1e-4
+    double tolerance = options.cubic_flatness + 1e-6;
+    double tolerance_sq = tolerance * tolerance;
+    for (size_t sample_idx = 0; sample_idx <= sample_count; sample_idx++) {
+        double t = (double)sample_idx / (double)sample_count;
+        GeomVec2 sample = path_builder_test_eval_cubic(
+            start,
+            control_a,
+            control_b,
+            end,
+            t
+        );
+        double min_distance_sq =
+            path_builder_test_min_distance_sq_to_polyline(contour, sample);
+        TEST_ASSERT(min_distance_sq <= tolerance_sq);
+    }
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_path_builder_options_flatten_enabled_quad_within_tolerance_stress) {
+    Arena* arena = arena_new(8192);
+
+    PathBuilderOptions options = path_builder_options_flattened();
+    options.quad_flatness = 0.2;
+    options.quad_max_depth = 24;
+
+    struct {
+        GeomVec2 start;
+        GeomVec2 control;
+        GeomVec2 end;
+    } cases[] = {
+        {.start = geom_vec2_new(0.0, 0.0),
+         .control = geom_vec2_new(0.5, 1.0),
+         .end = geom_vec2_new(1.0, 0.0)},
+        {.start = geom_vec2_new(-2.0, 0.0),
+         .control = geom_vec2_new(4.0, 8.0),
+         .end = geom_vec2_new(6.0, -1.0)},
+        {.start = geom_vec2_new(0.0, 0.0),
+         .control = geom_vec2_new(3.5, 18.0),
+         .end = geom_vec2_new(9.0, 0.0)},
+    };
+
+    const size_t sample_count = 20000;
+    double tolerance = options.quad_flatness + 1e-6;
+    double tolerance_sq = tolerance * tolerance;
+
+    for (size_t case_idx = 0; case_idx < sizeof(cases) / sizeof(cases[0]);
+         case_idx++) {
+        PathBuilder* path = path_builder_new_with_options(arena, options);
+        path_builder_new_contour(path, cases[case_idx].start);
+        path_builder_quad_bezier_to(
+            path,
+            cases[case_idx].end,
+            cases[case_idx].control
+        );
+
+        PathContour* contour = path_builder_test_first_contour(path);
+        for (size_t sample_idx = 0; sample_idx <= sample_count; sample_idx++) {
+            double t = (double)sample_idx / (double)sample_count;
+            GeomVec2 sample = path_builder_test_eval_quad(
+                cases[case_idx].start,
+                cases[case_idx].control,
+                cases[case_idx].end,
+                t
+            );
+            double min_distance_sq =
+                path_builder_test_min_distance_sq_to_polyline(contour, sample);
+            TEST_ASSERT(min_distance_sq <= tolerance_sq);
+        }
+    }
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_path_builder_options_flatten_enabled_cubic_within_tolerance_stress) {
+    Arena* arena = arena_new(8192);
+
+    PathBuilderOptions options = path_builder_options_flattened();
+    options.cubic_flatness = 0.2;
+    options.cubic_max_depth = 24;
+
+    struct {
+        GeomVec2 start;
+        GeomVec2 control_a;
+        GeomVec2 control_b;
+        GeomVec2 end;
+    } cases[] = {
+        {.start = geom_vec2_new(0.0, 0.0),
+         .control_a = geom_vec2_new(0.25, 1.6),
+         .control_b = geom_vec2_new(0.75, -1.2),
+         .end = geom_vec2_new(1.0, 0.2)},
+        {.start = geom_vec2_new(0.0, 0.0),
+         .control_a = geom_vec2_new(3.0, 0.0),
+         .control_b = geom_vec2_new(-2.0, 0.0),
+         .end = geom_vec2_new(1.0, 0.0)},
+        {.start = geom_vec2_new(-4.0, -1.0),
+         .control_a = geom_vec2_new(2.0, 16.0),
+         .control_b = geom_vec2_new(9.0, -12.0),
+         .end = geom_vec2_new(12.0, 0.0)},
+    };
+
+    const size_t sample_count = 20000;
+    double tolerance = options.cubic_flatness + 1e-6;
+    double tolerance_sq = tolerance * tolerance;
+
+    for (size_t case_idx = 0; case_idx < sizeof(cases) / sizeof(cases[0]);
+         case_idx++) {
+        PathBuilder* path = path_builder_new_with_options(arena, options);
+        path_builder_new_contour(path, cases[case_idx].start);
+        path_builder_cubic_bezier_to(
+            path,
+            cases[case_idx].end,
+            cases[case_idx].control_a,
+            cases[case_idx].control_b
+        );
+
+        PathContour* contour = path_builder_test_first_contour(path);
+        for (size_t sample_idx = 0; sample_idx <= sample_count; sample_idx++) {
+            double t = (double)sample_idx / (double)sample_count;
+            GeomVec2 sample = path_builder_test_eval_cubic(
+                cases[case_idx].start,
+                cases[case_idx].control_a,
+                cases[case_idx].control_b,
+                cases[case_idx].end,
+                t
+            );
+            double min_distance_sq =
+                path_builder_test_min_distance_sq_to_polyline(contour, sample);
+            TEST_ASSERT(min_distance_sq <= tolerance_sq);
+        }
+    }
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
 TEST_FUNC(test_path_builder_options_flatten_enabled_quad_depth_cap) {
     Arena* arena = arena_new(1024);
 
@@ -606,6 +912,37 @@ TEST_FUNC(test_path_builder_options_flatten_enabled_quad_depth_cap) {
     PathContourSegment segment;
     RELEASE_ASSERT(path_contour_get(contour, 1, &segment));
     TEST_ASSERT_EQ((int)segment.type, (int)PATH_CONTOUR_SEGMENT_TYPE_LINE);
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_path_builder_options_flatten_enabled_cubic_collinear_overshoot) {
+    Arena* arena = arena_new(1024);
+
+    PathBuilderOptions options = path_builder_options_flattened();
+    options.cubic_flatness = 0.01;
+    options.cubic_max_depth = 16;
+
+    PathBuilder* path = path_builder_new_with_options(arena, options);
+    path_builder_new_contour(path, geom_vec2_new(0.0, 0.0));
+    // Collinear controls outside the endpoint segment should not collapse to
+    // a single line segment between start/end.
+    path_builder_cubic_bezier_to(
+        path,
+        geom_vec2_new(1.0, 0.0),
+        geom_vec2_new(3.0, 0.0),
+        geom_vec2_new(-2.0, 0.0)
+    );
+
+    PathContour* contour = path_builder_test_first_contour(path);
+    TEST_ASSERT((unsigned long)path_contour_len(contour) > 2UL);
+
+    for (size_t idx = 1; idx < path_contour_len(contour); idx++) {
+        PathContourSegment segment;
+        RELEASE_ASSERT(path_contour_get(contour, idx, &segment));
+        TEST_ASSERT_EQ((int)segment.type, (int)PATH_CONTOUR_SEGMENT_TYPE_LINE);
+    }
 
     arena_free(arena);
     return TEST_RESULT_PASS;
