@@ -304,14 +304,24 @@ void path_builder_close_contour(PathBuilder* builder) {
         return;
     }
 
-    PathContourSegment segment;
-    RELEASE_ASSERT(path_contour_get(contour, contour_len - 1, &segment));
+    PathContourSegment first_segment;
+    RELEASE_ASSERT(path_contour_get(contour, 0, &first_segment));
+    RELEASE_ASSERT(first_segment.type == PATH_CONTOUR_SEGMENT_TYPE_START);
+    GeomVec2 start = first_segment.value.start;
+
+    PathContourSegment last_segment;
+    RELEASE_ASSERT(path_contour_get(contour, contour_len - 1, &last_segment));
+    GeomVec2 end = path_contour_segment_end(last_segment);
+
+    if (!geom_vec2_equal_eps(start, end, 1e-9)) {
+        path_builder_append_line(builder, start);
+    }
 
     PathContour* new_contour = path_contour_new(builder->arena);
     path_contour_push(
         new_contour,
         (PathContourSegment) {.type = PATH_CONTOUR_SEGMENT_TYPE_START,
-                              .value.start = path_contour_segment_end(segment)}
+                              .value.start = start}
     );
 
     path_contour_vec_push(builder->contours, new_contour);
@@ -483,6 +493,65 @@ TEST_FUNC(test_path_builder_options_flatten_disabled_keeps_quad) {
         (int)segment.type,
         (int)PATH_CONTOUR_SEGMENT_TYPE_QUAD_BEZIER
     );
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_path_builder_close_contour_adds_closing_line) {
+    Arena* arena = arena_new(1024);
+
+    PathBuilder* path = path_builder_new(arena);
+    path_builder_new_contour(path, geom_vec2_new(0.0, 0.0));
+    path_builder_line_to(path, geom_vec2_new(1.0, 0.0));
+    path_builder_line_to(path, geom_vec2_new(1.0, 1.0));
+    path_builder_close_contour(path);
+
+    TEST_ASSERT_EQ((unsigned long)path_contour_vec_len(path->contours), 2UL);
+
+    PathContour* first = NULL;
+    RELEASE_ASSERT(path_contour_vec_get(path->contours, 0, &first));
+    TEST_ASSERT_EQ((unsigned long)path_contour_len(first), 4UL);
+
+    PathContourSegment closing_segment;
+    RELEASE_ASSERT(path_contour_get(first, 3, &closing_segment));
+    TEST_ASSERT_EQ((int)closing_segment.type, (int)PATH_CONTOUR_SEGMENT_TYPE_LINE);
+    TEST_ASSERT(geom_vec2_equal_eps(
+        closing_segment.value.line,
+        geom_vec2_new(0.0, 0.0),
+        1e-9
+    ));
+
+    TEST_ASSERT(geom_vec2_equal_eps(
+        path_builder_position(path),
+        geom_vec2_new(0.0, 0.0),
+        1e-9
+    ));
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_path_builder_close_contour_keeps_existing_closure) {
+    Arena* arena = arena_new(1024);
+
+    PathBuilder* path = path_builder_new(arena);
+    path_builder_new_contour(path, geom_vec2_new(0.0, 0.0));
+    path_builder_line_to(path, geom_vec2_new(1.0, 0.0));
+    path_builder_line_to(path, geom_vec2_new(0.0, 0.0));
+    path_builder_close_contour(path);
+
+    TEST_ASSERT_EQ((unsigned long)path_contour_vec_len(path->contours), 2UL);
+
+    PathContour* first = NULL;
+    RELEASE_ASSERT(path_contour_vec_get(path->contours, 0, &first));
+    TEST_ASSERT_EQ((unsigned long)path_contour_len(first), 3UL);
+
+    TEST_ASSERT(geom_vec2_equal_eps(
+        path_builder_position(path),
+        geom_vec2_new(0.0, 0.0),
+        1e-9
+    ));
 
     arena_free(arena);
     return TEST_RESULT_PASS;
