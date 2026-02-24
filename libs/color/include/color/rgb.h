@@ -29,4 +29,5 @@ GeomVec3 rgb_to_geom(Rgb rgb);
 uint32_t rgba_pack(Rgba rgba);
 Rgba rgba_unpack(uint32_t packed_rgba);
 
+Rgba rgba_blend_src_over(Rgba dst, Rgba src);
 Rgb srgb_to_non_linear(Rgb linear_srgb, Rgb whitepoint, Rgb blackpoint);

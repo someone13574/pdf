@@ -17,7 +17,9 @@ Rgb rgb_from_rgba(Rgba rgba) {
 }
 
 Rgba rgba_from_rgb(Rgb rgb, double alpha) {
-    return (Rgba) {.r = rgb.r, .g = rgb.g, .b = rgb.b, .a = alpha};
+    GeomVec3 clamped_rgb = geom_vec3_clamp(rgb_to_geom(rgb));
+    double clamped_alpha = alpha < 0.0 ? 0.0 : (alpha > 1.0 ? 1.0 : alpha);
+    return rgba_new(clamped_rgb.x, clamped_rgb.y, clamped_rgb.z, clamped_alpha);
 }
 
 Rgb rgb_from_geom(GeomVec3 vec) {
@@ -42,6 +44,36 @@ Rgba rgba_unpack(uint32_t packed_rgba) {
         (double)((packed_rgba >> 8) & 0xff) / 255.0,
         (double)(packed_rgba & 0xff) / 255.0
     );
+}
+
+Rgba rgba_blend_src_over(Rgba dst, Rgba src) {
+    if (src.a <= 0.0) {
+        return rgba_from_rgb(rgb_from_rgba(dst), dst.a);
+    }
+    if (src.a >= 1.0) {
+        return rgba_from_rgb(rgb_from_rgba(src), src.a);
+    }
+
+    double out_a = src.a + dst.a * (1.0 - src.a);
+    if (out_a <= 1e-12) {
+        return rgba_new(0.0, 0.0, 0.0, 0.0);
+    }
+
+    Rgb src_rgb = rgb_from_rgba(src);
+    Rgb dst_rgb = rgb_from_rgba(dst);
+
+    GeomVec3 src_rgb_vec = rgb_to_geom(src_rgb);
+    GeomVec3 dst_rgb_vec = rgb_to_geom(dst_rgb);
+
+    GeomVec3 src_premul = geom_vec3_mul(src_rgb_vec, geom_vec3_scalar(src.a));
+    GeomVec3 dst_premul =
+        geom_vec3_mul(dst_rgb_vec, geom_vec3_scalar(dst.a * (1.0 - src.a)));
+    GeomVec3 out_rgb = geom_vec3_div(
+        geom_vec3_add(src_premul, dst_premul),
+        geom_vec3_scalar(out_a)
+    );
+
+    return rgba_from_rgb(rgb_from_geom(out_rgb), out_a);
 }
 
 Rgb srgb_to_non_linear(Rgb linear_srgb, Rgb whitepoint, Rgb blackpoint) {

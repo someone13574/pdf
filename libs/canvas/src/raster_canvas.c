@@ -396,11 +396,19 @@ void raster_canvas_draw_pixel(
     GeomVec2 position,
     Rgba rgba
 ) {
-    (void)canvas;
-    (void)position;
-    (void)rgba;
+    RELEASE_ASSERT(canvas);
 
-    LOG_TODO();
+    int64_t x = (int64_t)floor(position.x * canvas->coordinate_scale);
+    int64_t y = (int64_t)floor(position.y * canvas->coordinate_scale);
+    if (x < 0 || y < 0 || x >= (int64_t)canvas->width
+        || y >= (int64_t)canvas->height) {
+        return;
+    }
+
+    uint32_t px = (uint32_t)x;
+    uint32_t py = (uint32_t)y;
+    Rgba dst = raster_canvas_get_rgba(canvas, px, py);
+    raster_canvas_set_rgba(canvas, px, py, rgba_blend_src_over(dst, rgba));
 }
 
 bool raster_canvas_write_file(RasterCanvas* canvas, const char* path) {
