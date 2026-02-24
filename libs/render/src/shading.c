@@ -472,12 +472,12 @@ void render_shading(
                     canvas_draw_pixel(
                         canvas,
                         canvas_point,
-                        rgba_pack(rgba_new(
+                        rgba_new(
                             clamp01(rgb.x),
                             clamp01(rgb.y),
                             clamp01(rgb.z),
                             1.0
-                        ))
+                        )
                     );
                 }
 

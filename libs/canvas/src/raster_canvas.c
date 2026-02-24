@@ -71,13 +71,14 @@ RasterCanvas* raster_canvas_new(
     Arena* arena,
     uint32_t width,
     uint32_t height,
-    uint32_t rgba,
+    Rgba rgba,
     double coordinate_scale
 ) {
     RELEASE_ASSERT(coordinate_scale > 1e-3);
 
     uint32_t file_size =
         BMP_HEADER_LEN + BMP_INFO_HEADER_LEN + width * height * 4;
+    uint32_t packed_rgba = rgba_pack(rgba);
 
     LOG_DIAG(
         INFO,
@@ -86,7 +87,7 @@ RasterCanvas* raster_canvas_new(
         width,
         height,
         file_size,
-        rgba
+        packed_rgba
     );
 
     RasterCanvas* canvas = arena_alloc(arena, sizeof(RasterCanvas));
@@ -101,10 +102,10 @@ RasterCanvas* raster_canvas_new(
     write_bmp_header(canvas->data, file_size);
     write_bmp_info_header(canvas->data + BMP_HEADER_LEN, width, height);
 
-    uint8_t r = (uint8_t)((rgba >> 24) & 0xff);
-    uint8_t g = (uint8_t)((rgba >> 16) & 0xff);
-    uint8_t b = (uint8_t)((rgba >> 8) & 0xff);
-    uint8_t a = (uint8_t)(rgba & 0xff);
+    uint8_t r = (uint8_t)((packed_rgba >> 24) & 0xff);
+    uint8_t g = (uint8_t)((packed_rgba >> 16) & 0xff);
+    uint8_t b = (uint8_t)((packed_rgba >> 8) & 0xff);
+    uint8_t a = (uint8_t)(packed_rgba & 0xff);
     for (uint32_t idx = 0; idx < width * height; idx++) {
         canvas->data[BMP_HEADER_LEN + BMP_INFO_HEADER_LEN + idx * 4] = b;
         canvas->data[BMP_HEADER_LEN + BMP_INFO_HEADER_LEN + idx * 4 + 1] = g;
@@ -125,8 +126,11 @@ uint32_t raster_canvas_height(const RasterCanvas* canvas) {
     return canvas->height;
 }
 
-uint32_t
-raster_canvas_get_rgba(const RasterCanvas* canvas, uint32_t x, uint32_t y) {
+Rgba raster_canvas_get_rgba(
+    const RasterCanvas* canvas,
+    uint32_t x,
+    uint32_t y
+) {
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(x < canvas->width);
     RELEASE_ASSERT(y < canvas->height);
@@ -134,21 +138,25 @@ raster_canvas_get_rgba(const RasterCanvas* canvas, uint32_t x, uint32_t y) {
     uint32_t pixel_offset = BMP_HEADER_LEN + BMP_INFO_HEADER_LEN
                           + ((canvas->height - y - 1) * canvas->width + x) * 4;
 
-    return ((uint32_t)canvas->data[pixel_offset + 2] << 24)
-         | ((uint32_t)canvas->data[pixel_offset + 1] << 16)
-         | ((uint32_t)canvas->data[pixel_offset] << 8)
-         | ((uint32_t)canvas->data[pixel_offset + 3]);
+    return rgba_unpack(
+        ((uint32_t)canvas->data[pixel_offset + 2] << 24)
+        | ((uint32_t)canvas->data[pixel_offset + 1] << 16)
+        | ((uint32_t)canvas->data[pixel_offset] << 8)
+        | ((uint32_t)canvas->data[pixel_offset + 3])
+    );
 }
 
 void raster_canvas_set_rgba(
     RasterCanvas* canvas,
     uint32_t x,
     uint32_t y,
-    uint32_t rgba
+    Rgba rgba
 ) {
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(x < canvas->width);
     RELEASE_ASSERT(y < canvas->height);
+
+    uint32_t packed_rgba = rgba_pack(rgba);
 
     LOG_DIAG(
         TRACE,
@@ -156,16 +164,16 @@ void raster_canvas_set_rgba(
         "Setting canvas pixel (%u, %u) to 0x%08" PRIx32,
         x,
         y,
-        rgba
+        packed_rgba
     );
 
     uint32_t pixel_offset = BMP_HEADER_LEN + BMP_INFO_HEADER_LEN
                           + ((canvas->height - y - 1) * canvas->width + x) * 4;
 
-    canvas->data[pixel_offset + 2] = (uint8_t)((rgba >> 24) & 0xff);
-    canvas->data[pixel_offset + 1] = (uint8_t)((rgba >> 16) & 0xff);
-    canvas->data[pixel_offset] = (uint8_t)((rgba >> 8) & 0xff);
-    canvas->data[pixel_offset + 3] = (uint8_t)(rgba & 0xff);
+    canvas->data[pixel_offset + 2] = (uint8_t)((packed_rgba >> 24) & 0xff);
+    canvas->data[pixel_offset + 1] = (uint8_t)((packed_rgba >> 16) & 0xff);
+    canvas->data[pixel_offset] = (uint8_t)((packed_rgba >> 8) & 0xff);
+    canvas->data[pixel_offset + 3] = (uint8_t)(packed_rgba & 0xff);
 }
 
 static uint32_t clamp_and_floor(double value, uint32_t max) {
@@ -197,7 +205,7 @@ void raster_canvas_draw_circle(
     double x,
     double y,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 ) {
     RELEASE_ASSERT(canvas);
 
@@ -236,7 +244,7 @@ void raster_canvas_draw_line(
     double x2,
     double y2,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 ) {
     RELEASE_ASSERT(canvas);
 
@@ -264,7 +272,7 @@ void raster_canvas_draw_arrow(
     double y2,
     double radius,
     double tip_radius,
-    uint32_t rgba
+    Rgba rgba
 ) {
     RELEASE_ASSERT(canvas);
 
@@ -294,7 +302,7 @@ void raster_canvas_draw_bezier(
     double cy,
     double flatness,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 ) {
     RELEASE_ASSERT(canvas);
 

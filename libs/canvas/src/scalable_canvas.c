@@ -30,7 +30,7 @@ ScalableCanvas* scalable_canvas_new(
     Arena* arena,
     uint32_t width,
     uint32_t height,
-    uint32_t rgba,
+    Rgba rgba,
     double raster_res
 ) {
     RELEASE_ASSERT(arena);
@@ -45,6 +45,8 @@ ScalableCanvas* scalable_canvas_new(
     canvas->next_clip_id = 0;
     canvas->active_clip_depth = 0;
 
+    uint32_t packed_rgba = rgba_pack(rgba);
+
     svg_parts_vec_push(
         canvas->parts,
         str_new_fmt(
@@ -52,7 +54,7 @@ ScalableCanvas* scalable_canvas_new(
             "<rect width=\"%u\" height=\"%u\" fill=\"#%08x\" />",
             width,
             height,
-            rgba
+            packed_rgba
         )
     );
 
@@ -69,9 +71,10 @@ void scalable_canvas_draw_circle(
     double x,
     double y,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 ) {
     RELEASE_ASSERT(canvas);
+    uint32_t packed_rgba = rgba_pack(rgba);
 
     svg_parts_vec_push(
         canvas->parts,
@@ -81,7 +84,7 @@ void scalable_canvas_draw_circle(
             x,
             y,
             radius,
-            rgba
+            packed_rgba
         )
     );
 }
@@ -93,9 +96,10 @@ void scalable_canvas_draw_line(
     double x2,
     double y2,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 ) {
     RELEASE_ASSERT(canvas);
+    uint32_t packed_rgba = rgba_pack(rgba);
 
     svg_parts_vec_push(
         canvas->parts,
@@ -106,7 +110,7 @@ void scalable_canvas_draw_line(
             y1,
             x2,
             y2,
-            rgba,
+            packed_rgba,
             radius
         )
     );
@@ -121,9 +125,10 @@ void scalable_canvas_draw_bezier(
     double cx,
     double cy,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 ) {
     RELEASE_ASSERT(canvas);
+    uint32_t packed_rgba = rgba_pack(rgba);
 
     svg_parts_vec_push(
         canvas->parts,
@@ -136,7 +141,7 @@ void scalable_canvas_draw_bezier(
             cy,
             x2,
             y2,
-            rgba,
+            packed_rgba,
             radius
         )
     );
@@ -239,9 +244,10 @@ void scalable_canvas_draw_path(
 
     // Brush
     if (brush.enable_fill) {
+        uint32_t fill_rgba = rgba_pack(brush.fill_rgba);
         svg_parts_vec_push(
             canvas->parts,
-            str_new_fmt(canvas->arena, "\" fill=\"#%08x\"", brush.fill_rgba)
+            str_new_fmt(canvas->arena, "\" fill=\"#%08x\"", fill_rgba)
         );
     } else {
         svg_parts_vec_push(
@@ -251,12 +257,13 @@ void scalable_canvas_draw_path(
     }
 
     if (brush.enable_stroke) {
+        uint32_t stroke_rgba = rgba_pack(brush.stroke_rgba);
         svg_parts_vec_push(
             canvas->parts,
             str_new_fmt(
                 canvas->arena,
                 " stroke=\"#%08x\" stroke-width=\"%f\"",
-                brush.stroke_rgba,
+                stroke_rgba,
                 brush.stroke_width
             )
         );
@@ -362,9 +369,10 @@ void scalable_canvas_pop_clip_paths(ScalableCanvas* canvas, size_t count) {
 void scalable_canvas_draw_pixel(
     ScalableCanvas* canvas,
     GeomVec2 position,
-    uint32_t rgba
+    Rgba rgba
 ) {
     RELEASE_ASSERT(canvas);
+    uint32_t packed_rgba = rgba_pack(rgba);
 
     svg_parts_vec_push(
         canvas->parts,
@@ -375,7 +383,7 @@ void scalable_canvas_draw_pixel(
             position.y,
             canvas->raster_res,
             canvas->raster_res,
-            rgba
+            packed_rgba
         )
     );
 }

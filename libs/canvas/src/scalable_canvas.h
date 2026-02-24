@@ -15,7 +15,7 @@ ScalableCanvas* scalable_canvas_new(
     Arena* arena,
     uint32_t width,
     uint32_t height,
-    uint32_t rgba,
+    Rgba rgba,
     double raster_res
 );
 
@@ -26,7 +26,7 @@ void scalable_canvas_draw_circle(
     double x,
     double y,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 );
 
 void scalable_canvas_draw_line(
@@ -36,7 +36,7 @@ void scalable_canvas_draw_line(
     double x2,
     double y2,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 );
 
 void scalable_canvas_draw_bezier(
@@ -48,7 +48,7 @@ void scalable_canvas_draw_bezier(
     double cx,
     double cy,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 );
 
 void scalable_canvas_draw_path(
@@ -68,7 +68,7 @@ void scalable_canvas_pop_clip_paths(ScalableCanvas* canvas, size_t count);
 void scalable_canvas_draw_pixel(
     ScalableCanvas* canvas,
     GeomVec2 position,
-    uint32_t rgba
+    Rgba rgba
 );
 
 bool scalable_canvas_write_file(ScalableCanvas* canvas, const char* path);

@@ -115,9 +115,8 @@ static Error* restore_graphics_state(RenderState* state, Canvas* canvas) {
     return NULL;
 }
 
-static uint32_t pack_rgba(GeomVec3 rgb, double a) {
-    return ((uint32_t)(rgb.x * 255.0) << 24) | ((uint32_t)(rgb.y * 255.0) << 16)
-         | ((uint32_t)(rgb.z * 255.0) << 8) | (uint32_t)(a * 255.0);
+static Rgba make_rgba(GeomVec3 rgb, double a) {
+    return rgba_from_rgb(rgb_from_geom(rgb), a);
 }
 
 static void consume_current_path(Arena* arena, RenderState* state) {
@@ -272,7 +271,7 @@ static Error* process_content_stream(
                 CanvasBrush brush = {
                     .enable_fill = false,
                     .enable_stroke = true,
-                    .stroke_rgba = pack_rgba(
+                    .stroke_rgba = make_rgba(
                         current_graphics_state(state)->stroking_rgb,
                         current_graphics_state(state)->stroking_alpha
                     ),
@@ -299,7 +298,7 @@ static Error* process_content_stream(
                 CanvasBrush brush = {
                     .enable_fill = true,
                     .enable_stroke = false,
-                    .fill_rgba = pack_rgba(
+                    .fill_rgba = make_rgba(
                         current_graphics_state(state)->nonstroking_rgb,
                         current_graphics_state(state)->nonstroking_alpha
                     )
@@ -318,11 +317,11 @@ static Error* process_content_stream(
                 CanvasBrush brush = {
                     .enable_fill = true,
                     .enable_stroke = true,
-                    .fill_rgba = pack_rgba(
+                    .fill_rgba = make_rgba(
                         current_graphics_state(state)->nonstroking_rgb,
                         current_graphics_state(state)->nonstroking_alpha
                     ),
-                    .stroke_rgba = pack_rgba(
+                    .stroke_rgba = make_rgba(
                         current_graphics_state(state)->stroking_rgb,
                         current_graphics_state(state)->stroking_alpha
                     ),
@@ -479,7 +478,7 @@ static Error* process_content_stream(
                         CanvasBrush brush = {
                             .enable_fill = true,
                             .enable_stroke = false,
-                            .fill_rgba = pack_rgba(
+                            .fill_rgba = make_rgba(
                                 current_graphics_state(state)->nonstroking_rgb,
                                 current_graphics_state(state)->nonstroking_alpha
                             )
@@ -929,7 +928,7 @@ Error* render_page(
         arena,
         (uint32_t)geom_rect_size(rect).x,
         (uint32_t)geom_rect_size(rect).y,
-        0xffffffff,
+        rgba_new(1.0, 1.0, 1.0, 1.0),
         1.0
     );
 

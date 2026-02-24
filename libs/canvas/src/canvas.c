@@ -19,7 +19,7 @@ Canvas* canvas_new_raster(
     Arena* arena,
     uint32_t width,
     uint32_t height,
-    uint32_t rgba,
+    Rgba rgba,
     double coordinate_scale
 ) {
     Canvas* canvas = arena_alloc(arena, sizeof(Canvas));
@@ -42,7 +42,7 @@ Canvas* canvas_new_scalable(
     Arena* arena,
     uint32_t width,
     uint32_t height,
-    uint32_t rgba,
+    Rgba rgba,
     double raster_res
 ) {
     Canvas* canvas = arena_alloc(arena, sizeof(Canvas));
@@ -72,7 +72,7 @@ void canvas_draw_circle(
     double x,
     double y,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 ) {
     switch (canvas->type) {
         case CANVAS_TYPE_RASTER: {
@@ -102,7 +102,7 @@ void canvas_draw_line(
     double x2,
     double y2,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 ) {
     switch (canvas->type) {
         case CANVAS_TYPE_RASTER: {
@@ -145,7 +145,7 @@ void canvas_draw_bezier(
     double cy,
     double flatness,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 ) {
     switch (canvas->type) {
         case CANVAS_TYPE_RASTER: {
@@ -255,7 +255,7 @@ void canvas_pop_clip_paths(Canvas* canvas, size_t count) {
     }
 }
 
-void canvas_draw_pixel(Canvas* canvas, GeomVec2 position, uint32_t rgba) {
+void canvas_draw_pixel(Canvas* canvas, GeomVec2 position, Rgba rgba) {
     RELEASE_ASSERT(canvas);
 
     switch (canvas->type) {

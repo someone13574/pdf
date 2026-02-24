@@ -26,7 +26,13 @@ int main(int argc, char** argv) {
     SfntGlyph glyph;
     REQUIRE(sfnt_get_glyph_for_cid(&font, '%', &glyph));
 
-    Canvas* canvas = canvas_new_scalable(arena, 2000, 2000, 0xffffffff, 1.0);
+    Canvas* canvas = canvas_new_scalable(
+        arena,
+        2000,
+        2000,
+        rgba_new(1.0, 1.0, 1.0, 1.0),
+        1.0
+    );
     GeomMat3 transform =
         geom_mat3_new(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 500.0, 1500.0, 1.0);
     sfnt_glyph_render(
@@ -35,7 +41,7 @@ int main(int argc, char** argv) {
         transform,
         (CanvasBrush) {.enable_fill = true,
                        .enable_stroke = false,
-                       .fill_rgba = 0x000000ff}
+                       .fill_rgba = rgba_new(0.0, 0.0, 0.0, 1.0)}
     );
     canvas_write_file(canvas, "glyph.svg");
 

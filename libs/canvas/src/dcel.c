@@ -606,7 +606,7 @@ static void debug_render(Dcel* dcel, Arena* arena) {
         arena,
         1000 * resolution_multiplier,
         900 * resolution_multiplier,
-        0xffffffff,
+        rgba_new(1.0, 1.0, 1.0, 1.0),
         (double)resolution_multiplier
     );
 
@@ -895,17 +895,19 @@ static uint32_t hash32(uint32_t x) {
     return x;
 }
 
-static uint32_t color_from_ptr(void* ptr) {
+static Rgba color_from_ptr(void* ptr) {
     uintptr_t p = (uintptr_t)ptr;
     uint32_t hash = hash32((uint32_t)(p ^ (p >> 32)) + 1);
 
     uint8_t r = (hash >> 0) & 0xff;
     uint8_t g = (hash >> 8) & 0xff;
     uint8_t b = (hash >> 16) & 0xff;
-    uint8_t a = 0xff;
-
-    return ((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8)
-         | ((uint32_t)a << 0);
+    return rgba_new(
+        (double)r / 255.0,
+        (double)g / 255.0,
+        (double)b / 255.0,
+        1.0
+    );
 }
 
 static double point_left_of_segment(
@@ -1000,8 +1002,9 @@ void dcel_render(const Dcel* dcel, RasterCanvas* canvas) {
             double radius = 5.1;
             double tip_radius = 1.0;
 
-            // uint32_t color = face_sign < 0.0 ? 0xff0000ff : 0x00ff00ff;
-            uint32_t color = color_from_ptr((void*)curr_half_edge);
+            // Rgba color = face_sign < 0.0 ? rgba_new(1.0, 0.0, 0.0, 1.0)
+            //                                : rgba_new(0.0, 1.0, 0.0, 1.0);
+            Rgba color = color_from_ptr((void*)curr_half_edge);
 
             raster_canvas_draw_circle(
                 canvas,
@@ -1012,7 +1015,8 @@ void dcel_render(const Dcel* dcel, RasterCanvas* canvas) {
                         / 2.0
                     + offset_y * 2,
                 8.0,
-                (face_sign > 0.0) == in_poly ? 0x00ff00ff : 0xff0000ff
+                (face_sign > 0.0) == in_poly ? rgba_new(0.0, 1.0, 0.0, 1.0)
+                                             : rgba_new(1.0, 0.0, 0.0, 1.0)
             );
 
             raster_canvas_draw_circle(

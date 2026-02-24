@@ -98,7 +98,7 @@ Canvas* dcel_builder_render(
         builder->arena,
         width * resolution_multiplier,
         height * resolution_multiplier,
-        0xffffffff,
+        rgba_new(1.0, 1.0, 1.0, 1.0),
         (double)resolution_multiplier
     );
 
