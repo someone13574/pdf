@@ -63,6 +63,7 @@ static CanvasLineJoin pdf_line_join_to_canvas(PdfLineJoinStyle line_join) {
 typedef struct {
     GraphicsStateStack* graphics_state_stack; // idx 0 == top
     TextObjectState text_object_state;
+    PathBuilderOptions path_options;
     PathBuilder* path;
     bool pending_clip;
     bool pending_clip_even_odd;
@@ -119,11 +120,32 @@ static Rgba make_rgba(GeomVec3 rgb, double a) {
     return rgba_from_rgb(rgb_from_geom(rgb), a);
 }
 
+static PathBuilderOptions render_current_path_options(RenderState* state) {
+    RELEASE_ASSERT(state);
+
+    PathBuilderOptions options = state->path_options;
+    if (!options.flatten_curves) {
+        return options;
+    }
+
+    double flatness = current_graphics_state(state)->flatness;
+    if (flatness <= 1e-9) {
+        flatness = 1e-6;
+    }
+
+    options.quad_flatness = flatness;
+    options.cubic_flatness = flatness;
+    return options;
+}
+
 static void consume_current_path(Arena* arena, RenderState* state) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(state);
 
-    state->path = path_builder_new(arena); // TODO: recycle
+    state->path = path_builder_new_with_options(
+        arena,
+        render_current_path_options(state)
+    ); // TODO: recycle
 }
 
 static void apply_pending_clip_path(RenderState* state, Canvas* canvas) {
@@ -805,7 +827,10 @@ static Error* process_content_stream(
                             current_graphics_state(state)->ctm
                         );
 
-                        PathBuilder* clip_path = path_builder_new(arena);
+                        PathBuilder* clip_path = path_builder_new_with_options(
+                            arena,
+                            state->path_options
+                        );
                         path_builder_new_contour(
                             clip_path,
                             geom_vec2_new(
@@ -892,21 +917,36 @@ Error* render_page(
         )
     );
 
+    *canvas = canvas_new_raster(
+        arena,
+        (uint32_t)geom_rect_size(rect).x,
+        (uint32_t)geom_rect_size(rect).y,
+        rgba_new(1.0, 1.0, 1.0, 1.0),
+        1.0
+    );
+
+    PathBuilderOptions path_options = path_builder_options_default();
+    if (canvas_is_raster(*canvas)) {
+        path_options = path_builder_options_flattened();
+    }
+
     RenderState state = {
         .graphics_state_stack = graphics_state_stack_new(arena),
         .text_object_state = text_object_state_default(),
+        .path_options = path_options,
         .pending_clip = false,
         .pending_clip_even_odd = false,
         .cache.cmap_cache = pdf_cmap_cache_new(arena),
         .cache.glyph_list = NULL,
         .cache.icc_cache = icc_profile_cache_new(arena),
-        .path = path_builder_new(arena)
+        .path = NULL
     };
 
     graphics_state_stack_push_back(
         state.graphics_state_stack,
         graphics_state_default()
     );
+    consume_current_path(arena, &state);
 
     double scale = 1.0; // TODO: load
     current_graphics_state(&state)->ctm = geom_mat3_mul(
@@ -922,14 +962,6 @@ Error* render_page(
             rect.max.y * scale,
             1.0
         )
-    );
-
-    *canvas = canvas_new_scalable(
-        arena,
-        (uint32_t)geom_rect_size(rect).x,
-        (uint32_t)geom_rect_size(rect).y,
-        rgba_new(1.0, 1.0, 1.0, 1.0),
-        1.0
     );
 
     if (page->contents.is_some) {

@@ -9,6 +9,7 @@
 #include "arena/arena.h"
 #include "canvas/canvas.h"
 #include "logger/log.h"
+#include "path_builder.h"
 
 #define BMP_HEADER_LEN 14
 #define BMP_INFO_HEADER_LEN 40
@@ -359,17 +360,121 @@ void raster_canvas_draw_bezier(
     );
 }
 
+typedef struct {
+    RasterCanvas* canvas;
+    double radius;
+    Rgba rgba;
+} RasterStrokeLineCtx;
+
+static void raster_canvas_stroke_line_segment(
+    RasterStrokeLineCtx* ctx,
+    GeomVec2 from,
+    GeomVec2 to
+) {
+    RELEASE_ASSERT(ctx);
+
+    // `raster_canvas_draw_line` omits exact endpoints; round caps keep
+    // adjacent segments connected.
+    raster_canvas_draw_circle(ctx->canvas, from.x, from.y, ctx->radius, ctx->rgba);
+    raster_canvas_draw_line(
+        ctx->canvas,
+        from.x,
+        from.y,
+        to.x,
+        to.y,
+        ctx->radius,
+        ctx->rgba
+    );
+    raster_canvas_draw_circle(ctx->canvas, to.x, to.y, ctx->radius, ctx->rgba);
+}
+
 void raster_canvas_draw_path(
     RasterCanvas* canvas,
     const PathBuilder* path,
     CanvasBrush brush
 ) {
-    (void)brush;
-
     RELEASE_ASSERT(canvas);
     RELEASE_ASSERT(path);
 
-    LOG_TODO();
+    if (brush.enable_fill) {
+        static bool warned_fill_unimplemented = false;
+        if (!warned_fill_unimplemented) {
+            LOG_WARN(
+                CANVAS,
+                "Raster path fill is not implemented yet; ignoring fill"
+            );
+            warned_fill_unimplemented = true;
+        }
+    }
+
+    if (!brush.enable_stroke || brush.stroke_width <= 0.0) {
+        return;
+    }
+
+    // Join/cap styles are not implemented yet.
+    (void)brush.line_cap;
+    (void)brush.line_join;
+    (void)brush.miter_limit;
+
+    RasterStrokeLineCtx stroke_ctx = {
+        .canvas = canvas,
+        .radius = brush.stroke_width * 0.5,
+        .rgba = brush.stroke_rgba
+    };
+
+    for (size_t contour_idx = 0; contour_idx < path_contour_vec_len(path->contours);
+         contour_idx++) {
+        PathContour* contour = NULL;
+        RELEASE_ASSERT(
+            path_contour_vec_get(path->contours, contour_idx, &contour)
+        );
+
+        if (path_contour_len(contour) < 2) {
+            continue;
+        }
+
+        PathContourSegment first;
+        RELEASE_ASSERT(path_contour_get(contour, 0, &first));
+        RELEASE_ASSERT(first.type == PATH_CONTOUR_SEGMENT_TYPE_START);
+
+        GeomVec2 current = first.value.start;
+
+        for (size_t segment_idx = 1; segment_idx < path_contour_len(contour);
+             segment_idx++) {
+            PathContourSegment segment;
+            RELEASE_ASSERT(path_contour_get(contour, segment_idx, &segment));
+
+            switch (segment.type) {
+                case PATH_CONTOUR_SEGMENT_TYPE_START: {
+                    current = segment.value.start;
+                    break;
+                }
+                case PATH_CONTOUR_SEGMENT_TYPE_LINE: {
+                    raster_canvas_stroke_line_segment(
+                        &stroke_ctx,
+                        current,
+                        segment.value.line
+                    );
+                    current = segment.value.line;
+                    break;
+                }
+                case PATH_CONTOUR_SEGMENT_TYPE_QUAD_BEZIER: {
+                    RELEASE_ASSERT(
+                        false,
+                        "Raster path requires flattened curves. Use path_builder_options_flattened()."
+                    );
+                    break;
+                }
+                case PATH_CONTOUR_SEGMENT_TYPE_CUBIC_BEZIER: {
+                    RELEASE_ASSERT(
+                        false,
+                        "Raster path requires flattened curves. Use path_builder_options_flattened()."
+                    );
+                    break;
+                }
+            }
+        }
+    }
 }
 
 void raster_canvas_push_clip_path(

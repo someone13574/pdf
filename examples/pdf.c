@@ -44,7 +44,7 @@ int main(int argc, char** argv) {
 
         Canvas* canvas = NULL;
         REQUIRE(render_page(arena, resolver, &page, &canvas));
-        canvas_write_file(canvas, "test.svg");
+        canvas_write_file(canvas, "test.bmp");
     };
 
     LOG_DIAG(INFO, EXAMPLE, "Finished");

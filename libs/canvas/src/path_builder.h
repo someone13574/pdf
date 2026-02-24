@@ -1,5 +1,6 @@
 #pragma once
 
+#include "canvas/path_builder.h"
 #include "geom/vec2.h"
 
 typedef struct {
@@ -44,4 +45,5 @@ GeomVec2 path_contour_segment_end(PathContourSegment segment);
 struct PathBuilder {
     Arena* arena;
     PathContourVec* contours;
+    PathBuilderOptions options;
 };
