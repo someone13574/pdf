@@ -10,6 +10,5 @@ scripts/test.sh
 scripts/tidy.sh
 scripts/pdf.sh
 scripts/font.sh
-scripts/tessellation.sh
 
 pre-commit run --all-files

@@ -1,7 +1,6 @@
 add_library(canvas
     src/canvas.c
     src/path_builder.c
-    src/dcel_builder.c
     src/dcel.c
     src/raster_canvas.c
     src/scalable_canvas.c)

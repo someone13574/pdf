@@ -22,6 +22,7 @@ typedef enum CanvasLineJoin {
 
 typedef struct CanvasBrush {
     bool enable_fill;
+    bool even_odd_fill;
     bool enable_stroke;
 
     Rgba fill_rgba;
