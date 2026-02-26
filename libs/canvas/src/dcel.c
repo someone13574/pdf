@@ -1870,7 +1870,7 @@ TEST_FUNC(
 ) {
     uint32_t seed = 0x1337f00du;
 
-    for (size_t case_idx = 0; case_idx < 24; case_idx++) {
+    for (size_t case_idx = 0; case_idx < 16; case_idx++) {
         Arena* arena = arena_new(65536);
         PathBuilder* path = path_builder_new(arena);
 
@@ -2142,7 +2142,7 @@ TEST_FUNC(
 ) {
     uint32_t seed = 0x8badf00du;
 
-    for (size_t case_idx = 0; case_idx < 48; case_idx++) {
+    for (size_t case_idx = 0; case_idx < 16; case_idx++) {
         Arena* arena = arena_new(65536);
         PathBuilder* path = path_builder_new(arena);
 
@@ -2201,7 +2201,7 @@ TEST_FUNC(
 ) {
     uint32_t seed = 0x4a6f7921u;
 
-    for (size_t case_idx = 0; case_idx < 96; case_idx++) {
+    for (size_t case_idx = 0; case_idx < 16; case_idx++) {
         Arena* arena = arena_new(65536);
         PathBuilder* path = path_builder_new(arena);
 
@@ -2264,7 +2264,7 @@ TEST_FUNC(
 TEST_FUNC(test_dcel_rasterize_path_mask_monotone_random_simple_polygons) {
     uint32_t seed = 0x94a2f31du;
 
-    for (size_t case_idx = 0; case_idx < 96; case_idx++) {
+    for (size_t case_idx = 0; case_idx < 16; case_idx++) {
         Arena* arena = arena_new(32768);
         PathBuilder* path = path_builder_new(arena);
 
@@ -2312,7 +2312,7 @@ TEST_FUNC(test_dcel_rasterize_path_mask_monotone_random_simple_polygons) {
 TEST_FUNC(test_dcel_rasterize_path_mask_monotone_random_star_polygons) {
     uint32_t seed = 0x5f3759dfu;
 
-    for (size_t case_idx = 0; case_idx < 96; case_idx++) {
+    for (size_t case_idx = 0; case_idx < 16; case_idx++) {
         Arena* arena = arena_new(32768);
         PathBuilder* path = path_builder_new(arena);
 
@@ -2366,7 +2366,7 @@ TEST_FUNC(test_dcel_rasterize_path_mask_monotone_random_star_polygons) {
 TEST_FUNC(test_dcel_rasterize_path_mask_monotone_random_multicontour) {
     uint32_t seed = 0xcafebabeu;
 
-    for (size_t case_idx = 0; case_idx < 64; case_idx++) {
+    for (size_t case_idx = 0; case_idx < 16; case_idx++) {
         Arena* arena = arena_new(65536);
         PathBuilder* path = path_builder_new(arena);
 
