@@ -845,16 +845,14 @@ Error* cff_charstr2_render(
     if (canvas_is_raster(canvas)) {
         path_options = path_builder_options_flattened();
     }
-    CharstrState state =
-        (CharstrState) {.operand_count = 0,
-                        .stack_bottom = 0,
-                        .width_set = false,
-                        .width = 0.0,
-                        .path_builder = path_builder_new_with_options(
-                            temp_arena,
-                            path_options
-                        ),
-                        .current_point = geom_vec2_new(0.0, 0.0)};
+    CharstrState state = (CharstrState) {
+        .operand_count = 0,
+        .stack_bottom = 0,
+        .width_set = false,
+        .width = 0.0,
+        .path_builder = path_builder_new_with_options(temp_arena, path_options),
+        .current_point = geom_vec2_new(0.0, 0.0)
+    };
 
     bool endchar; // We don't actually need this since we aren't actually
                   // calling a subroutine.

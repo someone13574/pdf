@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "arena/arena.h"
+#include "arena/common.h"
 
 typedef struct PathBuilder PathBuilder;
 
@@ -107,6 +108,6 @@ void dcel_rasterize_path_mask(
     uint32_t width,
     uint32_t height,
     double coordinate_scale,
-    uint8_t* out_mask,
+    Uint8Array* out_mask,
     DcelMaskBounds* out_bounds
 );

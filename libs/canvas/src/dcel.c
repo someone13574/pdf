@@ -4,7 +4,6 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "arena/arena.h"
 #include "logger/log.h"
@@ -1112,7 +1111,7 @@ void dcel_rasterize_path_mask(
     uint32_t width,
     uint32_t height,
     double coordinate_scale,
-    uint8_t* out_mask,
+    Uint8Array* out_mask,
     DcelMaskBounds* out_bounds
 ) {
     RELEASE_ASSERT(arena);
@@ -1133,7 +1132,10 @@ void dcel_rasterize_path_mask(
     }
 
     size_t pixel_count = (size_t)width * (size_t)height;
-    memset(out_mask, 0, pixel_count);
+    RELEASE_ASSERT(uint8_array_len(out_mask) == pixel_count);
+    for (size_t mask_idx = 0; mask_idx < pixel_count; mask_idx++) {
+        uint8_array_set(out_mask, mask_idx, 0);
+    }
 
     DcelMaskAccum accum =
         {.has_pixels = false, .min_x = 0, .min_y = 0, .max_x = 0, .max_y = 0};
@@ -1312,8 +1314,12 @@ void dcel_rasterize_path_mask(
                     for (int64_t px = px_start; px <= px_end; px++) {
                         size_t mask_idx =
                             (size_t)py * (size_t)width + (size_t)px;
-                        if (out_mask[mask_idx] == 0) {
-                            out_mask[mask_idx] = 1;
+                        uint8_t mask_value = 0;
+                        RELEASE_ASSERT(
+                            uint8_array_get(out_mask, mask_idx, &mask_value)
+                        );
+                        if (mask_value == 0) {
+                            uint8_array_set(out_mask, mask_idx, 1);
                             dcel_mask_accum_mark(
                                 &accum,
                                 (uint32_t)px,
@@ -1383,13 +1389,17 @@ void dcel_rasterize_path_mask(
                          pixel_x++) {
                         size_t mask_idx =
                             (size_t)pixel_y * (size_t)width + (size_t)pixel_x;
-                        if (out_mask[mask_idx] != 0) {
+                        uint8_t mask_value = 0;
+                        RELEASE_ASSERT(
+                            uint8_array_get(out_mask, mask_idx, &mask_value)
+                        );
+                        if (mask_value != 0) {
                             continue;
                         }
                         double sample_x =
                             ((double)pixel_x + 0.5) / coordinate_scale;
                         if (dcel_sample_on_segment(a, b, sample_x, sample_y)) {
-                            out_mask[mask_idx] = 1;
+                            uint8_array_set(out_mask, mask_idx, 1);
                             dcel_mask_accum_mark(
                                 &accum,
                                 (uint32_t)pixel_x,
@@ -1436,13 +1446,17 @@ void dcel_rasterize_path_mask(
                          pixel_x++) {
                         size_t mask_idx =
                             (size_t)pixel_y * (size_t)width + (size_t)pixel_x;
-                        if (out_mask[mask_idx] != 0) {
+                        uint8_t mask_value = 0;
+                        RELEASE_ASSERT(
+                            uint8_array_get(out_mask, mask_idx, &mask_value)
+                        );
+                        if (mask_value != 0) {
                             continue;
                         }
                         double sample_x =
                             ((double)pixel_x + 0.5) / coordinate_scale;
                         if (dcel_sample_on_segment(a, b, sample_x, sample_y)) {
-                            out_mask[mask_idx] = 1;
+                            uint8_array_set(out_mask, mask_idx, 1);
                             dcel_mask_accum_mark(
                                 &accum,
                                 (uint32_t)pixel_x,
@@ -1612,7 +1626,7 @@ static TestResult dcel_test_expect_mask_matches_reference(
     RELEASE_ASSERT(path);
 
     size_t pixel_count = (size_t)width * (size_t)height;
-    uint8_t* actual_mask = arena_alloc(arena, pixel_count);
+    Uint8Array* actual_mask = uint8_array_new(arena, pixel_count);
     DcelMaskBounds actual_bounds;
     dcel_rasterize_path_mask(
         arena,
@@ -1640,8 +1654,12 @@ static TestResult dcel_test_expect_mask_matches_reference(
                 sample_y
             );
             size_t idx = (size_t)y * (size_t)width + (size_t)x;
+            uint8_t actual_mask_value = 0;
+            RELEASE_ASSERT(
+                uint8_array_get(actual_mask, idx, &actual_mask_value)
+            );
             TEST_ASSERT_EQ(
-                (unsigned int)actual_mask[idx],
+                (unsigned int)actual_mask_value,
                 expected ? 1U : 0U,
                 "Mask mismatch at (%u,%u), sample=(%.8f,%.8f)",
                 x,

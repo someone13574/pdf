@@ -25,8 +25,17 @@ GeomVec2 geom_vec2_scale(GeomVec2 vec, double scalar);
 /// Computes the dot product of vectors a and b.
 double geom_vec2_dot(GeomVec2 a, GeomVec2 b);
 
+/// Computes the 2D cross product of vectors a and b.
+double geom_vec2_cross(GeomVec2 a, GeomVec2 b);
+
 /// Computes the squared length of a vector.
 double geom_vec2_len_sq(GeomVec2 vec);
+
+/// Computes a normalized vector. Returns zero vector when input is ~zero.
+GeomVec2 geom_vec2_normalize(GeomVec2 vec);
+
+/// Computes the angle from `from` to `to` in radians.
+double geom_vec2_angle(GeomVec2 from, GeomVec2 to);
 
 /// Computes the linear interpolation of vectors a and b.
 GeomVec2 geom_vec2_lerp(GeomVec2 a, GeomVec2 b, double t);
@@ -45,3 +54,6 @@ GeomVec2 geom_vec2_transform(GeomVec2 lhs, GeomMat3 rhs);
 
 /// Swaps the x and y components of this vector
 GeomVec2 geom_vec2_transpose(GeomVec2 vec);
+
+/// Rotates a vector 90 degrees counter-clockwise.
+GeomVec2 geom_vec2_perpendicular(GeomVec2 vec);

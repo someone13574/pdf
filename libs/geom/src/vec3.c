@@ -39,11 +39,7 @@ static double clamp01(double value) {
 }
 
 GeomVec3 geom_vec3_clamp(GeomVec3 value) {
-    return geom_vec3_new(
-        clamp01(value.x),
-        clamp01(value.y),
-        clamp01(value.z)
-    );
+    return geom_vec3_new(clamp01(value.x), clamp01(value.y), clamp01(value.z));
 }
 
 GeomVec3 geom_vec3_transform(GeomVec3 lhs, GeomMat3 rhs) {
