@@ -38,8 +38,6 @@ struct RasterCanvas {
     uint32_t file_size;
     uint8_t* data;
 
-    double coordinate_scale;
-
     ClipPathVec* clip_paths;
 };
 
@@ -92,11 +90,8 @@ RasterCanvas* raster_canvas_new(
     Arena* arena,
     uint32_t width,
     uint32_t height,
-    Rgba rgba,
-    double coordinate_scale
+    Rgba rgba
 ) {
-    RELEASE_ASSERT(coordinate_scale > 1e-3);
-
     uint32_t file_size =
         BMP_HEADER_LEN + BMP_INFO_HEADER_LEN + width * height * 4;
     uint32_t packed_rgba = rgba_pack(rgba);
@@ -119,7 +114,6 @@ RasterCanvas* raster_canvas_new(
     canvas->data = arena_alloc(arena, file_size);
     memset(canvas->data, 0, file_size);
 
-    canvas->coordinate_scale = coordinate_scale;
     canvas->clip_paths = clip_path_vec_new(arena);
 
     write_bmp_header(canvas->data, file_size);
@@ -141,7 +135,7 @@ RasterCanvas* raster_canvas_new(
 
 double raster_canvas_raster_res(const RasterCanvas* canvas) {
     RELEASE_ASSERT(canvas);
-    return 1.0 / canvas->coordinate_scale;
+    return 1.0;
 }
 
 uint32_t raster_canvas_width(const RasterCanvas* canvas) {
@@ -165,8 +159,8 @@ static bool raster_canvas_pixel_visible(
         return true;
     }
 
-    double sample_x = ((double)x + 0.5) / canvas->coordinate_scale;
-    double sample_y = ((double)y + 0.5) / canvas->coordinate_scale;
+    double sample_x = (double)x + 0.5;
+    double sample_y = (double)y + 0.5;
     for (size_t idx = 0; idx < clip_path_vec_len(canvas->clip_paths); idx++) {
         ClipPathEntry clip_path;
         RELEASE_ASSERT(clip_path_vec_get(canvas->clip_paths, idx, &clip_path));
@@ -268,10 +262,6 @@ void raster_canvas_draw_circle(
     Rgba rgba
 ) {
     RELEASE_ASSERT(canvas);
-
-    x *= canvas->coordinate_scale;
-    y *= canvas->coordinate_scale;
-    radius *= canvas->coordinate_scale;
 
     double min_x = x - radius;
     double min_y = y - radius;
@@ -944,7 +934,7 @@ void raster_canvas_draw_path(
                                 : DCEL_FILL_RULE_NONZERO,
             canvas->width,
             canvas->height,
-            canvas->coordinate_scale,
+            1.0,
             mask,
             &bounds
         );
@@ -1080,7 +1070,7 @@ void raster_canvas_draw_path(
                 DCEL_FILL_RULE_EVEN_ODD,
                 canvas->width,
                 canvas->height,
-                canvas->coordinate_scale,
+                1.0,
                 mask,
                 &bounds
             );
@@ -1150,8 +1140,8 @@ void raster_canvas_draw_pixel(
 ) {
     RELEASE_ASSERT(canvas);
 
-    int64_t x = (int64_t)floor(position.x * canvas->coordinate_scale);
-    int64_t y = (int64_t)floor(position.y * canvas->coordinate_scale);
+    int64_t x = (int64_t)floor(position.x);
+    int64_t y = (int64_t)floor(position.y);
     if (x < 0 || y < 0 || x >= (int64_t)canvas->width
         || y >= (int64_t)canvas->height) {
         return;

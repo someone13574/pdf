@@ -302,6 +302,12 @@ PathBuilder* path_builder_clone(Arena* arena, const PathBuilder* to_clone) {
     return builder;
 }
 
+void path_builder_set_options(PathBuilder* builder, PathBuilderOptions options) {
+    RELEASE_ASSERT(builder);
+    path_builder_validate_options(options);
+    builder->options = options;
+}
+
 void path_builder_new_contour(PathBuilder* builder, GeomVec2 point) {
     RELEASE_ASSERT(builder);
 

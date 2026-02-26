@@ -19,12 +19,10 @@ Canvas* canvas_new_raster(
     Arena* arena,
     uint32_t width,
     uint32_t height,
-    Rgba rgba,
-    double coordinate_scale
+    Rgba rgba
 ) {
     Canvas* canvas = arena_alloc(arena, sizeof(Canvas));
-    canvas->data.raster =
-        raster_canvas_new(arena, width, height, rgba, coordinate_scale);
+    canvas->data.raster = raster_canvas_new(arena, width, height, rgba);
     canvas->type = CANVAS_TYPE_RASTER;
 
     return canvas;

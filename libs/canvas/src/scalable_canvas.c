@@ -249,6 +249,14 @@ void scalable_canvas_draw_path(
             canvas->parts,
             str_new_fmt(canvas->arena, "\" fill=\"#%08x\"", fill_rgba)
         );
+        svg_parts_vec_push(
+            canvas->parts,
+            str_new_fmt(
+                canvas->arena,
+                " fill-rule=\"%s\"",
+                brush.even_odd_fill ? "evenodd" : "nonzero"
+            )
+        );
     } else {
         svg_parts_vec_push(
             canvas->parts,

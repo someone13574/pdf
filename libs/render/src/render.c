@@ -66,6 +66,7 @@ typedef struct {
     TextObjectState text_object_state;
     PathBuilderOptions path_options;
     PathBuilder* path;
+    double stroke_width_scale;
     bool pending_clip;
     bool pending_clip_even_odd;
 
@@ -121,6 +122,11 @@ static Rgba make_rgba(GeomVec3 rgb, double a) {
     return rgba_from_rgb(rgb_from_geom(rgb), a);
 }
 
+static double render_current_stroke_width(RenderState* state) {
+    RELEASE_ASSERT(state);
+    return current_graphics_state(state)->line_width * state->stroke_width_scale;
+}
+
 static double render_ctm_max_linear_scale(GeomMat3 ctm) {
     double a = ctm.mat[0][0];
     double b = ctm.mat[0][1];
@@ -172,6 +178,20 @@ render_current_path_options(RenderState* state, Canvas* canvas) {
     options.quad_flatness = user_space_flatness;
     options.cubic_flatness = user_space_flatness;
     return options;
+}
+
+static void render_refresh_path_options(RenderState* state, Canvas* canvas) {
+    RELEASE_ASSERT(state);
+    RELEASE_ASSERT(canvas);
+
+    if (!state->path) {
+        return;
+    }
+
+    path_builder_set_options(
+        state->path,
+        render_current_path_options(state, canvas)
+    );
 }
 
 static void
@@ -239,6 +259,7 @@ static Error* process_content_stream(
             }
             case PDF_OPERATOR_i: {
                 current_graphics_state(state)->flatness = op.data.flatness;
+                render_refresh_path_options(state, canvas);
                 break;
             }
             case PDF_OPERATOR_gs: {
@@ -261,6 +282,7 @@ static Error* process_content_stream(
                     current_graphics_state(state),
                     params
                 );
+                render_refresh_path_options(state, canvas);
                 break;
             }
             case PDF_OPERATOR_q: {
@@ -269,6 +291,7 @@ static Error* process_content_stream(
             }
             case PDF_OPERATOR_Q: {
                 TRY(restore_graphics_state(state, canvas));
+                render_refresh_path_options(state, canvas);
                 break;
             }
             case PDF_OPERATOR_cm: {
@@ -276,6 +299,7 @@ static Error* process_content_stream(
                     op.data.set_ctm,
                     current_graphics_state(state)->ctm
                 );
+                render_refresh_path_options(state, canvas);
                 break;
             }
             case PDF_OPERATOR_m: {
@@ -335,7 +359,7 @@ static Error* process_content_stream(
                         current_graphics_state(state)->stroking_rgb,
                         current_graphics_state(state)->stroking_alpha
                     ),
-                    .stroke_width = current_graphics_state(state)->line_width,
+                    .stroke_width = render_current_stroke_width(state),
                     .line_cap = pdf_line_cap_to_canvas(
                         current_graphics_state(state)->line_cap
                     ),
@@ -406,7 +430,7 @@ static Error* process_content_stream(
                         current_graphics_state(state)->stroking_rgb,
                         current_graphics_state(state)->stroking_alpha
                     ),
-                    .stroke_width = current_graphics_state(state)->line_width,
+                    .stroke_width = render_current_stroke_width(state),
                     .line_cap = pdf_line_cap_to_canvas(
                         current_graphics_state(state)->line_cap
                     ),
@@ -438,7 +462,7 @@ static Error* process_content_stream(
                         current_graphics_state(state)->stroking_rgb,
                         current_graphics_state(state)->stroking_alpha
                     ),
-                    .stroke_width = current_graphics_state(state)->line_width,
+                    .stroke_width = render_current_stroke_width(state),
                     .line_cap = pdf_line_cap_to_canvas(
                         current_graphics_state(state)->line_cap
                     ),
@@ -471,7 +495,7 @@ static Error* process_content_stream(
                         current_graphics_state(state)->stroking_rgb,
                         current_graphics_state(state)->stroking_alpha
                     ),
-                    .stroke_width = current_graphics_state(state)->line_width,
+                    .stroke_width = render_current_stroke_width(state),
                     .line_cap = pdf_line_cap_to_canvas(
                         current_graphics_state(state)->line_cap
                     ),
@@ -505,7 +529,7 @@ static Error* process_content_stream(
                         current_graphics_state(state)->stroking_rgb,
                         current_graphics_state(state)->stroking_alpha
                     ),
-                    .stroke_width = current_graphics_state(state)->line_width,
+                    .stroke_width = render_current_stroke_width(state),
                     .line_cap = pdf_line_cap_to_canvas(
                         current_graphics_state(state)->line_cap
                     ),
@@ -1053,6 +1077,7 @@ Error* render_page(
     Arena* arena,
     PdfResolver* resolver,
     const PdfPage* page,
+    RenderCanvasType canvas_type,
     Canvas** canvas
 ) {
     RELEASE_ASSERT(arena);
@@ -1075,19 +1100,37 @@ Error* render_page(
         )
     );
 
-    const uint32_t resolution_multiplier = 5;
     GeomVec2 rect_size = geom_rect_size(rect);
-    uint32_t canvas_width =
-        (uint32_t)ceil(rect_size.x * (double)resolution_multiplier);
-    uint32_t canvas_height =
-        (uint32_t)ceil(rect_size.y * (double)resolution_multiplier);
-    *canvas = canvas_new_raster(
-        arena,
-        canvas_width,
-        canvas_height,
-        rgba_new(1.0, 1.0, 1.0, 1.0),
-        (double)resolution_multiplier
-    );
+    uint32_t canvas_width = (uint32_t)ceil(rect_size.x);
+    uint32_t canvas_height = (uint32_t)ceil(rect_size.y);
+    double canvas_scale = 1.0;
+    switch (canvas_type) {
+        case RENDER_CANVAS_TYPE_RASTER: {
+            const uint32_t resolution_multiplier = 5;
+            canvas_scale = (double)resolution_multiplier;
+            uint32_t raster_canvas_width =
+                (uint32_t)ceil(rect_size.x * (double)resolution_multiplier);
+            uint32_t raster_canvas_height =
+                (uint32_t)ceil(rect_size.y * (double)resolution_multiplier);
+            *canvas = canvas_new_raster(
+                arena,
+                raster_canvas_width,
+                raster_canvas_height,
+                rgba_new(1.0, 1.0, 1.0, 1.0)
+            );
+            break;
+        }
+        case RENDER_CANVAS_TYPE_SCALABLE: {
+            *canvas = canvas_new_scalable(
+                arena,
+                canvas_width,
+                canvas_height,
+                rgba_new(1.0, 1.0, 1.0, 1.0),
+                1.0
+            );
+            break;
+        }
+    }
 
     PathBuilderOptions path_options = path_builder_options_default();
     if (canvas_is_raster(*canvas)) {
@@ -1098,6 +1141,7 @@ Error* render_page(
         .graphics_state_stack = graphics_state_stack_new(arena),
         .text_object_state = text_object_state_default(),
         .path_options = path_options,
+        .stroke_width_scale = canvas_scale,
         .pending_clip = false,
         .pending_clip_even_odd = false,
         .cache.cmap_cache = pdf_cmap_cache_new(arena),
@@ -1110,9 +1154,8 @@ Error* render_page(
         state.graphics_state_stack,
         graphics_state_default()
     );
-    consume_current_path(arena, &state, *canvas);
 
-    double scale = 1.0; // TODO: load
+    double scale = canvas_scale; // TODO: load
     current_graphics_state(&state)->ctm = geom_mat3_mul(
         geom_mat3_translate(-rect.min.x * scale, -rect.min.y * scale),
         geom_mat3_new(
@@ -1127,6 +1170,7 @@ Error* render_page(
             1.0
         )
     );
+    consume_current_path(arena, &state, *canvas);
 
     if (page->contents.is_some) {
         for (size_t contents_idx = 0;

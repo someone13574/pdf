@@ -43,8 +43,14 @@ int main(int argc, char** argv) {
         }
 
         Canvas* canvas = NULL;
-        REQUIRE(render_page(arena, resolver, &page, &canvas));
-        canvas_write_file(canvas, "test.bmp");
+        REQUIRE(render_page(
+            arena,
+            resolver,
+            &page,
+            RENDER_CANVAS_TYPE_SCALABLE,
+            &canvas
+        ));
+        canvas_write_file(canvas, "test.svg");
     };
 
     LOG_DIAG(INFO, EXAMPLE, "Finished");
