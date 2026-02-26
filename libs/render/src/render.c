@@ -1076,10 +1076,15 @@ Error* render_page(
     );
 
     const uint32_t resolution_multiplier = 5;
+    GeomVec2 rect_size = geom_rect_size(rect);
+    uint32_t canvas_width =
+        (uint32_t)ceil(rect_size.x * (double)resolution_multiplier);
+    uint32_t canvas_height =
+        (uint32_t)ceil(rect_size.y * (double)resolution_multiplier);
     *canvas = canvas_new_raster(
         arena,
-        (uint32_t)geom_rect_size(rect).x * resolution_multiplier,
-        (uint32_t)geom_rect_size(rect).y * resolution_multiplier,
+        canvas_width,
+        canvas_height,
         rgba_new(1.0, 1.0, 1.0, 1.0),
         (double)resolution_multiplier
     );
