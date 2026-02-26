@@ -230,7 +230,11 @@ void sfnt_glyph_render(
     }
 
     Arena* temp_arena = arena_new(4096);
-    PathBuilder* path = path_builder_new(temp_arena);
+    PathBuilderOptions path_options = path_builder_options_default();
+    if (canvas_is_raster(canvas)) {
+        path_options = path_builder_options_flattened();
+    }
+    PathBuilder* path = path_builder_new_with_options(temp_arena, path_options);
 
     if (glyph->glyph_type != SFNT_GLYPH_TYPE_SIMPLE) {
         LOG_TODO("Only simple glyphs are supported");

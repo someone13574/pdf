@@ -19,12 +19,10 @@ Canvas* canvas_new_raster(
     Arena* arena,
     uint32_t width,
     uint32_t height,
-    uint32_t rgba,
-    double coordinate_scale
+    Rgba rgba
 ) {
     Canvas* canvas = arena_alloc(arena, sizeof(Canvas));
-    canvas->data.raster =
-        raster_canvas_new(arena, width, height, rgba, coordinate_scale);
+    canvas->data.raster = raster_canvas_new(arena, width, height, rgba);
     canvas->type = CANVAS_TYPE_RASTER;
 
     return canvas;
@@ -42,7 +40,7 @@ Canvas* canvas_new_scalable(
     Arena* arena,
     uint32_t width,
     uint32_t height,
-    uint32_t rgba,
+    Rgba rgba,
     double raster_res
 ) {
     Canvas* canvas = arena_alloc(arena, sizeof(Canvas));
@@ -61,7 +59,7 @@ bool canvas_is_raster(Canvas* canvas) {
 double canvas_raster_res(Canvas* canvas) {
     RELEASE_ASSERT(canvas);
     if (canvas->type == CANVAS_TYPE_RASTER) {
-        return 1.0;
+        return raster_canvas_raster_res(canvas->data.raster);
     } else {
         return scalable_canvas_raster_res(canvas->data.scalable);
     }
@@ -72,7 +70,7 @@ void canvas_draw_circle(
     double x,
     double y,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 ) {
     switch (canvas->type) {
         case CANVAS_TYPE_RASTER: {
@@ -102,7 +100,7 @@ void canvas_draw_line(
     double x2,
     double y2,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 ) {
     switch (canvas->type) {
         case CANVAS_TYPE_RASTER: {
@@ -145,7 +143,7 @@ void canvas_draw_bezier(
     double cy,
     double flatness,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 ) {
     switch (canvas->type) {
         case CANVAS_TYPE_RASTER: {
@@ -255,12 +253,13 @@ void canvas_pop_clip_paths(Canvas* canvas, size_t count) {
     }
 }
 
-void canvas_draw_pixel(Canvas* canvas, GeomVec2 position, uint32_t rgba) {
+void canvas_draw_pixel(Canvas* canvas, GeomVec2 position, Rgba rgba) {
     RELEASE_ASSERT(canvas);
 
     switch (canvas->type) {
         case CANVAS_TYPE_RASTER: {
-            LOG_TODO();
+            raster_canvas_draw_pixel(canvas->data.raster, position, rgba);
+            break;
         }
         case CANVAS_TYPE_SCALABLE: {
             scalable_canvas_draw_pixel(canvas->data.scalable, position, rgba);

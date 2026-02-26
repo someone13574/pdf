@@ -6,6 +6,7 @@
 
 #include "arena/arena.h"
 #include "canvas/path_builder.h"
+#include "color/rgb.h"
 
 typedef enum CanvasLineCap {
     CANVAS_LINECAP_BUTT,
@@ -21,10 +22,11 @@ typedef enum CanvasLineJoin {
 
 typedef struct CanvasBrush {
     bool enable_fill;
+    bool even_odd_fill;
     bool enable_stroke;
 
-    uint32_t fill_rgba;
-    uint32_t stroke_rgba;
+    Rgba fill_rgba;
+    Rgba stroke_rgba;
 
     double stroke_width;
     CanvasLineCap line_cap;
@@ -38,15 +40,14 @@ Canvas* canvas_new_raster(
     Arena* arena,
     uint32_t width,
     uint32_t height,
-    uint32_t rgba,
-    double coordinate_scale
+    Rgba rgba
 );
 
 Canvas* canvas_new_scalable(
     Arena* arena,
     uint32_t width,
     uint32_t height,
-    uint32_t rgba,
+    Rgba rgba,
     double raster_res
 );
 
@@ -58,7 +59,7 @@ void canvas_draw_circle(
     double x,
     double y,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 );
 
 void canvas_draw_line(
@@ -68,7 +69,7 @@ void canvas_draw_line(
     double x2,
     double y2,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 );
 
 void canvas_draw_bezier(
@@ -81,7 +82,7 @@ void canvas_draw_bezier(
     double cy,
     double flatness,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 );
 
 void canvas_draw_path(
@@ -98,7 +99,7 @@ void canvas_push_clip_path(
 
 void canvas_pop_clip_paths(Canvas* canvas, size_t count);
 
-void canvas_draw_pixel(Canvas* canvas, GeomVec2 position, uint32_t rgba);
+void canvas_draw_pixel(Canvas* canvas, GeomVec2 position, Rgba rgba);
 
 /// Writes the canvas to a file. Returns `true` on success.
 bool canvas_write_file(Canvas* canvas, const char* path);

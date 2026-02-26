@@ -14,21 +14,20 @@ RasterCanvas* raster_canvas_new(
     Arena* arena,
     uint32_t width,
     uint32_t height,
-    uint32_t rgba,
-    double coordinate_scale
+    Rgba rgba
 );
 
+double raster_canvas_raster_res(const RasterCanvas* canvas);
 uint32_t raster_canvas_width(const RasterCanvas* canvas);
 uint32_t raster_canvas_height(const RasterCanvas* canvas);
 
-uint32_t
-raster_canvas_get_rgba(const RasterCanvas* canvas, uint32_t x, uint32_t y);
+Rgba raster_canvas_get_rgba(const RasterCanvas* canvas, uint32_t x, uint32_t y);
 
 void raster_canvas_set_rgba(
     RasterCanvas* canvas,
     uint32_t x,
     uint32_t y,
-    uint32_t rgba
+    Rgba rgba
 );
 
 void raster_canvas_draw_circle(
@@ -36,7 +35,7 @@ void raster_canvas_draw_circle(
     double x,
     double y,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 );
 
 void raster_canvas_draw_line(
@@ -46,7 +45,7 @@ void raster_canvas_draw_line(
     double x2,
     double y2,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 );
 
 void raster_canvas_draw_arrow(
@@ -57,7 +56,7 @@ void raster_canvas_draw_arrow(
     double y2,
     double radius,
     double tip_radius,
-    uint32_t rgba
+    Rgba rgba
 );
 
 void raster_canvas_draw_bezier(
@@ -70,7 +69,7 @@ void raster_canvas_draw_bezier(
     double cy,
     double flatness,
     double radius,
-    uint32_t rgba
+    Rgba rgba
 );
 
 void raster_canvas_draw_path(
@@ -86,5 +85,11 @@ void raster_canvas_push_clip_path(
 );
 
 void raster_canvas_pop_clip_paths(RasterCanvas* canvas, size_t count);
+
+void raster_canvas_draw_pixel(
+    RasterCanvas* canvas,
+    GeomVec2 position,
+    Rgba rgba
+);
 
 bool raster_canvas_write_file(RasterCanvas* canvas, const char* path);

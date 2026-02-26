@@ -19,8 +19,8 @@ GeomRect geom_rect_new_centered(GeomVec2 center, GeomVec2 radius) {
 GeomRect geom_rect_round(GeomRect rect) {
     rect.min.x = floor(rect.min.x);
     rect.min.y = floor(rect.min.y);
-    rect.max.x = floor(rect.max.x);
-    rect.max.y = floor(rect.max.y);
+    rect.max.x = ceil(rect.max.x);
+    rect.max.y = ceil(rect.max.y);
 
     return rect;
 }

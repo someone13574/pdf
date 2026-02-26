@@ -1,5 +1,6 @@
 #include "render/render.h"
 
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -63,7 +64,9 @@ static CanvasLineJoin pdf_line_join_to_canvas(PdfLineJoinStyle line_join) {
 typedef struct {
     GraphicsStateStack* graphics_state_stack; // idx 0 == top
     TextObjectState text_object_state;
+    PathBuilderOptions path_options;
     PathBuilder* path;
+    double stroke_width_scale;
     bool pending_clip;
     bool pending_clip_even_odd;
 
@@ -115,16 +118,92 @@ static Error* restore_graphics_state(RenderState* state, Canvas* canvas) {
     return NULL;
 }
 
-static uint32_t pack_rgba(GeomVec3 rgb, double a) {
-    return ((uint32_t)(rgb.x * 255.0) << 24) | ((uint32_t)(rgb.y * 255.0) << 16)
-         | ((uint32_t)(rgb.z * 255.0) << 8) | (uint32_t)(a * 255.0);
+static Rgba make_rgba(GeomVec3 rgb, double a) {
+    return rgba_from_rgb(rgb_from_geom(rgb), a);
 }
 
-static void consume_current_path(Arena* arena, RenderState* state) {
+static double render_current_stroke_width(RenderState* state) {
+    RELEASE_ASSERT(state);
+    return current_graphics_state(state)->line_width * state->stroke_width_scale;
+}
+
+static double render_ctm_max_linear_scale(GeomMat3 ctm) {
+    double a = ctm.mat[0][0];
+    double b = ctm.mat[0][1];
+    double c = ctm.mat[1][0];
+    double d = ctm.mat[1][1];
+
+    double trace = a * a + b * b + c * c + d * d;
+    double det = a * d - b * c;
+    double disc = trace * trace - 4.0 * det * det;
+    if (disc < 0.0) {
+        disc = 0.0;
+    }
+
+    double sigma_max = sqrt(0.5 * (trace + sqrt(disc)));
+    if (sigma_max < 1e-9) {
+        return 1e-9;
+    }
+
+    return sigma_max;
+}
+
+static PathBuilderOptions
+render_current_path_options(RenderState* state, Canvas* canvas) {
+    RELEASE_ASSERT(state);
+    RELEASE_ASSERT(canvas);
+
+    PathBuilderOptions options = state->path_options;
+    if (!options.flatten_curves) {
+        return options;
+    }
+
+    double flatness = current_graphics_state(state)->flatness;
+    if (flatness <= 1e-9) {
+        flatness = 1e-6;
+    }
+
+    double ctm_scale =
+        render_ctm_max_linear_scale(current_graphics_state(state)->ctm);
+    double raster_scale = 1.0;
+    if (canvas_is_raster(canvas)) {
+        raster_scale = 1.0 / canvas_raster_res(canvas);
+    }
+
+    double user_space_flatness = flatness / (ctm_scale * raster_scale);
+    if (user_space_flatness <= 1e-9) {
+        user_space_flatness = 1e-9;
+    }
+
+    options.quad_flatness = user_space_flatness;
+    options.cubic_flatness = user_space_flatness;
+    return options;
+}
+
+static void render_refresh_path_options(RenderState* state, Canvas* canvas) {
+    RELEASE_ASSERT(state);
+    RELEASE_ASSERT(canvas);
+
+    if (!state->path) {
+        return;
+    }
+
+    path_builder_set_options(
+        state->path,
+        render_current_path_options(state, canvas)
+    );
+}
+
+static void
+consume_current_path(Arena* arena, RenderState* state, Canvas* canvas) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(state);
+    RELEASE_ASSERT(canvas);
 
-    state->path = path_builder_new(arena); // TODO: recycle
+    state->path = path_builder_new_with_options(
+        arena,
+        render_current_path_options(state, canvas)
+    ); // TODO: recycle
 }
 
 static void apply_pending_clip_path(RenderState* state, Canvas* canvas) {
@@ -180,6 +259,7 @@ static Error* process_content_stream(
             }
             case PDF_OPERATOR_i: {
                 current_graphics_state(state)->flatness = op.data.flatness;
+                render_refresh_path_options(state, canvas);
                 break;
             }
             case PDF_OPERATOR_gs: {
@@ -202,6 +282,7 @@ static Error* process_content_stream(
                     current_graphics_state(state),
                     params
                 );
+                render_refresh_path_options(state, canvas);
                 break;
             }
             case PDF_OPERATOR_q: {
@@ -210,6 +291,7 @@ static Error* process_content_stream(
             }
             case PDF_OPERATOR_Q: {
                 TRY(restore_graphics_state(state, canvas));
+                render_refresh_path_options(state, canvas);
                 break;
             }
             case PDF_OPERATOR_cm: {
@@ -217,6 +299,7 @@ static Error* process_content_stream(
                     op.data.set_ctm,
                     current_graphics_state(state)->ctm
                 );
+                render_refresh_path_options(state, canvas);
                 break;
             }
             case PDF_OPERATOR_m: {
@@ -272,11 +355,11 @@ static Error* process_content_stream(
                 CanvasBrush brush = {
                     .enable_fill = false,
                     .enable_stroke = true,
-                    .stroke_rgba = pack_rgba(
+                    .stroke_rgba = make_rgba(
                         current_graphics_state(state)->stroking_rgb,
                         current_graphics_state(state)->stroking_alpha
                     ),
-                    .stroke_width = current_graphics_state(state)->line_width,
+                    .stroke_width = render_current_stroke_width(state),
                     .line_cap = pdf_line_cap_to_canvas(
                         current_graphics_state(state)->line_cap
                     ),
@@ -292,14 +375,15 @@ static Error* process_content_stream(
                 );
                 apply_pending_clip_path(state, canvas);
                 canvas_draw_path(canvas, state->path, brush);
-                consume_current_path(arena, state);
+                consume_current_path(arena, state, canvas);
                 break;
             }
+            case PDF_OPERATOR_F:
             case PDF_OPERATOR_f: {
                 CanvasBrush brush = {
                     .enable_fill = true,
                     .enable_stroke = false,
-                    .fill_rgba = pack_rgba(
+                    .fill_rgba = make_rgba(
                         current_graphics_state(state)->nonstroking_rgb,
                         current_graphics_state(state)->nonstroking_alpha
                     )
@@ -311,22 +395,42 @@ static Error* process_content_stream(
                 );
                 apply_pending_clip_path(state, canvas);
                 canvas_draw_path(canvas, state->path, brush);
-                consume_current_path(arena, state);
+                consume_current_path(arena, state, canvas);
+                break;
+            }
+            case PDF_OPERATOR_f_star: {
+                CanvasBrush brush = {
+                    .enable_fill = true,
+                    .even_odd_fill = true,
+                    .enable_stroke = false,
+                    .fill_rgba = make_rgba(
+                        current_graphics_state(state)->nonstroking_rgb,
+                        current_graphics_state(state)->nonstroking_alpha
+                    )
+                };
+
+                path_builder_apply_transform(
+                    state->path,
+                    current_graphics_state(state)->ctm
+                );
+                apply_pending_clip_path(state, canvas);
+                canvas_draw_path(canvas, state->path, brush);
+                consume_current_path(arena, state, canvas);
                 break;
             }
             case PDF_OPERATOR_B: {
                 CanvasBrush brush = {
                     .enable_fill = true,
                     .enable_stroke = true,
-                    .fill_rgba = pack_rgba(
+                    .fill_rgba = make_rgba(
                         current_graphics_state(state)->nonstroking_rgb,
                         current_graphics_state(state)->nonstroking_alpha
                     ),
-                    .stroke_rgba = pack_rgba(
+                    .stroke_rgba = make_rgba(
                         current_graphics_state(state)->stroking_rgb,
                         current_graphics_state(state)->stroking_alpha
                     ),
-                    .stroke_width = current_graphics_state(state)->line_width,
+                    .stroke_width = render_current_stroke_width(state),
                     .line_cap = pdf_line_cap_to_canvas(
                         current_graphics_state(state)->line_cap
                     ),
@@ -342,7 +446,106 @@ static Error* process_content_stream(
                 );
                 apply_pending_clip_path(state, canvas);
                 canvas_draw_path(canvas, state->path, brush);
-                consume_current_path(arena, state);
+                consume_current_path(arena, state, canvas);
+                break;
+            }
+            case PDF_OPERATOR_B_star: {
+                CanvasBrush brush = {
+                    .enable_fill = true,
+                    .even_odd_fill = true,
+                    .enable_stroke = true,
+                    .fill_rgba = make_rgba(
+                        current_graphics_state(state)->nonstroking_rgb,
+                        current_graphics_state(state)->nonstroking_alpha
+                    ),
+                    .stroke_rgba = make_rgba(
+                        current_graphics_state(state)->stroking_rgb,
+                        current_graphics_state(state)->stroking_alpha
+                    ),
+                    .stroke_width = render_current_stroke_width(state),
+                    .line_cap = pdf_line_cap_to_canvas(
+                        current_graphics_state(state)->line_cap
+                    ),
+                    .line_join = pdf_line_join_to_canvas(
+                        current_graphics_state(state)->line_join
+                    ),
+                    .miter_limit = current_graphics_state(state)->miter_limit
+                };
+
+                path_builder_apply_transform(
+                    state->path,
+                    current_graphics_state(state)->ctm
+                );
+                apply_pending_clip_path(state, canvas);
+                canvas_draw_path(canvas, state->path, brush);
+                consume_current_path(arena, state, canvas);
+                break;
+            }
+            case PDF_OPERATOR_b: {
+                path_builder_close_contour(state->path);
+
+                CanvasBrush brush = {
+                    .enable_fill = true,
+                    .enable_stroke = true,
+                    .fill_rgba = make_rgba(
+                        current_graphics_state(state)->nonstroking_rgb,
+                        current_graphics_state(state)->nonstroking_alpha
+                    ),
+                    .stroke_rgba = make_rgba(
+                        current_graphics_state(state)->stroking_rgb,
+                        current_graphics_state(state)->stroking_alpha
+                    ),
+                    .stroke_width = render_current_stroke_width(state),
+                    .line_cap = pdf_line_cap_to_canvas(
+                        current_graphics_state(state)->line_cap
+                    ),
+                    .line_join = pdf_line_join_to_canvas(
+                        current_graphics_state(state)->line_join
+                    ),
+                    .miter_limit = current_graphics_state(state)->miter_limit
+                };
+
+                path_builder_apply_transform(
+                    state->path,
+                    current_graphics_state(state)->ctm
+                );
+                apply_pending_clip_path(state, canvas);
+                canvas_draw_path(canvas, state->path, brush);
+                consume_current_path(arena, state, canvas);
+                break;
+            }
+            case PDF_OPERATOR_b_star: {
+                path_builder_close_contour(state->path);
+
+                CanvasBrush brush = {
+                    .enable_fill = true,
+                    .even_odd_fill = true,
+                    .enable_stroke = true,
+                    .fill_rgba = make_rgba(
+                        current_graphics_state(state)->nonstroking_rgb,
+                        current_graphics_state(state)->nonstroking_alpha
+                    ),
+                    .stroke_rgba = make_rgba(
+                        current_graphics_state(state)->stroking_rgb,
+                        current_graphics_state(state)->stroking_alpha
+                    ),
+                    .stroke_width = render_current_stroke_width(state),
+                    .line_cap = pdf_line_cap_to_canvas(
+                        current_graphics_state(state)->line_cap
+                    ),
+                    .line_join = pdf_line_join_to_canvas(
+                        current_graphics_state(state)->line_join
+                    ),
+                    .miter_limit = current_graphics_state(state)->miter_limit
+                };
+
+                path_builder_apply_transform(
+                    state->path,
+                    current_graphics_state(state)->ctm
+                );
+                apply_pending_clip_path(state, canvas);
+                canvas_draw_path(canvas, state->path, brush);
+                consume_current_path(arena, state, canvas);
                 break;
             }
             case PDF_OPERATOR_n: {
@@ -353,7 +556,7 @@ static Error* process_content_stream(
                     );
                     apply_pending_clip_path(state, canvas);
                 }
-                consume_current_path(arena, state);
+                consume_current_path(arena, state, canvas);
                 break;
             }
             case PDF_OPERATOR_BT: {
@@ -479,7 +682,7 @@ static Error* process_content_stream(
                         CanvasBrush brush = {
                             .enable_fill = true,
                             .enable_stroke = false,
-                            .fill_rgba = pack_rgba(
+                            .fill_rgba = make_rgba(
                                 current_graphics_state(state)->nonstroking_rgb,
                                 current_graphics_state(state)->nonstroking_alpha
                             )
@@ -806,7 +1009,10 @@ static Error* process_content_stream(
                             current_graphics_state(state)->ctm
                         );
 
-                        PathBuilder* clip_path = path_builder_new(arena);
+                        PathBuilder* clip_path = path_builder_new_with_options(
+                            arena,
+                            state->path_options
+                        );
                         path_builder_new_contour(
                             clip_path,
                             geom_vec2_new(
@@ -871,6 +1077,7 @@ Error* render_page(
     Arena* arena,
     PdfResolver* resolver,
     const PdfPage* page,
+    RenderCanvasType canvas_type,
     Canvas** canvas
 ) {
     RELEASE_ASSERT(arena);
@@ -893,15 +1100,54 @@ Error* render_page(
         )
     );
 
+    GeomVec2 rect_size = geom_rect_size(rect);
+    uint32_t canvas_width = (uint32_t)ceil(rect_size.x);
+    uint32_t canvas_height = (uint32_t)ceil(rect_size.y);
+    double canvas_scale = 1.0;
+    switch (canvas_type) {
+        case RENDER_CANVAS_TYPE_RASTER: {
+            const uint32_t resolution_multiplier = 5;
+            canvas_scale = (double)resolution_multiplier;
+            uint32_t raster_canvas_width =
+                (uint32_t)ceil(rect_size.x * (double)resolution_multiplier);
+            uint32_t raster_canvas_height =
+                (uint32_t)ceil(rect_size.y * (double)resolution_multiplier);
+            *canvas = canvas_new_raster(
+                arena,
+                raster_canvas_width,
+                raster_canvas_height,
+                rgba_new(1.0, 1.0, 1.0, 1.0)
+            );
+            break;
+        }
+        case RENDER_CANVAS_TYPE_SCALABLE: {
+            *canvas = canvas_new_scalable(
+                arena,
+                canvas_width,
+                canvas_height,
+                rgba_new(1.0, 1.0, 1.0, 1.0),
+                1.0
+            );
+            break;
+        }
+    }
+
+    PathBuilderOptions path_options = path_builder_options_default();
+    if (canvas_is_raster(*canvas)) {
+        path_options = path_builder_options_flattened();
+    }
+
     RenderState state = {
         .graphics_state_stack = graphics_state_stack_new(arena),
         .text_object_state = text_object_state_default(),
+        .path_options = path_options,
+        .stroke_width_scale = canvas_scale,
         .pending_clip = false,
         .pending_clip_even_odd = false,
         .cache.cmap_cache = pdf_cmap_cache_new(arena),
         .cache.glyph_list = NULL,
         .cache.icc_cache = icc_profile_cache_new(arena),
-        .path = path_builder_new(arena)
+        .path = NULL
     };
 
     graphics_state_stack_push_back(
@@ -909,7 +1155,7 @@ Error* render_page(
         graphics_state_default()
     );
 
-    double scale = 1.0; // TODO: load
+    double scale = canvas_scale; // TODO: load
     current_graphics_state(&state)->ctm = geom_mat3_mul(
         geom_mat3_translate(-rect.min.x * scale, -rect.min.y * scale),
         geom_mat3_new(
@@ -924,14 +1170,7 @@ Error* render_page(
             1.0
         )
     );
-
-    *canvas = canvas_new_scalable(
-        arena,
-        (uint32_t)geom_rect_size(rect).x,
-        (uint32_t)geom_rect_size(rect).y,
-        0xffffffff,
-        1.0
-    );
+    consume_current_path(arena, &state, *canvas);
 
     if (page->contents.is_some) {
         for (size_t contents_idx = 0;

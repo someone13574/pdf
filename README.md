@@ -18,14 +18,13 @@ So far the following have been implemented:
   - This only implements the operators needed for these tasks
 - A simple (incomplete) renderer
 - A minimal ICC parser
-- A SVG canvas
+- SVG and raster (y-monotone tessellation) canvas backends
 
 Future expansions:
 
 - Type1 font parser
-- Support for patterns and shadings
+- Support for patterns and shadings (already partially supported)
 - Image support
-- Raster canvas backend
 
 # Resources
 

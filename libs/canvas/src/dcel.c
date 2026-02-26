@@ -3,10 +3,11 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "arena/arena.h"
 #include "logger/log.h"
-#include "raster_canvas.h"
+#include "path_builder.h"
 
 #define DVEC_NAME DcelVertices
 #define DVEC_LOWERCASE_NAME dcel_vertices
@@ -331,8 +332,16 @@ static bool half_edges_share_vertex(DcelHalfEdge* a, DcelHalfEdge* b) {
     RELEASE_ASSERT(a);
     RELEASE_ASSERT(b);
 
-    return a->origin == b->origin || a->twin->origin == b->twin->origin
-        || a->twin->origin == b->origin || a->origin == b->twin->origin;
+    const double eps = 1e-9;
+    GeomVec2 a_from = geom_vec2_new(a->origin->x, a->origin->y);
+    GeomVec2 a_to = geom_vec2_new(a->twin->origin->x, a->twin->origin->y);
+    GeomVec2 b_from = geom_vec2_new(b->origin->x, b->origin->y);
+    GeomVec2 b_to = geom_vec2_new(b->twin->origin->x, b->twin->origin->y);
+
+    return geom_vec2_equal_eps(a_from, b_from, eps)
+        || geom_vec2_equal_eps(a_from, b_to, eps)
+        || geom_vec2_equal_eps(a_to, b_from, eps)
+        || geom_vec2_equal_eps(a_to, b_to, eps);
 }
 
 static bool compute_intersection_point(
@@ -361,7 +370,8 @@ static bool compute_intersection_point(
     double num2 = (a2_x - a1_x) * (a1_y - b1_y) - (a2_y - a1_y) * (a1_x - b1_x);
     double ub = num2 / denom;
 
-    if (ua < 0.0 || ua > 1.0 || ub < 0.0 || ub > 1.0) {
+    const double eps = 1e-9;
+    if (ua <= eps || ua >= 1.0 - eps || ub <= eps || ub >= 1.0 - eps) {
         return false;
     }
 
@@ -597,23 +607,6 @@ void dcel_overlay(Dcel* dcel) {
     arena_free(local_arena);
 }
 
-static void debug_render(Dcel* dcel, Arena* arena) {
-    RELEASE_ASSERT(dcel);
-    RELEASE_ASSERT(arena);
-
-    uint32_t resolution_multiplier = 2;
-    RasterCanvas* canvas = raster_canvas_new(
-        arena,
-        1000 * resolution_multiplier,
-        900 * resolution_multiplier,
-        0xffffffff,
-        (double)resolution_multiplier
-    );
-
-    dcel_render(dcel, canvas);
-    raster_canvas_write_file(canvas, "tessellation.bmp");
-}
-
 static double signed_cycle_area(DcelHalfEdge* start_half_edge) {
     RELEASE_ASSERT(start_half_edge);
     RELEASE_ASSERT(start_half_edge->prev);
@@ -701,11 +694,10 @@ void dcel_assign_faces(Dcel* dcel) {
                 do {
                     current_edge->face = left->face;
                     current_edge = current_edge->next;
-                    debug_render(dcel, local_arena);
                 } while (current_edge && current_edge != left);
 
                 LOG_DIAG(
-                    INFO,
+                    TRACE,
                     DCEL,
                     "Area (left): %f",
                     signed_cycle_area(left)
@@ -720,11 +712,10 @@ void dcel_assign_faces(Dcel* dcel) {
                 do {
                     current_edge->face = right->face;
                     current_edge = current_edge->next;
-                    debug_render(dcel, local_arena);
                 } while (current_edge != right);
 
                 LOG_DIAG(
-                    INFO,
+                    TRACE,
                     DCEL,
                     "Area (right): %f",
                     signed_cycle_area(right)
@@ -886,169 +877,1551 @@ void dcel_partition(Dcel* dcel) {
     arena_free(local_arena);
 }
 
-static uint32_t hash32(uint32_t x) {
-    x ^= x >> 16;
-    x *= 0x7feb352d;
-    x ^= x >> 15;
-    x *= 0x846ca68b;
-    x ^= x >> 16;
-    return x;
+static bool dcel_sample_on_segment(
+    GeomVec2 a,
+    GeomVec2 b,
+    double sample_x,
+    double sample_y
+) {
+    const double eps = 1e-5;
+
+    GeomVec2 ab = geom_vec2_sub(b, a);
+    GeomVec2 ap = geom_vec2_new(sample_x - a.x, sample_y - a.y);
+    double ab_len_sq = geom_vec2_len_sq(ab);
+    if (ab_len_sq <= 1e-18) {
+        return geom_vec2_len_sq(ap) <= eps * eps;
+    }
+
+    double cross = ap.x * ab.y - ap.y * ab.x;
+    if (cross * cross > eps * eps * ab_len_sq) {
+        return false;
+    }
+
+    double dot = geom_vec2_dot(ap, ab);
+    if (dot < -eps || dot > ab_len_sq + eps) {
+        return false;
+    }
+
+    return true;
 }
 
-static uint32_t color_from_ptr(void* ptr) {
-    uintptr_t p = (uintptr_t)ptr;
-    uint32_t hash = hash32((uint32_t)(p ^ (p >> 32)) + 1);
+static void dcel_update_crossing(
+    GeomVec2 a,
+    GeomVec2 b,
+    double sample_x,
+    double sample_y,
+    int* winding,
+    int* parity,
+    bool* on_boundary
+) {
+    RELEASE_ASSERT(winding);
+    RELEASE_ASSERT(parity);
+    RELEASE_ASSERT(on_boundary);
 
-    uint8_t r = (hash >> 0) & 0xff;
-    uint8_t g = (hash >> 8) & 0xff;
-    uint8_t b = (hash >> 16) & 0xff;
-    uint8_t a = 0xff;
+    if (*on_boundary) {
+        return;
+    }
+    if (dcel_sample_on_segment(a, b, sample_x, sample_y)) {
+        *on_boundary = true;
+        return;
+    }
 
-    return ((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8)
-         | ((uint32_t)a << 0);
+    bool crosses_up = a.y <= sample_y && b.y > sample_y;
+    bool crosses_down = a.y > sample_y && b.y <= sample_y;
+    if (!crosses_up && !crosses_down) {
+        return;
+    }
+
+    double y_delta = b.y - a.y;
+    if (fabs(y_delta) < 1e-18) {
+        return;
+    }
+
+    double t = (sample_y - a.y) / y_delta;
+    double x_intersection = a.x + t * (b.x - a.x);
+    if (x_intersection <= sample_x) {
+        return;
+    }
+
+    *parity ^= 1;
+    *winding += crosses_up ? 1 : -1;
 }
 
-static double point_left_of_segment(
-    DcelVertex* vertex_a,
-    DcelVertex* vertex_b,
+bool dcel_path_contains_point(
+    const PathBuilder* path,
+    DcelFillRule fill_rule,
     double x,
     double y
 ) {
-    return (vertex_b->x - vertex_a->x) * (y - vertex_a->y)
-         - (x - vertex_a->x) * (vertex_b->y - vertex_a->y);
-}
+    RELEASE_ASSERT(path);
 
-static bool
-point_in_polygon(DcelHalfEdge* start_half_edge, double x, double y) {
-    RELEASE_ASSERT(start_half_edge);
-
-    DcelHalfEdge* half_edge = start_half_edge;
     int winding = 0;
+    int parity = 0;
+    bool on_boundary = false;
 
-    do {
-        DcelVertex* vertex_a = half_edge->origin;
-        DcelVertex* vertex_b = half_edge->twin->origin;
-        RELEASE_ASSERT(vertex_a);
-        RELEASE_ASSERT(vertex_b);
-
-        if (vertex_a->y <= y && vertex_b->y > y) {
-            if (point_left_of_segment(vertex_a, vertex_b, x, y) > 0) {
-                winding++;
-            }
-        }
-
-        if (vertex_a->y > y && vertex_b->y <= y) {
-            if (point_left_of_segment(vertex_a, vertex_b, x, y) < 0) {
-                winding--;
-            }
-        }
-
-        half_edge = half_edge->next;
-    } while (half_edge && half_edge != start_half_edge);
-
-    return winding % 2 != 0;
-}
-
-void dcel_render(const Dcel* dcel, RasterCanvas* canvas) {
-    RELEASE_ASSERT(dcel);
-    RELEASE_ASSERT(canvas);
-
-    for (size_t idx = 0; idx < dcel_half_edges_len(dcel->half_edges); idx++) {
-        DcelHalfEdge* half_edge = NULL;
+    for (size_t contour_idx = 0;
+         contour_idx < path_contour_vec_len(path->contours);
+         contour_idx++) {
+        PathContour* contour = NULL;
         RELEASE_ASSERT(
-            dcel_half_edges_get_ptr(dcel->half_edges, idx, &half_edge)
+            path_contour_vec_get(path->contours, contour_idx, &contour)
         );
 
-        if (half_edge->rendered) {
+        if (path_contour_len(contour) < 2) {
             continue;
         }
 
-        double signed_area = signed_cycle_area(half_edge);
+        PathContourSegment first;
+        RELEASE_ASSERT(path_contour_get(contour, 0, &first));
+        RELEASE_ASSERT(
+            first.type == PATH_CONTOUR_SEGMENT_TYPE_START,
+            "Path contour must start with START segment"
+        );
 
-        DcelHalfEdge* curr_half_edge = half_edge;
-        do {
-            double delta_x =
-                curr_half_edge->twin->origin->x - curr_half_edge->origin->x;
-            double delta_y =
-                curr_half_edge->twin->origin->y - curr_half_edge->origin->y;
-            double len = sqrt(delta_x * delta_x + delta_y * delta_y);
-            if (len < 1e-9) {
-                curr_half_edge->rendered = true;
-                curr_half_edge = curr_half_edge->next;
+        GeomVec2 start = first.value.start;
+        GeomVec2 current = start;
+        bool has_line = false;
+
+        for (size_t segment_idx = 1; segment_idx < path_contour_len(contour);
+             segment_idx++) {
+            PathContourSegment segment;
+            RELEASE_ASSERT(path_contour_get(contour, segment_idx, &segment));
+
+            switch (segment.type) {
+                case PATH_CONTOUR_SEGMENT_TYPE_START: {
+                    start = segment.value.start;
+                    current = segment.value.start;
+                    has_line = false;
+                    break;
+                }
+                case PATH_CONTOUR_SEGMENT_TYPE_LINE: {
+                    dcel_update_crossing(
+                        current,
+                        segment.value.line,
+                        x,
+                        y,
+                        &winding,
+                        &parity,
+                        &on_boundary
+                    );
+                    current = segment.value.line;
+                    has_line = true;
+                    break;
+                }
+                case PATH_CONTOUR_SEGMENT_TYPE_QUAD_BEZIER: {
+                    RELEASE_ASSERT(
+                        false,
+                        "DCEL point test requires flattened path segments"
+                    );
+                    break;
+                }
+                case PATH_CONTOUR_SEGMENT_TYPE_CUBIC_BEZIER: {
+                    RELEASE_ASSERT(
+                        false,
+                        "DCEL point test requires flattened path segments"
+                    );
+                    break;
+                }
+            }
+
+            if (on_boundary) {
+                break;
+            }
+        }
+
+        if (!on_boundary && has_line
+            && !geom_vec2_equal_eps(current, start, 1e-9)) {
+            dcel_update_crossing(
+                current,
+                start,
+                x,
+                y,
+                &winding,
+                &parity,
+                &on_boundary
+            );
+        }
+
+        if (on_boundary) {
+            break;
+        }
+    }
+
+    return on_boundary
+        || (fill_rule == DCEL_FILL_RULE_EVEN_ODD ? parity != 0 : winding != 0);
+}
+
+typedef struct {
+    double x;
+    int winding;
+} DcelIntersection;
+
+static int dcel_cmp_intersection(const void* lhs, const void* rhs) {
+    double a = ((const DcelIntersection*)lhs)->x;
+    double b = ((const DcelIntersection*)rhs)->x;
+    return (a > b) - (a < b);
+}
+
+static bool dcel_is_inside(int winding, DcelFillRule fill_rule) {
+    if (fill_rule == DCEL_FILL_RULE_NONZERO) {
+        return winding != 0;
+    } else {
+        return (winding & 1) != 0;
+    }
+}
+
+typedef struct {
+    bool has_pixels;
+    uint32_t min_x;
+    uint32_t min_y;
+    uint32_t max_x;
+    uint32_t max_y;
+} DcelMaskAccum;
+
+static void dcel_mask_accum_mark(DcelMaskAccum* accum, uint32_t x, uint32_t y) {
+    RELEASE_ASSERT(accum);
+
+    if (!accum->has_pixels) {
+        accum->has_pixels = true;
+        accum->min_x = x;
+        accum->min_y = y;
+        accum->max_x = x;
+        accum->max_y = y;
+        return;
+    }
+
+    if (x < accum->min_x) {
+        accum->min_x = x;
+    }
+    if (y < accum->min_y) {
+        accum->min_y = y;
+    }
+    if (x > accum->max_x) {
+        accum->max_x = x;
+    }
+    if (y > accum->max_y) {
+        accum->max_y = y;
+    }
+}
+
+void dcel_rasterize_path_mask(
+    Arena* arena,
+    const PathBuilder* path,
+    DcelFillRule fill_rule,
+    uint32_t width,
+    uint32_t height,
+    double coordinate_scale,
+    Uint8Array* out_mask,
+    DcelMaskBounds* out_bounds
+) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(path);
+    RELEASE_ASSERT(out_mask);
+    RELEASE_ASSERT(coordinate_scale > 1e-6);
+
+    if (out_bounds) {
+        *out_bounds = (DcelMaskBounds) {.is_empty = true,
+                                        .min_x = 0,
+                                        .min_y = 0,
+                                        .max_x = 0,
+                                        .max_y = 0};
+    }
+
+    if (width == 0 || height == 0) {
+        return;
+    }
+
+    size_t pixel_count = (size_t)width * (size_t)height;
+    RELEASE_ASSERT(uint8_array_len(out_mask) == pixel_count);
+    for (size_t mask_idx = 0; mask_idx < pixel_count; mask_idx++) {
+        uint8_array_set(out_mask, mask_idx, 0);
+    }
+
+    DcelMaskAccum accum =
+        {.has_pixels = false, .min_x = 0, .min_y = 0, .max_x = 0, .max_y = 0};
+
+    size_t num_contours = path_contour_vec_len(path->contours);
+    size_t num_path_segments = 0;
+    double global_min_y = 0.0, global_max_y = 0.0;
+    bool has_vertices = false;
+    for (size_t contour_idx = 0; contour_idx < num_contours; contour_idx++) {
+        PathContour* contour = NULL;
+        RELEASE_ASSERT(
+            path_contour_vec_get(path->contours, contour_idx, &contour)
+        );
+        size_t segment_count = path_contour_len(contour);
+        if (segment_count < 2) {
+            continue;
+        }
+        num_path_segments += segment_count;
+        for (size_t segment_idx = 0; segment_idx < segment_count;
+             segment_idx++) {
+            PathContourSegment segment;
+            RELEASE_ASSERT(path_contour_get(contour, segment_idx, &segment));
+            double y = path_contour_segment_end(segment).y;
+            if (!has_vertices) {
+                global_min_y = global_max_y = y;
+                has_vertices = true;
+            } else {
+                if (y < global_min_y) {
+                    global_min_y = y;
+                }
+                if (y > global_max_y) {
+                    global_max_y = y;
+                }
+            }
+        }
+    }
+    if (has_vertices) {
+        int64_t scan_start_y =
+            (int64_t)floor(global_min_y * coordinate_scale) - 1;
+        int64_t scan_end_y = (int64_t)ceil(global_max_y * coordinate_scale);
+        if (scan_start_y < 0) {
+            scan_start_y = 0;
+        }
+        if (scan_end_y >= (int64_t)height) {
+            scan_end_y = (int64_t)height - 1;
+        }
+
+        DcelIntersection* intersections =
+            arena_alloc(arena, num_path_segments * sizeof(DcelIntersection));
+
+        const double eps = 1e-9;
+        for (int64_t py = scan_start_y; py <= scan_end_y; py++) {
+            double sample_y = ((double)py + 0.5) / coordinate_scale;
+            size_t num_intersections = 0;
+
+            for (size_t contour_idx = 0; contour_idx < num_contours;
+                 contour_idx++) {
+                PathContour* contour = NULL;
+                RELEASE_ASSERT(
+                    path_contour_vec_get(path->contours, contour_idx, &contour)
+                );
+                size_t segment_count = path_contour_len(contour);
+                if (segment_count < 2) {
+                    continue;
+                }
+
+                PathContourSegment first_segment;
+                RELEASE_ASSERT(path_contour_get(contour, 0, &first_segment));
+                RELEASE_ASSERT(
+                    first_segment.type == PATH_CONTOUR_SEGMENT_TYPE_START
+                );
+                GeomVec2 contour_start = first_segment.value.start;
+                GeomVec2 current = contour_start;
+                bool has_line = false;
+
+                for (size_t segment_idx = 1; segment_idx < segment_count;
+                     segment_idx++) {
+                    PathContourSegment segment;
+                    RELEASE_ASSERT(
+                        path_contour_get(contour, segment_idx, &segment)
+                    );
+                    RELEASE_ASSERT(
+                        segment.type == PATH_CONTOUR_SEGMENT_TYPE_LINE,
+                        "DCEL rasterization requires flattened path segments"
+                    );
+                    GeomVec2 next = segment.value.line;
+
+                    double current_y = current.y;
+                    double next_y = next.y;
+                    int winding;
+                    if (current_y <= sample_y && next_y > sample_y) {
+                        winding = 1;
+                    } else if (current_y > sample_y && next_y <= sample_y) {
+                        winding = -1;
+                    } else {
+                        current = next;
+                        has_line = true;
+                        continue;
+                    }
+                    double t = (sample_y - current_y) / (next_y - current_y);
+                    RELEASE_ASSERT(num_intersections < num_path_segments);
+                    intersections[num_intersections].x =
+                        current.x + t * (next.x - current.x);
+                    intersections[num_intersections].winding = winding;
+                    num_intersections++;
+
+                    current = next;
+                    has_line = true;
+                }
+
+                // Implicit closing edge.
+                if (has_line
+                    && !geom_vec2_equal_eps(current, contour_start, 1e-9)) {
+                    double current_y = current.y;
+                    double contour_start_y = contour_start.y;
+                    int winding;
+                    bool crosses_scanline = false;
+                    if (current_y <= sample_y && contour_start_y > sample_y) {
+                        winding = 1;
+                        crosses_scanline = true;
+                    } else if (current_y > sample_y
+                               && contour_start_y <= sample_y) {
+                        winding = -1;
+                        crosses_scanline = true;
+                    }
+
+                    if (crosses_scanline) {
+                        double t = (sample_y - current_y)
+                                 / (contour_start_y - current_y);
+                        RELEASE_ASSERT(num_intersections < num_path_segments);
+                        intersections[num_intersections].x =
+                            current.x + t * (contour_start.x - current.x);
+                        intersections[num_intersections].winding = winding;
+                        num_intersections++;
+                    }
+                }
+            }
+
+            if (num_intersections == 0) {
                 continue;
             }
 
-            double normal_x = -delta_y / len;
-            double normal_y = delta_x / len;
-
-            double spacing = 5.0;
-            double face_sign = signed_area < 0.0 ? -1.0 : 1.0;
-            double offset_x = normal_x * spacing;
-            double offset_y = normal_y * spacing;
-
-            bool in_poly = point_in_polygon(
-                curr_half_edge,
-                (curr_half_edge->origin->x + curr_half_edge->twin->origin->x)
-                        / 2.0
-                    + offset_x * 1e-2,
-                (curr_half_edge->origin->y + curr_half_edge->twin->origin->y)
-                        / 2.0
-                    + offset_y * 1e-2
-            );
-            // double sign = in_poly ? 1.0 : -1.0;
-
-            double radius = 5.1;
-            double tip_radius = 1.0;
-
-            // uint32_t color = face_sign < 0.0 ? 0xff0000ff : 0x00ff00ff;
-            uint32_t color = color_from_ptr((void*)curr_half_edge);
-
-            raster_canvas_draw_circle(
-                canvas,
-                (curr_half_edge->origin->x + curr_half_edge->twin->origin->x)
-                        / 2.0
-                    + offset_x * 2,
-                (curr_half_edge->origin->y + curr_half_edge->twin->origin->y)
-                        / 2.0
-                    + offset_y * 2,
-                8.0,
-                (face_sign > 0.0) == in_poly ? 0x00ff00ff : 0xff0000ff
+            qsort(
+                intersections,
+                num_intersections,
+                sizeof(DcelIntersection),
+                dcel_cmp_intersection
             );
 
-            raster_canvas_draw_circle(
-                canvas,
-                (curr_half_edge->origin->x + curr_half_edge->twin->origin->x)
-                        / 2.0
-                    + offset_x * 2,
-                (curr_half_edge->origin->y + curr_half_edge->twin->origin->y)
-                        / 2.0
-                    + offset_y * 2,
-                5.0,
-                color
-            );
+            // Apply fill rule: track running winding, fill spans where inside.
+            int running = 0;
+            double span_start_x = 0.0;
+            for (size_t intersection_idx = 0;
+                 intersection_idx < num_intersections;
+                 intersection_idx++) {
+                bool was_inside = dcel_is_inside(running, fill_rule);
+                running += intersections[intersection_idx].winding;
+                bool now_inside = dcel_is_inside(running, fill_rule);
 
-            raster_canvas_draw_arrow(
-                canvas,
-                curr_half_edge->origin->x + offset_x,
-                curr_half_edge->origin->y + offset_y,
-                curr_half_edge->twin->origin->x + offset_x,
-                curr_half_edge->twin->origin->y + offset_y,
-                radius,
-                tip_radius,
-                color
-            );
+                if (!was_inside && now_inside) {
+                    span_start_x = intersections[intersection_idx].x;
+                } else if (was_inside && !now_inside) {
+                    double span_end_x = intersections[intersection_idx].x;
+                    int64_t px_start = (int64_t)ceil(
+                        (span_start_x - eps) * coordinate_scale - 0.5
+                    );
+                    int64_t px_end = (int64_t)floor(
+                        (span_end_x + eps) * coordinate_scale - 0.5
+                    );
+                    if (px_start < 0) {
+                        px_start = 0;
+                    }
+                    if (px_end >= (int64_t)width) {
+                        px_end = (int64_t)width - 1;
+                    }
+                    for (int64_t px = px_start; px <= px_end; px++) {
+                        size_t mask_idx =
+                            (size_t)py * (size_t)width + (size_t)px;
+                        uint8_t mask_value = 0;
+                        RELEASE_ASSERT(
+                            uint8_array_get(out_mask, mask_idx, &mask_value)
+                        );
+                        if (mask_value == 0) {
+                            uint8_array_set(out_mask, mask_idx, 1);
+                            dcel_mask_accum_mark(
+                                &accum,
+                                (uint32_t)px,
+                                (uint32_t)py
+                            );
+                        }
+                    }
+                }
+            }
+        }
 
-            curr_half_edge->rendered = true;
-            curr_half_edge = curr_half_edge->next;
-        } while (curr_half_edge && curr_half_edge != half_edge);
+        // Boundary pass: fill pixels whose centers lie on or near a path edge.
+        // Catches vertices at scanline y and other boundary samples missed by
+        // the span fill (e.g. topmost/bottommost vertices, horizontal edges).
+        for (size_t contour_idx = 0; contour_idx < num_contours;
+             contour_idx++) {
+            PathContour* contour = NULL;
+            RELEASE_ASSERT(
+                path_contour_vec_get(path->contours, contour_idx, &contour)
+            );
+            size_t segment_count = path_contour_len(contour);
+            if (segment_count < 2) {
+                continue;
+            }
+
+            PathContourSegment first_segment;
+            RELEASE_ASSERT(path_contour_get(contour, 0, &first_segment));
+            GeomVec2 contour_start = first_segment.value.start;
+            GeomVec2 current = contour_start;
+            bool has_line = false;
+
+            for (size_t segment_idx = 1; segment_idx < segment_count;
+                 segment_idx++) {
+                PathContourSegment segment;
+                RELEASE_ASSERT(
+                    path_contour_get(contour, segment_idx, &segment)
+                );
+                GeomVec2 next = segment.value.line;
+
+                GeomVec2 a = current, b = next;
+                int64_t edge_start_x =
+                    (int64_t)floor(fmin(a.x, b.x) * coordinate_scale) - 1;
+                int64_t edge_end_x =
+                    (int64_t)ceil(fmax(a.x, b.x) * coordinate_scale) + 1;
+                int64_t edge_start_y =
+                    (int64_t)floor(fmin(a.y, b.y) * coordinate_scale) - 1;
+                int64_t edge_end_y =
+                    (int64_t)ceil(fmax(a.y, b.y) * coordinate_scale) + 1;
+                if (edge_start_x < 0) {
+                    edge_start_x = 0;
+                }
+                if (edge_start_y < 0) {
+                    edge_start_y = 0;
+                }
+                if (edge_end_x >= (int64_t)width) {
+                    edge_end_x = (int64_t)width - 1;
+                }
+                if (edge_end_y >= (int64_t)height) {
+                    edge_end_y = (int64_t)height - 1;
+                }
+
+                for (int64_t pixel_y = edge_start_y; pixel_y <= edge_end_y;
+                     pixel_y++) {
+                    double sample_y =
+                        ((double)pixel_y + 0.5) / coordinate_scale;
+                    for (int64_t pixel_x = edge_start_x; pixel_x <= edge_end_x;
+                         pixel_x++) {
+                        size_t mask_idx =
+                            (size_t)pixel_y * (size_t)width + (size_t)pixel_x;
+                        uint8_t mask_value = 0;
+                        RELEASE_ASSERT(
+                            uint8_array_get(out_mask, mask_idx, &mask_value)
+                        );
+                        if (mask_value != 0) {
+                            continue;
+                        }
+                        double sample_x =
+                            ((double)pixel_x + 0.5) / coordinate_scale;
+                        if (dcel_sample_on_segment(a, b, sample_x, sample_y)) {
+                            uint8_array_set(out_mask, mask_idx, 1);
+                            dcel_mask_accum_mark(
+                                &accum,
+                                (uint32_t)pixel_x,
+                                (uint32_t)pixel_y
+                            );
+                        }
+                    }
+                }
+
+                current = next;
+                has_line = true;
+            }
+
+            // Implicit closing edge boundary check.
+            if (has_line
+                && !geom_vec2_equal_eps(current, contour_start, 1e-9)) {
+                GeomVec2 a = current, b = contour_start;
+                int64_t edge_start_x =
+                    (int64_t)floor(fmin(a.x, b.x) * coordinate_scale) - 1;
+                int64_t edge_end_x =
+                    (int64_t)ceil(fmax(a.x, b.x) * coordinate_scale) + 1;
+                int64_t edge_start_y =
+                    (int64_t)floor(fmin(a.y, b.y) * coordinate_scale) - 1;
+                int64_t edge_end_y =
+                    (int64_t)ceil(fmax(a.y, b.y) * coordinate_scale) + 1;
+                if (edge_start_x < 0) {
+                    edge_start_x = 0;
+                }
+                if (edge_start_y < 0) {
+                    edge_start_y = 0;
+                }
+                if (edge_end_x >= (int64_t)width) {
+                    edge_end_x = (int64_t)width - 1;
+                }
+                if (edge_end_y >= (int64_t)height) {
+                    edge_end_y = (int64_t)height - 1;
+                }
+
+                for (int64_t pixel_y = edge_start_y; pixel_y <= edge_end_y;
+                     pixel_y++) {
+                    double sample_y =
+                        ((double)pixel_y + 0.5) / coordinate_scale;
+                    for (int64_t pixel_x = edge_start_x; pixel_x <= edge_end_x;
+                         pixel_x++) {
+                        size_t mask_idx =
+                            (size_t)pixel_y * (size_t)width + (size_t)pixel_x;
+                        uint8_t mask_value = 0;
+                        RELEASE_ASSERT(
+                            uint8_array_get(out_mask, mask_idx, &mask_value)
+                        );
+                        if (mask_value != 0) {
+                            continue;
+                        }
+                        double sample_x =
+                            ((double)pixel_x + 0.5) / coordinate_scale;
+                        if (dcel_sample_on_segment(a, b, sample_x, sample_y)) {
+                            uint8_array_set(out_mask, mask_idx, 1);
+                            dcel_mask_accum_mark(
+                                &accum,
+                                (uint32_t)pixel_x,
+                                (uint32_t)pixel_y
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    for (size_t idx = 0; idx < dcel_half_edges_len(dcel->half_edges); idx++) {
-        DcelHalfEdge* half_edge = NULL;
-        RELEASE_ASSERT(
-            dcel_half_edges_get_ptr(dcel->half_edges, idx, &half_edge)
-        );
-
-        half_edge->rendered = false;
+    if (out_bounds) {
+        *out_bounds = (DcelMaskBounds) {.is_empty = !accum.has_pixels,
+                                        .min_x = accum.min_x,
+                                        .min_y = accum.min_y,
+                                        .max_x = accum.max_x,
+                                        .max_y = accum.max_y};
     }
 }
+
+#ifdef TEST
+
+#include "test/test.h"
+
+static void dcel_test_add_rect(
+    PathBuilder* path,
+    double min_x,
+    double min_y,
+    double max_x,
+    double max_y,
+    bool clockwise
+) {
+    RELEASE_ASSERT(path);
+
+    path_builder_new_contour(path, geom_vec2_new(min_x, min_y));
+    if (clockwise) {
+        path_builder_line_to(path, geom_vec2_new(min_x, max_y));
+        path_builder_line_to(path, geom_vec2_new(max_x, max_y));
+        path_builder_line_to(path, geom_vec2_new(max_x, min_y));
+    } else {
+        path_builder_line_to(path, geom_vec2_new(max_x, min_y));
+        path_builder_line_to(path, geom_vec2_new(max_x, max_y));
+        path_builder_line_to(path, geom_vec2_new(min_x, max_y));
+    }
+    path_builder_close_contour(path);
+}
+
+static void dcel_test_add_polygon(
+    PathBuilder* path,
+    const GeomVec2* points,
+    size_t point_count
+) {
+    RELEASE_ASSERT(path);
+    RELEASE_ASSERT(points);
+    RELEASE_ASSERT(point_count >= 3);
+
+    path_builder_new_contour(path, points[0]);
+    for (size_t idx = 1; idx < point_count; idx++) {
+        path_builder_line_to(path, points[idx]);
+    }
+    path_builder_close_contour(path);
+}
+
+static uint32_t dcel_test_lcg_next(uint32_t* state) {
+    RELEASE_ASSERT(state);
+    *state = *state * 1664525u + 1013904223u;
+    return *state;
+}
+
+static double dcel_test_lcg_unit(uint32_t* state) {
+    uint32_t value = dcel_test_lcg_next(state) & 0x00ffffffu;
+    return (double)value / (double)0x01000000u;
+}
+
+static double dcel_test_quantize(double value, double step) {
+    RELEASE_ASSERT(step > 0.0);
+    return round(value / step) * step;
+}
+
+static bool dcel_test_path_contains_point_reference(
+    const PathBuilder* path,
+    DcelFillRule fill_rule,
+    double x,
+    double y
+) {
+    RELEASE_ASSERT(path);
+
+    const long double two_pi = 2.0L * acosl(-1.0L);
+    long double total_angle = 0.0L;
+
+    for (size_t contour_idx = 0;
+         contour_idx < path_contour_vec_len(path->contours);
+         contour_idx++) {
+        PathContour* contour = NULL;
+        RELEASE_ASSERT(
+            path_contour_vec_get(path->contours, contour_idx, &contour)
+        );
+
+        if (path_contour_len(contour) < 2) {
+            continue;
+        }
+
+        PathContourSegment first;
+        RELEASE_ASSERT(path_contour_get(contour, 0, &first));
+        RELEASE_ASSERT(first.type == PATH_CONTOUR_SEGMENT_TYPE_START);
+
+        GeomVec2 start = first.value.start;
+        GeomVec2 current = start;
+        bool has_line = false;
+
+        for (size_t segment_idx = 1; segment_idx < path_contour_len(contour);
+             segment_idx++) {
+            PathContourSegment segment;
+            RELEASE_ASSERT(path_contour_get(contour, segment_idx, &segment));
+            RELEASE_ASSERT(segment.type == PATH_CONTOUR_SEGMENT_TYPE_LINE);
+
+            GeomVec2 end = segment.value.line;
+            if (dcel_sample_on_segment(current, end, x, y)) {
+                return true;
+            }
+
+            GeomVec2 from = geom_vec2_new(current.x - x, current.y - y);
+            GeomVec2 to = geom_vec2_new(end.x - x, end.y - y);
+            long double cross = (long double)from.x * (long double)to.y
+                              - (long double)from.y * (long double)to.x;
+            long double dot = (long double)from.x * (long double)to.x
+                            + (long double)from.y * (long double)to.y;
+            total_angle += atan2l(cross, dot);
+
+            current = end;
+            has_line = true;
+        }
+
+        if (has_line && !geom_vec2_equal_eps(current, start, 1e-9)) {
+            if (dcel_sample_on_segment(current, start, x, y)) {
+                return true;
+            }
+
+            GeomVec2 from = geom_vec2_new(current.x - x, current.y - y);
+            GeomVec2 to = geom_vec2_new(start.x - x, start.y - y);
+            long double cross = (long double)from.x * (long double)to.y
+                              - (long double)from.y * (long double)to.x;
+            long double dot = (long double)from.x * (long double)to.x
+                            + (long double)from.y * (long double)to.y;
+            total_angle += atan2l(cross, dot);
+        }
+    }
+
+    long long winding = llroundl(total_angle / two_pi);
+    long long winding_abs = winding < 0 ? -winding : winding;
+    if (fill_rule == DCEL_FILL_RULE_EVEN_ODD) {
+        return (winding_abs & 1LL) != 0;
+    }
+    return winding != 0;
+}
+
+static TestResult dcel_test_expect_mask_matches_reference(
+    Arena* arena,
+    const PathBuilder* path,
+    DcelFillRule fill_rule,
+    uint32_t width,
+    uint32_t height,
+    double coordinate_scale
+) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(path);
+
+    size_t pixel_count = (size_t)width * (size_t)height;
+    Uint8Array* actual_mask = uint8_array_new(arena, pixel_count);
+    DcelMaskBounds actual_bounds;
+    dcel_rasterize_path_mask(
+        arena,
+        path,
+        fill_rule,
+        width,
+        height,
+        coordinate_scale,
+        actual_mask,
+        &actual_bounds
+    );
+
+    bool has_expected = false;
+    DcelMaskBounds expected_bounds =
+        {.is_empty = true, .min_x = 0, .min_y = 0, .max_x = 0, .max_y = 0};
+
+    for (uint32_t y = 0; y < height; y++) {
+        for (uint32_t x = 0; x < width; x++) {
+            double sample_x = ((double)x + 0.5) / coordinate_scale;
+            double sample_y = ((double)y + 0.5) / coordinate_scale;
+            bool expected = dcel_test_path_contains_point_reference(
+                path,
+                fill_rule,
+                sample_x,
+                sample_y
+            );
+            size_t idx = (size_t)y * (size_t)width + (size_t)x;
+            uint8_t actual_mask_value = 0;
+            RELEASE_ASSERT(
+                uint8_array_get(actual_mask, idx, &actual_mask_value)
+            );
+            TEST_ASSERT_EQ(
+                (unsigned int)actual_mask_value,
+                expected ? 1U : 0U,
+                "Mask mismatch at (%u,%u), sample=(%.8f,%.8f)",
+                x,
+                y,
+                sample_x,
+                sample_y
+            );
+
+            if (!expected) {
+                continue;
+            }
+
+            if (!has_expected) {
+                expected_bounds = (DcelMaskBounds) {.is_empty = false,
+                                                    .min_x = x,
+                                                    .min_y = y,
+                                                    .max_x = x,
+                                                    .max_y = y};
+                has_expected = true;
+                continue;
+            }
+
+            if (x < expected_bounds.min_x) {
+                expected_bounds.min_x = x;
+            }
+            if (y < expected_bounds.min_y) {
+                expected_bounds.min_y = y;
+            }
+            if (x > expected_bounds.max_x) {
+                expected_bounds.max_x = x;
+            }
+            if (y > expected_bounds.max_y) {
+                expected_bounds.max_y = y;
+            }
+        }
+    }
+
+    TEST_ASSERT_EQ(actual_bounds.is_empty, (bool)!has_expected);
+    if (!has_expected) {
+        return TEST_RESULT_PASS;
+    }
+
+    TEST_ASSERT_EQ(actual_bounds.min_x, expected_bounds.min_x);
+    TEST_ASSERT_EQ(actual_bounds.min_y, expected_bounds.min_y);
+    TEST_ASSERT_EQ(actual_bounds.max_x, expected_bounds.max_x);
+    TEST_ASSERT_EQ(actual_bounds.max_y, expected_bounds.max_y);
+
+    return TEST_RESULT_PASS;
+}
+
+static TestResult dcel_test_expect_point_contains_matches_reference(
+    const PathBuilder* path,
+    uint32_t width,
+    uint32_t height,
+    double coordinate_scale
+) {
+    RELEASE_ASSERT(path);
+
+    for (uint32_t y = 0; y < height; y++) {
+        for (uint32_t x = 0; x < width; x++) {
+            double sample_x = ((double)x + 0.5) / coordinate_scale;
+            double sample_y = ((double)y + 0.5) / coordinate_scale;
+
+            for (size_t fill_idx = 0; fill_idx < 2; fill_idx++) {
+                DcelFillRule fill_rule = fill_idx == 0
+                                           ? DCEL_FILL_RULE_NONZERO
+                                           : DCEL_FILL_RULE_EVEN_ODD;
+                bool expected = dcel_test_path_contains_point_reference(
+                    path,
+                    fill_rule,
+                    sample_x,
+                    sample_y
+                );
+                bool actual = dcel_path_contains_point(
+                    path,
+                    fill_rule,
+                    sample_x,
+                    sample_y
+                );
+                TEST_ASSERT_EQ(
+                    actual,
+                    expected,
+                    "Point-contains mismatch at (%u,%u), sample=(%.8f,%.8f), fill=%d",
+                    x,
+                    y,
+                    sample_x,
+                    sample_y,
+                    (int)fill_rule
+                );
+            }
+        }
+    }
+
+    return TEST_RESULT_PASS;
+}
+
+static TestResult dcel_test_expect_mask_matches_reference_both_fill_rules(
+    Arena* arena,
+    const PathBuilder* path,
+    uint32_t width,
+    uint32_t height,
+    double coordinate_scale
+) {
+    RELEASE_ASSERT(arena);
+    RELEASE_ASSERT(path);
+
+    if (dcel_test_expect_mask_matches_reference(
+            arena,
+            path,
+            DCEL_FILL_RULE_NONZERO,
+            width,
+            height,
+            coordinate_scale
+        )
+        == TEST_RESULT_FAIL) {
+        return TEST_RESULT_FAIL;
+    }
+
+    if (dcel_test_expect_mask_matches_reference(
+            arena,
+            path,
+            DCEL_FILL_RULE_EVEN_ODD,
+            width,
+            height,
+            coordinate_scale
+        )
+        == TEST_RESULT_FAIL) {
+        return TEST_RESULT_FAIL;
+    }
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_dcel_rasterize_path_mask_monotone_matches_reference_fill_rules) {
+    Arena* arena = arena_new(4096);
+    PathBuilder* path = path_builder_new(arena);
+
+    dcel_test_add_rect(path, 1.0, 1.0, 9.0, 9.0, false);
+    dcel_test_add_rect(path, 3.0, 3.0, 7.0, 7.0, false);
+
+    TestResult result = dcel_test_expect_mask_matches_reference_both_fill_rules(
+        arena,
+        path,
+        12,
+        12,
+        1.0
+    );
+
+    arena_free(arena);
+    return result;
+}
+
+TEST_FUNC(test_dcel_path_contains_point_winding_orientation_cases) {
+    Arena* arena = arena_new(8192);
+
+    // Same orientation nesting: winding 2 in overlap region.
+    PathBuilder* same_orientation = path_builder_new(arena);
+    dcel_test_add_rect(same_orientation, 1.0, 1.0, 9.0, 9.0, false);
+    dcel_test_add_rect(same_orientation, 3.0, 3.0, 7.0, 7.0, false);
+    TEST_ASSERT(dcel_path_contains_point(
+        same_orientation,
+        DCEL_FILL_RULE_NONZERO,
+        5.0,
+        5.0
+    ));
+    TEST_ASSERT(!dcel_path_contains_point(
+        same_orientation,
+        DCEL_FILL_RULE_EVEN_ODD,
+        5.0,
+        5.0
+    ));
+
+    // Opposite orientation nesting: inner cancels winding.
+    PathBuilder* opposite_orientation = path_builder_new(arena);
+    dcel_test_add_rect(opposite_orientation, 1.0, 1.0, 9.0, 9.0, false);
+    dcel_test_add_rect(opposite_orientation, 3.0, 3.0, 7.0, 7.0, true);
+    TEST_ASSERT(!dcel_path_contains_point(
+        opposite_orientation,
+        DCEL_FILL_RULE_NONZERO,
+        5.0,
+        5.0
+    ));
+    TEST_ASSERT(!dcel_path_contains_point(
+        opposite_orientation,
+        DCEL_FILL_RULE_EVEN_ODD,
+        5.0,
+        5.0
+    ));
+
+    // Partial overlap, same orientation: nonzero differs from even-odd in
+    // overlap.
+    PathBuilder* overlap = path_builder_new(arena);
+    dcel_test_add_rect(overlap, 1.0, 1.0, 7.0, 7.0, false);
+    dcel_test_add_rect(overlap, 4.0, 2.0, 10.0, 8.0, false);
+    TEST_ASSERT(
+        dcel_path_contains_point(overlap, DCEL_FILL_RULE_NONZERO, 5.5, 4.0)
+    );
+    TEST_ASSERT(
+        !dcel_path_contains_point(overlap, DCEL_FILL_RULE_EVEN_ODD, 5.5, 4.0)
+    );
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(
+    test_dcel_path_contains_point_matches_angle_reference_random_multicontour
+) {
+    uint32_t seed = 0x1337f00du;
+
+    for (size_t case_idx = 0; case_idx < 16; case_idx++) {
+        Arena* arena = arena_new(65536);
+        PathBuilder* path = path_builder_new(arena);
+
+        size_t contour_count = 2 + (size_t)(dcel_test_lcg_next(&seed) % 3u);
+        for (size_t contour_idx = 0; contour_idx < contour_count;
+             contour_idx++) {
+            size_t point_count = 5 + (size_t)(dcel_test_lcg_next(&seed) % 6u);
+            GeomVec2 points[10];
+
+            double rotation = 2.0 * M_PI * dcel_test_lcg_unit(&seed);
+            double center_x = 6.4 + (dcel_test_lcg_unit(&seed) - 0.5) * 4.0;
+            double center_y = 6.4 + (dcel_test_lcg_unit(&seed) - 0.5) * 4.0;
+            double radius_base = 1.0 + dcel_test_lcg_unit(&seed) * 2.8;
+            bool clockwise = (dcel_test_lcg_next(&seed) & 1u) != 0;
+
+            for (size_t idx = 0; idx < point_count; idx++) {
+                double jitter = (dcel_test_lcg_unit(&seed) - 0.5) * 0.2;
+                double t = ((double)idx + jitter) / (double)point_count;
+                double angle = rotation + 2.0 * M_PI * t;
+                double radius =
+                    radius_base * (0.65 + 0.35 * dcel_test_lcg_unit(&seed));
+
+                points[idx] = geom_vec2_new(
+                    center_x + cos(angle) * radius,
+                    center_y + sin(angle) * radius
+                );
+            }
+
+            if (clockwise) {
+                for (size_t idx = 0; idx < point_count / 2; idx++) {
+                    GeomVec2 tmp = points[idx];
+                    points[idx] = points[point_count - idx - 1];
+                    points[point_count - idx - 1] = tmp;
+                }
+            }
+
+            dcel_test_add_polygon(path, points, point_count);
+        }
+
+        if (dcel_test_expect_point_contains_matches_reference(path, 32, 32, 3.0)
+            == TEST_RESULT_FAIL) {
+            arena_free(arena);
+            return TEST_RESULT_FAIL;
+        }
+
+        arena_free(arena);
+    }
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_dcel_rasterize_path_mask_monotone_canvas_edge_clip_cases) {
+    Arena* arena = arena_new(8192);
+
+    // Full-canvas rectangle: catches right/bottom clipping off-by-one.
+    PathBuilder* full_canvas = path_builder_new(arena);
+    dcel_test_add_rect(full_canvas, 0.0, 0.0, 8.0, 8.0, false);
+    if (dcel_test_expect_mask_matches_reference(
+            arena,
+            full_canvas,
+            DCEL_FILL_RULE_NONZERO,
+            40,
+            40,
+            5.0
+        )
+        == TEST_RESULT_FAIL) {
+        arena_free(arena);
+        return TEST_RESULT_FAIL;
+    }
+
+    // Partially out-of-bounds contours on all sides.
+    PathBuilder* out_of_bounds = path_builder_new(arena);
+    dcel_test_add_rect(out_of_bounds, -2.0, -1.0, 3.7, 4.6, false);
+    dcel_test_add_rect(out_of_bounds, 5.2, 5.3, 11.5, 10.9, false);
+    if (dcel_test_expect_mask_matches_reference_both_fill_rules(
+            arena,
+            out_of_bounds,
+            40,
+            40,
+            5.0
+        )
+        == TEST_RESULT_FAIL) {
+        arena_free(arena);
+        return TEST_RESULT_FAIL;
+    }
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_dcel_rasterize_path_mask_monotone_shared_edge_and_touch_cases) {
+    Arena* arena = arena_new(8192);
+
+    // Two contours sharing a full vertical edge.
+    PathBuilder* shared_edge = path_builder_new(arena);
+    dcel_test_add_rect(shared_edge, 2.0, 2.0, 6.0, 10.0, false);
+    dcel_test_add_rect(shared_edge, 6.0, 2.0, 10.0, 10.0, true);
+    if (dcel_test_expect_mask_matches_reference_both_fill_rules(
+            arena,
+            shared_edge,
+            72,
+            72,
+            6.0
+        )
+        == TEST_RESULT_FAIL) {
+        arena_free(arena);
+        return TEST_RESULT_FAIL;
+    }
+
+    // Two contours touching at one vertex only.
+    PathBuilder* touch_vertex = path_builder_new(arena);
+    GeomVec2 tri_a[] = {
+        geom_vec2_new(2.0, 2.0),
+        geom_vec2_new(7.0, 2.0),
+        geom_vec2_new(4.5, 6.0)
+    };
+    GeomVec2 tri_b[] = {
+        geom_vec2_new(4.5, 6.0),
+        geom_vec2_new(7.0, 10.0),
+        geom_vec2_new(2.0, 10.0)
+    };
+    dcel_test_add_polygon(
+        touch_vertex,
+        tri_a,
+        sizeof(tri_a) / sizeof(tri_a[0])
+    );
+    dcel_test_add_polygon(
+        touch_vertex,
+        tri_b,
+        sizeof(tri_b) / sizeof(tri_b[0])
+    );
+    if (dcel_test_expect_mask_matches_reference_both_fill_rules(
+            arena,
+            touch_vertex,
+            72,
+            72,
+            6.0
+        )
+        == TEST_RESULT_FAIL) {
+        arena_free(arena);
+        return TEST_RESULT_FAIL;
+    }
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_dcel_rasterize_path_mask_monotone_matches_reference_concave) {
+    Arena* arena = arena_new(4096);
+    PathBuilder* path = path_builder_new(arena);
+
+    path_builder_new_contour(path, geom_vec2_new(1.0, 1.0));
+    path_builder_line_to(path, geom_vec2_new(11.0, 1.0));
+    path_builder_line_to(path, geom_vec2_new(11.0, 11.0));
+    path_builder_line_to(path, geom_vec2_new(6.0, 6.0));
+    path_builder_line_to(path, geom_vec2_new(1.0, 11.0));
+    path_builder_close_contour(path);
+
+    TestResult result = dcel_test_expect_mask_matches_reference(
+        arena,
+        path,
+        DCEL_FILL_RULE_NONZERO,
+        64,
+        64,
+        5.0
+    );
+
+    arena_free(arena);
+    return result;
+}
+
+TEST_FUNC(
+    test_dcel_rasterize_path_mask_monotone_matches_reference_self_intersection
+) {
+    Arena* arena = arena_new(4096);
+    PathBuilder* path = path_builder_new(arena);
+
+    path_builder_new_contour(path, geom_vec2_new(2.0, 2.0));
+    path_builder_line_to(path, geom_vec2_new(10.0, 10.0));
+    path_builder_line_to(path, geom_vec2_new(2.0, 10.0));
+    path_builder_line_to(path, geom_vec2_new(10.0, 2.0));
+    path_builder_close_contour(path);
+
+    if (dcel_test_expect_mask_matches_reference_both_fill_rules(
+            arena,
+            path,
+            64,
+            64,
+            5.0
+        )
+        == TEST_RESULT_FAIL) {
+        arena_free(arena);
+        return TEST_RESULT_FAIL;
+    }
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_dcel_rasterize_path_mask_monotone_split_merge_cases) {
+    Arena* arena = arena_new(8192);
+
+    // Concave polygon with local minima/maxima that force split/merge handling.
+    GeomVec2 split_merge_a[] = {
+        geom_vec2_new(1.0, 1.0),
+        geom_vec2_new(9.0, 1.0),
+        geom_vec2_new(9.0, 9.0),
+        geom_vec2_new(7.0, 9.0),
+        geom_vec2_new(7.0, 3.0),
+        geom_vec2_new(3.0, 3.0),
+        geom_vec2_new(3.0, 9.0),
+        geom_vec2_new(1.0, 9.0),
+    };
+    PathBuilder* path_a = path_builder_new(arena);
+    dcel_test_add_polygon(
+        path_a,
+        split_merge_a,
+        sizeof(split_merge_a) / sizeof(split_merge_a[0])
+    );
+    if (dcel_test_expect_mask_matches_reference(
+            arena,
+            path_a,
+            DCEL_FILL_RULE_NONZERO,
+            80,
+            80,
+            5.0
+        )
+        == TEST_RESULT_FAIL) {
+        arena_free(arena);
+        return TEST_RESULT_FAIL;
+    }
+
+    // Flipped counterpart to exercise opposite event ordering.
+    GeomVec2 split_merge_b[] = {
+        geom_vec2_new(1.0, 9.0),
+        geom_vec2_new(9.0, 9.0),
+        geom_vec2_new(9.0, 1.0),
+        geom_vec2_new(7.0, 1.0),
+        geom_vec2_new(7.0, 7.0),
+        geom_vec2_new(3.0, 7.0),
+        geom_vec2_new(3.0, 1.0),
+        geom_vec2_new(1.0, 1.0),
+    };
+    PathBuilder* path_b = path_builder_new(arena);
+    dcel_test_add_polygon(
+        path_b,
+        split_merge_b,
+        sizeof(split_merge_b) / sizeof(split_merge_b[0])
+    );
+    if (dcel_test_expect_mask_matches_reference(
+            arena,
+            path_b,
+            DCEL_FILL_RULE_NONZERO,
+            80,
+            80,
+            5.0
+        )
+        == TEST_RESULT_FAIL) {
+        arena_free(arena);
+        return TEST_RESULT_FAIL;
+    }
+
+    arena_free(arena);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(
+    test_dcel_path_contains_point_matches_reference_quantized_random_multicontour
+) {
+    uint32_t seed = 0x8badf00du;
+
+    for (size_t case_idx = 0; case_idx < 16; case_idx++) {
+        Arena* arena = arena_new(65536);
+        PathBuilder* path = path_builder_new(arena);
+
+        size_t contour_count = 2 + (size_t)(dcel_test_lcg_next(&seed) % 3u);
+        for (size_t contour_idx = 0; contour_idx < contour_count;
+             contour_idx++) {
+            size_t point_count = 5 + (size_t)(dcel_test_lcg_next(&seed) % 6u);
+            GeomVec2 points[10];
+
+            double rotation = 2.0 * M_PI * dcel_test_lcg_unit(&seed);
+            double center_x = 6.4 + (dcel_test_lcg_unit(&seed) - 0.5) * 5.0;
+            double center_y = 6.4 + (dcel_test_lcg_unit(&seed) - 0.5) * 5.0;
+            double radius_base = 1.0 + dcel_test_lcg_unit(&seed) * 2.8;
+            bool clockwise = (dcel_test_lcg_next(&seed) & 1u) != 0;
+
+            for (size_t idx = 0; idx < point_count; idx++) {
+                double jitter = (dcel_test_lcg_unit(&seed) - 0.5) * 0.2;
+                double t = ((double)idx + jitter) / (double)point_count;
+                double angle = rotation + 2.0 * M_PI * t;
+                double radius =
+                    radius_base * (0.65 + 0.35 * dcel_test_lcg_unit(&seed));
+                double px = center_x + cos(angle) * radius;
+                double py = center_y + sin(angle) * radius;
+
+                points[idx] = geom_vec2_new(
+                    dcel_test_quantize(px, 0.25),
+                    dcel_test_quantize(py, 0.25)
+                );
+            }
+
+            if (clockwise) {
+                for (size_t idx = 0; idx < point_count / 2; idx++) {
+                    GeomVec2 tmp = points[idx];
+                    points[idx] = points[point_count - idx - 1];
+                    points[point_count - idx - 1] = tmp;
+                }
+            }
+
+            dcel_test_add_polygon(path, points, point_count);
+        }
+
+        if (dcel_test_expect_point_contains_matches_reference(path, 40, 40, 4.0)
+            == TEST_RESULT_FAIL) {
+            arena_free(arena);
+            return TEST_RESULT_FAIL;
+        }
+
+        arena_free(arena);
+    }
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(
+    test_dcel_rasterize_path_mask_monotone_quantized_random_multicontour
+) {
+    uint32_t seed = 0x4a6f7921u;
+
+    for (size_t case_idx = 0; case_idx < 16; case_idx++) {
+        Arena* arena = arena_new(65536);
+        PathBuilder* path = path_builder_new(arena);
+
+        size_t contour_count = 2 + (size_t)(dcel_test_lcg_next(&seed) % 3u);
+        for (size_t contour_idx = 0; contour_idx < contour_count;
+             contour_idx++) {
+            size_t point_count = 5 + (size_t)(dcel_test_lcg_next(&seed) % 6u);
+            GeomVec2 points[10];
+
+            double rotation = 2.0 * M_PI * dcel_test_lcg_unit(&seed);
+            double center_x = 6.4 + (dcel_test_lcg_unit(&seed) - 0.5) * 4.2;
+            double center_y = 6.4 + (dcel_test_lcg_unit(&seed) - 0.5) * 4.2;
+            double radius_base = 1.0 + dcel_test_lcg_unit(&seed) * 3.0;
+            bool clockwise = (dcel_test_lcg_next(&seed) & 1u) != 0;
+
+            for (size_t idx = 0; idx < point_count; idx++) {
+                double jitter = (dcel_test_lcg_unit(&seed) - 0.5) * 0.2;
+                double t = ((double)idx + jitter) / (double)point_count;
+                double angle = rotation + 2.0 * M_PI * t;
+                double radius =
+                    radius_base * (0.65 + 0.35 * dcel_test_lcg_unit(&seed));
+                double px = center_x + cos(angle) * radius;
+                double py = center_y + sin(angle) * radius;
+
+                points[idx] = geom_vec2_new(
+                    dcel_test_quantize(px, 0.25),
+                    dcel_test_quantize(py, 0.25)
+                );
+            }
+
+            if (clockwise) {
+                for (size_t idx = 0; idx < point_count / 2; idx++) {
+                    GeomVec2 tmp = points[idx];
+                    points[idx] = points[point_count - idx - 1];
+                    points[point_count - idx - 1] = tmp;
+                }
+            }
+
+            dcel_test_add_polygon(path, points, point_count);
+        }
+
+        if (dcel_test_expect_mask_matches_reference_both_fill_rules(
+                arena,
+                path,
+                64,
+                64,
+                5.0
+            )
+            == TEST_RESULT_FAIL) {
+            arena_free(arena);
+            return TEST_RESULT_FAIL;
+        }
+
+        arena_free(arena);
+    }
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_dcel_rasterize_path_mask_monotone_random_simple_polygons) {
+    uint32_t seed = 0x94a2f31du;
+
+    for (size_t case_idx = 0; case_idx < 16; case_idx++) {
+        Arena* arena = arena_new(32768);
+        PathBuilder* path = path_builder_new(arena);
+
+        size_t point_count = 5 + (size_t)(dcel_test_lcg_next(&seed) % 8u);
+        GeomVec2 points[12];
+
+        double rotation = 2.0 * M_PI * dcel_test_lcg_unit(&seed);
+        double center_x = 6.4 + (dcel_test_lcg_unit(&seed) - 0.5) * 2.0;
+        double center_y = 6.4 + (dcel_test_lcg_unit(&seed) - 0.5) * 2.0;
+        double radius_base = 1.8 + dcel_test_lcg_unit(&seed) * 2.6;
+
+        for (size_t idx = 0; idx < point_count; idx++) {
+            double jitter = (dcel_test_lcg_unit(&seed) - 0.5) * 0.3;
+            double t = ((double)idx + jitter) / (double)point_count;
+            double angle = rotation + 2.0 * M_PI * t;
+            double radius =
+                radius_base * (0.6 + 0.4 * dcel_test_lcg_unit(&seed));
+
+            points[idx] = geom_vec2_new(
+                center_x + cos(angle) * radius,
+                center_y + sin(angle) * radius
+            );
+        }
+
+        dcel_test_add_polygon(path, points, point_count);
+
+        if (dcel_test_expect_mask_matches_reference_both_fill_rules(
+                arena,
+                path,
+                64,
+                64,
+                5.0
+            )
+            == TEST_RESULT_FAIL) {
+            arena_free(arena);
+            return TEST_RESULT_FAIL;
+        }
+
+        arena_free(arena);
+    }
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_dcel_rasterize_path_mask_monotone_random_star_polygons) {
+    uint32_t seed = 0x5f3759dfu;
+
+    for (size_t case_idx = 0; case_idx < 16; case_idx++) {
+        Arena* arena = arena_new(32768);
+        PathBuilder* path = path_builder_new(arena);
+
+        size_t point_count = 5 + (size_t)(dcel_test_lcg_next(&seed) % 4u) * 2u;
+        GeomVec2 ring_points[11];
+        GeomVec2 star_points[11];
+
+        double rotation = 2.0 * M_PI * dcel_test_lcg_unit(&seed);
+        double center_x = 6.4 + (dcel_test_lcg_unit(&seed) - 0.5) * 1.6;
+        double center_y = 6.4 + (dcel_test_lcg_unit(&seed) - 0.5) * 1.6;
+        double radius_outer = 2.6 + dcel_test_lcg_unit(&seed) * 2.2;
+        double radius_inner =
+            radius_outer * (0.35 + 0.25 * dcel_test_lcg_unit(&seed));
+
+        for (size_t idx = 0; idx < point_count; idx++) {
+            double angle =
+                rotation + 2.0 * M_PI * ((double)idx / (double)point_count);
+            double radius = (idx % 2 == 0) ? radius_outer : radius_inner;
+
+            ring_points[idx] = geom_vec2_new(
+                center_x + cos(angle) * radius,
+                center_y + sin(angle) * radius
+            );
+        }
+
+        for (size_t idx = 0; idx < point_count; idx++) {
+            size_t star_idx = (idx * 2) % point_count;
+            star_points[idx] = ring_points[star_idx];
+        }
+
+        dcel_test_add_polygon(path, star_points, point_count);
+
+        if (dcel_test_expect_mask_matches_reference_both_fill_rules(
+                arena,
+                path,
+                64,
+                64,
+                5.0
+            )
+            == TEST_RESULT_FAIL) {
+            arena_free(arena);
+            return TEST_RESULT_FAIL;
+        }
+
+        arena_free(arena);
+    }
+
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_dcel_rasterize_path_mask_monotone_random_multicontour) {
+    uint32_t seed = 0xcafebabeu;
+
+    for (size_t case_idx = 0; case_idx < 16; case_idx++) {
+        Arena* arena = arena_new(65536);
+        PathBuilder* path = path_builder_new(arena);
+
+        size_t contour_count = 2 + (size_t)(dcel_test_lcg_next(&seed) % 3u);
+        for (size_t contour_idx = 0; contour_idx < contour_count;
+             contour_idx++) {
+            size_t point_count = 5 + (size_t)(dcel_test_lcg_next(&seed) % 6u);
+            GeomVec2 points[10];
+
+            double rotation = 2.0 * M_PI * dcel_test_lcg_unit(&seed);
+            double center_x = 6.4 + (dcel_test_lcg_unit(&seed) - 0.5) * 4.0;
+            double center_y = 6.4 + (dcel_test_lcg_unit(&seed) - 0.5) * 4.0;
+            double radius_base = 1.0 + dcel_test_lcg_unit(&seed) * 2.8;
+            bool clockwise = (dcel_test_lcg_next(&seed) & 1u) != 0;
+
+            for (size_t idx = 0; idx < point_count; idx++) {
+                double jitter = (dcel_test_lcg_unit(&seed) - 0.5) * 0.2;
+                double t = ((double)idx + jitter) / (double)point_count;
+                double angle = rotation + 2.0 * M_PI * t;
+                double radius =
+                    radius_base * (0.65 + 0.35 * dcel_test_lcg_unit(&seed));
+
+                points[idx] = geom_vec2_new(
+                    center_x + cos(angle) * radius,
+                    center_y + sin(angle) * radius
+                );
+            }
+
+            if (clockwise) {
+                for (size_t idx = 0; idx < point_count / 2; idx++) {
+                    GeomVec2 tmp = points[idx];
+                    points[idx] = points[point_count - idx - 1];
+                    points[point_count - idx - 1] = tmp;
+                }
+            }
+
+            dcel_test_add_polygon(path, points, point_count);
+        }
+
+        if (dcel_test_expect_mask_matches_reference_both_fill_rules(
+                arena,
+                path,
+                64,
+                64,
+                5.0
+            )
+            == TEST_RESULT_FAIL) {
+            arena_free(arena);
+            return TEST_RESULT_FAIL;
+        }
+
+        arena_free(arena);
+    }
+
+    return TEST_RESULT_PASS;
+}
+
+#endif

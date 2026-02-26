@@ -30,5 +30,8 @@ GeomVec3 geom_vec3_div(GeomVec3 lhs, GeomVec3 rhs);
 /// Computes the component-wise lhs^rhs
 GeomVec3 geom_vec3_pow(GeomVec3 lhs, GeomVec3 rhs);
 
+/// Clamps each component of value to [0, 1]
+GeomVec3 geom_vec3_clamp(GeomVec3 value);
+
 /// Transforms this vector using a 3x3 matrix
 GeomVec3 geom_vec3_transform(GeomVec3 lhs, GeomMat3 rhs);
