@@ -86,12 +86,8 @@ write_bmp_info_header(uint8_t* target, uint32_t width, uint32_t height) {
     write_u32(target + 20, 0);     // image size, can be 0 for BI_RGB
 }
 
-RasterCanvas* raster_canvas_new(
-    Arena* arena,
-    uint32_t width,
-    uint32_t height,
-    Rgba rgba
-) {
+RasterCanvas*
+raster_canvas_new(Arena* arena, uint32_t width, uint32_t height, Rgba rgba) {
     uint32_t file_size =
         BMP_HEADER_LEN + BMP_INFO_HEADER_LEN + width * height * 4;
     uint32_t packed_rgba = rgba_pack(rgba);

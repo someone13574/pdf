@@ -46,6 +46,15 @@ PDF_IMPL_ARRAY_FIELD(PdfBooleanVec, boolean_vec, boolean)
 PDF_IMPL_FIXED_ARRAY_FIELD(PdfBoolean, boolean)
 PDF_IMPL_OPTIONAL_FIELD(PdfBooleanVec*, PdfBooleanVecOptional, boolean_vec)
 
+#define DVEC_NAME PdfIntegerVec
+#define DVEC_LOWERCASE_NAME pdf_integer_vec
+#define DVEC_TYPE PdfInteger
+#include "arena/dvec_impl.h"
+
+PDF_IMPL_ARRAY_FIELD(PdfIntegerVec, integer_vec, integer)
+PDF_IMPL_FIXED_ARRAY_FIELD(PdfInteger, integer)
+PDF_IMPL_OPTIONAL_FIELD(PdfIntegerVec*, PdfIntegerVecOptional, integer_vec)
+
 #define DVEC_NAME PdfNameVec
 #define DVEC_LOWERCASE_NAME pdf_name_vec
 #define DVEC_TYPE PdfName

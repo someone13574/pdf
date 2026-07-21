@@ -124,7 +124,8 @@ static Rgba make_rgba(GeomVec3 rgb, double a) {
 
 static double render_current_stroke_width(RenderState* state) {
     RELEASE_ASSERT(state);
-    return current_graphics_state(state)->line_width * state->stroke_width_scale;
+    return current_graphics_state(state)->line_width
+         * state->stroke_width_scale;
 }
 
 static double render_ctm_max_linear_scale(GeomMat3 ctm) {

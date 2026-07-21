@@ -31,7 +31,9 @@ Error* pdf_decode_filtered_stream(
             RELEASE_ASSERT(pdf_name_vec_get(filters.value, idx, &name));
             LOG_DIAG(DEBUG, OBJECT, "Decoding stream with \"%s\"", name);
 
-            if (strcmp(name, "ASCIIHexDecode") == 0) {
+            // AHx and Fl are inline image abbreviations (Table 94)
+            if (strcmp(name, "ASCIIHexDecode") == 0
+                || strcmp(name, "AHx") == 0) {
                 uint8_t* out;
                 size_t out_len;
 
@@ -45,7 +47,8 @@ Error* pdf_decode_filtered_stream(
 
                 temp = out;
                 temp_len = out_len;
-            } else if (strcmp(name, "FlateDecode") == 0) {
+            } else if (strcmp(name, "FlateDecode") == 0
+                       || strcmp(name, "Fl") == 0) {
                 Uint8Array* out = NULL;
                 TRY(decode_zlib_data(local_arena, temp, temp_len, &out));
 

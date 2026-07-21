@@ -21,14 +21,17 @@ Error* pdf_deserde_trailer(
         pdf_integer_optional_field("Prev", &target_ptr->prev),
         pdf_catalog_ref_field("Root", &target_ptr->root),
         pdf_dict_optional_field("Info", &target_ptr->info),
-        pdf_array_optional_field("ID", &target_ptr->id)
+        pdf_array_optional_field("ID", &target_ptr->id),
+        pdf_integer_optional_field("XRefStm", &target_ptr->xref_stm)
     };
+
+    bool is_xref_stream = object->type == PDF_OBJECT_TYPE_STREAM;
 
     TRY(pdf_deserde_fields(
         object,
         fields,
         sizeof(fields) / sizeof(PdfFieldDescriptor),
-        false,
+        is_xref_stream,
         resolver,
         "PdfTrailer"
     ));

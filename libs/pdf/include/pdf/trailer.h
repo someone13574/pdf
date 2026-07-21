@@ -31,6 +31,10 @@ typedef struct {
     /// array and the two byte-strings shall be direct objects and shall be
     /// unencrypted.
     PdfArrayOptional id;
+
+    /// The byte offset in the decoded stream from the beginning of the file
+    /// of a cross-reference stream.
+    PdfIntegerOptional xref_stm;
 } PdfTrailer;
 
 Error* pdf_deserde_trailer(

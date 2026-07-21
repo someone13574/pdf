@@ -15,12 +15,8 @@ struct Canvas {
     enum { CANVAS_TYPE_SCALABLE, CANVAS_TYPE_RASTER } type;
 };
 
-Canvas* canvas_new_raster(
-    Arena* arena,
-    uint32_t width,
-    uint32_t height,
-    Rgba rgba
-) {
+Canvas*
+canvas_new_raster(Arena* arena, uint32_t width, uint32_t height, Rgba rgba) {
     Canvas* canvas = arena_alloc(arena, sizeof(Canvas));
     canvas->data.raster = raster_canvas_new(arena, width, height, rgba);
     canvas->type = CANVAS_TYPE_RASTER;

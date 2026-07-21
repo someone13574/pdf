@@ -21,10 +21,11 @@ Error* pdf_deserde_stream_dict(
     PdfFieldDescriptor fields[] = {
         pdf_integer_field("Length", &target_ptr->length),
         pdf_as_name_vec_optional_field("Filter", &target_ptr->filter),
-        pdf_unimplemented_field("DecodeParams"),
+        pdf_unimplemented_field("DecodeParms"),
+        pdf_unimplemented_field("DP"),
         pdf_unimplemented_field("F"),
         pdf_unimplemented_field("FFilter"),
-        pdf_unimplemented_field("FDecodeParams"),
+        pdf_unimplemented_field("FDecodeParms"),
         pdf_unimplemented_field("DL")
     };
 

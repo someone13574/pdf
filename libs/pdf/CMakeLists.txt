@@ -18,6 +18,7 @@ add_library(pdf
     src/fonts/encoding.c
     src/fonts/stream_dict.c
     src/object.c
+    src/object_stream.c
     src/page.c
     src/pdf.c
     src/trailer.c

@@ -36,12 +36,8 @@ typedef struct CanvasBrush {
 
 typedef struct Canvas Canvas;
 
-Canvas* canvas_new_raster(
-    Arena* arena,
-    uint32_t width,
-    uint32_t height,
-    Rgba rgba
-);
+Canvas*
+canvas_new_raster(Arena* arena, uint32_t width, uint32_t height, Rgba rgba);
 
 Canvas* canvas_new_scalable(
     Arena* arena,

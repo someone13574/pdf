@@ -10,12 +10,8 @@
 
 typedef struct RasterCanvas RasterCanvas;
 
-RasterCanvas* raster_canvas_new(
-    Arena* arena,
-    uint32_t width,
-    uint32_t height,
-    Rgba rgba
-);
+RasterCanvas*
+raster_canvas_new(Arena* arena, uint32_t width, uint32_t height, Rgba rgba);
 
 double raster_canvas_raster_res(const RasterCanvas* canvas);
 uint32_t raster_canvas_width(const RasterCanvas* canvas);
