@@ -22,8 +22,8 @@ Error* pdf_deserde_catalog(
         pdf_unimplemented_field("Version"),
         pdf_unimplemented_field("Extensions"),
         pdf_pages_ref_field("Pages", &target_ptr->pages),
-        pdf_unimplemented_field("PageLabels"),
-        pdf_unimplemented_field("Names"),
+        pdf_ignored_field("PageLabels", &target_ptr->page_labels),
+        pdf_ignored_field("Names", &target_ptr->names),
         pdf_ignored_field("Dests", &target_ptr->dests),
         pdf_ignored_field("ViewerPreferences", &target_ptr->viewer_preferences),
         pdf_ignored_field("PageLayout", &target_ptr->page_layout),
@@ -35,7 +35,7 @@ Error* pdf_deserde_catalog(
         pdf_ignored_field("URI", &target_ptr->uri),
         pdf_ignored_field("AcroForm", &target_ptr->acro_form),
         pdf_ignored_field("Metadata", &target_ptr->metadata),
-        pdf_unimplemented_field("StructTreeRoot"),
+        pdf_ignored_field("StructTreeRoot", &target_ptr->struct_tree_root),
         pdf_ignored_field("MarkInfo", &target_ptr->mark_info),
         pdf_ignored_field("Lang", &target_ptr->lang),
         pdf_ignored_field("SpiderInfo", &target_ptr->spider_info),
@@ -50,6 +50,7 @@ Error* pdf_deserde_catalog(
         pdf_unimplemented_field("Requirements"),
         pdf_unimplemented_field("Collection"),
         pdf_ignored_field("NeedsRendering", &target_ptr->needs_rendering),
+        pdf_ignored_field("AF", &target_ptr->af),
     };
 
     TRY(pdf_deserde_fields(

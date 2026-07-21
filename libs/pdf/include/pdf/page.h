@@ -144,7 +144,7 @@ typedef struct {
     /// (Required if the page contains structural content items; PDF 1.3) The
     /// integer key of the page’s entry in the structural parent tree
     /// (see 14.7.4.4, "Finding Structure Elements from Content Items").
-    PdfUnimplemented struct_parents;
+    PdfIgnored struct_parents;
 
     /// (Optional; PDF 1.3; indirect reference preferred) The digital identifier
     /// of the page’s parent Web Capture content set (see 14.10.6, "Object

@@ -787,7 +787,8 @@ Error* pdf_deserde_content_op(
             );
             return NULL;
         }
-        case PDF_OPERATOR_BDC:
+        case PDF_OPERATOR_BDC: // todo: optional content
+        case PDF_OPERATOR_BMC:
         case PDF_OPERATOR_EMC: {
             LOG_WARN(PDF, "TODO: Marked content");
             return NULL;

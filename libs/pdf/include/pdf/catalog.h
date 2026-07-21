@@ -12,8 +12,8 @@ typedef struct {
     PdfUnimplemented version;
     PdfUnimplemented extensions;
     PdfPagesRef pages;
-    PdfUnimplemented page_labels;
-    PdfUnimplemented names;
+    PdfIgnored page_labels;
+    PdfIgnored names;
     PdfIgnored dests;
     PdfIgnored viewer_preferences;
     PdfIgnored page_layout;
@@ -25,7 +25,7 @@ typedef struct {
     PdfIgnored uri;
     PdfIgnored acro_form;
     PdfIgnored metadata;
-    PdfUnimplemented struct_tree_root;
+    PdfIgnored struct_tree_root;
     PdfIgnored mark_info;
     PdfIgnored lang;
     PdfIgnored spider_info;
@@ -37,6 +37,10 @@ typedef struct {
     PdfUnimplemented requirements;
     PdfUnimplemented collection;
     PdfIgnored needs_rendering;
+
+    /// An array of one or more file specification dictionaries which denote
+    /// the associated files for this PDF document. (PDF 2.0)
+    PdfIgnored af;
 } PdfCatalog;
 
 Error* pdf_deserde_catalog(

@@ -345,6 +345,10 @@ Error* pdf_parse_number(PdfCtx* ctx, PdfObject* object) {
     return NULL;
 }
 
+static bool is_octal_digit(uint8_t c) {
+    return c >= '0' && c <= '7';
+}
+
 Error* pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
     RELEASE_ASSERT(arena);
     RELEASE_ASSERT(ctx);
@@ -402,6 +406,19 @@ Error* pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
                     break;
                 }
 
+                // An end-of-line marker appearing within a literal string
+                // without a preceding REVERSE SOLIDUS shall be treated as a
+                // byte value of (0Ah)
+                if (read_byte == '\r') {
+                    if (read_offset + 1 < length
+                        && raw[read_offset + 1] == '\n') {
+                        read_offset++;
+                    }
+
+                    parsed[write_offset++] = '\n';
+                    break;
+                }
+
                 parsed[write_offset++] = read_byte;
                 break;
             }
@@ -447,8 +464,42 @@ Error* pdf_parse_string_literal(Arena* arena, PdfCtx* ctx, PdfObject* object) {
                         escape = 0;
                         break;
                     }
+                    // A conforming reader shall disregard the REVERSE SOLIDUS
+                    // and the end-of-line marker following it
+                    case '\r': {
+                        if (read_offset + 1 < length
+                            && raw[read_offset + 1] == '\n') {
+                            read_offset++;
+                        }
+
+                        escape = 0;
+                        break;
+                    }
+                    case '\n': {
+                        escape = 0;
+                        break;
+                    }
                     default: {
-                        LOG_TODO("Octal escape codes and split lines");
+                        if (!is_octal_digit(read_byte)) {
+                            parsed[write_offset++] = read_byte;
+                            escape = 0;
+                            break;
+                        }
+
+                        uint32_t code = (uint32_t)(read_byte - '0');
+                        for (int digit = 1; digit < 3; digit++) {
+                            if (read_offset + 1 >= length
+                                || !is_octal_digit(raw[read_offset + 1])) {
+                                break;
+                            }
+
+                            code = (code << 3)
+                                 | (uint32_t)(raw[++read_offset] - '0');
+                        }
+
+                        parsed[write_offset++] = (uint8_t)code;
+                        escape = 0;
+                        break;
                     }
                 }
                 break;
@@ -1388,6 +1439,75 @@ TEST_FUNC(test_object_literal_str_escapes) {
         "This is a line\nThis is a newline\r\nThis is another line with tabs (\t), backspaces(\b), form feeds (\f), unbalanced parenthesis (((), and backslashes \\\\",
         pdf_string_as_cstr(object.data.string, arena)
     );
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_literal_str_split_lines) {
+    SETUP_VALID_PARSE_OBJECT(
+        "(These \\\ntwo strings \\\nare the same.)",
+        PDF_OBJECT_TYPE_STRING
+    );
+    TEST_ASSERT_EQ(
+        "These two strings are the same.",
+        pdf_string_as_cstr(object.data.string, arena)
+    );
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_literal_str_split_lines_crlf) {
+    SETUP_VALID_PARSE_OBJECT(
+        "(These \\\r\ntwo strings \\\rare the same.)",
+        PDF_OBJECT_TYPE_STRING
+    );
+    TEST_ASSERT_EQ(
+        "These two strings are the same.",
+        pdf_string_as_cstr(object.data.string, arena)
+    );
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_literal_str_octal) {
+    SETUP_VALID_PARSE_OBJECT(
+        "(This string contains \\245two octal characters\\307.)",
+        PDF_OBJECT_TYPE_STRING
+    );
+    TEST_ASSERT_EQ(
+        "This string contains \245two octal characters\307.",
+        pdf_string_as_cstr(object.data.string, arena)
+    );
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_literal_str_octal_digit_count) {
+    SETUP_VALID_PARSE_OBJECT("(\\0053)", PDF_OBJECT_TYPE_STRING);
+    TEST_ASSERT_EQ((size_t)2, object.data.string.len);
+    TEST_ASSERT_EQ((uint8_t)005, object.data.string.data[0]);
+    TEST_ASSERT_EQ((uint8_t)'3', object.data.string.data[1]);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_literal_str_octal_short) {
+    SETUP_VALID_PARSE_OBJECT("(\\053 \\53)", PDF_OBJECT_TYPE_STRING);
+    TEST_ASSERT_EQ("+ +", pdf_string_as_cstr(object.data.string, arena));
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_literal_str_octal_overflow) {
+    SETUP_VALID_PARSE_OBJECT("(\\777)", PDF_OBJECT_TYPE_STRING);
+    TEST_ASSERT_EQ((size_t)1, object.data.string.len);
+    TEST_ASSERT_EQ((uint8_t)0xFF, object.data.string.data[0]);
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_literal_str_unknown_escape) {
+    SETUP_VALID_PARSE_OBJECT("(a\\qb)", PDF_OBJECT_TYPE_STRING);
+    TEST_ASSERT_EQ("aqb", pdf_string_as_cstr(object.data.string, arena));
+    return TEST_RESULT_PASS;
+}
+
+TEST_FUNC(test_object_literal_str_eol_marker) {
+    SETUP_VALID_PARSE_OBJECT("(a\r\nb\rc\nd)", PDF_OBJECT_TYPE_STRING);
+    TEST_ASSERT_EQ("a\nb\nc\nd", pdf_string_as_cstr(object.data.string, arena));
     return TEST_RESULT_PASS;
 }
 

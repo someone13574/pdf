@@ -58,7 +58,7 @@ Error* pdf_deserde_page(
         pdf_ignored_field("AA", &target_ptr->aa),
         pdf_ignored_field("Metadata", &target_ptr->metadata),
         pdf_ignored_field("PieceInfo", &target_ptr->piece_info),
-        pdf_unimplemented_field("StructParents"),
+        pdf_ignored_field("StructParents", &target_ptr->struct_parents),
         pdf_ignored_field("ID", &target_ptr->id),
         pdf_ignored_field("PZ", &target_ptr->pz),
         pdf_unimplemented_field("SeparationInfo"),
